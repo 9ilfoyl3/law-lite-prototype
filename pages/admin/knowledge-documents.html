@@ -1,0 +1,896 @@
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识库文档管理 - AI辅助办案系统</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --hover-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed; height: 100vh;
+            display: flex; flex-direction: column; z-index: 100;
+        }
+
+        .sidebar-header {
+            height: var(--header-height);
+            display: flex; align-items: center; padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; margin-right: 12px;
+        }
+
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 0 12px; margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex; align-items: center; padding: 12px 16px;
+            border-radius: 10px; color: var(--text-secondary);
+            text-decoration: none; font-size: 14px; font-weight: 500;
+            transition: all 0.2s; margin-bottom: 4px;
+        }
+
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        .nav-sub-item {
+            display: flex; align-items: center; padding: 8px 16px 8px 48px;
+            border-radius: 8px; color: var(--text-muted);
+            text-decoration: none; font-size: 13px; font-weight: 400;
+            transition: all 0.2s; margin-bottom: 2px;
+        }
+
+        .nav-sub-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-sub-item.active { color: var(--accent-primary); font-weight: 500; }
+
+        .sidebar-footer { padding: 16px; border-top: 1px solid var(--border-color); }
+
+        .logout-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; padding: 12px;
+            border: 1px solid var(--border-color); border-radius: 10px;
+            background: transparent; color: var(--text-secondary);
+            font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+        }
+
+        .logout-btn:hover { background: var(--accent-danger); color: white; border-color: var(--accent-danger); }
+        .logout-btn i { margin-right: 8px; }
+
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+
+        .header {
+            height: var(--header-height); background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px; position: sticky; top: 0; z-index: 50;
+        }
+
+        .header-left { display: flex; align-items: center; }
+        .breadcrumb { display: flex; align-items: center; font-size: 14px; }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { margin: 0 8px; color: var(--text-muted); }
+        .breadcrumb-current { color: var(--text-primary); font-weight: 500; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+
+        .header-btn {
+            width: 40px; height: 40px; border-radius: 10px; border: none;
+            background: var(--bg-primary); color: var(--text-secondary);
+            cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+
+        .header-btn:hover { background: var(--accent-light); color: var(--accent-primary); }
+
+        .user-menu {
+            display: flex; align-items: center; gap: 12px;
+            padding: 6px 12px 6px 6px; border-radius: 10px; cursor: pointer; transition: all 0.2s;
+        }
+
+        .user-menu:hover { background: var(--bg-primary); }
+
+        .user-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 14px; font-weight: 600;
+        }
+
+        .user-dropdown.show { display: block !important; }
+
+        .page-content { flex: 1; padding: 24px 32px; overflow-y: auto; }
+        .page-header { margin-bottom: 24px; }
+        .page-title { font-size: 24px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+        .page-subtitle { font-size: 14px; color: var(--text-secondary); }
+
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 20px; margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary); border-radius: 12px;
+            padding: 20px; display: flex; align-items: center; gap: 16px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .stat-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 20px;
+        }
+
+        .stat-icon.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .stat-icon.green { background: #d1fae5; color: var(--accent-success); }
+        .stat-icon.orange { background: #fef3c7; color: var(--accent-warning); }
+        .stat-icon.purple { background: #f3e8ff; color: #9333ea; }
+
+        .stat-info { flex: 1; }
+        .stat-value { font-size: 28px; font-weight: 700; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
+        .stat-label { font-size: 13px; color: var(--text-secondary); }
+
+        .action-bar {
+            background: var(--bg-secondary); border-radius: 12px;
+            padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; box-shadow: var(--card-shadow); flex-wrap: wrap; gap: 12px;
+        }
+
+        .filter-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+        .search-input {
+            padding: 10px 16px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 14px; transition: all 0.2s; width: 240px;
+        }
+
+        .search-input:focus { outline: none; border-color: var(--accent-primary); }
+
+        .filter-select {
+            padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 14px; color: var(--text-primary); background: var(--bg-primary);
+            cursor: pointer; font-family: inherit;
+        }
+
+        .filter-select:focus { outline: none; border-color: var(--accent-primary); }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; border-radius: 8px; font-size: 14px;
+            font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; font-family: inherit;
+        }
+
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--border-color); }
+        .btn-danger { background: #fef2f2; color: var(--accent-danger); }
+        .btn-danger:hover { background: #fecaca; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+        .content-card {
+            background: var(--bg-secondary); border-radius: 12px;
+            box-shadow: var(--card-shadow); overflow: hidden;
+        }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 14px 20px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .data-table th { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--bg-primary); }
+        .data-table tbody tr:hover { background: var(--bg-primary); }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        .doc-info { display: flex; align-items: center; gap: 12px; }
+        .doc-icon {
+            width: 36px; height: 36px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; font-size: 16px;
+        }
+
+        .doc-icon.pdf { background: #fee2e2; color: #dc2626; }
+        .doc-icon.word { background: #dbeafe; color: #2563eb; }
+        .doc-icon.txt { background: #f3f4f6; color: #6b7280; }
+        .doc-icon.md { background: #fef3c7; color: #d97706; }
+
+        .doc-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+
+        .badge {
+            display: inline-flex; align-items: center; padding: 4px 12px;
+            border-radius: 20px; font-size: 12px; font-weight: 500;
+        }
+
+        .badge-success { background: #d1fae5; color: #059669; }
+        .badge-warning { background: #fef3c7; color: #d97706; }
+        .badge-danger { background: #fee2e2; color: #dc2626; }
+        .badge-info { background: #dbeafe; color: #2563eb; }
+        .badge-muted { background: #f3f4f6; color: #6b7280; }
+
+        .table-actions { display: flex; gap: 8px; }
+
+        .action-btn {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent; border: 1px solid var(--border-color);
+            border-radius: 6px; color: var(--text-secondary);
+            cursor: pointer; transition: all 0.2s;
+        }
+
+        .action-btn:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .action-btn.delete:hover { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
+
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.2s;
+        }
+
+        .modal-backdrop.show { opacity: 1; visibility: visible; }
+
+        .modal {
+            background: var(--bg-secondary); border-radius: 16px;
+            width: 90%; max-width: 560px; max-height: 90vh;
+            overflow: hidden; transform: scale(0.95); transition: transform 0.2s;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-backdrop.show .modal { transform: scale(1); }
+
+        .modal-header {
+            padding: 20px 24px; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .modal-title { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+
+        .modal-close {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent; border: none; border-radius: 8px;
+            color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+        }
+
+        .modal-close:hover { background: var(--bg-primary); color: var(--text-primary); }
+
+        .modal-body { padding: 24px; overflow-y: auto; max-height: calc(90vh - 140px); }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group:last-child { margin-bottom: 0; }
+
+        .form-label {
+            display: block; font-size: 14px; font-weight: 500;
+            color: var(--text-primary); margin-bottom: 8px;
+        }
+
+        .form-label .required { color: #dc2626; margin-left: 4px; }
+
+        .form-input, .form-textarea, .form-select {
+            width: 100%; padding: 10px 14px;
+            border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 14px; background: var(--bg-primary); color: var(--text-primary);
+            transition: all 0.2s; font-family: inherit;
+        }
+
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            outline: none; border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-textarea { resize: vertical; min-height: 80px; }
+
+        .modal-footer {
+            padding: 16px 24px; border-top: 1px solid var(--border-color);
+            display: flex; justify-content: flex-end; gap: 12px;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border-color); border-radius: 12px;
+            padding: 40px 20px; text-align: center; cursor: pointer;
+            transition: all 0.2s; background: var(--bg-primary);
+        }
+
+        .upload-zone:hover { border-color: var(--accent-primary); background: var(--accent-light); }
+        .upload-zone.dragover { border-color: var(--accent-primary); background: var(--accent-light); }
+
+        .upload-icon { font-size: 36px; color: var(--text-muted); margin-bottom: 12px; }
+        .upload-text { font-size: 14px; color: var(--text-secondary); margin-bottom: 4px; }
+        .upload-hint { font-size: 12px; color: var(--text-muted); }
+
+        .upload-file-list { margin-top: 16px; }
+
+        .upload-file-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px;
+        }
+
+        .upload-file-name { flex: 1; font-size: 13px; color: var(--text-primary); }
+        .upload-file-size { font-size: 12px; color: var(--text-muted); }
+        .upload-file-status { font-size: 12px; }
+        .upload-file-status.success { color: var(--accent-success); }
+        .upload-file-status.processing { color: var(--accent-warning); }
+
+        .progress-bar { width: 100px; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent-primary); border-radius: 3px; transition: width 0.3s; }
+
+        .notification {
+            position: fixed; top: 20px; right: 20px;
+            padding: 14px 20px; border-radius: 10px; color: white;
+            font-size: 14px; font-weight: 500; z-index: 2000;
+            animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 10px;
+        }
+
+        .notification.success { background: var(--accent-success); }
+        .notification.error { background: var(--accent-danger); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .action-bar { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-gavel"></i></div>
+                <div>
+                    <div class="sidebar-title">管理后台</div>
+                    <div class="sidebar-subtitle">AI辅助办案系统</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item active"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+
+            </nav>
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="header-left">
+                    <nav class="breadcrumb">
+                        <a href="dashboard.html">首页</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <a href="knowledge-base.html">知识库管理</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">文档管理</span>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <button class="header-btn" title="通知"><i class="fas fa-bell"></i></button>
+                    <button class="header-btn" title="帮助"><i class="fas fa-question-circle"></i></button>
+                    <div class="user-menu" id="userMenu" style="position: relative;">
+                        <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="user-dropdown" id="userDropdown" style="position: absolute; top: calc(100% + 8px); right: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--hover-shadow); min-width: 160px; z-index: 1001; display: none; overflow: hidden;">
+                            <button onclick="logout()" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: var(--accent-danger); text-decoration: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none; background: none; width: 100%; text-align: left; font-family: inherit; border-top: 1px solid var(--border-color);">
+                                <i class="fas fa-sign-out-alt"></i><span>退出登录</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="page-header">
+                    <h1 class="page-title">知识库文档管理</h1>
+                    <p class="page-subtitle">管理知识库中的文档，支持上传、状态管理、OCR索引</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fas fa-file-alt"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="totalDocs">0</div>
+                            <div class="stat-label">文档总数</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="onlineDocs">0</div>
+                            <div class="stat-label">已上架</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange"><i class="fas fa-spinner"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="processingDocs">0</div>
+                            <div class="stat-label">处理中</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="failedDocs">0</div>
+                            <div class="stat-label">解析失败</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-bar">
+                    <div class="filter-group">
+                        <input type="text" class="search-input" id="searchInput" placeholder="搜索文档名称..." oninput="filterDocuments()">
+                        <select class="filter-select" id="kbFilter" onchange="filterDocuments()">
+                            <option value="">全部知识库</option>
+                            <option value="法条库">法条库</option>
+                            <option value="历史案例库">历史案例库</option>
+                            <option value="内部审判指引">内部审判指引</option>
+                        </select>
+                        <select class="filter-select" id="typeFilter" onchange="filterDocuments()">
+                            <option value="">全部类型</option>
+                            <option value="PDF">PDF</option>
+                            <option value="Word">Word</option>
+                            <option value="TXT">TXT</option>
+                            <option value="Markdown">Markdown</option>
+                        </select>
+                        <select class="filter-select" id="statusFilter" onchange="filterDocuments()">
+                            <option value="">全部状态</option>
+                            <option value="上架">上架</option>
+                            <option value="下架">下架</option>
+                            <option value="处理中">处理中</option>
+                            <option value="解析失败">解析失败</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="openUploadModal()">
+                        <i class="fas fa-upload"></i>上传文档
+                    </button>
+                </div>
+
+                <div class="content-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>文档名称</th>
+                                <th>所属知识库</th>
+                                <th>文件类型</th>
+                                <th>文件大小</th>
+                                <th>状态</th>
+                                <th>上传时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="docTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-backdrop" id="uploadModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">上传文档到知识库</h3>
+                <button class="modal-close" onclick="closeUploadModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">选择目标知识库 <span class="required">*</span></label>
+                    <select class="form-select" id="targetKb">
+                        <option value="">请选择知识库</option>
+                        <option value="法条库">法条库</option>
+                        <option value="历史案例库">历史案例库</option>
+                        <option value="内部审判指引">内部审判指引</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">上传文件</label>
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                        <div class="upload-text">点击或拖拽文件到此区域</div>
+                        <div class="upload-hint">支持格式: PDF, Word, TXT, MD | 单个文件最大50MB | 最多10个文件</div>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.md" style="display: none;" onchange="handleFileSelect(event)">
+                    <div class="upload-file-list" id="uploadFileList"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeUploadModal()">取消</button>
+                <button class="btn btn-primary" onclick="startUpload()">开始上传</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="editModalTitle">编辑文档</h3>
+                <button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editDocId">
+                <div class="form-group">
+                    <label class="form-label">文档名称 <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="editDocName">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">所属知识库</label>
+                    <select class="form-select" id="editDocKb">
+                        <option value="法条库">法条库</option>
+                        <option value="历史案例库">历史案例库</option>
+                        <option value="内部审判指引">内部审判指引</option>
+                    </select>
+                </div>
+                <div class="form-group" id="lawStatusGroup" style="display: none;">
+                    <label class="form-label">法条效力状态</label>
+                    <select class="form-select" id="lawStatus">
+                        <option value="有效">有效</option>
+                        <option value="废止">废止</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveEditDoc()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function(){
+        var pages=JSON.parse(localStorage.getItem('adminRolePages')||'[]');
+        if(pages.length===0)return;
+        document.querySelectorAll('.sidebar-nav .nav-item,.sidebar-nav .nav-sub-item').forEach(function(item){
+            var href=item.getAttribute('href');
+            if(!href||href==='#')return;
+            var pageName=href.replace('.html','');
+            if(pages.indexOf(pageName)===-1){item.style.display='none';}
+        });
+    })();
+        let documents = JSON.parse(localStorage.getItem('adminKbDocuments')) || [
+            { id: 'd1', name: '中华人民共和国民法典.pdf', kb: '法条库', type: 'PDF', size: '12.3MB', status: '上架', uploadTime: '2026-04-20', lawStatus: '有效' },
+            { id: 'd2', name: '最高人民法院关于审理民间借贷案件的司法解释.pdf', kb: '法条库', type: 'PDF', size: '3.2MB', status: '上架', uploadTime: '2026-04-18', lawStatus: '有效' },
+            { id: 'd3', name: '民事诉讼法（2023修正）.pdf', kb: '法条库', type: 'PDF', size: '5.1MB', status: '上架', uploadTime: '2026-04-15', lawStatus: '有效' },
+            { id: 'd4', name: '合同法已废止条款说明.docx', kb: '法条库', type: 'Word', size: '1.8MB', status: '上架', uploadTime: '2026-04-12', lawStatus: '废止' },
+            { id: 'd5', name: '南京市中级人民法院民间借贷纠纷裁判文书集.pdf', kb: '历史案例库', type: 'PDF', size: '28.6MB', status: '上架', uploadTime: '2026-04-10' },
+            { id: 'd6', name: '江苏省高级人民法院买卖合同纠纷典型案例.docx', kb: '历史案例库', type: 'Word', size: '15.2MB', status: '下架', uploadTime: '2026-04-08' },
+            { id: 'd7', name: '交通事故责任纠纷裁判规则汇编.pdf', kb: '历史案例库', type: 'PDF', size: '22.1MB', status: '上架', uploadTime: '2026-04-05' },
+            { id: 'd8', name: '民事审判庭内部审判指引（2026版）.docx', kb: '内部审判指引', type: 'Word', size: '4.5MB', status: '处理中', uploadTime: '2026-04-28' },
+            { id: 'd9', name: '民间借贷纠纷审理要点.md', kb: '内部审判指引', type: 'Markdown', size: '0.3MB', status: '上架', uploadTime: '2026-04-03' },
+            { id: 'd10', name: '证据规则适用指引.txt', kb: '内部审判指引', type: 'TXT', size: '0.8MB', status: '解析失败', uploadTime: '2026-04-01' }
+        ];
+
+        let uploadFiles = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            renderDocuments();
+            initUploadZone();
+        });
+
+        function renderDocuments() {
+            const tbody = document.getElementById('docTableBody');
+            const filtered = getFilteredDocuments();
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+                    <i class="fas fa-inbox" style="font-size: 36px; margin-bottom: 12px; display: block;"></i>暂无匹配的文档
+                </td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(doc => {
+                const typeClass = doc.type === 'PDF' ? 'pdf' : doc.type === 'Word' ? 'word' : doc.type === 'TXT' ? 'txt' : 'md';
+                const typeIcon = doc.type === 'PDF' ? 'fa-file-pdf' : doc.type === 'Word' ? 'fa-file-word' : doc.type === 'TXT' ? 'fa-file-alt' : 'fa-file-code';
+                const statusClass = doc.status === '上架' ? 'badge-success' : doc.status === '下架' ? 'badge-muted' : doc.status === '处理中' ? 'badge-warning' : 'badge-danger';
+                const toggleLabel = doc.status === '上架' ? '下架' : '上架';
+                const toggleIcon = doc.status === '上架' ? 'fa-arrow-down' : 'fa-arrow-up';
+
+                return `<tr>
+                    <td>
+                        <div class="doc-info">
+                            <div class="doc-icon ${typeClass}"><i class="fas ${typeIcon}"></i></div>
+                            <div class="doc-name">${escapeHtml(doc.name)}</div>
+                        </div>
+                    </td>
+                    <td>${doc.kb}</td>
+                    <td>${doc.type}</td>
+                    <td>${doc.size}</td>
+                    <td><span class="badge ${statusClass}">${doc.status}</span>${doc.lawStatus ? ` <span class="badge ${doc.lawStatus === '有效' ? 'badge-info' : 'badge-danger'}">${doc.lawStatus}</span>` : ''}</td>
+                    <td>${doc.uploadTime}</td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="action-btn" title="编辑" onclick="openEditModal('${doc.id}')"><i class="fas fa-edit"></i></button>
+                            ${doc.status !== '处理中' ? `<button class="action-btn" title="${toggleLabel}" onclick="toggleDocStatus('${doc.id}')"><i class="fas ${toggleIcon}"></i></button>` : ''}
+                            ${doc.status === '解析失败' ? `<button class="action-btn" title="重新解析" onclick="reprocessDoc('${doc.id}')"><i class="fas fa-redo"></i></button>` : ''}
+                            <button class="action-btn delete" title="删除" onclick="deleteDoc('${doc.id}')"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            updateStats();
+        }
+
+        function getFilteredDocuments() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const kb = document.getElementById('kbFilter').value;
+            const type = document.getElementById('typeFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            return documents.filter(doc => {
+                if (search && !doc.name.toLowerCase().includes(search)) return false;
+                if (kb && doc.kb !== kb) return false;
+                if (type && doc.type !== type) return false;
+                if (status && doc.status !== status) return false;
+                return true;
+            });
+        }
+
+        function filterDocuments() { renderDocuments(); }
+
+        function updateStats() {
+            document.getElementById('totalDocs').textContent = documents.length;
+            document.getElementById('onlineDocs').textContent = documents.filter(d => d.status === '上架').length;
+            document.getElementById('processingDocs').textContent = documents.filter(d => d.status === '处理中').length;
+            document.getElementById('failedDocs').textContent = documents.filter(d => d.status === '解析失败').length;
+        }
+
+        function toggleDocStatus(id) {
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
+            doc.status = doc.status === '上架' ? '下架' : '上架';
+            saveToStorage();
+            renderDocuments();
+            showNotification(`文档已${doc.status}`, 'success');
+        }
+
+        function reprocessDoc(id) {
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
+            doc.status = '处理中';
+            saveToStorage();
+            renderDocuments();
+            showNotification('文档已重新提交解析', 'success');
+            setTimeout(() => {
+                doc.status = '上架';
+                saveToStorage();
+                renderDocuments();
+                showNotification('文档解析完成', 'success');
+            }, 3000);
+        }
+
+        function deleteDoc(id) {
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
+            if (!confirm(`确定要删除"${doc.name}"吗？删除后对应的OCR文本和索引将同步清除，此操作不可恢复。`)) return;
+            documents = documents.filter(d => d.id !== id);
+            saveToStorage();
+            renderDocuments();
+            showNotification('文档已删除', 'success');
+        }
+
+        function openEditModal(id) {
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
+            document.getElementById('editDocId').value = id;
+            document.getElementById('editDocName').value = doc.name;
+            document.getElementById('editDocKb').value = doc.kb;
+            document.getElementById('lawStatusGroup').style.display = doc.kb === '法条库' ? 'block' : 'none';
+            if (doc.lawStatus) document.getElementById('lawStatus').value = doc.lawStatus;
+            document.getElementById('editModalTitle').textContent = '编辑文档';
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function closeEditModal() { document.getElementById('editModal').classList.remove('show'); }
+
+        function saveEditDoc() {
+            const id = document.getElementById('editDocId').value;
+            const name = document.getElementById('editDocName').value.trim();
+            const kb = document.getElementById('editDocKb').value;
+            if (!name) { showNotification('请输入文档名称', 'error'); return; }
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
+            doc.name = name;
+            doc.kb = kb;
+            if (kb === '法条库') {
+                doc.lawStatus = document.getElementById('lawStatus').value;
+            } else {
+                delete doc.lawStatus;
+            }
+            saveToStorage();
+            renderDocuments();
+            closeEditModal();
+            showNotification('文档已更新', 'success');
+        }
+
+        document.getElementById('editDocKb').addEventListener('change', function() {
+            document.getElementById('lawStatusGroup').style.display = this.value === '法条库' ? 'block' : 'none';
+        });
+
+        function openUploadModal() {
+            uploadFiles = [];
+            document.getElementById('uploadFileList').innerHTML = '';
+            document.getElementById('targetKb').value = '';
+            document.getElementById('uploadModal').classList.add('show');
+        }
+
+        function closeUploadModal() { document.getElementById('uploadModal').classList.remove('show'); }
+
+        function initUploadZone() {
+            const zone = document.getElementById('uploadZone');
+            zone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+            zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+        }
+
+        function handleFileSelect(event) { handleFiles(event.target.files); }
+
+        function handleFiles(files) {
+            const allowed = ['.pdf', '.doc', '.docx', '.txt', '.md'];
+            for (const file of files) {
+                if (uploadFiles.length >= 10) { showNotification('最多上传10个文件', 'error'); break; }
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                if (!allowed.includes(ext)) { showNotification(`不支持的格式: ${ext}`, 'error'); continue; }
+                if (file.size > 50 * 1024 * 1024) { showNotification(`文件过大: ${file.name}`, 'error'); continue; }
+                uploadFiles.push({ name: file.name, size: (file.size / 1024 / 1024).toFixed(1) + 'MB', status: 'pending' });
+            }
+            renderUploadFileList();
+        }
+
+        function renderUploadFileList() {
+            const list = document.getElementById('uploadFileList');
+            list.innerHTML = uploadFiles.map((f, i) => `
+                <div class="upload-file-item">
+                    <i class="fas fa-file" style="color: var(--text-muted);"></i>
+                    <span class="upload-file-name">${escapeHtml(f.name)}</span>
+                    <span class="upload-file-size">${f.size}</span>
+                    <span class="upload-file-status ${f.status === 'done' ? 'success' : f.status === 'uploading' ? 'processing' : ''}">${f.status === 'done' ? '✓ 完成' : f.status === 'uploading' ? '上传中...' : '待上传'}</span>
+                    ${f.status === 'uploading' ? '<div class="progress-bar"><div class="progress-fill" style="width: 60%;"></div></div>' : ''}
+                    <button class="action-btn delete" style="width: 24px; height: 24px;" onclick="removeUploadFile(${i})"><i class="fas fa-times" style="font-size: 10px;"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function removeUploadFile(index) {
+            uploadFiles.splice(index, 1);
+            renderUploadFileList();
+        }
+
+        function startUpload() {
+            const kb = document.getElementById('targetKb').value;
+            if (!kb) { showNotification('请选择目标知识库', 'error'); return; }
+            if (uploadFiles.length === 0) { showNotification('请选择要上传的文件', 'error'); return; }
+
+            uploadFiles.forEach((f, i) => {
+                f.status = 'uploading';
+                renderUploadFileList();
+
+                setTimeout(() => {
+                    f.status = 'done';
+                    renderUploadFileList();
+
+                    const ext = f.name.split('.').pop().toLowerCase();
+                    const type = ext === 'pdf' ? 'PDF' : (ext === 'doc' || ext === 'docx') ? 'Word' : ext === 'txt' ? 'TXT' : 'Markdown';
+                    const newDoc = {
+                        id: 'd' + Date.now() + i,
+                        name: f.name,
+                        kb: kb,
+                        type: type,
+                        size: f.size,
+                        status: '处理中',
+                        uploadTime: new Date().toISOString().slice(0, 10)
+                    };
+                    if (kb === '法条库') newDoc.lawStatus = '有效';
+                    documents.unshift(newDoc);
+                    saveToStorage();
+
+                    setTimeout(() => {
+                        const doc = documents.find(d => d.id === newDoc.id);
+                        if (doc) { doc.status = '上架'; saveToStorage(); renderDocuments(); }
+                    }, 2000);
+                }, 1000 + i * 800);
+            });
+
+            setTimeout(() => {
+                renderDocuments();
+                closeUploadModal();
+                showNotification('文档上传成功，正在处理中', 'success');
+            }, 1000 + uploadFiles.length * 800 + 500);
+        }
+
+        function saveToStorage() { localStorage.setItem('adminKbDocuments', JSON.stringify(documents)); }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i><span>${message}</span>`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 2500);
+        }
+
+        function toggleUserDropdown() { document.getElementById('userDropdown').classList.toggle('show'); }
+
+        document.addEventListener('click', function(e) {
+            const userMenu = document.getElementById('userMenu');
+            if (userMenu && !userMenu.contains(e.target)) {
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
+
+        document.getElementById('uploadModal').addEventListener('click', function(e) { if (e.target === this) closeUploadModal(); });
+        document.getElementById('editModal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
+
+        function logout() {
+            if (confirm('确定要退出登录吗？')) { window.location.href = '../../index.html'; }
+        }
+    </script>
+</body>
+</html>

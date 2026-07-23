@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>我的要件 - AI辅助办案系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --danger-color: #dc2626;
+            --success-color: #16a34a;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .page-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        .page-header {
+            margin-bottom: 28px;
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .page-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--accent-primary);
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .main-layout {
+            display: flex;
+            gap: 20px;
+        }
+        .cause-sidebar {
+            width: 240px;
+            flex-shrink: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .sidebar-header {
+            padding: 14px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        .cause-list {
+            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+        }
+        .cause-item {
+            padding: 12px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.15s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .cause-item:hover { background: var(--bg-secondary); }
+        .cause-item.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .cause-item .count {
+            font-size: 11px;
+            padding: 2px 6px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            color: var(--text-secondary);
+        }
+        .content-area {
+            flex: 1;
+            min-width: 0;
+        }
+        .section-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .section-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+        }
+        .btn-primary { background: var(--accent-primary); color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: var(--bg-secondary); color: var(--text-secondary); border-color: var(--border-color); }
+        .btn-secondary:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .btn-danger { background: #fef2f2; color: var(--danger-color); border-color: #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .element-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .element-item {
+            padding: 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+        .element-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .element-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .element-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .element-question {
+            font-size: 13px;
+            color: var(--text-primary);
+            padding: 8px 10px;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .element-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        .form-label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            outline: none;
+        }
+        .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); }
+        .form-textarea { min-height: 60px; resize: vertical; }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .empty-state i { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 18px;
+            background: var(--text-primary);
+            color: #fff;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+        .toast.show { opacity: 1; visibility: visible; }
+        .toast.success { background: var(--success-color); }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <a href="cases.html" class="back-link"><i class="fas fa-arrow-left"></i> 返回案件列表</a>
+        <div class="page-header">
+            <div class="page-title">我的要件</div>
+            <div class="page-subtitle">按案由维护个人自定义要件，生成文书时与标准要件一同作为可选上下文</div>
+        </div>
+
+        <div class="main-layout">
+            <div class="cause-sidebar">
+                <div class="sidebar-header">选择案由</div>
+                <div class="cause-list" id="causeList"></div>
+            </div>
+
+            <div class="content-area">
+                <div class="section-card">
+                    <div class="section-card-header">
+                        <div>
+                            <div class="section-title" id="currentCauseTitle">请选择一个案由</div>
+                            <div class="section-desc">在此案由下新增、编辑、删除个人自定义要件</div>
+                        </div>
+                        <button class="btn btn-primary" id="addElementBtn" onclick="addMyElement()" style="display:none;">
+                            <i class="fas fa-plus"></i> 新增我的要件
+                        </button>
+                    </div>
+
+                    <div id="myElementsSection" style="display:none;">
+                        <div class="element-list" id="myElementList"></div>
+                    </div>
+
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-folder-open"></i>
+                        <div>请从左侧选择一个案由进行管理</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="../js/case-data.js?v=39"></script>
+    <script>
+        const causeListEl = document.getElementById('causeList');
+        const currentCauseTitleEl = document.getElementById('currentCauseTitle');
+        const myElementsSection = document.getElementById('myElementsSection');
+        const myElementList = document.getElementById('myElementList');
+        const emptyState = document.getElementById('emptyState');
+        const addElementBtn = document.getElementById('addElementBtn');
+
+        let currentCause = '';
+        let editingId = null;
+
+        function init() {
+            const urlCause = getUrlParam('cause');
+            const myData = getMyElementPresets();
+            const allCauses = Object.keys(elementPresetsByCause);
+            
+            if (urlCause && (elementPresetsByCause[urlCause] || (myData[urlCause] && myData[urlCause].length > 0))) {
+                currentCause = urlCause;
+            } else if (urlCause) {
+                // URL 传入了案由但不在预设列表中，仍然选中它（用户可能要为其新增要件）
+                currentCause = urlCause;
+            } else if (allCauses.length > 0) {
+                // 没有传入案由参数时，默认选中第一个案由
+                currentCause = allCauses[0];
+            }
+            
+            renderCauseList();
+            if (currentCause) {
+                renderElements();
+            }
+        }
+
+        function getUrlParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || '';
+        }
+
+        function renderCauseList() {
+            let causes = Object.keys(elementPresetsByCause);
+            const myData = getMyElementPresets();
+            // 合并我的要件中独有的案由
+            Object.keys(myData).forEach(c => {
+                if (causes.indexOf(c) === -1 && myData[c] && myData[c].length > 0) {
+                    causes.push(c);
+                }
+            });
+            // 确保 URL 传入的案由出现在列表中
+            const urlCause = getUrlParam('cause');
+            if (urlCause && causes.indexOf(urlCause) === -1) {
+                causes.unshift(urlCause);
+            }
+            causeListEl.innerHTML = causes.map(cause => {
+                const myCount = (myData[cause] || []).length;
+                return `
+                    <div class="cause-item ${cause === currentCause ? 'active' : ''}" onclick="selectCause('${cause}')">
+                        <span>${cause}</span>
+                        ${myCount > 0 ? `<span class="count">${myCount}</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectCause(cause) {
+            currentCause = cause;
+            editingId = null;
+            renderCauseList();
+            renderElements();
+        }
+
+        function renderElements() {
+            if (!currentCause) {
+                emptyState.style.display = 'block';
+                myElementsSection.style.display = 'none';
+                addElementBtn.style.display = 'none';
+                currentCauseTitleEl.textContent = '请选择一个案由';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            currentCauseTitleEl.textContent = currentCause;
+            addElementBtn.style.display = 'inline-flex';
+
+            renderMyElements();
+            myElementsSection.style.display = 'block';
+        }
+
+        function renderMyElements() {
+            const mine = getMyElementPresets(currentCause);
+            if (mine.length === 0 && editingId !== -1) {
+                myElementList.innerHTML = `<div class="empty-state" style="padding:24px;"><div>尚未添加自定义要件</div></div>`;
+                return;
+            }
+            const items = mine.map((p, idx) => {
+                if (editingId === idx) {
+                    return renderMyElementForm(p, idx);
+                }
+                return `
+                    <div class="element-item">
+                        <div class="element-header">
+                            <div style="flex:1;min-width:0;">
+                                <div class="element-name">${p.name}</div>
+                                <div class="element-desc">${p.desc || ''}</div>
+                                <div class="element-question">${p.question || ''}</div>
+                            </div>
+                            <div class="element-actions">
+                                <button class="btn btn-secondary btn-sm" onclick="editMyElement(${idx})"><i class="fas fa-edit"></i> 编辑</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteMyElement(${idx})"><i class="fas fa-trash"></i> 删除</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            if (editingId === -1) {
+                items.push(renderMyElementForm(null, -1));
+            }
+            myElementList.innerHTML = items.join('');
+        }
+
+        function renderMyElementForm(item, idx) {
+            const isNew = item === null;
+            const data = item || { name: '', desc: '', question: '' };
+            return `
+                <div class="element-item" style="background:var(--accent-light);border-color:#bfdbfe;">
+                    <div class="form-group">
+                        <label class="form-label">要件名称</label>
+                        <input type="text" class="form-input" id="editName_${idx}" value="${escapeHtml(data.name)}" placeholder="如：借款用途">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">要件说明</label>
+                        <input type="text" class="form-input" id="editDesc_${idx}" value="${escapeHtml(data.desc || '')}" placeholder="简要说明该要件的含义">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">问题</label>
+                        <textarea class="form-textarea" id="editQuestion_${idx}" placeholder="生成文书前需要确认的单一问题">${escapeHtml(data.question || '')}</textarea>
+                    </div>
+                    <div class="element-actions" style="justify-content:flex-end;">
+                        <button class="btn btn-secondary btn-sm" onclick="cancelEdit()">取消</button>
+                        <button class="btn btn-primary btn-sm" onclick="saveMyElement(${idx})">保存</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addMyElement() {
+            editingId = -1;
+            renderMyElements();
+            const input = document.getElementById('editName_-1');
+            if (input) input.focus();
+        }
+
+        function editMyElement(idx) {
+            editingId = idx;
+            renderMyElements();
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            renderMyElements();
+        }
+
+        function saveMyElement(idx) {
+            const name = document.getElementById(`editName_${idx}`).value.trim();
+            const desc = document.getElementById(`editDesc_${idx}`).value.trim();
+            const question = document.getElementById(`editQuestion_${idx}`).value.trim();
+            if (!name || !question) {
+                showToast('要件名称和问题不能为空', 'error');
+                return;
+            }
+            const mine = getMyElementPresets(currentCause);
+            if (idx === -1) {
+                mine.push({ name, desc, question });
+            } else {
+                mine[idx] = { name, desc, question };
+            }
+            setMyElementPresets(currentCause, mine);
+            editingId = null;
+            renderCauseList();
+            renderMyElements();
+            showToast('保存成功', 'success');
+        }
+
+        function deleteMyElement(idx) {
+            if (!confirm('确定删除该要件吗？')) return;
+            const mine = getMyElementPresets(currentCause);
+            mine.splice(idx, 1);
+            setMyElementPresets(currentCause, mine);
+            renderCauseList();
+            renderMyElements();
+            showToast('删除成功', 'success');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast show ' + (type || '');
+            setTimeout(() => { toast.className = 'toast'; }, 2500);
+        }
+
+        init();
+    </script>
+</body>
+</html>

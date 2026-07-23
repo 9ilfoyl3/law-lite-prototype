@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统运行报告 - AI辅助办案系统</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --hover-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: 12px;
+        }
+
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 0 12px; margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex; align-items: center; padding: 12px 16px;
+            border-radius: 10px; color: var(--text-secondary);
+            text-decoration: none; font-size: 14px; font-weight: 500;
+            transition: all 0.2s; margin-bottom: 4px;
+        }
+
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        .sidebar-footer { padding: 16px; border-top: 1px solid var(--border-color); }
+
+        .logout-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; padding: 12px;
+            border: 1px solid var(--border-color); border-radius: 10px;
+            background: transparent; color: var(--text-secondary);
+            font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+        }
+
+        .logout-btn:hover { background: var(--accent-danger); color: white; border-color: var(--accent-danger); }
+        .logout-btn i { margin-right: 8px; }
+
+        /* 主内容区 */
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+
+        .header {
+            height: var(--header-height); background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px; position: sticky; top: 0; z-index: 50;
+        }
+
+        .header-left { display: flex; align-items: center; }
+
+        .breadcrumb { display: flex; align-items: center; font-size: 14px; }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { margin: 0 8px; color: var(--text-muted); }
+        .breadcrumb-current { color: var(--text-primary); font-weight: 500; }
+
+        .header-right { display: flex; align-items: center; gap: 16px; }
+
+        .header-btn {
+            width: 40px; height: 40px; border-radius: 10px; border: none;
+            background: var(--bg-primary); color: var(--text-secondary);
+            cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+
+        .header-btn:hover { background: var(--accent-light); color: var(--accent-primary); }
+
+        .user-menu {
+            display: flex; align-items: center; gap: 12px;
+            padding: 6px 12px 6px 6px; border-radius: 10px; cursor: pointer; transition: all 0.2s;
+            position: relative;
+        }
+
+        .user-menu:hover { background: var(--bg-primary); }
+
+        .user-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 14px; font-weight: 600;
+        }
+
+        .user-dropdown.show { display: block !important; }
+
+        .page-content { flex: 1; padding: 24px 32px; overflow-y: auto; }
+
+        .page-header { margin-bottom: 24px; }
+        .page-title { font-size: 24px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+        .page-subtitle { font-size: 14px; color: var(--text-secondary); }
+
+        /* 操作栏 */
+        .action-bar {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            box-shadow: var(--card-shadow);
+            flex-wrap: wrap;
+        }
+
+        .action-group { display: flex; align-items: center; gap: 8px; }
+
+        .action-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+
+        .action-select {
+            padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 13px; color: var(--text-primary); background: var(--bg-primary);
+            cursor: pointer; font-family: inherit;
+        }
+
+        .action-select:focus { outline: none; border-color: var(--accent-primary); }
+
+        .action-input {
+            padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 13px; color: var(--text-primary); background: var(--bg-primary);
+            font-family: inherit;
+        }
+
+        .action-input:focus { outline: none; border-color: var(--accent-primary); }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; border-radius: 8px; font-size: 14px;
+            font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; font-family: inherit;
+        }
+
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--border-color); }
+
+        /* 报告内容区 */
+        .report-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            padding: 40px 48px;
+            margin-bottom: 24px;
+            max-width: 900px;
+        }
+
+        .report-section { margin-bottom: 32px; }
+        .report-section:last-child { margin-bottom: 0; }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent-primary);
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .overview-item {
+            padding: 16px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+        }
+
+        .overview-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+        .overview-value { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+
+        /* 表格 */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .report-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .report-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .report-table tbody tr:hover { background: var(--bg-primary); }
+        .report-table tbody tr:last-child td { border-bottom: none; }
+
+        .trend-up { color: var(--accent-success); font-weight: 500; }
+        .trend-down { color: var(--accent-danger); font-weight: 500; }
+
+        .anomaly-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .anomaly-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 16px; background: var(--bg-primary); border-radius: 8px;
+        }
+
+        .anomaly-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
+        }
+
+        .anomaly-icon.danger { background: #fee2e2; color: var(--accent-danger); }
+        .anomaly-icon.warning { background: #fef3c7; color: var(--accent-warning); }
+
+        .anomaly-content { flex: 1; }
+        .anomaly-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .anomaly-desc { font-size: 13px; color: var(--text-secondary); }
+        .anomaly-time { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+        /* 历史报告 */
+        .history-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .history-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .history-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .history-table th {
+            padding: 12px 24px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .history-table td {
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .history-table tbody tr:hover { background: var(--bg-primary); }
+        .history-table tbody tr:last-child td { border-bottom: none; }
+
+        .action-link {
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .action-link:hover { text-decoration: underline; }
+        .action-link + .action-link { margin-left: 12px; }
+
+        .badge {
+            display: inline-flex; align-items: center; padding: 4px 12px;
+            border-radius: 20px; font-size: 12px; font-weight: 500;
+        }
+
+        .badge-weekly { background: var(--accent-light); color: var(--accent-primary); }
+        .badge-monthly { background: #d1fae5; color: #059669; }
+        .badge-custom { background: #fef3c7; color: #d97706; }
+
+        /* 通知 */
+        .notification {
+            position: fixed; top: 20px; right: 20px;
+            padding: 14px 20px; border-radius: 10px; color: white;
+            font-size: 14px; font-weight: 500; z-index: 2000;
+            animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 10px;
+        }
+
+        .notification.success { background: var(--accent-success); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .action-bar { flex-direction: column; align-items: stretch; }
+            .report-card { padding: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-cube"></i></div>
+                <div>
+                    <div class="sidebar-title">管理后台</div>
+                    <div class="sidebar-subtitle">AI辅助办案系统</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item active"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-balance-scale"></i><span>案由管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-microchip"></i><span>模型配置与用量</span></a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</button>
+            </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+            <header class="header">
+                <div class="header-left">
+                    <nav class="breadcrumb">
+                        <a href="dashboard.html">首页</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">系统运行报告</span>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <button class="header-btn" title="通知"><i class="fas fa-bell"></i></button>
+                    <button class="header-btn" title="帮助"><i class="fas fa-question-circle"></i></button>
+                    <div class="user-menu" id="userMenu">
+                        <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="user-dropdown" id="userDropdown" style="position: absolute; top: calc(100% + 8px); right: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--hover-shadow); min-width: 160px; z-index: 1001; display: none; overflow: hidden;">
+                            <button onclick="logout()" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: var(--accent-danger); text-decoration: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none; background: none; width: 100%; text-align: left; font-family: inherit; border-top: 1px solid var(--border-color);">
+                                <i class="fas fa-sign-out-alt"></i><span>退出登录</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="page-header">
+                    <h1 class="page-title">系统运行报告</h1>
+                    <p class="page-subtitle">生成和查看系统运行报告，支持周报、月报及自定义周期</p>
+                </div>
+
+                <!-- 顶部操作栏 -->
+                <div class="action-bar">
+                    <div class="action-group">
+                        <span class="action-label">报告类型</span>
+                        <select class="action-select" id="reportType" onchange="onReportTypeChange()">
+                            <option value="weekly">周报</option>
+                            <option value="monthly" selected>月报</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                    <div class="action-group" id="customDateGroup" style="display: none;">
+                        <span class="action-label">日期范围</span>
+                        <input type="date" class="action-input" id="startDate">
+                        <span style="color: var(--text-muted);">至</span>
+                        <input type="date" class="action-input" id="endDate">
+                    </div>
+                    <div style="flex: 1;"></div>
+                    <button class="btn btn-primary" onclick="generateReport()">
+                        <i class="fas fa-file-alt"></i>生成报告
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportPDF()">
+                        <i class="fas fa-file-pdf"></i>导出PDF
+                    </button>
+                </div>
+
+                <!-- 报告内容区 -->
+                <div class="report-card" id="reportContent">
+                    <div class="report-section">
+                        <h2 class="section-title">一、系统运行概况</h2>
+                        <div class="overview-grid" id="overviewGrid">
+                            <div class="overview-item">
+                                <div class="overview-label">报告周期</div>
+                                <div class="overview-value" id="reportPeriod" style="font-size: 16px;">2026年5月</div>
+                            </div>
+                            <div class="overview-item">
+                                <div class="overview-label">系统运行天数</div>
+                                <div class="overview-value" id="runDays">31</div>
+                            </div>
+                            <div class="overview-item">
+                                <div class="overview-label">AI任务总数</div>
+                                <div class="overview-value" id="totalTasks">12,847</div>
+                            </div>
+                            <div class="overview-item">
+                                <div class="overview-label">文书生成采纳率</div>
+                                <div class="overview-value" id="adoptionRate">78.5%</div>
+                            </div>
+                            <div class="overview-item">
+                                <div class="overview-label">平均案件处理时长</div>
+                                <div class="overview-value" id="avgDuration" style="font-size: 16px;">3.2天</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="report-section">
+                        <h2 class="section-title">二、各模块使用情况</h2>
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>模块名称</th>
+                                    <th>任务数</th>
+                                    <th>采纳率</th>
+                                    <th>较上期变化</th>
+                                </tr>
+                            </thead>
+                            <tbody id="moduleTableBody">
+                                <tr>
+                                    <td>文书生成</td>
+                                    <td>4,287</td>
+                                    <td>82.3%</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +5.2%</td>
+                                </tr>
+                                <tr>
+                                    <td>庭审提纲</td>
+                                    <td>2,156</td>
+                                    <td>76.8%</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +3.1%</td>
+                                </tr>
+                                <tr>
+                                    <td>法条适用</td>
+                                    <td>1,893</td>
+                                    <td>85.1%</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +2.7%</td>
+                                </tr>
+                                <tr>
+                                    <td>文书评查</td>
+                                    <td>987</td>
+                                    <td>79.4%</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +4.8%</td>
+                                </tr>
+                                <tr>
+                                    <td>知识问答</td>
+                                    <td>2,279</td>
+                                    <td>73.2%</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +1.9%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="report-section">
+                        <h2 class="section-title">三、部门使用排名</h2>
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>排名</th>
+                                    <th>部门</th>
+                                    <th>使用次数</th>
+                                    <th>较上期变化</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deptTableBody">
+                                <tr>
+                                    <td>1</td>
+                                    <td>民事审判庭</td>
+                                    <td>4,862</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +8.3%</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>刑事审判庭</td>
+                                    <td>3,521</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +6.1%</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>行政审判庭</td>
+                                    <td>2,784</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +4.7%</td>
+                                </tr>
+                                <tr>
+                                    <td>4</td>
+                                    <td>立案庭</td>
+                                    <td>1,953</td>
+                                    <td class="trend-down"><i class="fas fa-arrow-down"></i> -2.1%</td>
+                                </tr>
+                                <tr>
+                                    <td>5</td>
+                                    <td>执行局</td>
+                                    <td>1,347</td>
+                                    <td class="trend-up"><i class="fas fa-arrow-up"></i> +3.5%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="report-section">
+                        <h2 class="section-title">四、异常与风险</h2>
+                        <div class="overview-grid" style="margin-bottom: 16px;">
+                            <div class="overview-item">
+                                <div class="overview-label">AI生成失败次数</div>
+                                <div class="overview-value" style="color: var(--accent-danger);" id="failCount">47</div>
+                            </div>
+                            <div class="overview-item">
+                                <div class="overview-label">敏感词拦截次数</div>
+                                <div class="overview-value" style="color: var(--accent-warning);" id="interceptCount">128</div>
+                            </div>
+                        </div>
+                        <div class="anomaly-list" id="anomalyList">
+                            <div class="anomaly-item">
+                                <div class="anomaly-icon danger"><i class="fas fa-exclamation-circle"></i></div>
+                                <div class="anomaly-content">
+                                    <div class="anomaly-title">文书生成服务异常</div>
+                                    <div class="anomaly-desc">5月12日 14:23 文书生成模块响应超时，影响23个任务</div>
+                                </div>
+                                <span class="anomaly-time">5月12日</span>
+                            </div>
+                            <div class="anomaly-item">
+                                <div class="anomaly-icon warning"><i class="fas fa-shield-alt"></i></div>
+                                <div class="anomaly-content">
+                                    <div class="anomaly-title">敏感词拦截激增</div>
+                                    <div class="anomaly-desc">5月18日敏感词拦截量较日均增长320%，已排查为测试数据</div>
+                                </div>
+                                <span class="anomaly-time">5月18日</span>
+                            </div>
+                            <div class="anomaly-item">
+                                <div class="anomaly-icon danger"><i class="fas fa-exclamation-circle"></i></div>
+                                <div class="anomaly-content">
+                                    <div class="anomaly-title">法条数据库同步延迟</div>
+                                    <div class="anomaly-desc">5月22日法条库同步延迟约15分钟，已自动恢复</div>
+                                </div>
+                                <span class="anomaly-time">5月22日</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 历史报告区 -->
+                <div class="history-card">
+                    <div class="history-header">
+                        <h3 class="history-title">历史报告</h3>
+                    </div>
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>报告名称</th>
+                                <th>类型</th>
+                                <th>生成时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td>2026年4月系统运行月报</td>
+                                <td><span class="badge badge-monthly">月报</span></td>
+                                <td>2026-05-01 09:00</td>
+                                <td>
+                                    <a class="action-link" onclick="viewReport('2026年4月系统运行月报')">查看</a>
+                                    <a class="action-link" onclick="exportHistoryPDF('2026年4月系统运行月报')">导出PDF</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2026年4月第4周系统运行周报</td>
+                                <td><span class="badge badge-weekly">周报</span></td>
+                                <td>2026-04-28 09:00</td>
+                                <td>
+                                    <a class="action-link" onclick="viewReport('2026年4月第4周系统运行周报')">查看</a>
+                                    <a class="action-link" onclick="exportHistoryPDF('2026年4月第4周系统运行周报')">导出PDF</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2026年4月第3周系统运行周报</td>
+                                <td><span class="badge badge-weekly">周报</span></td>
+                                <td>2026-04-21 09:00</td>
+                                <td>
+                                    <a class="action-link" onclick="viewReport('2026年4月第3周系统运行周报')">查看</a>
+                                    <a class="action-link" onclick="exportHistoryPDF('2026年4月第3周系统运行周报')">导出PDF</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2026年3月系统运行月报</td>
+                                <td><span class="badge badge-monthly">月报</span></td>
+                                <td>2026-04-01 09:00</td>
+                                <td>
+                                    <a class="action-link" onclick="viewReport('2026年3月系统运行月报')">查看</a>
+                                    <a class="action-link" onclick="exportHistoryPDF('2026年3月系统运行月报')">导出PDF</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2026年Q1系统运行自定义报告</td>
+                                <td><span class="badge badge-custom">自定义</span></td>
+                                <td>2026-03-31 14:30</td>
+                                <td>
+                                    <a class="action-link" onclick="viewReport('2026年Q1系统运行自定义报告')">查看</a>
+                                    <a class="action-link" onclick="exportHistoryPDF('2026年Q1系统运行自定义报告')">导出PDF</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    (function(){
+        var pages=JSON.parse(localStorage.getItem('adminRolePages')||'[]');
+        if(pages.length===0)return;
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(function(item){
+            var href=item.getAttribute('href');
+            if(!href||href==='#')return;
+            var pageName=href.replace('.html','');
+            if(pages.indexOf(pageName)===-1){item.style.display='none';}
+        });
+    })();
+
+        var defaultReports = {
+            current: {
+                period: '2026年5月',
+                runDays: 31,
+                totalTasks: 12847,
+                adoptionRate: 78.5,
+                avgDuration: '3.2天',
+                failCount: 47,
+                interceptCount: 128,
+                modules: [
+                    { name: '文书生成', tasks: 4287, rate: 82.3, change: '+5.2%', up: true },
+                    { name: '庭审提纲', tasks: 2156, rate: 76.8, change: '+3.1%', up: true },
+                    { name: '法条适用', tasks: 1893, rate: 85.1, change: '+2.7%', up: true },
+                    { name: '文书评查', tasks: 987, rate: 79.4, change: '+4.8%', up: true },
+                    { name: '知识问答', tasks: 2279, rate: 73.2, change: '+1.9%', up: true }
+                ],
+                departments: [
+                    { rank: 1, name: '民事审判庭', count: 4862, change: '+8.3%', up: true },
+                    { rank: 2, name: '刑事审判庭', count: 3521, change: '+6.1%', up: true },
+                    { rank: 3, name: '行政审判庭', count: 2784, change: '+4.7%', up: true },
+                    { rank: 4, name: '立案庭', count: 1953, change: '-2.1%', up: false },
+                    { rank: 5, name: '执行局', count: 1347, change: '+3.5%', up: true }
+                ],
+                anomalies: [
+                    { type: 'danger', title: '文书生成服务异常', desc: '5月12日 14:23 文书生成模块响应超时，影响23个任务', time: '5月12日' },
+                    { type: 'warning', title: '敏感词拦截激增', desc: '5月18日敏感词拦截量较日均增长320%，已排查为测试数据', time: '5月18日' },
+                    { type: 'danger', title: '法条数据库同步延迟', desc: '5月22日法条库同步延迟约15分钟，已自动恢复', time: '5月22日' }
+                ]
+            },
+            history: [
+                { name: '2026年4月系统运行月报', type: 'monthly', typeName: '月报', time: '2026-05-01 09:00' },
+                { name: '2026年4月第4周系统运行周报', type: 'weekly', typeName: '周报', time: '2026-04-28 09:00' },
+                { name: '2026年4月第3周系统运行周报', type: 'weekly', typeName: '周报', time: '2026-04-21 09:00' },
+                { name: '2026年3月系统运行月报', type: 'monthly', typeName: '月报', time: '2026-04-01 09:00' },
+                { name: '2026年Q1系统运行自定义报告', type: 'custom', typeName: '自定义', time: '2026-03-31 14:30' }
+            ]
+        };
+
+        function loadReports() {
+            var stored = localStorage.getItem('adminSystemReports');
+            if (stored) {
+                try {
+                    return JSON.parse(stored);
+                } catch(e) {
+                    return defaultReports;
+                }
+            }
+            return defaultReports;
+        }
+
+        function saveReports(data) {
+            localStorage.setItem('adminSystemReports', JSON.stringify(data));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var reports = loadReports();
+            renderReport(reports.current);
+            renderHistory(reports.history);
+        });
+
+        function renderReport(current) {
+            if (!current) return;
+            document.getElementById('reportPeriod').textContent = current.period || '2026年5月';
+            document.getElementById('runDays').textContent = current.runDays || 31;
+            document.getElementById('totalTasks').textContent = (current.totalTasks || 12847).toLocaleString();
+            document.getElementById('adoptionRate').textContent = (current.adoptionRate || 78.5) + '%';
+            document.getElementById('avgDuration').textContent = current.avgDuration || '3.2天';
+            document.getElementById('failCount').textContent = current.failCount || 47;
+            document.getElementById('interceptCount').textContent = current.interceptCount || 128;
+
+            var moduleBody = document.getElementById('moduleTableBody');
+            var modules = current.modules || defaultReports.current.modules;
+            moduleBody.innerHTML = modules.map(function(m) {
+                var cls = m.up ? 'trend-up' : 'trend-down';
+                var icon = m.up ? 'fa-arrow-up' : 'fa-arrow-down';
+                return '<tr><td>' + m.name + '</td><td>' + m.tasks.toLocaleString() + '</td><td>' + m.rate + '%</td><td class="' + cls + '"><i class="fas ' + icon + '"></i> ' + m.change + '</td></tr>';
+            }).join('');
+
+            var deptBody = document.getElementById('deptTableBody');
+            var depts = current.departments || defaultReports.current.departments;
+            deptBody.innerHTML = depts.map(function(d) {
+                var cls = d.up ? 'trend-up' : 'trend-down';
+                var icon = d.up ? 'fa-arrow-up' : 'fa-arrow-down';
+                return '<tr><td>' + d.rank + '</td><td>' + d.name + '</td><td>' + d.count.toLocaleString() + '</td><td class="' + cls + '"><i class="fas ' + icon + '"></i> ' + d.change + '</td></tr>';
+            }).join('');
+
+            var anomalyList = document.getElementById('anomalyList');
+            var anomalies = current.anomalies || defaultReports.current.anomalies;
+            anomalyList.innerHTML = anomalies.map(function(a) {
+                var iconClass = a.type === 'danger' ? 'fa-exclamation-circle' : 'fa-shield-alt';
+                return '<div class="anomaly-item"><div class="anomaly-icon ' + a.type + '"><i class="fas ' + iconClass + '"></i></div><div class="anomaly-content"><div class="anomaly-title">' + a.title + '</div><div class="anomaly-desc">' + a.desc + '</div></div><span class="anomaly-time">' + a.time + '</span></div>';
+            }).join('');
+        }
+
+        function renderHistory(history) {
+            var tbody = document.getElementById('historyTableBody');
+            var items = history || defaultReports.history;
+            tbody.innerHTML = items.map(function(h) {
+                var badgeClass = h.type === 'weekly' ? 'badge-weekly' : h.type === 'monthly' ? 'badge-monthly' : 'badge-custom';
+                return '<tr><td>' + h.name + '</td><td><span class="badge ' + badgeClass + '">' + h.typeName + '</span></td><td>' + h.time + '</td><td><a class="action-link" onclick="viewReport(\'' + h.name.replace(/'/g, "\\'") + '\')">查看</a><a class="action-link" onclick="exportHistoryPDF(\'' + h.name.replace(/'/g, "\\'") + '\')">导出PDF</a></td></tr>';
+            }).join('');
+        }
+
+        function onReportTypeChange() {
+            var type = document.getElementById('reportType').value;
+            document.getElementById('customDateGroup').style.display = type === 'custom' ? 'flex' : 'none';
+        }
+
+        function generateReport() {
+            var type = document.getElementById('reportType').value;
+            var reports = loadReports();
+            var period = '';
+            var now = new Date();
+            if (type === 'weekly') {
+                period = now.getFullYear() + '年' + (now.getMonth() + 1) + '月第' + Math.ceil(now.getDate() / 7) + '周';
+            } else if (type === 'monthly') {
+                period = now.getFullYear() + '年' + (now.getMonth() + 1) + '月';
+            } else {
+                var start = document.getElementById('startDate').value;
+                var end = document.getElementById('endDate').value;
+                if (start && end) {
+                    period = start + ' 至 ' + end;
+                } else {
+                    period = '自定义周期';
+                }
+            }
+
+            reports.current.period = period;
+            saveReports(reports);
+            renderReport(reports.current);
+            showNotification('报告生成成功');
+        }
+
+        function exportPDF() {
+            showNotification('报告导出成功');
+        }
+
+        function exportHistoryPDF(name) {
+            showNotification('"' + name + '" 导出成功');
+        }
+
+        function viewReport(name) {
+            showNotification('正在查看：' + name);
+        }
+
+        function showNotification(message) {
+            var notification = document.createElement('div');
+            notification.className = 'notification success';
+            notification.innerHTML = '<i class="fas fa-check-circle"></i><span>' + message + '</span>';
+            document.body.appendChild(notification);
+            setTimeout(function() { notification.remove(); }, 2500);
+        }
+
+        function toggleUserDropdown() {
+            document.getElementById('userDropdown').classList.toggle('show');
+        }
+
+        document.addEventListener('click', function(e) {
+            var userMenu = document.getElementById('userMenu');
+            if (userMenu && !userMenu.contains(e.target)) {
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
+
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                window.location.href = '../../index.html';
+            }
+        }
+    </script>
+</body>
+</html>

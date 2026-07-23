@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文书详情 - AI辅助办案系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/common.css">
+    <style>
+        :root {
+            --sidebar-width: 25%;
+        }
+
+        .doc-detail-page {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 顶部导航栏 */
+        .doc-detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 24px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .doc-detail-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .doc-detail-back {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .doc-detail-back:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .doc-detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .doc-detail-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .doc-detail-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .doc-detail-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+        }
+        .doc-detail-btn:hover {
+            background: var(--bg-secondary);
+        }
+        .doc-detail-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .doc-detail-btn.primary:hover {
+            background: #1d4ed8;
+        }
+
+        /* 主体分栏 */
+        .doc-detail-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 左侧材料树 */
+        .doc-detail-sidebar {
+            width: var(--sidebar-width);
+            min-width: 260px;
+            max-width: 360px;
+            border-right: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+        }
+        .doc-detail-sidebar-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .doc-detail-sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .doc-detail-sidebar-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+        .doc-detail-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        .doc-detail-category {
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .doc-detail-category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+        .doc-detail-category-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .doc-detail-category-header i {
+            font-size: 12px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .doc-detail-category.expanded .doc-detail-category-header i.fa-chevron-right {
+            transform: rotate(90deg);
+        }
+        .doc-detail-category-children {
+            display: none;
+            padding: 6px;
+        }
+        .doc-detail-category.expanded .doc-detail-category-children {
+            display: block;
+        }
+        .doc-detail-file {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .doc-detail-file.selected {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+        .doc-detail-file input[type="checkbox"] {
+            cursor: default;
+        }
+        .doc-detail-file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* 右侧文书显示 */
+        .doc-detail-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f3f4f6;
+            overflow: hidden;
+        }
+        .doc-detail-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .doc-detail-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .doc-detail-viewport {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+        .doc-detail-paper {
+            max-width: 900px;
+            min-height: 800px;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 60px 70px;
+            font-family: 'Noto Serif SC', 'SimSun', serif;
+            line-height: 2;
+            color: #1f2937;
+        }
+        .doc-detail-paper h2 {
+            text-align: center;
+            font-size: 22pt;
+            font-weight: bold;
+            margin-bottom: 24px;
+            letter-spacing: 2px;
+        }
+        .doc-detail-paper .case-number {
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 14pt;
+        }
+        .doc-detail-paper p {
+            text-indent: 2em;
+            margin-bottom: 10px;
+            font-size: 14pt;
+        }
+        .doc-detail-paper h3 {
+            font-size: 15pt;
+            font-weight: bold;
+            margin: 24px 0 12px;
+        }
+        .doc-detail-paper .signature {
+            text-align: right;
+            margin-top: 32px;
+        }
+        .doc-detail-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            gap: 12px;
+        }
+        .doc-detail-empty i {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        @media print {
+            .doc-detail-header,
+            .doc-detail-sidebar,
+            .doc-detail-toolbar {
+                display: none;
+            }
+            .doc-detail-content {
+                background: #fff;
+            }
+            .doc-detail-viewport {
+                padding: 0;
+            }
+            .doc-detail-paper {
+                box-shadow: none;
+                max-width: 100%;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="doc-detail-page">
+        <header class="doc-detail-header">
+            <div class="doc-detail-header-left">
+                <button class="doc-detail-back" onclick="goBackToCases()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>返回列表</span>
+                </button>
+                <div>
+                    <div class="doc-detail-title" id="headerCaseName">-</div>
+                    <div class="doc-detail-subtitle" id="headerDocInfo">-</div>
+                </div>
+            </div>
+            <div class="doc-detail-actions">
+                <button class="doc-detail-btn" onclick="printDocument()">
+                    <i class="fas fa-print"></i> 打印
+                </button>
+                <button class="doc-detail-btn primary" onclick="downloadDocument()">
+                    <i class="fas fa-download"></i> 下载
+                </button>
+            </div>
+        </header>
+
+        <div class="doc-detail-body">
+            <aside class="doc-detail-sidebar">
+                <div class="doc-detail-sidebar-header">
+                    <div class="doc-detail-sidebar-title">
+                        <i class="fas fa-folder-open"></i>
+                        <span>案件材料</span>
+                        <span class="doc-detail-sidebar-count" id="materialCount">0 / 0</span>
+                    </div>
+                </div>
+                <div class="doc-detail-tree" id="materialTree"></div>
+            </aside>
+
+            <main class="doc-detail-content">
+                <div class="doc-detail-toolbar">
+                    <div class="doc-detail-meta" id="docMeta">-</div>
+                </div>
+                <div class="doc-detail-viewport" id="docViewport">
+                    <div class="doc-detail-paper" id="docPaper"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="../js/common.js?v=29"></script>
+    <script src="../js/case-data.js?v=36"></script>
+    <script src="../js/document-detail.js?v=3"></script>
+</body>
+</html>

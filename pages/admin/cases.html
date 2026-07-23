@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>案件管理 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        /* ===== admin 基础布局（与 dashboard.html 保持一致） ===== */
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .sidebar-header {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-logo {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: 12px;
+        }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 0 12px; margin-bottom: 8px;
+        }
+        .nav-item {
+            display: flex; align-items: center;
+            padding: 12px 16px; border-radius: 10px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            transition: all 0.2s; margin-bottom: 4px;
+        }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航 */
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px;
+            position: sticky; top: 0; z-index: 50;
+        }
+        .breadcrumb { display: flex; align-items: center; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { margin: 0 8px; font-size: 10px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-menu {
+            display: flex; align-items: center; gap: 12px;
+            padding: 6px 12px 6px 6px; border-radius: 10px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .user-menu:hover { background: var(--bg-primary); }
+        .user-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 14px; font-weight: 600;
+        }
+        .user-name { font-size: 14px; font-weight: 600; }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        /* 内容区 */
+        .content { flex: 1; padding: 24px 32px; overflow-x: hidden; }
+
+        /* ===== 案件管理页专属样式 ===== */
+        .page-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+        .page-header .page-title-wrap { flex: 1; min-width: 0; }
+        .page-header h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0 0 6px 0; }
+        .page-header p { font-size: 14px; color: var(--text-secondary); margin: 0; }
+
+        /* 业务系统切换按钮组（与用户侧 cases.html 一致） */
+        .business-switch { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-primary); padding: 4px; border-radius: 8px; }
+        .business-switch-btn {
+            padding: 7px 14px; border: none; background: transparent; border-radius: 6px;
+            font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer;
+            transition: all 0.2s; font-family: inherit;
+        }
+        .business-switch-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .business-switch-btn.active { background: var(--accent-primary); color: #fff; }
+        .business-switch-tip { display: inline-flex; align-items: center; margin-left: 8px; color: var(--text-muted); cursor: help; position: relative; }
+        .business-switch-tip:hover .business-switch-tooltip { display: block; }
+        .business-switch-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: #1f2937; color: #fff; padding: 8px 12px; border-radius: 6px;
+            font-size: 12px; line-height: 1.6; white-space: nowrap; z-index: 100;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* 筛选栏 */
+        .filter-bar {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .filter-bar .search-box { position: relative; flex: 1; min-width: 240px; max-width: 320px; }
+        .filter-bar .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 14px; }
+        .filter-bar .search-box input {
+            width: 100%; padding: 8px 12px 8px 34px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 14px; outline: none; transition: border-color 0.2s;
+        }
+        .filter-bar .search-box input:focus { border-color: var(--accent-primary); }
+        .filter-bar select {
+            padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 14px; background: var(--bg-secondary); cursor: pointer; min-width: 120px; outline: none;
+        }
+        .filter-bar select:focus { border-color: var(--accent-primary); }
+        .filter-bar .btn-reset {
+            padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 6px;
+            background: var(--bg-secondary); color: var(--text-secondary); font-size: 14px; cursor: pointer;
+        }
+        .filter-bar .btn-reset:hover { background: var(--bg-primary); border-color: #d1d5db; }
+
+        /* 批量操作栏 */
+        .batch-bar {
+            background: var(--accent-light); border: 1px solid #bfdbfe;
+            border-radius: 8px; padding: 10px 16px; margin-bottom: 12px;
+            display: none; align-items: center; gap: 12px;
+        }
+        .batch-bar.show { display: flex; }
+        .batch-bar .batch-info { color: #1e40af; font-size: 14px; font-weight: 500; }
+        .batch-bar .btn {
+            padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.2s;
+        }
+        .batch-bar .btn-delete { background: var(--bg-secondary); color: #b91c1c; border: 1px solid #fecaca; }
+        .batch-bar .btn-delete:hover { background: #fef2f2; }
+        .batch-bar .btn-handler { background: var(--bg-secondary); color: #1e40af; border: 1px solid #bfdbfe; }
+        .batch-bar .btn-handler:hover { background: #eff6ff; }
+        .batch-bar .btn-clear { margin-left: auto; background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 13px; }
+        .batch-bar .btn-clear:hover { color: var(--text-primary); }
+
+        /* 案件表格 */
+        .case-table-wrap {
+            background: var(--bg-secondary); border-radius: 10px; overflow: auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .case-grid { display: grid; min-width: 1200px; }
+        .case-grid .grid-head,
+        .case-grid .grid-row {
+            display: grid;
+            grid-template-columns: 40px minmax(0, 2.4fr) minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 1fr) 180px;
+            align-items: center;
+        }
+        .case-grid .grid-head {
+            background: var(--bg-primary); border-bottom: 1px solid var(--border-color);
+            font-size: 12px; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .case-grid .grid-head > div { padding: 12px 10px; }
+        .case-grid .grid-row {
+            border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;
+            transition: background 0.15s; position: relative;
+        }
+        .case-grid .grid-row:hover { background: var(--bg-primary); }
+        .case-grid .grid-row:last-child { border-bottom: none; }
+        .case-grid .grid-row > div {
+            padding: 14px 10px; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .case-grid .grid-row.has-ocr-error::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent-danger);
+        }
+        .case-grid .col-center { text-align: center; }
+        .case-grid .case-name-link { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
+        .case-grid .case-name-link:hover { text-decoration: underline; }
+        .case-grid .org-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+        .org-tag.court { background: #dbeafe; color: #1e40af; }
+        .org-tag.procuratorate { background: #ede9fe; color: #5b21b6; }
+        .org-tag.justice { background: #d1fae5; color: #065f46; }
+        .case-grid .file-count-cell.has-error { color: var(--accent-danger); font-weight: 600; }
+        .case-grid .action-cell { display: flex; justify-content: center; gap: 6px; }
+        .case-grid .action-btn {
+            padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer;
+            border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .case-grid .action-btn:hover { background: #f3f4f6; }
+        .case-grid .action-btn.view { color: var(--accent-primary); border-color: #bfdbfe; }
+        .case-grid .action-btn.view:hover { background: var(--accent-light); }
+        .case-grid .action-btn.handler { color: #1e40af; border-color: #bfdbfe; }
+        .case-grid .action-btn.handler:hover { background: #eff6ff; }
+        .case-grid .action-btn.delete { color: #b91c1c; border-color: #fecaca; }
+        .case-grid .action-btn.delete:hover { background: #fef2f2; }
+
+        /* 分页 */
+        .pagination { display: flex; justify-content: space-between; align-items: center; padding: 16px 4px; margin-top: 12px; }
+        .pagination-info { font-size: 13px; color: var(--text-secondary); }
+        .pagination-right { display: flex; align-items: center; gap: 12px; }
+        .page-size-select { padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; background: var(--bg-secondary); cursor: pointer; }
+        .pagination-btns { display: flex; gap: 4px; }
+        .page-btn {
+            min-width: 32px; height: 32px; padding: 0 8px;
+            border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: 6px;
+            cursor: pointer; font-size: 13px; color: #374151; transition: all 0.15s;
+        }
+        .page-btn:hover:not(:disabled):not(.active) { background: #f3f4f6; border-color: #d1d5db; }
+        .page-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+        .page-btn:disabled { color: #d1d5db; cursor: not-allowed; }
+
+        /* 空状态 */
+        .empty-state-inline { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state-inline i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
+        .empty-state-inline p { font-size: 14px; margin: 0; }
+
+        /* 确认弹窗 */
+        .modal-mask {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4); z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+        .modal-mask.show { display: flex; }
+        .modal-box {
+            background: var(--bg-secondary); border-radius: 10px; padding: 24px;
+            min-width: 360px; max-width: 480px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        .modal-box h3 { margin: 0 0 12px; font-size: 16px; color: var(--text-primary); }
+        .modal-box p { margin: 0 0 20px; font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+        .modal-box .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-box .btn { padding: 8px 18px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; transition: all 0.15s; }
+        .modal-box .btn-cancel { background: #f3f4f6; color: #374151; }
+        .modal-box .btn-cancel:hover { background: #e5e7eb; }
+        .modal-box .btn-confirm { background: var(--accent-danger); color: #fff; }
+        .modal-box .btn-confirm:hover { background: #dc2626; }
+        /* 改承办人弹窗表单 */
+        .handler-modal .form-row { margin-bottom: 16px; }
+        .handler-modal .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .handler-modal .form-value { font-size: 14px; color: var(--text-primary); padding: 8px 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; }
+        .handler-modal .form-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-family: inherit; }
+        .handler-modal .form-select:focus { outline: none; border-color: var(--accent-primary); }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item active"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 顶部导航 -->
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>案件管理</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-avatar">管</div>
+                        <div>
+                            <div class="user-name">管理员</div>
+                            <div class="user-role">系统管理员</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 内容区 -->
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1>案件管理</h1>
+                        <p>查看和管理全院案件数据（只读详情 + 批量删除）</p>
+                    </div>
+                    <div class="business-switch">
+                        <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
+                        <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
+                        <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
+                        <span class="business-switch-tip" tabindex="0">
+                            <i class="fas fa-info-circle"></i>
+                            <span class="business-switch-tooltip">该切换功能为原型演示用<br>实际一套环境只存在一种业务场景</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 筛选栏 -->
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="caseSearch" placeholder="搜索案件名称、案号、当事人...">
+                    </div>
+                    <select id="deptFilter">
+                        <option value="">全部部门</option>
+                    </select>
+                    <select id="handlerFilter">
+                        <option value="">全部承办人</option>
+                    </select>
+                    <select id="yearFilter">
+                        <option value="">全部年份</option>
+                        <option value="2024">2024年</option>
+                        <option value="2023">2023年</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                    <button class="btn-reset" onclick="resetFilters()">重置</button>
+                </div>
+
+                <!-- 自定义日期范围（默认隐藏） -->
+                <div class="filter-bar" id="customDateBar" style="display:none; padding: 12px 20px; margin-bottom: 12px;">
+                    <span style="font-size:13px; color:var(--text-secondary);">更新时间范围：</span>
+                    <input type="date" id="dateFrom" style="padding:6px 10px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
+                    <span style="color:var(--text-muted);">至</span>
+                    <input type="date" id="dateTo" style="padding:6px 10px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
+                </div>
+
+                <!-- 批量操作栏 -->
+                <div class="batch-bar" id="batchBar">
+                    <span class="batch-info" id="batchInfo">已选 0 件</span>
+                    <button class="btn btn-handler" onclick="batchChangeHandler()">批量改承办人</button>
+                    <button class="btn btn-delete" onclick="batchDelete()">批量删除</button>
+                    <button class="btn-clear" onclick="clearSelection()">取消选择</button>
+                </div>
+
+                <!-- 案件表格 -->
+                <div class="case-table-wrap">
+                    <div class="case-grid" id="caseGrid">
+                        <div class="grid-head">
+                            <div class="col-center"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></div>
+                            <div>案件名称</div>
+                            <div>案号</div>
+                            <div>案由</div>
+                            <div>承办人</div>
+                            <div>部门</div>
+                            <div class="col-center">文件数</div>
+                            <div class="col-center">文书数</div>
+                            <div class="col-center">更新时间</div>
+                            <div class="col-center">操作</div>
+                        </div>
+                        <div id="gridBody"></div>
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div class="pagination" id="pagination">
+                    <span class="pagination-info" id="paginationInfo">共 0 条</span>
+                    <div class="pagination-right">
+                        <select class="page-size-select" id="pageSize" onchange="changePageSize(this.value)">
+                            <option value="10">10条/页</option>
+                            <option value="20" selected>20条/页</option>
+                            <option value="50">50条/页</option>
+                        </select>
+                        <div class="pagination-btns" id="paginationBtns"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-mask" id="confirmModal">
+        <div class="modal-box">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmText">确定执行此操作吗？</p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-confirm" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 改承办人弹窗 -->
+    <div class="modal-mask" id="handlerModal">
+        <div class="modal-box handler-modal">
+            <h3 id="handlerModalTitle">改承办人</h3>
+            <div class="form-row">
+                <label class="form-label" id="handlerCaseLabel">案件</label>
+                <div class="form-value" id="handlerCaseName">-</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">当前承办人</label>
+                <div class="form-value" id="handlerCurrent">-</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">新承办人</label>
+                <select class="form-select" id="handlerNew">
+                    <option value="">请选择...</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeHandlerModal()">取消</button>
+                <button class="btn btn-confirm" id="handlerConfirmBtn" style="background:var(--accent-primary);" onclick="execChangeHandler()">确认修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知容器 -->
+    <div id="notificationContainer" style="position:fixed;top:20px;right:20px;z-index:2000;"></div>
+
+    <!-- 脚本 -->
+    <script src="../../js/case-data.js"></script>
+    <script src="../../js/admin-cases.js?v=5"></script>
+</body>
+</html>

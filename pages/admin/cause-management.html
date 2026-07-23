@@ -1,0 +1,1711 @@
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>案由管理 - AI辅助办案系统</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --hover-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+
+        .sidebar-logo i {
+            color: white;
+            font-size: 20px;
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0 12px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        .nav-sub-item {
+            display: flex; align-items: center; padding: 8px 16px 8px 48px;
+            border-radius: 8px; color: var(--text-muted);
+            text-decoration: none; font-size: 13px; font-weight: 400;
+            transition: all 0.2s; margin-bottom: 2px;
+        }
+
+        .nav-sub-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-sub-item.active { color: var(--accent-primary); font-weight: 500; }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: var(--accent-danger);
+            color: white;
+            border-color: var(--accent-danger);
+        }
+
+        .logout-btn i {
+            margin-right: 8px;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--accent-primary);
+        }
+
+        .breadcrumb-separator {
+            margin: 0 8px;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb-current {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            border: none;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .header-btn:hover {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 12px 6px 6px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .user-menu:hover {
+            background: var(--bg-primary);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-dropdown.show {
+            display: block !important;
+        }
+
+        /* 页面内容 */
+        .page-content {
+            flex: 1;
+            padding: 24px 32px;
+            overflow-y: auto;
+        }
+
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-icon.blue {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .stat-icon.green {
+            background: #d1fae5;
+            color: var(--accent-success);
+        }
+
+        .stat-icon.orange {
+            background: #fef3c7;
+            color: var(--accent-warning);
+        }
+
+        .stat-icon.purple {
+            background: #f3e8ff;
+            color: #9333ea;
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* 操作栏 */
+        .action-bar {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: #fef2f2;
+            color: var(--accent-danger);
+        }
+
+        .btn-danger:hover {
+            background: #fecaca;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* 案由树形容器 */
+        .cause-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .cause-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cause-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .cause-tree {
+            padding: 20px;
+        }
+
+        /* 案由层级样式 */
+        .cause-level-1 {
+            margin-bottom: 16px;
+        }
+
+        .cause-level-1-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cause-level-1-header:hover {
+            background: var(--accent-light);
+        }
+
+        .cause-expand-icon {
+            width: 20px;
+            margin-right: 8px;
+            transition: transform 0.2s;
+            color: var(--text-muted);
+        }
+
+        .cause-level-1.expanded .cause-expand-icon {
+            transform: rotate(90deg);
+        }
+
+        .cause-level-1-name {
+            font-weight: 600;
+            font-size: 15px;
+            flex: 1;
+        }
+
+        .cause-actions {
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .cause-level-1-header:hover .cause-actions,
+        .cause-level-2-header:hover .cause-actions,
+        .cause-level-3-item:hover .cause-actions {
+            opacity: 1;
+        }
+
+        .cause-action-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .cause-action-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--accent-primary);
+        }
+
+        .cause-action-btn.delete:hover {
+            background: #fef2f2;
+            color: var(--accent-danger);
+        }
+
+        /* 二级案由 */
+        .cause-level-2-container {
+            display: none;
+            padding-left: 28px;
+            margin-top: 8px;
+        }
+
+        .cause-level-1.expanded .cause-level-2-container {
+            display: block;
+        }
+
+        .cause-level-2 {
+            margin-bottom: 8px;
+        }
+
+        .cause-level-2-header {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cause-level-2-header:hover {
+            background: var(--bg-primary);
+        }
+
+        .cause-level-2-name {
+            font-weight: 500;
+            font-size: 14px;
+            flex: 1;
+            color: var(--text-secondary);
+        }
+
+        /* 三级案由 */
+        .cause-level-3-container {
+            display: none;
+            padding-left: 28px;
+            margin-top: 4px;
+        }
+
+        .cause-level-2.expanded .cause-level-3-container {
+            display: block;
+        }
+
+        .cause-level-3-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .cause-level-3-item:hover {
+            background: var(--bg-primary);
+        }
+
+        .cause-level-3-name {
+            font-size: 14px;
+            color: var(--text-muted);
+            flex: 1;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow: hidden;
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--border-color);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            max-height: calc(90vh - 140px);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* 通知 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 14px 20px;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .notification.success {
+            background: var(--accent-success);
+        }
+
+        .notification.error {
+            background: var(--accent-danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-gavel"></i>
+                </div>
+                <div>
+                    <div class="sidebar-title">管理后台</div>
+                    <div class="sidebar-subtitle">AI辅助办案系统</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item active"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+
+
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    退出登录
+                </button>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 顶部导航 -->
+            <header class="header">
+                <div class="header-left">
+                    <nav class="breadcrumb">
+                        <a href="dashboard.html">首页</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">案由管理</span>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <button class="header-btn" title="通知">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button class="header-btn" title="帮助">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <div class="user-menu" id="userMenu" style="position: relative;">
+                        <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="user-dropdown" id="userDropdown" style="position: absolute; top: calc(100% + 8px); right: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--hover-shadow); min-width: 160px; z-index: 1001; display: none; overflow: hidden;">
+                            <button class="user-dropdown-item logout" onclick="logout()" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: var(--accent-danger); text-decoration: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none; background: none; width: 100%; text-align: left; font-family: inherit; border-top: 1px solid var(--border-color);">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>退出登录</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 页面内容 -->
+            <div class="page-content">
+                <!-- 页面标题 -->
+                <div class="page-header">
+                    <h1 class="page-title">案由管理</h1>
+                    <p class="page-subtitle">管理系统案由分类，支持多级案由配置</p>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <i class="fas fa-folder"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="level1Count">0</div>
+                            <div class="stat-label">一级案由</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="level2Count">0</div>
+                            <div class="stat-label">二级案由</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="level3Count">0</div>
+                            <div class="stat-label">三级案由</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="totalCount">0</div>
+                            <div class="stat-label">案由总数</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作栏 -->
+                <div class="action-bar">
+                    <div class="search-box">
+                        <input type="text" class="search-input" id="searchInput" placeholder="搜索案由...">
+                        <button class="btn btn-secondary" onclick="searchCauses()">
+                            <i class="fas fa-search"></i>
+                            搜索
+                        </button>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()">
+                        <i class="fas fa-plus"></i>
+                        新增案由
+                    </button>
+                </div>
+
+                <!-- 案由树形列表 -->
+                <div class="cause-container">
+                    <div class="cause-header">
+                        <span class="cause-title">案由列表</span>
+                        <button class="btn btn-secondary btn-sm" onclick="expandAll()">
+                            <i class="fas fa-expand-alt"></i>
+                            全部展开
+                        </button>
+                    </div>
+                    <div class="cause-tree" id="causeTree">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑案由模态框 -->
+    <div class="modal" id="causeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">新增案由</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">案由级别 <span style="color: var(--accent-danger);">*</span></label>
+                    <select class="form-select" id="causeLevel" onchange="onLevelChange()">
+                        <option value="1">一级案由</option>
+                        <option value="2">二级案由</option>
+                        <option value="3">三级案由</option>
+                    </select>
+                </div>
+                <div class="form-group" id="parentGroup" style="display: none;">
+                    <label class="form-label">上级案由 <span style="color: var(--accent-danger);">*</span></label>
+                    <select class="form-select" id="parentCause">
+                        <option value="">请选择上级案由</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">案由名称 <span style="color: var(--accent-danger);">*</span></label>
+                    <input type="text" class="form-input" id="causeName" placeholder="请输入案由名称">
+                    <div class="form-hint">案由名称将在Chat页面供用户选择</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">排序号</label>
+                    <input type="number" class="form-input" id="causeSort" placeholder="0" value="0">
+                    <div class="form-hint">数字越小排序越靠前</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveCause()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function(){
+        var pages=JSON.parse(localStorage.getItem('adminRolePages')||'[]');
+        if(pages.length===0)return;
+        document.querySelectorAll('.sidebar-nav .nav-item,.sidebar-nav .nav-sub-item').forEach(function(item){
+            var href=item.getAttribute('href');
+            if(!href||href==='#')return;
+            var pageName=href.replace('.html','');
+            if(pages.indexOf(pageName)===-1){item.style.display='none';}
+        });
+    })();
+
+        // 初始化数据 - 默认案由数据
+        let causeData = JSON.parse(localStorage.getItem('adminCauseData')) || [
+            {
+                id: 'c1',
+                name: '民事案由',
+                level: 1,
+                sort: 1,
+                status: 'online',
+                children: [
+                    {
+                        id: 'c1-1',
+                        name: '合同纠纷',
+                        level: 2,
+                        parentId: 'c1',
+                        sort: 1,
+                        status: 'online',
+                        children: [
+                            { id: 'c1-1-1', name: '买卖合同纠纷', level: 3, parentId: 'c1-1', sort: 1, status: 'online' },
+                            { id: 'c1-1-2', name: '借款合同纠纷', level: 3, parentId: 'c1-1', sort: 2, status: 'online' },
+                            { id: 'c1-1-3', name: '租赁合同纠纷', level: 3, parentId: 'c1-1', sort: 3, status: 'online' }
+                        ]
+                    },
+                    {
+                        id: 'c1-2',
+                        name: '侵权责任纠纷',
+                        level: 2,
+                        parentId: 'c1',
+                        sort: 2,
+                        status: 'online',
+                        children: [
+                            { id: 'c1-2-1', name: '机动车交通事故责任纠纷', level: 3, parentId: 'c1-2', sort: 1, status: 'online' },
+                            { id: 'c1-2-2', name: '医疗损害责任纠纷', level: 3, parentId: 'c1-2', sort: 2, status: 'online' },
+                            { id: 'c1-2-3', name: '产品责任纠纷', level: 3, parentId: 'c1-2', sort: 3, status: 'offline' }
+                        ]
+                    },
+                    {
+                        id: 'c1-3',
+                        name: '婚姻家庭纠纷',
+                        level: 2,
+                        parentId: 'c1',
+                        sort: 3,
+                        status: 'online',
+                        children: [
+                            { id: 'c1-3-1', name: '离婚纠纷', level: 3, parentId: 'c1-3', sort: 1, status: 'online' },
+                            { id: 'c1-3-2', name: '抚养纠纷', level: 3, parentId: 'c1-3', sort: 2, status: 'online' },
+                            { id: 'c1-3-3', name: '继承纠纷', level: 3, parentId: 'c1-3', sort: 3, status: 'online' }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: 'c2',
+                name: '刑事案由',
+                level: 1,
+                sort: 2,
+                status: 'online',
+                children: [
+                    {
+                        id: 'c2-1',
+                        name: '危害国家安全罪',
+                        level: 2,
+                        parentId: 'c2',
+                        sort: 1,
+                        status: 'offline',
+                        children: []
+                    },
+                    {
+                        id: 'c2-2',
+                        name: '危害公共安全罪',
+                        level: 2,
+                        parentId: 'c2',
+                        sort: 2,
+                        status: 'online',
+                        children: [
+                            { id: 'c2-2-1', name: '放火罪', level: 3, parentId: 'c2-2', sort: 1, status: 'online' },
+                            { id: 'c2-2-2', name: '交通肇事罪', level: 3, parentId: 'c2-2', sort: 2, status: 'online' }
+                        ]
+                    },
+                    {
+                        id: 'c2-3',
+                        name: '侵犯公民人身权利罪',
+                        level: 2,
+                        parentId: 'c2',
+                        sort: 3,
+                        status: 'online',
+                        children: [
+                            { id: 'c2-3-1', name: '故意杀人罪', level: 3, parentId: 'c2-3', sort: 1, status: 'online' },
+                            { id: 'c2-3-2', name: '故意伤害罪', level: 3, parentId: 'c2-3', sort: 2, status: 'online' },
+                            { id: 'c2-3-3', name: '强奸罪', level: 3, parentId: 'c2-3', sort: 3, status: 'online' }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: 'c3',
+                name: '行政案由',
+                level: 1,
+                sort: 3,
+                status: 'online',
+                children: [
+                    {
+                        id: 'c3-1',
+                        name: '行政处罚',
+                        level: 2,
+                        parentId: 'c3',
+                        sort: 1,
+                        status: 'online',
+                        children: [
+                            { id: 'c3-1-1', name: '治安行政处罚', level: 3, parentId: 'c3-1', sort: 1, status: 'online' },
+                            { id: 'c3-1-2', name: '环保行政处罚', level: 3, parentId: 'c3-1', sort: 2, status: 'online' }
+                        ]
+                    },
+                    {
+                        id: 'c3-2',
+                        name: '行政许可',
+                        level: 2,
+                        parentId: 'c3',
+                        sort: 2,
+                        status: 'online',
+                        children: []
+                    }
+                ]
+            },
+            {
+                id: 'c4',
+                name: '国家赔偿案由',
+                level: 1,
+                sort: 4,
+                status: 'offline',
+                children: []
+            },
+            {
+                id: 'c5',
+                name: '执行案由',
+                level: 1,
+                sort: 5,
+                status: 'online',
+                children: [
+                    {
+                        id: 'c5-1',
+                        name: '执行实施类',
+                        level: 2,
+                        parentId: 'c5',
+                        sort: 1,
+                        status: 'online',
+                        children: []
+                    }
+                ]
+            }
+        ];
+
+        let editingId = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            renderCauseTree();
+            updateStats();
+            
+            // 搜索框回车事件
+            document.getElementById('searchInput').addEventListener('input', function() {
+                searchCauses();
+            });
+        });
+
+        // 渲染案由树
+        function renderCauseTree() {
+            const treeContainer = document.getElementById('causeTree');
+            
+            if (causeData.length === 0) {
+                treeContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>暂无案由数据，点击右上角"新增案由"添加</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 按排序号排序
+            const sortedData = [...causeData].sort((a, b) => a.sort - b.sort);
+            
+            treeContainer.innerHTML = sortedData.map(level1 => {
+                const statusBadge = level1.status === 'offline' ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f3f4f6;color:#6b7280;margin-left:8px;">已下线</span>' : '';
+                const toggleBtn = level1.status === 'online'
+                    ? `<button class="cause-action-btn" onclick="toggleCauseStatus('${level1.id}')" title="下线" style="color:var(--accent-warning);"><i class="fas fa-arrow-down"></i></button>`
+                    : `<button class="cause-action-btn" onclick="toggleCauseStatus('${level1.id}')" title="上线" style="color:var(--accent-success);"><i class="fas fa-arrow-up"></i></button>`;
+                return `
+                <div class="cause-level-1" data-id="${level1.id}">
+                    <div class="cause-level-1-header" onclick="toggleCauseLevel1(this)">
+                        <i class="fas fa-chevron-right cause-expand-icon"></i>
+                        <span class="cause-level-1-name" style="${level1.status === 'offline' ? 'color:var(--text-muted);' : ''}">${escapeHtml(level1.name)}</span>
+                        ${statusBadge}
+                        <div class="cause-actions" onclick="event.stopPropagation()">
+                            ${toggleBtn}
+                            <button class="cause-action-btn" onclick="openAddModal(2, '${level1.id}')" title="添加二级案由">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="cause-action-btn" onclick="openEditModal('${level1.id}')" title="编辑">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="cause-action-btn delete" onclick="deleteCause('${level1.id}')" title="删除">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cause-level-2-container">
+                        ${renderLevel2(level1.children || [], level1.id)}
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        // 渲染二级案由
+        function renderLevel2(children, parentId) {
+            if (!children || children.length === 0) return '';
+            
+            const sorted = [...children].sort((a, b) => a.sort - b.sort);
+            
+            return sorted.map(level2 => {
+                const statusBadge = level2.status === 'offline' ? '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#f3f4f6;color:#6b7280;margin-left:6px;">已下线</span>' : '';
+                const toggleBtn = level2.status === 'online'
+                    ? `<button class="cause-action-btn" onclick="toggleCauseStatus('${level2.id}')" title="下线" style="color:var(--accent-warning);"><i class="fas fa-arrow-down"></i></button>`
+                    : `<button class="cause-action-btn" onclick="toggleCauseStatus('${level2.id}')" title="上线" style="color:var(--accent-success);"><i class="fas fa-arrow-up"></i></button>`;
+                return `
+                <div class="cause-level-2" data-id="${level2.id}">
+                    <div class="cause-level-2-header" onclick="toggleCauseLevel2(this)">
+                        <i class="fas fa-chevron-right cause-expand-icon"></i>
+                        <span class="cause-level-2-name" style="${level2.status === 'offline' ? 'color:var(--text-muted);' : ''}">${escapeHtml(level2.name)}</span>
+                        ${statusBadge}
+                        <div class="cause-actions" onclick="event.stopPropagation()">
+                            ${toggleBtn}
+                            <button class="cause-action-btn" onclick="openAddModal(3, '${level2.id}')" title="添加三级案由">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="cause-action-btn" onclick="openEditModal('${level2.id}')" title="编辑">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="cause-action-btn delete" onclick="deleteCause('${level2.id}')" title="删除">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cause-level-3-container">
+                        ${renderLevel3(level2.children || [])}
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        // 渲染三级案由
+        function renderLevel3(children) {
+            if (!children || children.length === 0) return '';
+            
+            const sorted = [...children].sort((a, b) => a.sort - b.sort);
+            
+            return sorted.map(level3 => {
+                const statusBadge = level3.status === 'offline' ? '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#f3f4f6;color:#6b7280;margin-left:6px;">已下线</span>' : '';
+                const toggleBtn = level3.status === 'online'
+                    ? `<button class="cause-action-btn" onclick="toggleCauseStatus('${level3.id}')" title="下线" style="color:var(--accent-warning);"><i class="fas fa-arrow-down"></i></button>`
+                    : `<button class="cause-action-btn" onclick="toggleCauseStatus('${level3.id}')" title="上线" style="color:var(--accent-success);"><i class="fas fa-arrow-up"></i></button>`;
+                return `
+                <div class="cause-level-3-item" data-id="${level3.id}">
+                    <span class="cause-level-3-name" style="${level3.status === 'offline' ? 'color:var(--text-muted);' : ''}">${escapeHtml(level3.name)}</span>
+                    ${statusBadge}
+                    <div class="cause-actions">
+                        ${toggleBtn}
+                        <button class="cause-action-btn" onclick="openEditModal('${level3.id}')" title="编辑">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="cause-action-btn delete" onclick="deleteCause('${level3.id}')" title="删除">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        // 切换一级案由展开/折叠
+        function toggleCauseLevel1(element) {
+            const level1 = element.closest('.cause-level-1');
+            level1.classList.toggle('expanded');
+        }
+
+        // 切换二级案由展开/折叠
+        function toggleCauseLevel2(element) {
+            const level2 = element.closest('.cause-level-2');
+            level2.classList.toggle('expanded');
+        }
+
+        // 全部展开
+        function expandAll() {
+            document.querySelectorAll('.cause-level-1').forEach(el => el.classList.add('expanded'));
+            document.querySelectorAll('.cause-level-2').forEach(el => el.classList.add('expanded'));
+        }
+
+        // 更新统计
+        function updateStats() {
+            let level1Count = 0;
+            let level2Count = 0;
+            let level3Count = 0;
+            let onlineCount = 0;
+            
+            causeData.forEach(level1 => {
+                level1Count++;
+                if (level1.status === 'online') onlineCount++;
+                (level1.children || []).forEach(level2 => {
+                    level2Count++;
+                    if (level2.status === 'online') onlineCount++;
+                    (level2.children || []).forEach(level3 => {
+                        level3Count++;
+                        if (level3.status === 'online') onlineCount++;
+                    });
+                });
+            });
+            
+            document.getElementById('level1Count').textContent = level1Count;
+            document.getElementById('level2Count').textContent = level2Count;
+            document.getElementById('level3Count').textContent = level3Count;
+            document.getElementById('totalCount').textContent = level1Count + level2Count + level3Count;
+        }
+
+        // 打开新增模态框
+        function openAddModal(level, parentId) {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = '新增案由';
+            document.getElementById('causeLevel').value = level || 1;
+            document.getElementById('causeName').value = '';
+            document.getElementById('causeSort').value = 0;
+            
+            onLevelChange();
+            
+            if (parentId) {
+                document.getElementById('parentCause').value = parentId;
+            }
+            
+            document.getElementById('causeModal').classList.add('active');
+        }
+
+        // 打开编辑模态框
+        function openEditModal(id) {
+            const cause = findCauseById(id);
+            if (!cause) return;
+            
+            editingId = id;
+            document.getElementById('modalTitle').textContent = '编辑案由';
+            document.getElementById('causeLevel').value = cause.level;
+            document.getElementById('causeName').value = cause.name;
+            document.getElementById('causeSort').value = cause.sort || 0;
+            
+            onLevelChange();
+            
+            if (cause.parentId) {
+                document.getElementById('parentCause').value = cause.parentId;
+            }
+            
+            document.getElementById('causeModal').classList.add('active');
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('causeModal').classList.remove('active');
+            editingId = null;
+        }
+
+        // 级别改变时更新上级选项
+        function onLevelChange() {
+            const level = parseInt(document.getElementById('causeLevel').value);
+            const parentGroup = document.getElementById('parentGroup');
+            const parentSelect = document.getElementById('parentCause');
+            
+            if (level === 1) {
+                parentGroup.style.display = 'none';
+            } else {
+                parentGroup.style.display = 'block';
+                
+                // 填充上级选项
+                let options = '<option value="">请选择上级案由</option>';
+                
+                if (level === 2) {
+                    // 二级案由的上级是一级案由
+                    causeData.forEach(level1 => {
+                        options += `<option value="${level1.id}">${escapeHtml(level1.name)}</option>`;
+                    });
+                } else if (level === 3) {
+                    // 三级案由的上级是二级案由
+                    causeData.forEach(level1 => {
+                        (level1.children || []).forEach(level2 => {
+                            options += `<option value="${level2.id}">${escapeHtml(level1.name)} > ${escapeHtml(level2.name)}</option>`;
+                        });
+                    });
+                }
+                
+                parentSelect.innerHTML = options;
+            }
+        }
+
+        // 保存案由
+        function saveCause() {
+            const level = parseInt(document.getElementById('causeLevel').value);
+            const name = document.getElementById('causeName').value.trim();
+            const sort = parseInt(document.getElementById('causeSort').value) || 0;
+            const parentId = document.getElementById('parentCause').value;
+            
+            if (!name) {
+                showNotification('请输入案由名称', 'error');
+                return;
+            }
+            
+            if (level > 1 && !parentId) {
+                showNotification('请选择上级案由', 'error');
+                return;
+            }
+            
+            if (editingId) {
+                // 编辑
+                updateCause(editingId, { name, sort, level, parentId });
+                showNotification('案由已更新');
+            } else {
+                // 新增
+                const newId = 'c' + Date.now();
+                const newCause = {
+                    id: newId,
+                    name,
+                    level,
+                    sort,
+                    status: 'online',
+                    parentId: parentId || undefined,
+                    children: []
+                };
+                
+                if (level === 1) {
+                    causeData.push(newCause);
+                } else if (level === 2) {
+                    const parent = findCauseById(parentId);
+                    if (parent) {
+                        if (!parent.children) parent.children = [];
+                        parent.children.push(newCause);
+                    }
+                } else if (level === 3) {
+                    const parent = findCauseById(parentId);
+                    if (parent) {
+                        if (!parent.children) parent.children = [];
+                        parent.children.push(newCause);
+                    }
+                }
+                
+                showNotification('案由已添加');
+            }
+            
+            saveToStorage();
+            renderCauseTree();
+            updateStats();
+            closeModal();
+        }
+
+        // 更新案由
+        function updateCause(id, data) {
+            const cause = findCauseById(id);
+            if (!cause) return;
+            
+            // 如果级别或上级改变了，需要移动位置
+            if (data.level !== cause.level || data.parentId !== cause.parentId) {
+                // 从原位置删除
+                deleteCauseFromData(id, false);
+                
+                // 重新添加到新位置
+                const newCause = {
+                    ...cause,
+                    name: data.name,
+                    sort: data.sort,
+                    level: data.level,
+                    parentId: data.parentId || undefined
+                };
+                
+                if (data.level === 1) {
+                    causeData.push(newCause);
+                } else {
+                    const parent = findCauseById(data.parentId);
+                    if (parent) {
+                        if (!parent.children) parent.children = [];
+                        parent.children.push(newCause);
+                    }
+                }
+            } else {
+                // 只更新字段
+                cause.name = data.name;
+                cause.sort = data.sort;
+            }
+        }
+
+        // 查找案由
+        function findCauseById(id) {
+            for (const level1 of causeData) {
+                if (level1.id === id) return level1;
+                for (const level2 of (level1.children || [])) {
+                    if (level2.id === id) return level2;
+                    for (const level3 of (level2.children || [])) {
+                        if (level3.id === id) return level3;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // 从数据中删除案由
+        function deleteCauseFromData(id, save = true) {
+            // 检查一级
+            const level1Index = causeData.findIndex(c => c.id === id);
+            if (level1Index > -1) {
+                causeData.splice(level1Index, 1);
+                if (save) saveToStorage();
+                return;
+            }
+            
+            // 检查二级和三级
+            for (const level1 of causeData) {
+                if (level1.children) {
+                    const level2Index = level1.children.findIndex(c => c.id === id);
+                    if (level2Index > -1) {
+                        level1.children.splice(level2Index, 1);
+                        if (save) saveToStorage();
+                        return;
+                    }
+                    
+                    for (const level2 of level1.children) {
+                        if (level2.children) {
+                            const level3Index = level2.children.findIndex(c => c.id === id);
+                            if (level3Index > -1) {
+                                level2.children.splice(level3Index, 1);
+                                if (save) saveToStorage();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 删除案由
+        function deleteCause(id) {
+            const cause = findCauseById(id);
+            if (!cause) return;
+            
+            const hasChildren = cause.children && cause.children.length > 0;
+            const confirmMsg = hasChildren 
+                ? `确定要删除"${cause.name}"吗？该操作将同时删除其下的所有子案由，此操作不可恢复。`
+                : `确定要删除"${cause.name}"吗？此操作不可恢复。`;
+            
+            if (confirm(confirmMsg)) {
+                deleteCauseFromData(id);
+                renderCauseTree();
+                updateStats();
+                showNotification('案由已删除');
+            }
+        }
+
+        // 搜索案由
+        function searchCauses() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            if (!keyword) {
+                renderCauseTree();
+                return;
+            }
+            
+            // 展开所有以方便查看搜索结果
+            setTimeout(() => expandAll(), 100);
+            
+            // 高亮匹配项
+            document.querySelectorAll('.cause-level-1-name, .cause-level-2-name, .cause-level-3-name').forEach(el => {
+                if (el.textContent.toLowerCase().includes(keyword)) {
+                    el.style.color = 'var(--accent-primary)';
+                    el.style.fontWeight = '600';
+                    
+                    // 确保父级展开
+                    const level1 = el.closest('.cause-level-1');
+                    const level2 = el.closest('.cause-level-2');
+                    
+                    if (level1) level1.classList.add('expanded');
+                    if (level2) level2.classList.add('expanded');
+                } else {
+                    el.style.color = '';
+                    el.style.fontWeight = '';
+                }
+            });
+        }
+
+        function toggleCauseStatus(id) {
+            const cause = findCauseById(id);
+            if (!cause) return;
+            const newStatus = cause.status === 'online' ? 'offline' : 'online';
+            const actionText = newStatus === 'online' ? '上线' : '下线';
+            if (cause.level < 3 && newStatus === 'offline') {
+                const onlineChildren = countOnlineChildren(cause);
+                if (onlineChildren > 0) {
+                    if (!confirm(`"${cause.name}"下有 ${onlineChildren} 个已上线的子案由，下线后将一并下线，确定要${actionText}吗？`)) return;
+                    setChildrenStatus(cause, 'offline');
+                }
+            }
+            if (cause.level === 3 && newStatus === 'online') {
+                const parent2 = findParentOf(id);
+                if (parent2 && parent2.status === 'offline') {
+                    showNotification('请先将上级案由上线', 'error');
+                    return;
+                }
+            }
+            cause.status = newStatus;
+            saveToStorage();
+            renderCauseTree();
+            updateStats();
+            showNotification(`案由已${actionText}`);
+        }
+
+        function countOnlineChildren(cause) {
+            let count = 0;
+            if (cause.status === 'online') count++;
+            (cause.children || []).forEach(c => { count += countOnlineChildren(c); });
+            return Math.max(0, count - (cause.status === 'online' ? 1 : 0));
+        }
+
+        function setChildrenStatus(cause, status) {
+            (cause.children || []).forEach(c => {
+                c.status = status;
+                setChildrenStatus(c, status);
+            });
+        }
+
+        function findParentOf(id) {
+            for (const l1 of causeData) {
+                for (const l2 of (l1.children || [])) {
+                    if (l2.id === id) return l1;
+                    for (const l3 of (l2.children || [])) {
+                        if (l3.id === id) return l2;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function filterOnlineCauses(data) {
+            return data
+                .filter(c => c.status === 'online')
+                .map(c => {
+                    const copy = { id: c.id, name: c.name, level: c.level, sort: c.sort };
+                    if (c.children && c.children.length > 0) {
+                        const onlineChildren = filterOnlineCauses(c.children);
+                        if (onlineChildren.length > 0) copy.children = onlineChildren;
+                    }
+                    return copy;
+                });
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('adminCauseData', JSON.stringify(causeData));
+            const onlineOnly = filterOnlineCauses(causeData);
+            localStorage.setItem('causeData', JSON.stringify(onlineOnly));
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 2500);
+        }
+
+        // 切换用户下拉菜单
+        function toggleUserDropdown() {
+            document.getElementById('userDropdown').classList.toggle('show');
+        }
+
+        // 点击页面其他区域关闭下拉菜单
+        document.addEventListener('click', function(e) {
+            const userMenu = document.getElementById('userMenu');
+            if (userMenu && !userMenu.contains(e.target)) {
+                const dropdown = document.getElementById('userDropdown');
+                if (dropdown) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        });
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                window.location.href = '../../index.html';
+            }
+        }
+
+        // 点击模态框背景关闭
+        document.getElementById('causeModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

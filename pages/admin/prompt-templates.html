@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提示词管理 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-logo { width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 12px; margin-bottom: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 16px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+        .header { height: var(--header-height); background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 50; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { color: var(--text-muted); font-size: 10px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-menu { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+        .user-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        .content { padding: 24px 32px; flex: 1; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .page-title-wrap h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .page-title-wrap p { font-size: 14px; color: var(--text-secondary); margin: 4px 0 0; }
+        .page-header-right { display: flex; align-items: center; gap: 12px; }
+        .business-switch { display: flex; gap: 4px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; }
+        .business-switch-btn { padding: 6px 14px; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+        .business-switch-btn.active { background: var(--accent-primary); color: white; }
+        .btn-restore { padding: 6px 14px; border: 1px solid #fecaca; background: #fef2f2; color: var(--accent-danger); font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-restore:hover { background: #fee2e2; }
+
+        .pt-body { display: flex; gap: 16px; min-height: 480px; }
+        .pt-left { width: 220px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px; height: fit-content; }
+        .pt-left-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; margin-bottom: 2px; }
+        .pt-left-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .pt-left-item.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .pt-left-item i { width: 16px; font-size: 13px; }
+        .pt-left-item .count { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+        .pt-right { flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .pt-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+        .pt-toolbar .title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+
+        .pt-list { padding: 8px 0; }
+        .pt-item { padding: 14px 18px; border-bottom: 1px solid #f3f4f6; display: flex; gap: 14px; align-items: flex-start; }
+        .pt-item:last-child { border-bottom: none; }
+        .pt-item:hover { background: var(--bg-primary); }
+        .pt-item-tag { flex-shrink: 0; min-width: 96px; padding: 4px 10px; background: var(--accent-light); color: var(--accent-primary); border-radius: 4px; font-size: 13px; font-weight: 500; text-align: center; }
+        .pt-item-tag.builtin { background: #dbeafe; color: #1e40af; }
+        .pt-item-tag.custom { background: #d1fae5; color: #065f46; }
+        .pt-item-body { flex: 1; min-width: 0; }
+        .pt-item-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 80px; overflow: hidden; position: relative; }
+        .pt-item-text.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: linear-gradient(to bottom, transparent, var(--bg-secondary)); }
+        .pt-item-meta { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+        .pt-item-actions { flex-shrink: 0; display: flex; gap: 6px; }
+        .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; font-family: inherit; }
+        .action-btn:hover { background: #f3f4f6; }
+        .action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
+        .action-btn.edit:hover { background: var(--accent-light); }
+        .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
+        .action-btn.delete:hover { background: #fef2f2; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
+        .empty-state p { font-size: 14px; margin: 0; }
+
+        .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-mask.show { display: flex; }
+        .modal-box { background: var(--bg-secondary); border-radius: 10px; padding: 24px; width: 560px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--text-primary); }
+        .form-row { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-label .required { color: var(--accent-danger); }
+        .form-input, .form-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent-primary); }
+        .form-textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; resize: vertical; min-height: 140px; box-sizing: border-box; line-height: 1.5; }
+        .form-textarea:focus { outline: none; border-color: var(--accent-primary); }
+        .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { background: #f3f4f6; color: #374151; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-confirm { background: var(--accent-primary); color: white; }
+        .btn-confirm:hover { background: #1d4ed8; }
+        .btn-confirm.danger { background: var(--accent-danger); }
+        .btn-confirm.danger:hover { background: #b91c1c; }
+
+        .notification { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; background: var(--bg-secondary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 2000; font-size: 14px; display: flex; align-items: center; gap: 8px; animation: slideIn 0.2s ease; }
+        .notification.success { border-left: 4px solid var(--accent-success); color: #065f46; }
+        .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
+        .notification.warning { border-left: 4px solid var(--accent-warning); color: #92400e; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-balance-scale"></i></div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item active"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>提示词管理</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-avatar">管</div>
+                        <div>
+                            <div class="user-name">管理员</div>
+                            <div class="user-role">系统管理员</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1>提示词管理</h1>
+                        <p>维护各文书类型的生成需求说明提示词</p>
+                    </div>
+                    <div class="page-header-right">
+                        <div class="business-switch">
+                            <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
+                            <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
+                            <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
+                        </div>
+                        <button class="btn-restore" onclick="restoreDefault()">
+                            <i class="fas fa-rotate-left"></i> 恢复默认
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-body">
+                    <div class="pt-left" id="ptLeft"></div>
+                    <div class="pt-right">
+                        <div class="pt-toolbar">
+                            <span class="title" id="rightTitle">全部提示词</span>
+                            <button class="btn btn-primary" onclick="openAddModal()">
+                                <i class="fas fa-plus"></i> 新增提示词
+                            </button>
+                        </div>
+                        <div class="pt-list" id="ptList"></div>
+                        <div id="emptyState" class="empty-state" style="display:none;">
+                            <i class="fas fa-comment-dots"></i>
+                            <p>暂无提示词，点击「新增提示词」创建</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div class="modal-mask" id="ptModal">
+        <div class="modal-box">
+            <h3 id="modalTitle">新增提示词</h3>
+            <div class="form-row">
+                <label class="form-label">所属文书类型 <span class="required">*</span></label>
+                <select class="form-select" id="ptDocType"></select>
+            </div>
+            <div class="form-row">
+                <label class="form-label">标签名 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="ptName" placeholder="如：支持原告全部诉请">
+            </div>
+            <div class="form-row">
+                <label class="form-label">提示词正文 <span class="required">*</span></label>
+                <textarea class="form-textarea" id="ptText" placeholder="支持换行；用户点击标签后会自动填入「需求说明」输入框"></textarea>
+                <div class="form-hint">支持 \\n 换行；空提示词的标签点击后清空需求说明</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-confirm" onclick="savePrompt()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-mask" id="confirmModal">
+        <div class="modal-box" style="width:400px;">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmText" style="font-size:14px; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;"></p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-confirm danger" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script src="../../js/case-data.js"></script>
+    <script src="../../js/admin-prompt-templates.js?v=1"></script>
+</body>
+</html>

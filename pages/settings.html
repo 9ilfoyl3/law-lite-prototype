@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - AI辅助办案系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/common.css">
+    <style>
+        /* Settings Page Styles */
+        .settings-page {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        .settings-header {
+            margin-bottom: 32px;
+        }
+
+        .settings-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .settings-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .settings-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .settings-tab {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .settings-tab:hover {
+            background: var(--nav-active-bg);
+            color: var(--text-primary);
+        }
+
+        .settings-tab.active {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .settings-content {
+            max-width: 800px;
+        }
+
+        .settings-section {
+            display: none;
+        }
+
+        .settings-section.active {
+            display: block;
+        }
+
+        .section-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .section-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .section-card-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Category Management Styles */
+        .category-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+
+        .category-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .category-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .category-icon.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .category-icon.green { background: #d1fae5; color: #059669; }
+        .category-icon.orange { background: #fef3c7; color: #d97706; }
+        .category-icon.purple { background: #ede9fe; color: #7c3aed; }
+        .category-icon.red { background: #fee2e2; color: #dc2626; }
+        .category-icon.cyan { background: #cffafe; color: #0891b2; }
+        .category-icon.pink { background: #fce7f3; color: #db2777; }
+        .category-icon.teal { background: #ccfbf1; color: #0d9488; }
+
+        .category-info {
+            flex: 1;
+        }
+
+        .category-name {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .category-meta {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .category-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .category-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .category-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .category-btn.delete {
+            border-color: #fee2e2;
+            color: #dc2626;
+            background: #fee2e2;
+        }
+
+        .category-btn.delete:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        .add-category-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px;
+            background: var(--bg-primary);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-category-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        /* Permission Warning */
+        .permission-warning {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 12px;
+            color: #92400e;
+            font-size: 14px;
+        }
+
+        .permission-warning i {
+            font-size: 20px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* Modal Styles (reused from knowledge.html) */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+
+        .modal-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 480px;
+            max-height: 90vh;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: transform 0.2s;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-backdrop.show .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-label .required {
+            color: #dc2626;
+            margin-left: 4px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Icon Selector */
+        .icon-selector {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+        }
+
+        .icon-option {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .icon-option:hover {
+            transform: scale(1.05);
+        }
+
+        .icon-option.selected {
+            border-color: var(--accent-primary);
+        }
+
+        .icon-option.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .icon-option.green { background: #d1fae5; color: #059669; }
+        .icon-option.orange { background: #fef3c7; color: #d97706; }
+        .icon-option.purple { background: #ede9fe; color: #7c3aed; }
+        .icon-option.red { background: #fee2e2; color: #dc2626; }
+        .icon-option.cyan { background: #cffafe; color: #0891b2; }
+        .icon-option.pink { background: #fce7f3; color: #db2777; }
+        .icon-option.teal { background: #ccfbf1; color: #0d9488; }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .settings-page {
+                padding: 20px;
+            }
+
+            .settings-tabs {
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+
+            .category-item {
+                flex-wrap: wrap;
+            }
+
+            .category-actions {
+                width: 100%;
+                justify-content: flex-end;
+                margin-top: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <i class="fas fa-cube"></i>
+        </div>
+        <div class="nav-items">
+            <a href="chat.html" class="nav-item">
+                <i class="fas fa-comments"></i>
+                <span>聊天</span>
+            </a>
+            <a href="tasks.html" class="nav-item">
+                <i class="fas fa-list-check"></i>
+                <span>全部</span>
+            </a>
+            <a href="cases.html" class="nav-item">
+                <i class="fas fa-folder"></i>
+                <span>案件</span>
+            </a>
+            <a href="documents.html" class="nav-item">
+                <i class="fas fa-file-signature"></i>
+                <span>文书</span>
+            </a>
+            <a href="knowledge.html" class="nav-item">
+                <i class="fas fa-book"></i>
+                <span>知识库</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <span style="font-size: 16px; font-weight: 500; color: var(--text-primary);">设置</span>
+            </div>
+            <div class="user-menu" id="userMenu" style="position: relative;">
+                <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-dropdown" id="userDropdown">
+                    <button class="user-dropdown-item" onclick="goToKnowledge()">
+                        <i class="fas fa-book"></i>
+                        <span>知识库</span>
+                    </button>
+                    <button class="user-dropdown-item logout" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>退出登录</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Settings Content -->
+        <div class="settings-page">
+            <div class="settings-header">
+                <h1 class="settings-title">系统设置</h1>
+                <p class="settings-subtitle">管理您的账户和系统配置</p>
+            </div>
+
+            <div class="settings-tabs">
+                <button class="settings-tab" onclick="switchTab('account')">账户信息</button>
+                <button class="settings-tab active" onclick="switchTab('public-kb')">全员公开库管理</button>
+            </div>
+
+            <div class="settings-content">
+                <!-- Account Tab -->
+                <div class="settings-section" id="accountTab">
+                    <div class="section-card">
+                        <div class="section-card-header">
+                            <div>
+                                <div class="section-card-title">账户信息</div>
+                                <div class="section-card-desc">查看您的账户基本信息</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <div class="user-avatar" style="width: 64px; height: 64px; font-size: 24px;">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div style="font-size: 16px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">管理员</div>
+                                    <div style="font-size: 13px; color: var(--text-muted);">admin@example.com</div>
+                                </div>
+                            </div>
+                            <div style="padding: 16px; background: var(--bg-primary); border-radius: 10px;">
+                                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">用户角色</div>
+                                <div style="font-size: 15px; font-weight: 500; color: var(--text-primary);">
+                                    <span id="userRoleDisplay">管理员</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Public KB Management Tab -->
+                <div class="settings-section active" id="publicKbTab">
+                    <!-- Non-admin Warning -->
+                    <div class="permission-warning" id="permissionWarning" style="display: none; margin-bottom: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>您没有权限管理全员公开库，请联系系统管理员。</span>
+                    </div>
+
+                    <!-- Admin Content -->
+                    <div id="adminContent">
+                        <div class="section-card">
+                            <div class="section-card-header">
+                                <div>
+                                    <div class="section-card-title">全员公开库分类管理</div>
+                                    <div class="section-card-desc">管理全员公开库中的知识库分类，包括新建、编辑和删除分类</div>
+                                </div>
+                            </div>
+                            <div class="category-list" id="categoryList">
+                                <!-- Categories will be rendered here -->
+                            </div>
+                            <div style="margin-top: 16px;">
+                                <button class="add-category-btn" onclick="openCategoryModal()">
+                                    <i class="fas fa-plus-circle"></i>
+                                    新建分类
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="section-card-header">
+                                <div>
+                                    <div class="section-card-title">用户角色切换（演示用）</div>
+                                    <div class="section-card-desc">切换用户角色以测试不同权限下的功能</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <span style="font-size: 14px; color: var(--text-secondary);">当前角色：</span>
+                                <select id="roleSelect" class="form-input" style="width: auto; min-width: 150px;" onchange="changeUserRole(this.value)">
+                                    <option value="user">普通用户</option>
+                                    <option value="admin" selected>管理员</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal-backdrop" id="categoryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="categoryModalTitle">新建分类</h3>
+                <button class="modal-close" onclick="closeCategoryModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="categoryId">
+                <div class="form-group">
+                    <label class="form-label">分类名称 <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="categoryName" placeholder="请输入分类名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">图标</label>
+                    <div class="icon-selector" id="categoryIconSelector">
+                        <div class="icon-option blue selected" data-icon="blue" data-class="fa-folder">
+                            <i class="fas fa-folder"></i>
+                        </div>
+                        <div class="icon-option green" data-icon="green" data-class="fa-folder-open">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <div class="icon-option orange" data-icon="orange" data-class="fa-archive">
+                            <i class="fas fa-archive"></i>
+                        </div>
+                        <div class="icon-option purple" data-icon="purple" data-class="fa-briefcase">
+                            <i class="fas fa-briefcase"></i>
+                        </div>
+                        <div class="icon-option red" data-icon="red" data-class="fa-flag">
+                            <i class="fas fa-flag"></i>
+                        </div>
+                        <div class="icon-option cyan" data-icon="cyan" data-class="fa-tag">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                        <div class="icon-option pink" data-icon="pink" data-class="fa-heart">
+                            <i class="fas fa-heart"></i>
+                        </div>
+                        <div class="icon-option teal" data-icon="teal" data-class="fa-bookmark">
+                            <i class="fas fa-bookmark"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCategoryModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveCategory()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/common.js"></script>
+    <script src="../js/knowledge.js"></script>
+    <script>
+        // 切换用户下拉菜单
+        function toggleUserDropdown() {
+            document.getElementById('userDropdown').classList.toggle('show');
+        }
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                window.location.href = '../index.html';
+            }
+        }
+
+        // 跳转到知识库
+        function goToKnowledge() {
+            window.location.href = 'knowledge.html';
+        }
+
+        // 点击外部关闭下拉菜单
+        document.addEventListener('click', function(e) {
+            const userMenu = document.getElementById('userMenu');
+            if (userMenu && !userMenu.contains(e.target)) {
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
+
+        // 切换标签页
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.settings-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update sections
+            document.querySelectorAll('.settings-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        // 渲染分类列表
+        function renderCategoryList() {
+            const container = document.getElementById('categoryList');
+            if (!container) return;
+
+            if (!isAdmin()) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-lock"></i>
+                        <p>您没有权限查看此内容</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (publicCategories.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-folder-open"></i>
+                        <p>暂无分类</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = publicCategories.map(cat => `
+                <div class="category-item">
+                    <div class="category-icon ${cat.icon}">
+                        <i class="fas ${cat.iconClass}"></i>
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">${cat.name}</div>
+                        <div class="category-meta">${cat.count} 个知识库 · ID: ${cat.id}</div>
+                    </div>
+                    <div class="category-actions">
+                        <button class="category-btn" onclick="editCategory('${cat.id}')">
+                            <i class="fas fa-edit"></i> 编辑
+                        </button>
+                        <button class="category-btn delete" onclick="deleteCategory('${cat.id}')">
+                            <i class="fas fa-trash-alt"></i> 删除
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 打开分类模态框
+        let editingCategoryId = null;
+        let selectedCategoryIcon = 'blue';
+        let selectedCategoryIconClass = 'fa-folder';
+
+        function openCategoryModal(categoryId = null) {
+            if (!isAdmin()) {
+                showNotification('只有管理员可以管理分类', 'warning');
+                return;
+            }
+
+            editingCategoryId = categoryId;
+            const modal = document.getElementById('categoryModal');
+            const title = document.getElementById('categoryModalTitle');
+            const nameInput = document.getElementById('categoryName');
+
+            if (categoryId) {
+                const category = publicCategories.find(c => c.id === categoryId);
+                if (!category) return;
+                title.textContent = '编辑分类';
+                nameInput.value = category.name;
+                selectedCategoryIcon = category.icon;
+                selectedCategoryIconClass = category.iconClass;
+            } else {
+                title.textContent = '新建分类';
+                nameInput.value = '';
+                selectedCategoryIcon = 'blue';
+                selectedCategoryIconClass = 'fa-folder';
+            }
+
+            renderIconSelector();
+            modal.classList.add('show');
+        }
+
+        // 关闭分类模态框
+        function closeCategoryModal() {
+            document.getElementById('categoryModal').classList.remove('show');
+            editingCategoryId = null;
+        }
+
+        // 渲染图标选择器
+        function renderIconSelector() {
+            document.querySelectorAll('#categoryIconSelector .icon-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.dataset.icon === selectedCategoryIcon) {
+                    option.classList.add('selected');
+                }
+            });
+        }
+
+        // 保存分类
+        function saveCategory() {
+            if (!isAdmin()) {
+                showNotification('只有管理员可以保存分类', 'warning');
+                return;
+            }
+
+            const name = document.getElementById('categoryName').value.trim();
+            if (!name) {
+                showNotification('请输入分类名称', 'warning');
+                return;
+            }
+
+            if (editingCategoryId) {
+                // 更新现有分类
+                const category = publicCategories.find(c => c.id === editingCategoryId);
+                if (category) {
+                    category.name = name;
+                    category.icon = selectedCategoryIcon;
+                    category.iconClass = selectedCategoryIconClass;
+                    showNotification('分类已更新', 'success');
+                }
+            } else {
+                // 创建新分类
+                const newId = 'public-' + Date.now();
+                publicCategories.push({
+                    id: newId,
+                    name: name,
+                    icon: selectedCategoryIcon,
+                    iconClass: selectedCategoryIconClass,
+                    count: 0
+                });
+                showNotification('分类创建成功', 'success');
+            }
+
+            renderCategoryList();
+            closeCategoryModal();
+        }
+
+        // 编辑分类
+        function editCategory(categoryId) {
+            openCategoryModal(categoryId);
+        }
+
+        // 删除分类
+        function deleteCategory(categoryId) {
+            if (!isAdmin()) {
+                showNotification('只有管理员可以删除分类', 'warning');
+                return;
+            }
+
+            if (!confirm('确定要删除此分类吗？该分类下的知识库将被移到"全部知识库"中。')) {
+                return;
+            }
+
+            const index = publicCategories.findIndex(c => c.id === categoryId);
+            if (index > -1) {
+                publicCategories.splice(index, 1);
+                renderCategoryList();
+                showNotification('分类已删除', 'success');
+            }
+        }
+
+        // 切换用户角色（演示用）
+        function changeUserRole(role) {
+            setUserRole(role);
+            updateUIByRole();
+            
+            // 更新知识库页面的权限（通过 localStorage 共享）
+            localStorage.setItem('userRole', role);
+            
+            showNotification(`已切换到${role === 'admin' ? '管理员' : '普通用户'}角色`, 'success');
+        }
+
+        // 根据角色更新 UI
+        function updateUIByRole() {
+            const isAdminUser = isAdmin();
+            
+            // 更新权限警告
+            const warning = document.getElementById('permissionWarning');
+            const adminContent = document.getElementById('adminContent');
+            const roleDisplay = document.getElementById('userRoleDisplay');
+            const roleSelect = document.getElementById('roleSelect');
+            
+            if (warning) warning.style.display = isAdminUser ? 'none' : 'flex';
+            if (adminContent) adminContent.style.display = isAdminUser ? 'block' : 'none';
+            if (roleDisplay) roleDisplay.textContent = isAdminUser ? '管理员' : '普通用户';
+            if (roleSelect) roleSelect.value = currentUserRole;
+            
+            // 重新渲染分类列表
+            renderCategoryList();
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从 localStorage 读取角色（用于跨页面同步）
+            const savedRole = localStorage.getItem('userRole');
+            if (savedRole) {
+                setUserRole(savedRole);
+            }
+            
+            updateUIByRole();
+
+            // 图标选择器事件
+            document.querySelectorAll('#categoryIconSelector .icon-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    selectedCategoryIcon = this.dataset.icon;
+                    selectedCategoryIconClass = this.dataset.class;
+                    renderIconSelector();
+                });
+            });
+
+            // 点击模态框背景关闭
+            document.getElementById('categoryModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeCategoryModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1208 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统初始化配置 - AI辅助办案系统</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-warning-light: #fffbeb;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --hover-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+
+        .sidebar-logo i {
+            color: white;
+            font-size: 20px;
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0 12px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: var(--accent-danger);
+            color: white;
+            border-color: var(--accent-danger);
+        }
+
+        .logout-btn i {
+            margin-right: 8px;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--accent-primary);
+        }
+
+        .breadcrumb-separator {
+            margin: 0 8px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            border: none;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .header-btn:hover {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 12px 6px 6px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .user-menu:hover {
+            background: var(--bg-primary);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .content {
+            flex: 1;
+            padding: 32px;
+        }
+
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .page-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* 提示条 */
+        .config-banner {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 24px;
+        }
+
+        .config-banner i {
+            font-size: 18px;
+        }
+
+        .config-banner.locked {
+            display: flex;
+            background: var(--accent-light);
+            color: var(--accent-primary);
+            border: 1px solid #bfdbfe;
+        }
+
+        .config-banner.unlocked {
+            display: flex;
+            background: var(--accent-warning-light);
+            color: #b45309;
+            border: 1px solid #fde68a;
+        }
+
+        /* 配置卡片 */
+        .config-card {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .config-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .config-card-indicator {
+            width: 4px;
+            height: 20px;
+            border-radius: 2px;
+        }
+
+        .config-card-indicator.blue { background: var(--accent-primary); }
+        .config-card-indicator.green { background: var(--accent-success); }
+        .config-card-indicator.purple { background: #8b5cf6; }
+        .config-card-indicator.orange { background: var(--accent-warning); }
+
+        .config-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .config-card-body {
+            padding: 24px;
+        }
+
+        /* 配置项行 - 两列布局 */
+        .config-row {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            align-items: center;
+            min-height: 48px;
+            padding: 8px 0;
+        }
+
+        .config-row + .config-row {
+            border-top: 1px solid var(--border-color);
+        }
+
+        .config-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .config-value {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* 表单输入 */
+        .form-input {
+            width: 100%;
+            max-width: 360px;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        .form-input:disabled {
+            background: #f3f4f6;
+            color: var(--text-muted);
+            cursor: not-allowed;
+            border-color: #e5e7eb;
+        }
+
+        .form-input[type="number"] {
+            max-width: 160px;
+        }
+
+        .form-hint {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Toggle 开关 */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: #d1d5db;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch.active {
+            background: var(--accent-primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+
+        .toggle-switch.active::after {
+            left: 25px;
+        }
+
+        .toggle-switch.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* 上传区域 */
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            max-width: 360px;
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .upload-area.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+        }
+
+        .upload-icon i {
+            font-size: 20px;
+            color: var(--accent-primary);
+        }
+
+        .upload-text {
+            font-size: 14px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* 底部操作栏 */
+        .config-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-save {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-unlock {
+            background: transparent;
+            color: var(--accent-warning);
+            border: 2px solid var(--accent-warning);
+        }
+
+        .btn-unlock:hover {
+            background: var(--accent-warning-light);
+        }
+
+        /* 用户下拉菜单 */
+        .user-dropdown.show {
+            display: block !important;
+        }
+
+        .user-dropdown-item:hover {
+            background: var(--bg-primary) !important;
+        }
+
+        /* 确认弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-box {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            width: 420px;
+            max-width: 90vw;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 24px 24px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .modal-icon.warning {
+            background: var(--accent-warning-light);
+            color: var(--accent-warning);
+        }
+
+        .modal-icon.info {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 16px 24px 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+        }
+
+        .modal-btn-cancel {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-btn-cancel:hover {
+            background: var(--border-color);
+        }
+
+        .modal-btn-confirm-warning {
+            background: var(--accent-warning);
+            color: white;
+        }
+
+        .modal-btn-confirm-warning:hover {
+            background: #d97706;
+        }
+
+        .modal-btn-confirm-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .modal-btn-confirm-primary:hover {
+            background: #1d4ed8;
+        }
+
+        /* 通知 */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .content {
+                padding: 16px;
+            }
+            .config-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .form-input {
+                max-width: 100%;
+            }
+            .form-input[type="number"] {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-cube"></i>
+                </div>
+                <div>
+                    <div class="sidebar-title">管理后台</div>
+                    <div class="sidebar-subtitle">AI辅助办案系统</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-balance-scale"></i><span>案由管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item active"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-microchip"></i><span>模型配置与用量</span></a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>退出登录</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+            <header class="header">
+                <div class="header-left">
+                    <nav class="breadcrumb">
+                        <a href="dashboard.html">首页</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span>系统初始化配置</span>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <button class="header-btn" title="通知">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button class="header-btn" title="帮助">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <div class="user-menu" id="userMenu" style="position: relative;">
+                        <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="user-dropdown" id="userDropdown" style="position: absolute; top: calc(100% + 8px); right: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--hover-shadow); min-width: 160px; z-index: 1001; display: none; overflow: hidden;">
+                            <button class="user-dropdown-item logout" onclick="logout()" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: var(--accent-danger); text-decoration: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none; background: none; width: 100%; text-align: left; font-family: inherit; border-top: 1px solid var(--border-color);">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>退出登录</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <h1 class="page-title">系统初始化配置</h1>
+                    <p class="page-description">系统部署时的初始化配置，配置完成后锁定，需超级管理员确认才能解锁修改</p>
+                </div>
+
+                <!-- 提示条 -->
+                <div class="config-banner" id="configBanner">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="bannerText"></span>
+                </div>
+
+                <!-- 系统信息 -->
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <div class="config-card-indicator blue"></div>
+                        <h3 class="config-card-title">系统信息</h3>
+                    </div>
+                    <div class="config-card-body">
+                        <div class="config-row">
+                            <div class="config-label">系统名称</div>
+                            <div class="config-value">
+                                <input type="text" class="form-input" id="systemName" value="AI辅助办案系统">
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">系统Logo</div>
+                            <div class="config-value">
+                                <div class="upload-area" id="logoUploadArea" onclick="handleUploadClick()">
+                                    <div class="upload-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <div class="upload-text" id="logoUploadText">点击上传Logo</div>
+                                    <div class="upload-hint">支持 JPG、PNG 格式，建议尺寸 200x200</div>
+                                    <input type="file" id="logoFileInput" accept=".jpg,.jpeg,.png" style="display:none" onchange="handleLogoUpload(this)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 登录安全 -->
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <div class="config-card-indicator green"></div>
+                        <h3 class="config-card-title">登录安全</h3>
+                    </div>
+                    <div class="config-card-body">
+                        <div class="config-row">
+                            <div class="config-label">登录验证码</div>
+                            <div class="config-value">
+                                <div class="toggle-switch active" id="switchCaptcha" onclick="toggleSwitch(this)"></div>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">双因素认证</div>
+                            <div class="config-value">
+                                <div class="toggle-switch" id="switch2FA" onclick="toggleSwitch(this)"></div>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">最大登录失败次数</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="maxLoginFail" value="5">
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">账号锁定时间(分钟)</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="lockDuration" value="30">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 密码策略 -->
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <div class="config-card-indicator purple"></div>
+                        <h3 class="config-card-title">密码策略</h3>
+                    </div>
+                    <div class="config-card-body">
+                        <div class="config-row">
+                            <div class="config-label">最小密码长度</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="minPwdLen" value="8">
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">密码有效期(天)</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="pwdExpiry" value="90">
+                                <span class="form-hint">0 表示永不过期</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">要求大小写字母</div>
+                            <div class="config-value">
+                                <div class="toggle-switch active" id="switchUpperLower" onclick="toggleSwitch(this)"></div>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">要求包含数字</div>
+                            <div class="config-value">
+                                <div class="toggle-switch active" id="switchDigit" onclick="toggleSwitch(this)"></div>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">要求特殊字符</div>
+                            <div class="config-value">
+                                <div class="toggle-switch" id="switchSpecial" onclick="toggleSwitch(this)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 会话与文件 -->
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <div class="config-card-indicator orange"></div>
+                        <h3 class="config-card-title">会话与文件</h3>
+                    </div>
+                    <div class="config-card-body">
+                        <div class="config-row">
+                            <div class="config-label">会话超时时间(分钟)</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="sessionTimeout" value="30">
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">单文件最大大小(MB)</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="maxFileSize" value="50">
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-label">允许的文件格式</div>
+                            <div class="config-value">
+                                <input type="text" class="form-input" id="allowedFormats" value="pdf,doc,docx,xls,xlsx,png,jpg,jpeg">
+                                <span class="form-hint">多个格式用逗号分隔</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 底部操作 -->
+                <div class="config-actions" id="configActions"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-icon" id="modalIcon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="modal-title" id="modalTitle">确认操作</div>
+            </div>
+            <div class="modal-body" id="modalBody">确认内容</div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn" id="modalConfirmBtn" onclick="confirmAction()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function(){
+        var pages=JSON.parse(localStorage.getItem('adminRolePages')||'[]');
+        if(pages.length===0)return;
+        document.querySelectorAll('.sidebar-nav .nav-item,.sidebar-nav .nav-sub-item').forEach(function(item){
+            var href=item.getAttribute('href');
+            if(!href||href==='#')return;
+            var pageName=href.replace('.html','');
+            if(pages.indexOf(pageName)===-1){item.style.display='none';}
+        });
+    })();
+
+    // 默认配置
+    var DEFAULT_CONFIG = {
+        systemName: 'AI辅助办案系统',
+        loginCaptcha: true,
+        twoFA: false,
+        maxLoginFail: 5,
+        lockDuration: 30,
+        minPwdLen: 8,
+        pwdExpiry: 90,
+        requireUpperLower: true,
+        requireDigit: true,
+        requireSpecial: false,
+        sessionTimeout: 30,
+        maxFileSize: 50,
+        allowedFormats: 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg'
+    };
+
+    // 状态: 'unconfigured' | 'locked' | 'unlocking'
+    var configState = 'unconfigured';
+    var currentConfig = {};
+    var pendingAction = null; // 'unlock' | 'lock'
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadState();
+    });
+
+    function loadState() {
+        var stored = localStorage.getItem('adminSystemConfig');
+        if (!stored) {
+            // 未配置状态
+            configState = 'unconfigured';
+            currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+        } else {
+            var data = JSON.parse(stored);
+            currentConfig = data.config || JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+            if (data.locked) {
+                configState = 'locked';
+            } else {
+                configState = 'unlocking';
+            }
+        }
+        applyConfigToForm();
+        applyState();
+    }
+
+    function applyConfigToForm() {
+        document.getElementById('systemName').value = currentConfig.systemName || '';
+        setSwitch('switchCaptcha', currentConfig.loginCaptcha);
+        setSwitch('switch2FA', currentConfig.twoFA);
+        document.getElementById('maxLoginFail').value = currentConfig.maxLoginFail;
+        document.getElementById('lockDuration').value = currentConfig.lockDuration;
+        document.getElementById('minPwdLen').value = currentConfig.minPwdLen;
+        document.getElementById('pwdExpiry').value = currentConfig.pwdExpiry;
+        setSwitch('switchUpperLower', currentConfig.requireUpperLower);
+        setSwitch('switchDigit', currentConfig.requireDigit);
+        setSwitch('switchSpecial', currentConfig.requireSpecial);
+        document.getElementById('sessionTimeout').value = currentConfig.sessionTimeout;
+        document.getElementById('maxFileSize').value = currentConfig.maxFileSize;
+        document.getElementById('allowedFormats').value = currentConfig.allowedFormats;
+    }
+
+    function readConfigFromForm() {
+        return {
+            systemName: document.getElementById('systemName').value.trim(),
+            loginCaptcha: getSwitch('switchCaptcha'),
+            twoFA: getSwitch('switch2FA'),
+            maxLoginFail: parseInt(document.getElementById('maxLoginFail').value) || 5,
+            lockDuration: parseInt(document.getElementById('lockDuration').value) || 30,
+            minPwdLen: parseInt(document.getElementById('minPwdLen').value) || 8,
+            pwdExpiry: parseInt(document.getElementById('pwdExpiry').value) || 90,
+            requireUpperLower: getSwitch('switchUpperLower'),
+            requireDigit: getSwitch('switchDigit'),
+            requireSpecial: getSwitch('switchSpecial'),
+            sessionTimeout: parseInt(document.getElementById('sessionTimeout').value) || 30,
+            maxFileSize: parseInt(document.getElementById('maxFileSize').value) || 50,
+            allowedFormats: document.getElementById('allowedFormats').value.trim()
+        };
+    }
+
+    function applyState() {
+        var banner = document.getElementById('configBanner');
+        var bannerText = document.getElementById('bannerText');
+        var actionsEl = document.getElementById('configActions');
+        var inputs = document.querySelectorAll('.form-input');
+        var switches = document.querySelectorAll('.toggle-switch');
+        var uploadArea = document.getElementById('logoUploadArea');
+
+        if (configState === 'unconfigured') {
+            // 未配置：无提示条，可编辑，显示"保存并锁定"
+            banner.className = 'config-banner';
+            banner.style.display = 'none';
+            inputs.forEach(function(el) { el.disabled = false; });
+            switches.forEach(function(el) { el.classList.remove('disabled'); });
+            uploadArea.classList.remove('disabled');
+            actionsEl.innerHTML = '<button class="btn btn-save" onclick="onSaveAndLock()"><i class="fas fa-lock"></i> 保存并锁定</button>';
+        } else if (configState === 'locked') {
+            // 已锁定：蓝色提示条，只读，显示"解锁修改"
+            banner.className = 'config-banner locked';
+            banner.style.display = 'flex';
+            bannerText.textContent = '系统配置已锁定，如需修改请点击下方"解锁修改"按钮';
+            inputs.forEach(function(el) { el.disabled = true; });
+            switches.forEach(function(el) { el.classList.add('disabled'); });
+            uploadArea.classList.add('disabled');
+            actionsEl.innerHTML = '<button class="btn btn-unlock" onclick="onUnlock()"><i class="fas fa-unlock-alt"></i> 解锁修改</button>';
+        } else if (configState === 'unlocking') {
+            // 解锁中：橙色提示条，可编辑，显示"保存并锁定"
+            banner.className = 'config-banner unlocked';
+            banner.style.display = 'flex';
+            bannerText.textContent = '配置已解锁，修改完成后请及时锁定';
+            inputs.forEach(function(el) { el.disabled = false; });
+            switches.forEach(function(el) { el.classList.remove('disabled'); });
+            uploadArea.classList.remove('disabled');
+            actionsEl.innerHTML = '<button class="btn btn-save" onclick="onSaveAndLock()"><i class="fas fa-lock"></i> 保存并锁定</button>';
+        }
+    }
+
+    // 开关操作
+    function setSwitch(id, active) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (active) el.classList.add('active');
+        else el.classList.remove('active');
+    }
+
+    function getSwitch(id) {
+        var el = document.getElementById(id);
+        return el ? el.classList.contains('active') : false;
+    }
+
+    function toggleSwitch(el) {
+        if (el.classList.contains('disabled')) return;
+        el.classList.toggle('active');
+    }
+
+    // 上传
+    function handleUploadClick() {
+        var uploadArea = document.getElementById('logoUploadArea');
+        if (uploadArea.classList.contains('disabled')) return;
+        document.getElementById('logoFileInput').click();
+    }
+
+    function handleLogoUpload(input) {
+        var file = input.files[0];
+        if (!file) return;
+        if (!['image/jpeg', 'image/png'].includes(file.type)) {
+            showNotification('请上传 JPG 或 PNG 格式', 'error'); return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            showNotification('Logo文件不能超过2MB', 'error'); return;
+        }
+        document.getElementById('logoUploadText').textContent = file.name + '（点击更换）';
+        showNotification('Logo已上传');
+    }
+
+    // 解锁
+    function onUnlock() {
+        pendingAction = 'unlock';
+        showModal(
+            'warning',
+            '确认解锁',
+            '解锁后配置项可被修改，确认解锁？',
+            'modal-btn-confirm-warning'
+        );
+    }
+
+    // 保存并锁定
+    function onSaveAndLock() {
+        var name = document.getElementById('systemName').value.trim();
+        if (!name) {
+            showNotification('系统名称不能为空', 'error');
+            return;
+        }
+        pendingAction = 'lock';
+        showModal(
+            'info',
+            '确认锁定',
+            '配置锁定后需超级管理员才能解锁修改，确认锁定？',
+            'modal-btn-confirm-primary'
+        );
+    }
+
+    // 弹窗
+    function showModal(iconType, title, body, confirmClass) {
+        var overlay = document.getElementById('modalOverlay');
+        var icon = document.getElementById('modalIcon');
+        var titleEl = document.getElementById('modalTitle');
+        var bodyEl = document.getElementById('modalBody');
+        var confirmBtn = document.getElementById('modalConfirmBtn');
+
+        icon.className = 'modal-icon ' + iconType;
+        if (iconType === 'warning') {
+            icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+        } else {
+            icon.innerHTML = '<i class="fas fa-lock"></i>';
+        }
+        titleEl.textContent = title;
+        bodyEl.textContent = body;
+        confirmBtn.className = 'modal-btn ' + confirmClass;
+        overlay.classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('modalOverlay').classList.remove('show');
+        pendingAction = null;
+    }
+
+    function confirmAction() {
+        closeModal();
+        if (pendingAction === 'unlock') {
+            configState = 'unlocking';
+            applyState();
+        } else if (pendingAction === 'lock') {
+            currentConfig = readConfigFromForm();
+            localStorage.setItem('adminSystemConfig', JSON.stringify({
+                locked: true,
+                config: currentConfig
+            }));
+            configState = 'locked';
+            applyState();
+            showNotification('配置已保存并锁定');
+        }
+        pendingAction = null;
+    }
+
+    // 通知
+    function showNotification(message, type) {
+        type = type || 'success';
+        var n = document.createElement('div');
+        n.style.cssText = 'position:fixed;top:20px;right:20px;padding:14px 20px;border-radius:10px;color:white;font-size:14px;font-weight:500;z-index:3000;animation:slideIn 0.3s ease;display:flex;align-items:center;gap:10px;';
+        n.style.background = type === 'success' ? '#10b981' : '#dc2626';
+        n.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i><span>' + message + '</span>';
+        document.body.appendChild(n);
+        setTimeout(function() { n.remove(); }, 2500);
+    }
+
+    // 用户菜单
+    function toggleUserDropdown() {
+        document.getElementById('userDropdown').classList.toggle('show');
+    }
+
+    function logout() {
+        if (confirm('确定要退出登录吗？')) window.location.href = '../../index.html';
+    }
+
+    document.addEventListener('click', function(e) {
+        var userMenu = document.getElementById('userMenu');
+        if (userMenu && !userMenu.contains(e.target)) {
+            document.getElementById('userDropdown').classList.remove('show');
+        }
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI文书生成 - AI辅助办案系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/common.css">
+    <style>
+        /* 页面布局 */
+        .gen-sidebar {
+            width: 56px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 12px;
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            z-index: 100;
+        }
+        .gen-side-btn {
+            width: 40px; height: 40px;
+            border: none; border-radius: 10px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .gen-side-btn:hover {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .gen-main {
+            margin-left: 56px;
+            flex: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 固定顶部区域 */
+        .gen-header {
+            background: var(--bg-primary);
+            padding: 20px 36px 0;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .gen-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .gen-topbar-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .gen-topbar-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .gen-config-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .gen-config-tag {
+            padding: 4px 12px;
+            background: var(--accent-light);
+            color: var(--accent-primary);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* 步骤进度条 */
+        .gen-progress-bar {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0 8px 20px;
+            overflow-x: auto;
+        }
+        .gen-progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+            cursor: default;
+        }
+        .gen-progress-step.clickable { cursor: pointer; }
+        .gen-progress-step.clickable:hover .gen-progress-dot { transform: scale(1.15); }
+        .gen-progress-dot {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            background: var(--bg-secondary);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: all 0.3s;
+        }
+        .gen-progress-dot.waiting { border-color: var(--border-color); color: var(--text-muted); }
+        .gen-progress-dot.current { border-color: var(--accent-primary); background: var(--accent-primary); color: #fff; animation: pulse 1.5s infinite; }
+        .gen-progress-dot.done { border-color: #059669; background: #059669; color: #fff; }
+        .gen-progress-dot.viewing { border-color: var(--accent-primary); background: var(--bg-secondary); color: var(--accent-primary); border-width: 3px; }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(37,99,235,0); }
+        }
+        .gen-progress-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .gen-progress-label.active { color: var(--accent-primary); font-weight: 500; }
+        .gen-progress-label.done { color: #059669; }
+        .gen-progress-label.viewing { color: var(--accent-primary); font-weight: 600; }
+        .gen-progress-line {
+            flex: 1;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0 4px;
+            margin-bottom: 24px;
+            min-width: 20px;
+            transition: background 0.3s;
+        }
+        .gen-progress-line.done { background: #059669; }
+
+        /* 主内容区 */
+        .gen-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 28px 36px;
+        }
+
+        /* 单步卡片 */
+        .gen-step-detail {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-width: 900px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        .gen-step-detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .gen-step-detail-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .gen-step-detail-icon {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px;
+        }
+        .gen-step-detail-icon.waiting { background: #f3f4f6; color: var(--text-muted); }
+        .gen-step-detail-icon.current { background: var(--accent-light); color: var(--accent-primary); }
+        .gen-step-detail-icon.done { background: #d1fae5; color: #059669; }
+        .gen-step-detail-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .gen-step-status {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .gen-step-status.waiting { background: #f3f4f6; color: var(--text-muted); }
+        .gen-step-status.current { background: var(--accent-light); color: var(--accent-primary); }
+        .gen-step-status.done { background: #d1fae5; color: #059669; }
+        .gen-edit-btn {
+            padding: 5px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .gen-edit-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+
+        /* 步骤内容 */
+        .gen-step-detail-content {
+            padding: 20px 24px;
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--text-primary);
+            min-height: 200px;
+        }
+        /* 骨架屏 */
+        .gen-skeleton {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 4px 0;
+        }
+        .gen-skeleton-line {
+            height: 14px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        /* 内容样式 */
+        .gen-step-detail-content .info-row {
+            display: flex;
+            gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        .gen-step-detail-content .info-row:last-child { border-bottom: none; }
+        .gen-step-detail-content .info-label {
+            color: var(--text-secondary);
+            min-width: 80px;
+            flex-shrink: 0;
+        }
+        .gen-step-detail-content .info-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .gen-step-detail-content .content-item {
+            padding: 8px 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        .gen-step-detail-content .content-item:last-child { border-bottom: none; }
+        .gen-step-detail-content .content-item-num {
+            color: var(--accent-primary);
+            font-weight: 600;
+            margin-right: 6px;
+        }
+        /* 渐入动画 */
+        .gen-step-detail-content.fade-in {
+            animation: genFadeIn 0.5s ease;
+        }
+        @keyframes genFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* 编辑模式 */
+        .gen-edit-textarea {
+            width: 100%;
+            min-height: 240px;
+            padding: 12px;
+            border: 1px solid var(--accent-primary);
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.8;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            outline: none;
+            resize: vertical;
+        }
+        .gen-edit-textarea:focus { box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .gen-edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .gen-edit-save, .gen-edit-cancel {
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+        .gen-edit-save {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .gen-edit-save:hover { background: #1d4ed8; }
+        .gen-edit-cancel {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+        }
+        .gen-edit-cancel:hover { background: var(--bg-primary); }
+
+        /* 底部导航 */
+        .gen-step-nav {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 20px 0 28px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .gen-nav-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .gen-nav-btn:hover:not(:disabled) { background: var(--bg-primary); border-color: var(--text-muted); }
+        .gen-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .gen-nav-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .gen-nav-btn.primary:hover:not(:disabled) { background: #1d4ed8; }
+
+        /* 完成按钮 */
+        .gen-complete-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            padding: 0 0 28px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .gen-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 22px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .gen-action-btn:hover { background: var(--bg-primary); border-color: var(--text-muted); }
+        .gen-action-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .gen-action-btn.primary:hover { background: #1d4ed8; }
+
+        /* 历史文书面板 */
+        .gen-history-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        .gen-history-overlay.show { opacity: 1; visibility: visible; }
+        .gen-history-panel {
+            position: fixed;
+            right: 0; top: 0; bottom: 0;
+            width: 400px;
+            background: var(--bg-secondary);
+            box-shadow: -4px 0 24px rgba(0,0,0,0.1);
+            z-index: 201;
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        .gen-history-panel.show { transform: translateX(0); }
+        .gen-history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .gen-history-header button {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+        .gen-history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        .gen-history-item {
+            padding: 14px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .gen-history-item:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+        .gen-history-item-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .gen-history-item-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 8px;
+        }
+        .gen-history-item-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .gen-history-item-btn {
+            padding: 3px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .gen-history-item-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .gen-history-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .gen-history-empty i { font-size: 36px; opacity: 0.4; margin-bottom: 12px; }
+
+        /* 滚动条美化 */
+        .gen-content::-webkit-scrollbar,
+        .gen-history-list::-webkit-scrollbar,
+        .gen-progress-bar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .gen-content::-webkit-scrollbar-thumb,
+        .gen-history-list::-webkit-scrollbar-thumb,
+        .gen-progress-bar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <!-- 左侧边栏 -->
+    <div class="gen-sidebar">
+        <button class="gen-side-btn" onclick="goBack()" title="返回案件列表">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <button class="gen-side-btn" onclick="toggleHistory()" title="历史文书">
+            <i class="fas fa-history"></i>
+        </button>
+    </div>
+
+    <!-- 主区域 -->
+    <div class="gen-main">
+        <!-- 固定顶部：信息栏 + 进度条 -->
+        <div class="gen-header">
+            <div class="gen-topbar">
+                <div>
+                    <div class="gen-topbar-title">AI文书生成</div>
+                    <div class="gen-topbar-subtitle" id="genCaseName"></div>
+                </div>
+                <div class="gen-config-tags" id="genConfigTags"></div>
+            </div>
+            <div class="gen-progress-bar" id="genProgressBar"></div>
+        </div>
+
+        <!-- 主内容区：单步展示 -->
+        <div class="gen-content">
+            <div class="gen-step-detail" id="genStepDetail">
+                <!-- JS 动态渲染 -->
+            </div>
+
+            <!-- 底部导航 -->
+            <div class="gen-step-nav" id="genStepNav">
+                <button class="gen-nav-btn" id="genPrevBtn" onclick="prevStep()" disabled>
+                    <i class="fas fa-chevron-left"></i> 上一步
+                </button>
+                <button class="gen-nav-btn primary" id="genNextBtn" onclick="nextStep()" style="display:none;">
+                    下一步 <i class="fas fa-chevron-right"></i>
+                </button>
+                <button class="gen-nav-btn primary" id="genFinishBtn" onclick="finishGeneration()" style="display:none;">
+                    <i class="fas fa-check"></i> 完成生成
+                </button>
+            </div>
+
+            <!-- 完成后操作按钮 -->
+            <div class="gen-complete-actions" id="genCompleteActions" style="display:none;">
+                <button class="gen-action-btn primary" onclick="previewGeneratedDoc()">
+                    <i class="fas fa-eye"></i> 预览文书
+                </button>
+                <button class="gen-action-btn primary" onclick="downloadGeneratedDoc()">
+                    <i class="fas fa-download"></i> 下载
+                </button>
+                <button class="gen-action-btn" onclick="refineGeneratedDoc()">
+                    <i class="fas fa-magic"></i> 文书精修
+                </button>
+                <button class="gen-action-btn" onclick="goBack()">
+                    <i class="fas fa-list"></i> 返回案件列表
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 历史文书侧滑面板 -->
+    <div class="gen-history-overlay" id="genHistoryOverlay" onclick="toggleHistory()"></div>
+    <div class="gen-history-panel" id="genHistoryPanel">
+        <div class="gen-history-header">
+            <span>历史文书</span>
+            <button onclick="toggleHistory()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="gen-history-list" id="genHistoryList"></div>
+    </div>
+
+    <script src="../js/common.js"></script>
+    <script src="../js/case-data.js"></script>
+    <script src="../js/doc-generation.js"></script>
+</body>
+</html>

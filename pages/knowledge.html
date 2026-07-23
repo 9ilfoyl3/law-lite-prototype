@@ -1,0 +1,2377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识库 - AI辅助办案系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/common.css">
+    <style>
+        /* Knowledge Page Styles */
+        .knowledge-page {
+            flex: 1;
+            display: flex;
+            padding: 32px;
+            gap: 32px;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .knowledge-sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .knowledge-sidebar-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .knowledge-sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .knowledge-sidebar-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .knowledge-sidebar-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .kb-category {
+            margin-bottom: 8px;
+        }
+
+        .kb-category-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .kb-category-header:hover {
+            background: var(--nav-active-bg);
+        }
+
+        .kb-category-header.active {
+            background: var(--accent-light);
+        }
+
+        .kb-category-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .kb-category-icon.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .kb-category-icon.green { background: #d1fae5; color: #059669; }
+        .kb-category-icon.orange { background: #fef3c7; color: #d97706; }
+        .kb-category-icon.purple { background: #ede9fe; color: #7c3aed; }
+        .kb-category-icon.red { background: #fee2e2; color: #dc2626; }
+        .kb-category-icon.cyan { background: #cffafe; color: #0891b2; }
+        .kb-category-icon.pink { background: #fce7f3; color: #db2777; }
+        .kb-category-icon.teal { background: #ccfbf1; color: #0d9488; }
+
+        .kb-category-info { flex: 1; }
+        .kb-category-name { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+        .kb-category-count { font-size: 12px; color: var(--text-muted); }
+
+        /* Category Group */
+        .kb-category-group {
+            margin-bottom: 8px;
+        }
+
+        .kb-category-group-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 8px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+        }
+
+        .kb-category-group-title:hover {
+            color: var(--text-primary);
+        }
+
+        .kb-category-group-title-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kb-category-group-title i {
+            font-size: 14px;
+        }
+
+        .kb-category-group-toggle {
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+
+        .kb-category-group.collapsed .kb-category-group-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .kb-category-group-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.2s;
+            max-height: 1000px;
+            opacity: 1;
+        }
+
+        .kb-category-group.collapsed .kb-category-group-content {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .kb-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 12px 16px;
+        }
+
+        .personal-storage-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            background: #f0f7ff;
+            border: 1px solid #d4e6ff;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+        .storage-bar-left { color: #1a1a2e; font-weight: 500; }
+        .storage-bar-right { color: #2563eb; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .storage-progress-track {
+            height: 5px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            margin: 0 14px 12px;
+            overflow: hidden;
+        }
+        .storage-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #2563eb);
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .kb-category-add {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            margin-top: 4px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px dashed var(--border-color);
+        }
+
+        .kb-category-add:hover {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .kb-category-add i {
+            font-size: 14px;
+        }
+
+        .category-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .kb-category:hover .category-actions {
+            opacity: 1;
+        }
+
+        /* 非管理员用户不显示操作按钮悬停效果 */
+        .kb-category.no-actions:hover .category-actions {
+            display: none;
+        }
+
+        .category-action-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .category-action-btn:hover {
+            background: var(--nav-active-bg);
+            color: var(--text-primary);
+        }
+
+        .category-action-btn.delete:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        /* Main Content */
+        .knowledge-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .knowledge-main-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .knowledge-main-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .knowledge-main-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-btn-primary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .action-btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .action-btn-secondary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn-secondary:hover {
+            background: var(--bg-primary);
+        }
+
+        /* Search Box */
+        .knowledge-search {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .knowledge-search input {
+            width: 100%;
+            padding: 14px 20px 14px 52px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 15px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .knowledge-search input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .knowledge-search i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 18px;
+        }
+
+        /* Knowledge Grid */
+        .knowledge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .kb-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .kb-card:hover {
+            border-color: var(--accent-primary);
+            box-shadow: var(--hover-shadow);
+            transform: translateY(-2px);
+        }
+
+        .kb-card-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .kb-card-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .kb-card-icon.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .kb-card-icon.green { background: #d1fae5; color: #059669; }
+        .kb-card-icon.orange { background: #fef3c7; color: #d97706; }
+        .kb-card-icon.purple { background: #ede9fe; color: #7c3aed; }
+        .kb-card-icon.red { background: #fee2e2; color: #dc2626; }
+        .kb-card-icon.cyan { background: #cffafe; color: #0891b2; }
+        .kb-card-icon.pink { background: #fce7f3; color: #db2777; }
+        .kb-card-icon.teal { background: #ccfbf1; color: #0d9488; }
+
+        .kb-card-info { flex: 1; }
+        .kb-card-name { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+        .kb-card-meta { font-size: 13px; color: var(--text-muted); }
+
+        .kb-card-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .kb-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .kb-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--tag-bg);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--tag-text);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .kb-tag:hover {
+            background: #bae6fd;
+            transform: translateY(-1px);
+        }
+
+        .kb-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .kb-card-stats {
+            display: flex;
+            gap: 16px;
+        }
+
+        .kb-card-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .kb-card-stat i { font-size: 12px; }
+
+        .kb-card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .kb-card-action {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .kb-card-action:hover {
+            background: var(--bg-primary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            width: 96px;
+            height: 96px;
+            margin-bottom: 24px;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: var(--text-muted);
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+
+        .modal-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 560px;
+            max-height: 90vh;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: transform 0.2s;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-backdrop.show .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            max-height: calc(90vh - 140px);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-label .required {
+            color: #dc2626;
+            margin-left: 4px;
+        }
+
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Tag Input */
+        .tag-input-container {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            background: var(--bg-primary);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 46px;
+            transition: all 0.2s;
+        }
+
+        .tag-input-container:focus-within {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .tag-input-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--tag-bg);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--tag-text);
+            font-weight: 500;
+        }
+
+        .tag-input-tag .remove {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .tag-input-tag .remove:hover {
+            opacity: 1;
+        }
+
+        .tag-input {
+            flex: 1;
+            min-width: 100px;
+            border: none;
+            background: transparent;
+            padding: 4px 8px;
+            font-size: 14px;
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .tag-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .tag-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        /* Icon Selector */
+        .icon-selector {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+        }
+
+        .icon-option {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .icon-option:hover {
+            transform: scale(1.05);
+        }
+
+        .icon-option.selected {
+            border-color: var(--accent-primary);
+        }
+
+        .icon-option.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .icon-option.green { background: #d1fae5; color: #059669; }
+        .icon-option.orange { background: #fef3c7; color: #d97706; }
+        .icon-option.purple { background: #ede9fe; color: #7c3aed; }
+        .icon-option.red { background: #fee2e2; color: #dc2626; }
+        .icon-option.cyan { background: #cffafe; color: #0891b2; }
+        .icon-option.pink { background: #fce7f3; color: #db2777; }
+        .icon-option.teal { background: #ccfbf1; color: #0d9488; }
+
+        /* Upload Modal Styles */
+        .upload-dropzone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px 24px;
+            text-align: center;
+            background: var(--bg-primary);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .upload-dropzone:hover,
+        .upload-dropzone.dragover {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .upload-dropzone-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--accent-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            color: var(--accent-primary);
+            font-size: 24px;
+        }
+
+        .upload-dropzone-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .upload-dropzone-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .upload-file-types {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .upload-file-type {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .upload-file-type i {
+            font-size: 14px;
+        }
+
+        /* File List */
+        .upload-file-list {
+            margin-top: 20px;
+        }
+
+        .upload-file-list-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .upload-file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .upload-file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .upload-file-icon.pdf { background: #fee2e2; color: #dc2626; }
+        .upload-file-icon.doc { background: #dbeafe; color: #2563eb; }
+        .upload-file-icon.docx { background: #dbeafe; color: #2563eb; }
+        .upload-file-icon.txt { background: #f3f4f6; color: #6b7280; }
+        .upload-file-icon.default { background: #fef3c7; color: #d97706; }
+
+        .upload-file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .upload-file-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .upload-file-size {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .upload-file-progress {
+            flex: 1;
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .upload-file-progress-bar {
+            height: 100%;
+            background: var(--accent-primary);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .upload-file-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upload-file-status-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .upload-file-status-icon.success {
+            color: #059669;
+        }
+
+        .upload-file-status-icon.error {
+            color: #dc2626;
+        }
+
+        .upload-file-status-icon.pending {
+            color: var(--text-muted);
+        }
+
+        .upload-file-remove {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-file-remove:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .upload-target-kb {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .upload-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        .upload-empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .upload-empty-state p {
+            font-size: 14px;
+        }
+
+        /* Search Highlight */
+        .search-highlight {
+            background: linear-gradient(180deg, transparent 60%, #fef08a 60%);
+            color: #92400e;
+            font-weight: 600;
+            border-radius: 2px;
+            padding: 0 2px;
+        }
+
+        .kb-tag .search-highlight {
+            background: #fef08a;
+        }
+
+        /* My Uploads Styles */
+        .my-uploads-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Knowledge Base Detail Styles */
+        .kb-detail-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            padding: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        .kb-detail-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+
+        .kb-detail-icon.blue { background: var(--accent-light); color: var(--accent-primary); }
+        .kb-detail-icon.green { background: #d1fae5; color: #059669; }
+        .kb-detail-icon.orange { background: #fef3c7; color: #d97706; }
+        .kb-detail-icon.purple { background: #ede9fe; color: #7c3aed; }
+        .kb-detail-icon.red { background: #fee2e2; color: #dc2626; }
+        .kb-detail-icon.cyan { background: #cffafe; color: #0891b2; }
+        .kb-detail-icon.pink { background: #fce7f3; color: #db2777; }
+        .kb-detail-icon.teal { background: #ccfbf1; color: #0d9488; }
+
+        .kb-detail-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .kb-detail-name {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 8px 0;
+        }
+
+        .kb-detail-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .kb-detail-meta {
+            display: flex;
+            gap: 20px;
+        }
+
+        .kb-detail-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .kb-detail-meta-item i {
+            font-size: 14px;
+        }
+
+        .kb-detail-back {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .kb-detail-back:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .kb-files-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .kb-file-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .kb-file-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .kb-file-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .kb-file-icon.pdf { background: #fee2e2; color: #dc2626; }
+        .kb-file-icon.doc { background: #dbeafe; color: #2563eb; }
+        .kb-file-icon.docx { background: #dbeafe; color: #2563eb; }
+        .kb-file-icon.txt { background: #f3f4f6; color: #6b7280; }
+
+        .kb-file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .kb-file-name {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kb-file-meta {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .kb-file-actions {
+            flex-shrink: 0;
+        }
+
+        .kb-file-download {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--accent-light);
+            border: 1px solid var(--accent-primary);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--accent-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .kb-file-download:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .my-uploads-settings {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .settings-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .settings-info i {
+            color: var(--accent-primary);
+            font-size: 16px;
+        }
+
+        .settings-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toggle-label {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--border-color);
+            border-radius: 26px;
+            transition: all 0.3s;
+        }
+
+        .toggle-slider:before {
+            content: '';
+            position: absolute;
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-primary);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Batch Actions Bar */
+        .batch-actions-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--accent-light);
+            border: 1px solid var(--accent-primary);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .batch-selected-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .batch-selected-info input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .batch-delete-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .batch-delete-btn:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        .batch-delete-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Uploads File Grid */
+        .uploads-file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .uploads-file-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .uploads-file-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .uploads-file-item.selected {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .uploads-file-checkbox {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .uploads-file-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding-right: 28px;
+        }
+
+        .uploads-file-icon {
+            width: 48px;
+            height: 48px;
+            background: #fee2e2;
+            color: #dc2626;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .uploads-file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .uploads-file-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .uploads-file-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .uploads-file-source {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .uploads-file-source i {
+            color: var(--accent-primary);
+        }
+
+        .uploads-file-source span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .uploads-file-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .uploads-file-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .uploads-file-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .uploads-file-btn.delete:hover {
+            border-color: #dc2626;
+            color: #dc2626;
+            background: #fee2e2;
+        }
+
+        /* Empty State for Uploads */
+        .uploads-empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .uploads-empty-state i {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .uploads-empty-state h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .uploads-empty-state p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 400px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .knowledge-page {
+                flex-direction: column;
+                padding: 20px;
+            }
+
+            .knowledge-sidebar {
+                width: 100%;
+                max-height: 240px;
+            }
+
+            .knowledge-sidebar-body {
+                display: flex;
+                gap: 8px;
+                overflow-x: auto;
+                padding: 12px;
+            }
+
+            .kb-divider {
+                display: none;
+            }
+
+            .kb-category-group {
+                display: flex;
+                gap: 8px;
+                flex-shrink: 0;
+                margin-bottom: 0;
+            }
+
+            .kb-category-group-title {
+                display: none;
+            }
+
+            .kb-category {
+                flex-shrink: 0;
+                margin-bottom: 0;
+            }
+
+            .kb-category-header {
+                padding: 10px 14px;
+            }
+
+            .kb-category-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+
+            .kb-category-info { display: none; }
+            
+            .kb-category-add {
+                display: none;
+            }
+            
+            .category-actions {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .knowledge-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .knowledge-main-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+
+            .kb-detail-header {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .kb-detail-icon {
+                width: 56px;
+                height: 56px;
+                font-size: 24px;
+            }
+
+            .kb-detail-name {
+                font-size: 18px;
+            }
+
+            .kb-detail-meta {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .kb-detail-back {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .kb-file-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .kb-file-actions {
+                width: 100%;
+            }
+
+            .kb-file-download {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .knowledge-main-actions {
+                width: 100%;
+            }
+
+            .action-btn-primary,
+            .action-btn-secondary {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <i class="fas fa-cube"></i>
+        </div>
+        <div class="nav-items">
+            <a href="chat.html" class="nav-item">
+                <i class="fas fa-comments"></i>
+                <span>聊天</span>
+            </a>
+            <a href="tasks.html" class="nav-item">
+                <i class="fas fa-list-check"></i>
+                <span>全部</span>
+            </a>
+            <a href="cases.html" class="nav-item">
+                <i class="fas fa-folder"></i>
+                <span>案件</span>
+            </a>
+            <a href="documents.html" class="nav-item">
+                <i class="fas fa-file-signature"></i>
+                <span>文书</span>
+            </a>
+            <a href="knowledge.html" class="nav-item active">
+                <i class="fas fa-book"></i>
+                <span>知识库</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <span style="font-size: 16px; font-weight: 500; color: var(--text-primary);">知识库</span>
+            </div>
+            <div class="user-menu" id="userMenu" style="position: relative;">
+                <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-dropdown" id="userDropdown">
+                    <button class="user-dropdown-item" id="settingsBtn" onclick="goToSettings()" style="display: none;">
+                        <i class="fas fa-cog"></i>
+                        <span>设置</span>
+                    </button>
+                    <button class="user-dropdown-item logout" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>退出登录</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Knowledge Page Content -->
+        <div class="knowledge-page">
+            <!-- Sidebar -->
+            <div class="knowledge-sidebar">
+                <div class="knowledge-sidebar-header">
+                    <div class="knowledge-sidebar-title">知识库分类</div>
+                    <div class="knowledge-sidebar-subtitle">选择分类查看知识库</div>
+                </div>
+                <div class="knowledge-sidebar-body">
+                    <!-- 全部知识库 - 独立入口 -->
+                    <div class="kb-category" data-category="all">
+                        <div class="kb-category-header active" onclick="showKnowledgeGrid()">
+                            <div class="kb-category-icon blue">
+                                <i class="fas fa-th-large"></i>
+                            </div>
+                            <div class="kb-category-info">
+                                <div class="kb-category-name">全部知识库</div>
+                                <div class="kb-category-count">20个知识库</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="kb-divider"></div>
+
+                    <!-- 全员公开库 -->
+                    <div class="kb-category-group" id="publicGroup">
+                        <div class="kb-category-group-title" onclick="toggleGroup('public')">
+                            <div class="kb-category-group-title-left">
+                                <i class="fas fa-globe"></i>
+                                全员公开库
+                            </div>
+                            <i class="fas fa-chevron-down kb-category-group-toggle"></i>
+                        </div>
+                        <div class="kb-category-group-content">
+                            <div id="publicCategories">
+                                <!-- 动态渲染公开库分类 -->
+                            </div>
+                            <div class="kb-category-add" id="publicCategoryAddBtn" onclick="event.stopPropagation(); openCategoryModal('public')">
+                                <i class="fas fa-plus-circle"></i>
+                                新建分类
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="kb-divider"></div>
+
+                    <!-- 个人知识库 -->
+                    <div class="kb-category-group" id="personalGroup">
+                        <div class="kb-category-group-title" onclick="toggleGroup('personal')">
+                            <div class="kb-category-group-title-left">
+                                <i class="fas fa-user-lock"></i>
+                                个人知识库
+                            </div>
+                            <i class="fas fa-chevron-down kb-category-group-toggle"></i>
+                        </div>
+                        <div class="kb-category-group-content">
+                            <!-- 个人知识库容量提示 -->
+                            <div class="personal-storage-bar">
+                                <div class="storage-bar-left">知识库容量</div>
+                                <div class="storage-bar-right"><span id="storageUsed">0</span>/<span id="storageTotal">500MB</span></div>
+                            </div>
+                            <div class="storage-progress-track">
+                                <div class="storage-progress-fill" id="storageProgressFill" style="width:0%"></div>
+                            </div>
+                            <!-- 我的上传 - 独立入口 -->
+                            <div class="kb-category" data-category="my-uploads">
+                                <div class="kb-category-header" onclick="showMyUploads()">
+                                    <div class="kb-category-icon orange">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <div class="kb-category-info">
+                                        <div class="kb-category-name">我的上传</div>
+                                        <div class="kb-category-count" id="myUploadsCount">0个文件</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="personalCategories">
+                                <!-- 动态渲染个人库分类 -->
+                            </div>
+                            <div class="kb-category-add" onclick="event.stopPropagation(); openCategoryModal('personal')">
+                                <i class="fas fa-plus-circle"></i>
+                                新建分类
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="knowledge-main">
+                <div class="knowledge-main-header">
+                    <h1 class="knowledge-main-title">全部知识库</h1>
+                    <div class="knowledge-main-actions">
+                        <button class="action-btn-secondary" onclick="openCreateModal()">
+                            <i class="fas fa-folder-plus"></i>
+                            新建知识库
+                        </button>
+                        <button class="action-btn-primary" onclick="openUploadModal()">
+                            <i class="fas fa-plus"></i>
+                            上传文档
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search -->
+                <div class="knowledge-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="搜索知识库……" id="kbSearchInput">
+                </div>
+
+                <!-- Knowledge Grid -->
+                <div class="knowledge-grid" id="knowledgeGrid">
+                    <!-- Knowledge base cards will be rendered here -->
+                </div>
+
+                <!-- My Uploads Content -->
+                <div class="my-uploads-container" id="myUploadsContainer" style="display: none;">
+                    <!-- Settings Bar -->
+                    <div class="my-uploads-settings">
+                        <div class="settings-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>以下是您在对话中上传的文件（已进行OCR识别）</span>
+                        </div>
+                        <div class="settings-toggle">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="autoSaveToggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-label">自动保存对话中的文件到知识库</span>
+                        </div>
+                    </div>
+
+                    <!-- Batch Actions Bar -->
+                    <div class="batch-actions-bar" id="batchActionsBar" style="display: none;">
+                        <div class="batch-selected-info">
+                            <input type="checkbox" id="selectAllCheckbox">
+                            <span>已选择 <strong id="selectedCount">0</strong> 个文件</span>
+                        </div>
+                        <button class="batch-delete-btn" onclick="deleteSelectedFiles()">
+                            <i class="fas fa-trash-alt"></i>
+                            批量删除
+                        </button>
+                    </div>
+
+                    <!-- Uploads File List -->
+                    <div class="uploads-file-grid" id="uploadsFileGrid">
+                        <!-- File items will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- My Favorites Content -->
+                <div class="my-uploads-container" id="myFavoritesContainer" style="display: none;">
+                    <!-- Settings Bar -->
+                    <div class="my-uploads-settings">
+                        <div class="settings-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>以下是您收藏的常用文档，方便快速查找和使用</span>
+                        </div>
+                    </div>
+
+                    <!-- Favorites File List -->
+                    <div class="uploads-file-grid" id="favoritesFileGrid">
+                        <!-- Favorite items will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Knowledge Base Detail Content -->
+                <div class="my-uploads-container" id="kbDetailContainer" style="display: none;">
+                    <!-- KB Detail Header -->
+                    <div class="kb-detail-header">
+                        <div class="kb-detail-icon" id="kbDetailIcon">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="kb-detail-info">
+                            <h2 class="kb-detail-name" id="kbDetailName">知识库名称</h2>
+                            <p class="kb-detail-desc" id="kbDetailDesc">知识库描述</p>
+                            <div class="kb-detail-meta">
+                                <span class="kb-detail-meta-item">
+                                    <i class="fas fa-file-alt"></i>
+                                    <span id="kbDetailCount">0</span> 个文件
+                                </span>
+                                <span class="kb-detail-meta-item">
+                                    <i class="fas fa-clock"></i>
+                                    更新于 <span id="kbDetailUpdate">2024-01-01</span>
+                                </span>
+                            </div>
+                        </div>
+                        <button class="kb-detail-back" onclick="backToKnowledgeList()">
+                            <i class="fas fa-arrow-left"></i>
+                            返回列表
+                        </button>
+                    </div>
+
+                    <!-- KB Files List -->
+                    <div class="kb-files-list" id="kbFilesList">
+                        <!-- KB files will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Document Modal -->
+    <div class="modal-backdrop" id="uploadModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">上传文档</h3>
+                <button class="modal-close" onclick="closeUploadModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Target Knowledge Base Selection -->
+                <div class="form-group">
+                    <label class="form-label">上传到知识库 <span class="required">*</span></label>
+                    <select class="form-select" id="uploadTargetKb">
+                        <option value="">请选择知识库</option>
+                    </select>
+                </div>
+
+                <!-- Dropzone -->
+                <div class="form-group">
+                    <label class="form-label">选择文件</label>
+                    <div class="upload-dropzone" id="uploadDropzone">
+                        <div class="upload-dropzone-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-dropzone-title">点击或拖拽文件到此处上传</div>
+                        <div class="upload-dropzone-desc">支持批量上传，单个文件不超过 50MB</div>
+                        <div class="upload-file-types">
+                            <span class="upload-file-type"><i class="fas fa-file-pdf"></i> PDF</span>
+                            <span class="upload-file-type"><i class="fas fa-file-word"></i> Word</span>
+                            <span class="upload-file-type"><i class="fas fa-file-alt"></i> TXT</span>
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
+                </div>
+
+                <!-- File List -->
+                <div class="upload-file-list" id="uploadFileList" style="display: none;">
+                    <div class="upload-file-list-title">待上传文件 (<span id="fileCount">0</span>)</div>
+                    <div id="fileListContainer"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="upload-empty-state" id="uploadEmptyState">
+                    <i class="fas fa-folder-open"></i>
+                    <p>暂无待上传文件</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeUploadModal()">取消</button>
+                <button class="btn btn-primary" onclick="startUpload()" id="startUploadBtn" disabled>
+                    <i class="fas fa-upload" style="margin-right: 6px;"></i>开始上传
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Knowledge Base Modal -->
+    <div class="modal-backdrop" id="kbModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">新建知识库</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="kbId">
+                <div class="form-group">
+                    <label class="form-label">知识库名称 <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="kbName" placeholder="请输入知识库名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">分类 <span class="required">*</span></label>
+                    <select class="form-select" id="kbCategory">
+                        <optgroup label="全员公开库">
+                            <option value="law">法律法规</option>
+                            <option value="case">案例库</option>
+                            <option value="template">文书模板</option>
+                            <option value="local">地方法规</option>
+                        </optgroup>
+                        <optgroup label="个人知识库">
+                            <option value="my-templates">我的模板</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">描述</label>
+                    <textarea class="form-textarea" id="kbDescription" placeholder="请输入知识库描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">标签</label>
+                    <div class="tag-input-container" id="tagInputContainer">
+                        <input type="text" class="tag-input" id="tagInput" placeholder="输入标签后按回车添加">
+                    </div>
+                    <div class="tag-hint">按回车键添加标签，点击标签可删除</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">图标</label>
+                    <div class="icon-selector" id="iconSelector">
+                        <div class="icon-option blue selected" data-icon="blue" data-class="fa-book">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="icon-option green" data-icon="green" data-class="fa-gavel">
+                            <i class="fas fa-gavel"></i>
+                        </div>
+                        <div class="icon-option orange" data-icon="orange" data-class="fa-balance-scale">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div class="icon-option purple" data-icon="purple" data-class="fa-file-signature">
+                            <i class="fas fa-file-signature"></i>
+                        </div>
+                        <div class="icon-option red" data-icon="red" data-class="fa-book-open">
+                            <i class="fas fa-book-open"></i>
+                        </div>
+                        <div class="icon-option cyan" data-icon="cyan" data-class="fa-map-marker-alt">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="icon-option pink" data-icon="pink" data-class="fa-star">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div class="icon-option teal" data-icon="teal" data-class="fa-file-code">
+                            <i class="fas fa-file-code"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveKnowledgeBase()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Management Modal -->
+    <div class="modal-backdrop" id="categoryModal">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="categoryModalTitle">新建分类</h3>
+                <button class="modal-close" onclick="closeCategoryModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="categoryId">
+                <input type="hidden" id="categoryType">
+                <div class="form-group">
+                    <label class="form-label">分类名称 <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="categoryName" placeholder="请输入分类名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">图标</label>
+                    <div class="icon-selector" id="categoryIconSelector">
+                        <div class="icon-option blue selected" data-icon="blue" data-class="fa-folder">
+                            <i class="fas fa-folder"></i>
+                        </div>
+                        <div class="icon-option green" data-icon="green" data-class="fa-folder-open">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <div class="icon-option orange" data-icon="orange" data-class="fa-archive">
+                            <i class="fas fa-archive"></i>
+                        </div>
+                        <div class="icon-option purple" data-icon="purple" data-class="fa-briefcase">
+                            <i class="fas fa-briefcase"></i>
+                        </div>
+                        <div class="icon-option red" data-icon="red" data-class="fa-flag">
+                            <i class="fas fa-flag"></i>
+                        </div>
+                        <div class="icon-option cyan" data-icon="cyan" data-class="fa-tag">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                        <div class="icon-option pink" data-icon="pink" data-class="fa-heart">
+                            <i class="fas fa-heart"></i>
+                        </div>
+                        <div class="icon-option teal" data-icon="teal" data-class="fa-bookmark">
+                            <i class="fas fa-bookmark"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCategoryModal()">取消</button>
+                <button class="btn btn-primary" id="categorySaveBtn" onclick="saveCategory()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/common.js"></script>
+    <script src="../js/knowledge.js"></script>
+    <script>
+        // 切换用户下拉菜单
+        function toggleUserDropdown() {
+            document.getElementById('userDropdown').classList.toggle('show');
+        }
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                window.location.href = '../index.html';
+            }
+        }
+
+        // 点击外部关闭下拉菜单
+        document.addEventListener('click', function(e) {
+            const userMenu = document.getElementById('userMenu');
+            if (userMenu && !userMenu.contains(e.target)) {
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
+
+        // 跳转到设置页面
+        function goToSettings() {
+            window.location.href = 'settings.html';
+        }
+
+        // 更新用户下拉菜单（根据角色显示设置按钮）
+        function updateUserDropdown() {
+            const settingsBtn = document.getElementById('settingsBtn');
+            if (settingsBtn && typeof isAdmin === 'function') {
+                settingsBtn.style.display = isAdmin() ? 'flex' : 'none';
+            }
+        }
+
+        // 页面加载完成后更新下拉菜单和角色
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从 localStorage 读取角色并更新
+            const savedRole = localStorage.getItem('userRole');
+            if (savedRole && typeof setUserRole === 'function') {
+                setUserRole(savedRole);
+            }
+            updateUserDropdown();
+        });
+
+        // ==================== 我的上传模块 ====================
+        
+        // 模拟已上传的文件数据（实际应用中应从后端获取）
+        let myUploadsData = [
+            {
+                id: 'upload-001',
+                name: '起诉状_20240220.pdf',
+                size: '2.4 MB',
+                uploadTime: '2024-02-20 14:32',
+                source: '对话于 2024-02-20 民间借贷纠纷案',
+                type: 'pdf'
+            },
+            {
+                id: 'upload-002',
+                name: '证据材料清单.pdf',
+                size: '1.8 MB',
+                uploadTime: '2024-02-20 14:33',
+                source: '对话于 2024-02-20 民间借贷纠纷案',
+                type: 'pdf'
+            },
+            {
+                id: 'upload-003',
+                name: '合同原件扫描.pdf',
+                size: '5.2 MB',
+                uploadTime: '2024-02-19 10:15',
+                source: '对话于 2024-02-19 合同纠纷案',
+                type: 'pdf'
+            },
+            {
+                id: 'upload-004',
+                name: '账户流水记录.pdf',
+                size: '3.1 MB',
+                uploadTime: '2024-02-18 16:45',
+                source: '对话于 2024-02-18 金融借贷案',
+                type: 'pdf'
+            }
+        ];
+
+        // 当前选中的文件ID列表
+        let selectedUploadIds = [];
+
+        // 是否显示我的上传页面
+        let isMyUploadsView = false;
+
+        // 显示我的上传页面
+        function showMyUploads() {
+            isMyUploadsView = true;
+            
+            // 更新标题
+            document.querySelector('.knowledge-main-title').textContent = '我的上传';
+            
+            // 隐藏知识库网格，显示我的上传容器
+            document.getElementById('knowledgeGrid').style.display = 'none';
+            document.getElementById('myUploadsContainer').style.display = 'flex';
+            
+            // 隐藏新建知识库按钮
+            document.querySelector('.knowledge-main-actions').style.display = 'none';
+            
+            // 更新侧边栏选中状态
+            document.querySelectorAll('.kb-category-header').forEach(header => {
+                header.classList.remove('active');
+            });
+            document.querySelector('[data-category="my-uploads"] .kb-category-header').classList.add('active');
+            
+            // 渲染文件列表
+            renderMyUploads();
+            
+            // 更新文件数量
+            updateUploadsCount();
+        }
+
+        // 显示知识库列表页面
+        function showKnowledgeGrid() {
+            isMyUploadsView = false;
+            
+            // 更新标题
+            document.querySelector('.knowledge-main-title').textContent = '全部知识库';
+            
+            // 显示知识库网格，隐藏我的上传容器
+            document.getElementById('knowledgeGrid').style.display = 'grid';
+            document.getElementById('myUploadsContainer').style.display = 'none';
+            
+            // 显示新建知识库按钮
+            document.querySelector('.knowledge-main-actions').style.display = 'flex';
+            
+            // 更新侧边栏选中状态
+            document.querySelectorAll('.kb-category-header').forEach(header => {
+                header.classList.remove('active');
+            });
+            document.querySelector('[data-category="all"] .kb-category-header').classList.add('active');
+        }
+
+        // 渲染我的上传文件列表
+        function renderMyUploads() {
+            const grid = document.getElementById('uploadsFileGrid');
+            
+            if (myUploadsData.length === 0) {
+                grid.innerHTML = `
+                    <div class="uploads-empty-state" style="grid-column: 1 / -1;">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>暂无上传文件</h3>
+                        <p>您在对话中上传的文件将自动显示在这里，方便您统一管理</p>
+                    </div>
+                `;
+                document.getElementById('batchActionsBar').style.display = 'none';
+                return;
+            }
+            
+            grid.innerHTML = myUploadsData.map(file => `
+                <div class="uploads-file-item ${selectedUploadIds.includes(file.id) ? 'selected' : ''}" data-id="${file.id}">
+                    <input type="checkbox" class="uploads-file-checkbox" 
+                        ${selectedUploadIds.includes(file.id) ? 'checked' : ''} 
+                        onchange="toggleFileSelection('${file.id}')">
+                    <div class="uploads-file-header">
+                        <div class="uploads-file-icon">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="uploads-file-info">
+                            <div class="uploads-file-name" title="${file.name}">${file.name}</div>
+                            <div class="uploads-file-meta">${file.size} · ${file.uploadTime}</div>
+                        </div>
+                    </div>
+                    <div class="uploads-file-source">
+                        <i class="fas fa-comments"></i>
+                        <span title="${file.source}">${file.source}</span>
+                    </div>
+                    <div class="uploads-file-actions">
+                        <button class="uploads-file-btn" onclick="viewFile('${file.id}')">
+                            <i class="fas fa-eye"></i>
+                            查看
+                        </button>
+                        <button class="uploads-file-btn" onclick="downloadFile('${file.id}')">
+                            <i class="fas fa-download"></i>
+                            下载
+                        </button>
+                        <button class="uploads-file-btn delete" onclick="deleteFile('${file.id}')">
+                            <i class="fas fa-trash-alt"></i>
+                            删除
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 更新批量操作栏显示状态
+            updateBatchActionsBar();
+        }
+
+        // 更新文件数量显示
+        function updateUploadsCount() {
+            const count = myUploadsData.length;
+            document.getElementById('myUploadsCount').textContent = `${count}个文件`;
+        }
+
+        // 切换文件选择状态
+        function toggleFileSelection(fileId) {
+            if (selectedUploadIds.includes(fileId)) {
+                selectedUploadIds = selectedUploadIds.filter(id => id !== fileId);
+            } else {
+                selectedUploadIds.push(fileId);
+            }
+            
+            renderMyUploads();
+            updateSelectAllCheckbox();
+        }
+
+        // 更新批量操作栏
+        function updateBatchActionsBar() {
+            const bar = document.getElementById('batchActionsBar');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (myUploadsData.length === 0) {
+                bar.style.display = 'none';
+                return;
+            }
+            
+            bar.style.display = 'flex';
+            selectedCount.textContent = selectedUploadIds.length;
+            
+            // 更新全选复选框状态
+            updateSelectAllCheckbox();
+        }
+
+        // 更新全选复选框状态
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (myUploadsData.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedUploadIds.length === myUploadsData.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedUploadIds.length > 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+
+        // 全选/取消全选
+        document.getElementById('selectAllCheckbox')?.addEventListener('change', function() {
+            if (this.checked) {
+                selectedUploadIds = myUploadsData.map(file => file.id);
+            } else {
+                selectedUploadIds = [];
+            }
+            renderMyUploads();
+        });
+
+        // 查看文件
+        function viewFile(fileId) {
+            const file = myUploadsData.find(f => f.id === fileId);
+            if (file) {
+                alert(`查看文件: ${file.name}\n（此处应打开PDF预览窗口）`);
+            }
+        }
+
+        // 下载文件
+        function downloadFile(fileId) {
+            const file = myUploadsData.find(f => f.id === fileId);
+            if (file) {
+                alert(`下载文件: ${file.name}\n（此处应触发文件下载）`);
+            }
+        }
+
+        // 删除单个文件
+        function deleteFile(fileId) {
+            const file = myUploadsData.find(f => f.id === fileId);
+            if (!file) return;
+            
+            if (confirm(`确定要删除文件 "${file.name}" 吗？`)) {
+                myUploadsData = myUploadsData.filter(f => f.id !== fileId);
+                selectedUploadIds = selectedUploadIds.filter(id => id !== fileId);
+                renderMyUploads();
+                updateUploadsCount();
+            }
+        }
+
+        // 批量删除文件
+        function deleteSelectedFiles() {
+            if (selectedUploadIds.length === 0) {
+                alert('请先选择要删除的文件');
+                return;
+            }
+            
+            if (confirm(`确定要删除选中的 ${selectedUploadIds.length} 个文件吗？`)) {
+                myUploadsData = myUploadsData.filter(f => !selectedUploadIds.includes(f.id));
+                selectedUploadIds = [];
+                renderMyUploads();
+                updateUploadsCount();
+            }
+        }
+
+        // 自动保存设置切换
+        document.getElementById('autoSaveToggle')?.addEventListener('change', function() {
+            const isEnabled = this.checked;
+            console.log('自动保存对话中的文件到知识库:', isEnabled ? '已开启' : '已关闭');
+            // 实际应用中应保存用户偏好到后端
+            alert(isEnabled ? '已开启自动保存功能，对话中上传的文件将自动保存到知识库' : '已关闭自动保存功能');
+        });
+
+        // 监听全部知识库分类点击
+        document.querySelector('[data-category="all"]')?.addEventListener('click', showKnowledgeGrid);
+
+        // 初始化时渲染文件数量
+        document.addEventListener('DOMContentLoaded', function() {
+            updateUploadsCount();
+        });
+
+        // 切换分组折叠/展开
+        function toggleGroup(group) {
+            const groupElement = document.getElementById(group + 'Group');
+            if (groupElement) {
+                groupElement.classList.toggle('collapsed');
+            }
+        }
+    </script>
+</body>
+</html>
