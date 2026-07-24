@@ -127,10 +127,25 @@
         .no-match-tip { padding: 16px 12px; text-align: center; font-size: 12px; color: var(--text-muted); }
 
         .tpl-right { flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
-        .tpl-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-color); gap: 12px; }
+        .tpl-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-color); gap: 12px; flex-wrap: wrap; }
         .tpl-toolbar .title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
         .tpl-toolbar .title .sub { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
         .toolbar-right { display: flex; gap: 8px; align-items: center; }
+
+        /* 案字适配选择器 */
+        .case-word-bar { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--border-color); background: var(--bg-primary); flex-wrap: wrap; }
+        .case-word-bar .cw-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+        .case-word-bar .cw-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .cw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); transition: all 0.15s; user-select: none; }
+        .cw-chip:hover { border-color: var(--accent-primary); }
+        .cw-chip.checked { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 500; }
+        .cw-chip .cw-check { display: none; font-size: 9px; }
+        .cw-chip.checked .cw-check { display: inline; }
+        .case-word-bar .cw-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+        /* 表格案字标签 */
+        .cw-tag { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin: 1px 2px; background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .cw-tag.universal { background: #fef3c7; color: #92400e; border-color: #fde68a; }
         .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
         .btn-primary { background: var(--accent-primary); color: white; }
         .btn-primary:hover { background: #1d4ed8; }
@@ -256,6 +271,10 @@
                         <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
                     </div>
                 </div>
+                <div style="margin-bottom:16px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-info-circle"></i>
+                    <span>此处维护的标准要件仅在生成「裁判文书」类文书时才会询问是否引入辅助生成；其他文书类型（庭审提纲、执行文书、材料总结等）不会触发要件引入。</span>
+                </div>
 
                 <div class="tpl-body">
                     <div class="tpl-left">
@@ -282,13 +301,19 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="case-word-bar" id="caseWordBar" style="display:none;">
+                            <span class="cw-label">适配案字：</span>
+                            <div class="cw-chips" id="caseWordChips"></div>
+                            <span class="cw-hint">勾选该案由适用的案字；不勾选则适配全部</span>
+                        </div>
                         <table class="tpl-table">
                             <thead>
                                 <tr>
-                                    <th style="width:18%;">要件名</th>
-                                    <th style="width:22%;">说明</th>
-                                    <th style="width:32%;">问题</th>
-                                    <th style="width:10%;">来源</th>
+                                    <th style="width:16%;">要件名</th>
+                                    <th style="width:20%;">说明</th>
+                                    <th style="width:28%;">问题</th>
+                                    <th style="width:14%;">适用案字</th>
+                                    <th style="width:8%;">来源</th>
                                     <th style="width:120px;">操作</th>
                                 </tr>
                             </thead>
@@ -321,6 +346,11 @@
                 <label class="form-label">问题 <span class="required">*</span></label>
                 <textarea class="form-textarea" id="tplQuestion" placeholder="生成文书前需要确认的单一问题"></textarea>
                 <div class="form-hint">每个要件仅包含一个问题；用户在生成文书时可对该问题预生成答案</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">适用案字</label>
+                <div id="modalCaseWords" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);min-height:40px;"></div>
+                <div class="form-hint">勾选该要件适用的案字；不勾选 = 通用（该案由下所有案字适用）</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>

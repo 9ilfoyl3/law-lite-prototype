@@ -1,38 +1,19 @@
 // ============ Admin Doc Types Management ============
 // v1.0 文书类型管理：维护各业务系统文书类型（模板/提示词的父级分类）
+// v1.28/v1.29 workflow 新增 type 字段（'step'=展示型 | 'material'=不展示型），弹窗加类型 radio，子表格加类型列
+// v1.29: 类型命名简化为展示型/不展示型（内部仍用 'step'/'material'）
 // 数据持久化：localStorage.adminDocTypes（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTypes 在加载时合并到 system.docTypes
 
 (function() {
     'use strict';
 
-    // ===== 预设图标库 =====
-    const PRESET_ICONS = [
-        { key: 'fa-gavel', name: '法槌' },
-        { key: 'fa-list-alt', name: '清单' },
-        { key: 'fa-hammer', name: '锤子' },
-        { key: 'fa-folder-open', name: '文件夹' },
-        { key: 'fa-file-alt', name: '文件' },
-        { key: 'fa-ban', name: '禁止' },
-        { key: 'fa-landmark', name: '法院' },
-        { key: 'fa-balance-scale', name: '天平' },
-        { key: 'fa-envelope', name: '信封' },
-        { key: 'fa-envelope-open-text', name: '信函' },
-        { key: 'fa-file-signature', name: '签署' },
-        { key: 'fa-stamp', name: '印章' },
-        { key: 'fa-book', name: '书籍' },
-        { key: 'fa-scroll', name: '卷轴' },
-        { key: 'fa-clipboard', name: '剪贴板' },
-        { key: 'fa-folder-tree', name: '目录' },
-        { key: 'fa-file-contract', name: '合同' },
-        { key: 'fa-certificate', name: '证明' }
-    ];
+    // v1.8: 移除文书类型与 workflow 步骤的 icon 字段（PRESET_ICONS、selectedIcon、renderIconPicker、selectIcon 一并移除）
 
     // ===== 状态 =====
     let currentOrg = 'court';
     let editingKey = null;        // 当前编辑的 key（null=新增模式）
     let editingIsBuiltin = false; // 编辑的是内置类型（编辑后转为自定义覆盖）
-    let selectedIcon = '';        // 当前选中的图标
     let pendingConfirmAction = null;
 
     // ===== 存储 =====
@@ -162,7 +143,6 @@
             const promptCount = countPrompts(currentOrg, key);
             const wfCount = (typeof countWorkflowsForDocType === 'function')
                 ? countWorkflowsForDocType(currentOrg, key) : 0;
-            const iconClass = t.icon || 'fa-folder';
             const badge = t.isBuiltin
                 ? '<span class="tpl-badge builtin">内置</span>'
                 : '<span class="tpl-badge custom">自定义</span>';
@@ -176,8 +156,7 @@
 
             let html = '<tr>'
                 + '<td>' + expandBtn + '</td>'
-                + '<td class="tpl-name-cell"><i class="fas ' + escapeHtml(iconClass) + '"></i>' + escapeHtml(t.name) + badge + '</td>'
-                + '<td><i class="fas ' + escapeHtml(iconClass) + '" style="font-size:16px;color:var(--text-secondary);"></i></td>'
+                + '<td class="tpl-name-cell">' + escapeHtml(t.name) + badge + '</td>'
                 + '<td class="' + tplCountClass + '">' + tplCount + '</td>'
                 + '<td class="' + promptCountClass + '">' + promptCount + '</td>'
                 + '<td class="' + wfCountClass + '">' + wfCount + '</td>'
@@ -200,27 +179,43 @@
         const orgData = getWfOrgData(currentOrg);
         const isCustomized = orgData[docTypeKey] && Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey].length > 0;
 
+        // v1.28: 按类型分组统计，用于删除按钮禁用判断
+        const stepWfs = workflows.filter(w => (w.type || 'step') === 'step');
+        const materialWfs = workflows.filter(w => (w.type || 'step') === 'material');
+
         let rowsHtml = '';
         if (workflows.length === 0) {
-            rowsHtml = '<tr><td colspan="5" class="step-empty">暂无 workflow，点击「新增 workflow」创建</td></tr>';
+            rowsHtml = '<tr><td colspan="6" class="step-empty">暂无 workflow，点击「新增 workflow」创建</td></tr>';
         } else {
             rowsHtml = workflows.map(wf => {
+                const wfType = wf.type || 'step';
                 const wfBadge = wf.isBuiltin
                     ? '<span class="wf-badge builtin">内置</span>'
                     : '<span class="wf-badge custom">自定义</span>';
+                // v1.28: 类型徽章
+                const typeBadge = wfType === 'material'
+                    ? '<span class="wf-type-badge material">不展示型</span>'
+                    : '<span class="wf-type-badge step">展示型</span>';
                 const caseWordsHtml = (!wf.caseWords || wf.caseWords.length === 0)
                     ? '<span class="case-word-fallback">兜底</span>'
                     : wf.caseWords.map(w => '<span class="case-word-tag">' + escapeHtml(w) + '</span>').join('');
-                const stepCount = (wf.steps && wf.steps.length) || 0;
-                const isOnlyOne = workflows.length === 1;
-                const deleteBtn = isOnlyOne
-                    ? '<button class="action-btn delete" disabled title="每个文书类型至少需保留 1 个 workflow">删除</button>'
+                // v1.28: 不展示型步骤数显示「-」
+                const stepCountHtml = wfType === 'material' ? '<span class="step-count-dash">-</span>' : ((wf.steps && wf.steps.length) || 0);
+                // v1.28: 删除按钮禁用规则——同类型仅剩 1 个时禁用
+                const sameTypeCount = wfType === 'material' ? materialWfs.length : stepWfs.length;
+                const isOnlyOneOfSameType = sameTypeCount <= 1;
+                const deleteTitle = isOnlyOneOfSameType
+                    ? ('每个类型至少需保留 1 个' + (wfType === 'material' ? '不展示型' : '展示型') + ' workflow')
+                    : '';
+                const deleteBtn = isOnlyOneOfSameType
+                    ? '<button class="action-btn delete" disabled title="' + deleteTitle + '">删除</button>'
                     : '<button class="action-btn delete" onclick="deleteWorkflow(\'' + docTypeKey + '\',\'' + wf.id + '\')">删除</button>';
                 const editBtn = '<button class="action-btn edit" onclick="editWorkflow(\'' + docTypeKey + '\',\'' + wf.id + '\')">编辑</button>';
                 return '<tr>'
                     + '<td class="wf-name-cell">' + escapeHtml(wf.name) + wfBadge + '</td>'
+                    + '<td>' + typeBadge + '</td>'
                     + '<td>' + caseWordsHtml + '</td>'
-                    + '<td>' + stepCount + '</td>'
+                    + '<td>' + stepCountHtml + '</td>'
                     + '<td>' + wfBadge + '</td>'
                     + '<td class="tpl-action-cell">' + editBtn + deleteBtn + '</td>'
                     + '</tr>';
@@ -229,13 +224,13 @@
 
         const title = escapeHtml(typeCfg.name) + ' 的 workflow';
         const hint = isCustomized ? '(已自定义，删除全部 workflow 恢复内置)' : '(使用内置默认)';
-        return '<tr class="wf-sub-row"><td colspan="8"><div class="wf-sub-wrap">'
+        return '<tr class="wf-sub-row"><td colspan="7"><div class="wf-sub-wrap">'
             + '<div class="wf-sub-header">'
             + '  <div class="wf-sub-title">' + title + '<span class="hint">' + hint + '</span></div>'
             + '  <button class="btn btn-primary" onclick="openAddWfModal(\'' + docTypeKey + '\')"><i class="fas fa-plus"></i> 新增 workflow</button>'
             + '</div>'
             + '<table class="wf-sub-table"><thead><tr>'
-            + '<th>workflow 名称</th><th>匹配案字</th><th style="width:70px;">步骤数</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
+            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th>匹配案字</th><th style="width:70px;">步骤数</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
             + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
             + '</div></td></tr>';
     }
@@ -275,14 +270,31 @@
     let wfEditingId = null;         // 当前编辑的 workflow id（null=新增）
     let wfEditingSteps = [];        // 步骤编辑器当前步骤列表
     let wfSelectedCaseWords = new Set();
+    let wfEditingType = 'step';     // v1.28: 当前编辑的 workflow 类型（'step' | 'material'）
+    let wfEditingBuiltin = false;   // v1.30: 是否编辑内置 workflow（控制 id 只读）
 
     window.openAddWfModal = function(docTypeKey) {
         wfEditingDocType = docTypeKey;
         wfEditingId = null;
-        wfEditingSteps = [{ id: '', title: '', icon: 'fa-folder-open' }];
+        wfEditingSteps = [{ id: '', title: '' }];
         wfSelectedCaseWords = new Set();
+        wfEditingType = 'step';  // v1.28: 默认展示型
+        wfEditingBuiltin = false;  // v1.30: 新增非内置
         document.getElementById('wfModalTitle').textContent = '新增 workflow';
         document.getElementById('wfName').value = '';
+        // v1.30: workflow id 新增时清空可填
+        const wfIdInput = document.getElementById('wfId');
+        if (wfIdInput) {
+            wfIdInput.value = '';
+            wfIdInput.readOnly = false;
+            wfIdInput.placeholder = '如：wf-judgment-1st（不填将自动生成）';
+        }
+        // v1.28: 重置类型 radio
+        const stepRadio = document.getElementById('wfTypeStep');
+        const materialRadio = document.getElementById('wfTypeMaterial');
+        if (stepRadio) stepRadio.checked = true;
+        if (materialRadio) materialRadio.checked = false;
+        applyWfTypeUI();  // v1.28: 切换 UI 显示
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderStepsEditor(wfEditingSteps);
         document.getElementById('wfModal').classList.add('show');
@@ -295,12 +307,27 @@
         if (!wf) return;
         wfEditingDocType = docTypeKey;
         wfEditingId = wfId;
+        wfEditingType = wf.type || 'step';  // v1.28: 兼容旧数据
         wfEditingSteps = JSON.parse(JSON.stringify(wf.steps || []));
-        if (wfEditingSteps.length === 0) wfEditingSteps = [{ id: '', title: '', icon: 'fa-folder-open' }];
+        if (wfEditingSteps.length === 0) wfEditingSteps = [{ id: '', title: '' }];
         wfSelectedCaseWords = new Set(wf.caseWords || []);
         const isBuiltin = !!wf.isBuiltin;
+        wfEditingBuiltin = isBuiltin;  // v1.30: 内置只读
         document.getElementById('wfModalTitle').textContent = isBuiltin ? '编辑内置 workflow（另存为自定义覆盖）' : '编辑 workflow';
         document.getElementById('wfName').value = wf.name || '';
+        // v1.30: workflow id 编辑时回填；内置只读，自定义可改
+        const wfIdInput = document.getElementById('wfId');
+        if (wfIdInput) {
+            wfIdInput.value = wf.id || '';
+            wfIdInput.readOnly = isBuiltin;
+            wfIdInput.placeholder = isBuiltin ? '内置 workflow id 只读' : '如：wf-judgment-1st';
+        }
+        // v1.28: 设置类型 radio
+        const stepRadio = document.getElementById('wfTypeStep');
+        const materialRadio = document.getElementById('wfTypeMaterial');
+        if (stepRadio) stepRadio.checked = (wfEditingType === 'step');
+        if (materialRadio) materialRadio.checked = (wfEditingType === 'material');
+        applyWfTypeUI();
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderStepsEditor(wfEditingSteps);
         document.getElementById('wfModal').classList.add('show');
@@ -312,7 +339,44 @@
         wfEditingId = null;
         wfEditingSteps = [];
         wfSelectedCaseWords = new Set();
+        wfEditingType = 'step';
+        wfEditingBuiltin = false;
+        // v1.30: 关闭时重置 id 输入框状态
+        const wfIdInput = document.getElementById('wfId');
+        if (wfIdInput) {
+            wfIdInput.value = '';
+            wfIdInput.readOnly = false;
+        }
     };
+
+    // v1.28: 切换 workflow 类型 radio 时调用
+    window.onWfTypeChange = function(type) {
+        wfEditingType = type;
+        applyWfTypeUI();
+        // 切换到不展示型时清空步骤（避免脏数据），切回展示型时若空则补一行
+        if (type === 'material') {
+            wfEditingSteps = [];
+        } else if (wfEditingSteps.length === 0) {
+            wfEditingSteps = [{ id: '', title: '' }];
+        }
+        renderStepsEditor(wfEditingSteps);
+    };
+
+    // v1.28: 根据类型切换步骤编辑器/不展示型提示的显示
+    function applyWfTypeUI() {
+        const stepsRow = document.getElementById('wfStepsRow');
+        const materialRow = document.getElementById('wfMaterialRow');
+        const stepsAddBtn = document.getElementById('wfStepsAddBtn');
+        if (wfEditingType === 'material') {
+            if (stepsRow) stepsRow.style.display = 'none';
+            if (materialRow) materialRow.style.display = '';
+            if (stepsAddBtn) stepsAddBtn.style.display = 'none';
+        } else {
+            if (stepsRow) stepsRow.style.display = '';
+            if (materialRow) materialRow.style.display = 'none';
+            if (stepsAddBtn) stepsAddBtn.style.display = '';
+        }
+    }
 
     function renderCaseWordsPicker(docTypeKey, selected) {
         const picker = document.getElementById('wfCaseWordsPicker');
@@ -321,12 +385,13 @@
             picker.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">当前业务系统未配置案字列表</span>';
             return;
         }
-        // 获取已被其他 workflow 占用的案字（用于提示，不强制禁用）
-        const orgData = getWfOrgData(currentOrg);
+        // v1.28: 仅显示同类型 workflow 已占用的案字（不同类型间案字可重复）
         const usedWords = new Set();
         const existingWfs = getWorkflowsForDocType(currentOrg, docTypeKey);
         existingWfs.forEach(wf => {
-            if (wf.id !== wfEditingId && Array.isArray(wf.caseWords)) {
+            if (wf.id !== wfEditingId
+                && (wf.type || 'step') === wfEditingType
+                && Array.isArray(wf.caseWords)) {
                 wf.caseWords.forEach(w => usedWords.add(w));
             }
         });
@@ -334,7 +399,7 @@
             const isSel = selected.has(w);
             const isUsed = usedWords.has(w);
             const cls = 'case-word-option' + (isSel ? ' selected' : '');
-            const title = isUsed ? '已被其他 workflow 匹配' : '';
+            const title = isUsed ? '已被同类型其他 workflow 匹配' : '';
             return '<label class="' + cls + '" title="' + title + '">'
                 + '<input type="checkbox" value="' + escapeHtml(w) + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleCaseWord(\'' + escapeHtml(w) + '\', this.checked)">'
                 + '<span>' + escapeHtml(w) + (isUsed ? ' ⚠' : '') + '</span></label>';
@@ -348,6 +413,11 @@
 
     function renderStepsEditor(steps) {
         const editor = document.getElementById('wfStepsEditor');
+        // v1.28: 不展示型不渲染步骤
+        if (wfEditingType === 'material') {
+            editor.innerHTML = '';
+            return;
+        }
         if (!steps || steps.length === 0) {
             editor.innerHTML = '<div class="step-empty">点击下方「添加步骤」创建第一个步骤</div>';
             return;
@@ -356,13 +426,9 @@
             const isFirst = idx === 0;
             const isLast = idx === steps.length - 1;
             const onlyOne = steps.length === 1;
-            const iconOptions = PRESET_ICONS.map(ic =>
-                '<option value="' + ic.key + '"' + (s.icon === ic.key ? ' selected' : '') + '>' + ic.name + '</option>'
-            ).join('');
             return '<div class="step-editor-row">'
                 + '<input type="text" placeholder="步骤 id" value="' + escapeHtml(s.id || '') + '" oninput="updateStep(' + idx + ', \'id\', this.value)">'
                 + '<input type="text" placeholder="步骤标题" value="' + escapeHtml(s.title || '') + '" oninput="updateStep(' + idx + ', \'title\', this.value)">'
-                + '<select onchange="updateStep(' + idx + ', \'icon\', this.value)">' + iconOptions + '</select>'
                 + '<div class="step-editor-actions">'
                 + '<button class="step-action-btn" onclick="moveStep(' + idx + ', -1)" ' + (isFirst ? 'disabled' : '') + ' title="上移"><i class="fas fa-arrow-up"></i></button>'
                 + '<button class="step-action-btn" onclick="moveStep(' + idx + ', 1)" ' + (isLast ? 'disabled' : '') + ' title="下移"><i class="fas fa-arrow-down"></i></button>'
@@ -388,7 +454,8 @@
         renderStepsEditor(wfEditingSteps);
     };
     window.addWorkflowStep = function() {
-        wfEditingSteps.push({ id: '', title: '', icon: 'fa-folder-open' });
+        if (wfEditingType === 'material') return;  // v1.28: 不展示型不允许加步骤
+        wfEditingSteps.push({ id: '', title: '' });
         renderStepsEditor(wfEditingSteps);
     };
 
@@ -399,34 +466,72 @@
             document.getElementById('wfName').focus();
             return;
         }
-        // 校验步骤
-        const cleanSteps = wfEditingSteps.map(s => ({
-            id: (s.id || '').trim(),
-            title: (s.title || '').trim(),
-            icon: s.icon || 'fa-folder-open'
-        }));
-        const emptyStep = cleanSteps.find(s => !s.id || !s.title);
-        if (emptyStep) {
-            showNotification('每个步骤需填写 id 和标题', 'error');
-            return;
-        }
-        const idSet = new Set();
-        for (const s of cleanSteps) {
-            if (idSet.has(s.id)) {
-                showNotification('步骤 id 重复：「' + s.id + '」', 'error');
-                return;
-            }
-            idSet.add(s.id);
+
+        // v1.30: workflow id 处理——内置只读原值；自定义可填，不填自动生成
+        const wfIdInput = document.getElementById('wfId');
+        let finalWfId = wfIdInput ? wfIdInput.value.trim() : '';
+        if (wfEditingBuiltin) {
+            // 内置 workflow：保留原 id（覆盖内置时也沿用原 id）
+            finalWfId = wfEditingId || finalWfId;
+        } else if (!finalWfId) {
+            // 新增/编辑自定义未填 id：自动生成
+            finalWfId = genWfId(wfEditingDocType);
         }
 
-        // 案字冲突校验
+        // v1.30: workflow id 同 docType 内唯一校验（排除自身）
+        const existingWfsForIdCheck = getWorkflowsForDocType(currentOrg, wfEditingDocType);
+        const idConflict = existingWfsForIdCheck.find(wf => wf.id === finalWfId && wf.id !== wfEditingId);
+        if (idConflict) {
+            showNotification('workflow id「' + finalWfId + '」已被「' + idConflict.name + '」占用，请更换', 'error');
+            if (wfIdInput) wfIdInput.focus();
+            return;
+        }
+
+        // v1.28: 不展示型强制 steps=[]，展示型校验步骤
+        let cleanSteps = [];
+        if (wfEditingType === 'step') {
+            cleanSteps = wfEditingSteps.map(s => ({
+                id: (s.id || '').trim(),
+                title: (s.title || '').trim()
+            }));
+            const emptyStep = cleanSteps.find(s => !s.id || !s.title);
+            if (emptyStep) {
+                showNotification('每个步骤需填写 id 和标题', 'error');
+                return;
+            }
+            const idSet = new Set();
+            for (const s of cleanSteps) {
+                if (idSet.has(s.id)) {
+                    showNotification('步骤 id 重复：「' + s.id + '」', 'error');
+                    return;
+                }
+                idSet.add(s.id);
+            }
+        }
+
+        // v1.28: 案字冲突校验——仅与同类型 workflow 校验
         const existingWfs = getWorkflowsForDocType(currentOrg, wfEditingDocType);
         const newCaseWords = Array.from(wfSelectedCaseWords);
         for (const wf of existingWfs) {
             if (wf.id === wfEditingId) continue;
+            if ((wf.type || 'step') !== wfEditingType) continue;  // v1.28: 跨类型不冲突
             const conflict = (wf.caseWords || []).find(w => newCaseWords.indexOf(w) >= 0);
             if (conflict) {
-                showNotification('案字「' + conflict + '」已被 workflow「' + wf.name + '」匹配', 'error');
+                showNotification('案字「' + conflict + '」已被同类型 workflow「' + wf.name + '」匹配', 'error');
+                return;
+            }
+        }
+
+        // v1.28: 兜底 workflow 唯一性校验——同类型内 caseWords 为空最多 1 个
+        if (newCaseWords.length === 0) {
+            const existingFallback = existingWfs.find(wf =>
+                wf.id !== wfEditingId
+                && (wf.type || 'step') === wfEditingType
+                && (!Array.isArray(wf.caseWords) || wf.caseWords.length === 0)
+            );
+            if (existingFallback) {
+                const typeLabel = wfEditingType === 'material' ? '不展示型' : '展示型';
+                showNotification('每个类型最多 1 个' + typeLabel + '兜底 workflow，已有「' + existingFallback.name + '」', 'error');
                 return;
             }
         }
@@ -438,24 +543,29 @@
             orgData[wfEditingDocType] = JSON.parse(JSON.stringify(existingWfs));
         }
         const arr = orgData[wfEditingDocType];
+
+        // v1.30: 若自定义 workflow 改了 id，需用新 id 写入；同时按新 id 查找覆盖
         const newWf = {
             name: name,
+            type: wfEditingType,            // v1.28: workflow 类型
             caseWords: newCaseWords,
-            steps: cleanSteps,
+            steps: cleanSteps,               // v1.28: 不展示型为 []
             isBuiltin: false
         };
         if (wfEditingId) {
+            // 编辑：先按原 id 在数组中查找（可能是内置迁入的自定义记录，也可能是纯自定义）
             const idx = arr.findIndex(w => w.id === wfEditingId);
             if (idx >= 0) {
-                newWf.id = wfEditingId;
+                newWf.id = finalWfId;  // v1.30: 使用最终 id（可能被用户修改）
                 arr[idx] = newWf;
             } else {
-                // 编辑内置 workflow：保留原 id，作为自定义覆盖写入
-                newWf.id = wfEditingId;
+                // 编辑内置 workflow：作为自定义覆盖追加，沿用最终 id
+                newWf.id = finalWfId;
                 arr.push(newWf);
             }
         } else {
-            newWf.id = genWfId(wfEditingDocType);
+            // 新增：使用最终 id
+            newWf.id = finalWfId;
             arr.push(newWf);
         }
         setWfOrgData(currentOrg, orgData);
@@ -467,12 +577,16 @@
 
     window.deleteWorkflow = function(docTypeKey, wfId) {
         const workflows = getWorkflowsForDocType(currentOrg, docTypeKey);
-        if (workflows.length <= 1) {
-            showNotification('每个文书类型至少需保留 1 个 workflow', 'warning');
-            return;
-        }
         const wf = workflows.find(w => w.id === wfId);
         if (!wf) return;
+        const wfType = wf.type || 'step';
+        // v1.28: 同类型至少保留 1 个
+        const sameTypeWfs = workflows.filter(w => (w.type || 'step') === wfType);
+        if (sameTypeWfs.length <= 1) {
+            const typeLabel = wfType === 'material' ? '不展示型' : '展示型';
+            showNotification('每个类型至少需保留 1 个' + typeLabel + ' workflow', 'warning');
+            return;
+        }
         const isBuiltinWf = !!wf.isBuiltin;
         const isCustomized = getWfOrgData(currentOrg)[docTypeKey] && getWfOrgData(currentOrg)[docTypeKey].length > 0;
         const confirmText = (isBuiltinWf && isCustomized)
@@ -497,12 +611,10 @@
     window.openAddModal = function() {
         editingKey = null;
         editingIsBuiltin = false;
-        selectedIcon = '';
         document.getElementById('modalTitle').textContent = '新增类型';
         document.getElementById('tplName').value = '';
         document.getElementById('nameHint').textContent = '用于模板和提示词的分类，不可与现有类型重名';
         document.getElementById('nameHint').style.color = '';
-        renderIconPicker('');
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
     };
@@ -513,14 +625,12 @@
         if (!t) return;
         editingKey = key;
         editingIsBuiltin = !!t.isBuiltin;
-        selectedIcon = t.icon || '';
         document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置类型（另存为自定义覆盖）' : '编辑类型';
         document.getElementById('tplName').value = t.name;
         document.getElementById('nameHint').textContent = editingIsBuiltin
             ? '修改后将覆盖内置配置；删除自定义覆盖可恢复内置默认'
             : '用于模板和提示词的分类，不可与现有类型重名';
         document.getElementById('nameHint').style.color = '';
-        renderIconPicker(selectedIcon);
         document.getElementById('tplModal').classList.add('show');
     };
 
@@ -528,23 +638,6 @@
         document.getElementById('tplModal').classList.remove('show');
         editingKey = null;
         editingIsBuiltin = false;
-        selectedIcon = '';
-    };
-
-    function renderIconPicker(selected) {
-        const picker = document.getElementById('iconPicker');
-        picker.innerHTML = PRESET_ICONS.map(ic => {
-            const sel = ic.key === selected ? ' selected' : '';
-            return '<div class="icon-option' + sel + '" data-icon="' + ic.key + '" onclick="selectIcon(\'' + ic.key + '\')">'
-                + '<i class="fas ' + ic.key + '"></i><span>' + escapeHtml(ic.name) + '</span></div>';
-        }).join('');
-    }
-
-    window.selectIcon = function(iconKey) {
-        selectedIcon = iconKey;
-        document.querySelectorAll('.icon-option').forEach(el => {
-            el.classList.toggle('selected', el.dataset.icon === iconKey);
-        });
     };
 
     window.saveType = function() {
@@ -552,10 +645,6 @@
         if (!name) {
             showNotification('请填写类型名称', 'error');
             document.getElementById('tplName').focus();
-            return;
-        }
-        if (!selectedIcon) {
-            showNotification('请选择图标', 'error');
             return;
         }
 
@@ -582,7 +671,6 @@
 
         orgData[key] = {
             name: name,
-            icon: selectedIcon,
             isBuiltin: false
         };
         setOrgData(currentOrg, orgData);

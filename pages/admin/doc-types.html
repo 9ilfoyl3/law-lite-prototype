@@ -107,15 +107,6 @@
         .form-input:focus { outline: none; border-color: var(--accent-primary); }
         .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
-        /* 图标选择网格 */
-        .icon-picker { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); max-height: 180px; overflow-y: auto; }
-        .icon-option { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 4px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.15s; background: var(--bg-secondary); font-size: 11px; color: var(--text-secondary); }
-        .icon-option i { font-size: 16px; margin-bottom: 4px; color: var(--text-secondary); }
-        .icon-option:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
-        .icon-option:hover i { color: var(--accent-primary); }
-        .icon-option.selected { border-color: var(--accent-primary); background: var(--accent-light); color: var(--accent-primary); }
-        .icon-option.selected i { color: var(--accent-primary); }
-
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-cancel { background: #f3f4f6; color: #374151; }
         .btn-cancel:hover { background: #e5e7eb; }
@@ -148,6 +139,20 @@
         .wf-badge.fallback { background: #fef3c7; color: #92400e; }
         .case-word-tag { display: inline-block; padding: 2px 8px; background: var(--accent-light); color: var(--accent-primary); border-radius: 4px; font-size: 11px; margin-right: 4px; }
         .case-word-fallback { font-size: 12px; color: var(--accent-warning); font-weight: 500; }
+
+        /* v1.28: workflow 类型徽章 */
+        .wf-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .wf-type-badge.step { background: #dbeafe; color: #1e40af; }
+        .wf-type-badge.material { background: #ede9fe; color: #5b21b6; }
+        .step-count-dash { color: var(--text-muted); font-size: 14px; }
+
+        /* v1.28: workflow 类型 radio 行 */
+        .wf-type-radio-group { display: flex; gap: 16px; padding: 8px 0; }
+        .wf-type-radio { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); background: var(--bg-secondary); transition: all 0.15s; }
+        .wf-type-radio:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .wf-type-radio input { margin: 0; }
+        .wf-type-radio.selected { border-color: var(--accent-primary); background: var(--accent-light); color: var(--accent-primary); }
+        .wf-material-hint { padding: 12px 14px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 6px; color: #5b21b6; font-size: 13px; line-height: 1.6; }
 
         /* 步骤编辑器 */
         .step-editor-row { display: grid; grid-template-columns: 140px 1fr 130px 90px; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #f3f4f6; align-items: center; }
@@ -247,7 +252,6 @@
                             <tr>
                                 <th style="width:40px;"></th>
                                 <th>类型名称</th>
-                                <th style="width:80px;">图标</th>
                                 <th style="width:90px;">模板数</th>
                                 <th style="width:90px;">提示词数</th>
                                 <th style="width:90px;">workflow</th>
@@ -274,11 +278,6 @@
                 <label class="form-label">类型名称 <span class="required">*</span></label>
                 <input type="text" class="form-input" id="tplName" placeholder="如：司法建议书">
                 <div class="form-hint" id="nameHint">用于模板和提示词的分类，不可与现有类型重名</div>
-            </div>
-            <div class="form-row">
-                <label class="form-label">图标 <span class="required">*</span></label>
-                <div class="icon-picker" id="iconPicker"></div>
-                <div class="form-hint">从预设图标中选择一个，用于侧边栏与下拉显示</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
@@ -308,18 +307,48 @@
                 <input type="text" class="form-input" id="wfName" placeholder="如：一审民事判决">
                 <div class="form-hint">仅管理后台可见，用户侧不显示此名称</div>
             </div>
+            <!-- v1.30: workflow id（新增可填，编辑内置只读） -->
+            <div class="form-row">
+                <label class="form-label">workflow id <span class="required">*</span></label>
+                <input type="text" class="form-input" id="wfId" placeholder="如：wf-judgment-1st">
+                <div class="form-hint">唯一标识，同一文书类型下不可重复；编辑内置 workflow 时只读</div>
+            </div>
+            <!-- v1.28/v1.29: workflow 类型 radio（命名简化为展示型/不展示型） -->
+            <div class="form-row">
+                <label class="form-label">workflow 类型 <span class="required">*</span></label>
+                <div class="wf-type-radio-group">
+                    <label class="wf-type-radio" id="wfTypeStepLabel">
+                        <input type="radio" name="wfType" id="wfTypeStep" value="step" checked onchange="onWfTypeChange('step')">
+                        <span>展示型（含人工交互节点）</span>
+                    </label>
+                    <label class="wf-type-radio" id="wfTypeMaterialLabel">
+                        <input type="radio" name="wfType" id="wfTypeMaterial" value="material" onchange="onWfTypeChange('material')">
+                        <span>不展示型（无人工交互节点）</span>
+                    </label>
+                </div>
+                <div class="form-hint">展示型 = 用户在分步生成 tab 按步骤逐个确认；不展示型 = 输入参数直接出文书结果，用于材料生成 tab</div>
+            </div>
             <div class="form-row">
                 <label class="form-label">匹配案字（不选 = 兜底 workflow）</label>
                 <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
-                <div class="form-hint">案字从案件案号自动识别；同一案字在多个 workflow 间不可重复</div>
+                <div class="form-hint">案字从案件案号自动识别；同一案字在多个<strong>同类型</strong> workflow 间不可重复</div>
             </div>
-            <div class="form-row">
+            <!-- v1.28: 步骤序列行（仅展示型显示） -->
+            <div class="form-row" id="wfStepsRow">
                 <label class="form-label">步骤序列 <span class="required">*</span></label>
                 <div id="wfStepsEditor" style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);"></div>
-                <button class="btn btn-cancel" style="margin-top:8px;" onclick="addWorkflowStep()">
+                <button class="btn btn-cancel" id="wfStepsAddBtn" style="margin-top:8px;" onclick="addWorkflowStep()">
                     <i class="fas fa-plus"></i> 添加步骤
                 </button>
                 <div class="form-hint">步骤顺序即分步生成的执行顺序；步骤 id 在同一 workflow 内需唯一</div>
+            </div>
+            <!-- v1.28: 不展示型提示行（仅不展示型显示） -->
+            <div class="form-row" id="wfMaterialRow" style="display:none;">
+                <label class="form-label">不展示型 workflow 说明</label>
+                <div class="wf-material-hint">
+                    <i class="fas fa-info-circle"></i>
+                    不展示型 workflow 无人工交互节点，用户在材料生成 tab 中选择材料 + 模板 + 提示词后系统直接生成文书。无需配置步骤序列。
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeWfModal()">取消</button>
@@ -331,6 +360,6 @@
     <div id="notificationContainer"></div>
 
     <script src="../../js/case-data.js"></script>
-    <script src="../../js/admin-doc-types.js?v=1"></script>
+    <script src="../../js/admin-doc-types.js?v=5"></script>
 </body>
 </html>

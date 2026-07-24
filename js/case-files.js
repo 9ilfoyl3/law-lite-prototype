@@ -1,4 +1,5 @@
 // ============ Case Files Page JavaScript ============
+// v2.17 workflow 区分分步型/材料型：分步生成 tab 仅匹配 step 型，材料生成 tab 新增 refreshMaterialWorkflow 匹配 material 型（用户侧不感知）
 // v2.16 移除「我的模板」「我的提示词」入口（迁移至案件列表页 cases.js）；清理 applyReadOnlyMode 中对应隐藏逻辑
 // v2.14 提示词标签优先读管理后台 adminPromptTemplates；模板渲染兼容对象结构
 // v2.13 支持管理后台只读模式（?readonly=1）：隐藏编辑/删除/生成按钮
@@ -16,6 +17,7 @@ let stepStates = [];                        // 每步状态: waiting/current/don
 let stepsConfig = [];                       // 步骤配置
 let expandedStepIndex = 0;                  // 当前展开的分步面板索引
 let isGenerating = false;                   // 是否正在生成中
+let stepGenerationStarted = false;          // 分步生成是否已开始（控制提示/步骤列表显示）
 let resultContent = '';                     // 右栏结果内容HTML
 let resultEditContent = '';                 // 右栏编辑模式内容
 let pendingUploadFiles = [];
@@ -25,7 +27,7 @@ let pendingElementConfirmCallback = null;   // 要素确认回调
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
 let stepDocType = '';                       // 分步生成视图中的文书类型
 let stepTemplate = '';                      // 分步生成视图中的文书模板
-let stepRequirement = '';                   // 分步生成视图中的需求说明
+let stepRequirement = '';                   // 分步生成视图中的提示词
 
 // ===== 每步材料选择建议（写死） =====
 const stepMaterialHints = {
@@ -151,7 +153,7 @@ function applyReadOnlyMode() {
     const compileStepsBtn = document.getElementById('compileStepsBtn');
     if (compileStepsBtn) compileStepsBtn.style.display = 'none';
 
-    // 禁用模型选择器、文书类型/模板下拉、需求说明 textarea
+    // 禁用模型选择器、文书类型/模板下拉、提示词 textarea
     const modelSelect = document.getElementById('modelSelect');
     if (modelSelect) modelSelect.disabled = true;
     const docTypeSelect = document.getElementById('docTypeSelect');
@@ -714,6 +716,7 @@ function switchToStepView(options = {}) {
     }
 
     renderStepGenConfig();
+    resetStepFlowUI();
     renderSteps();
 }
 
@@ -748,6 +751,8 @@ function backToMainView() {
 
     const autoAlert = document.getElementById('autoSwitchAlert');
     if (autoAlert) autoAlert.classList.remove('show');
+    // v1.28: 切换回材料生成 tab 时，刷新材料型 workflow 匹配（用户侧不感知）
+    refreshMaterialWorkflow();
 }
 
 function toggleMaterialCol() {
@@ -895,6 +900,8 @@ function onMatDocTypeChange(shouldSync = true) {
     }
     renderMatReqTemplates(docTypeKey);
     refreshStepsConfig();
+    // v1.28: 材料生成 tab 切换文书类型时，同步匹配材料型 workflow（用户侧不感知）
+    refreshMaterialWorkflow();
     updateMatGenerateButtonState();
     if (shouldSync) syncStepConfigFromMaterial();
 }
@@ -975,11 +982,31 @@ function renderStepGenConfig() {
     const requirementTextarea = document.getElementById('stepRequirement');
     if (!docTypeSelect || !templateSelect || !requirementTextarea) return;
 
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
     const docTypes = getCurrentDocTypes();
-    const currentDocType = stepDocType || Object.keys(docTypes)[0] || '';
-    if (!stepDocType && currentDocType) stepDocType = currentDocType;
+    // v1.29: 分步生成 tab 文书类型下拉仅展示有展示型 workflow（type='step'）的类型
+    const filteredEntries = Object.entries(docTypes).filter(([key]) => {
+        const workflows = (typeof getWorkflowsForDocType !== 'undefined')
+            ? getWorkflowsForDocType(org, key, 'step')
+            : [];
+        return Array.isArray(workflows) && workflows.length > 0;
+    });
+    const filteredKeys = filteredEntries.map(([key]) => key);
 
-    docTypeSelect.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
+    // 当前 stepDocType 不在过滤后列表中时，重置为第一个可用类型
+    if (filteredKeys.length === 0) {
+        docTypeSelect.innerHTML = '<option value="">暂无可用类型</option>';
+        templateSelect.innerHTML = '';
+        requirementTextarea.value = '';
+        return;
+    }
+    if (filteredKeys.indexOf(stepDocType) < 0) {
+        stepDocType = filteredKeys[0];
+    }
+    const currentDocType = stepDocType || filteredKeys[0];
+    if (!stepDocType) stepDocType = currentDocType;
+
+    docTypeSelect.innerHTML = filteredEntries.map(([key, cfg]) =>
         `<option value="${key}" ${key === currentDocType ? 'selected' : ''}>${cfg.name}</option>`
     ).join('');
 
@@ -996,6 +1023,7 @@ function renderStepGenConfig() {
 
 function onStepDocTypeChange(docTypeKey) {
     stepDocType = docTypeKey;
+    currentStepPlanId = '';  // 重置步骤方案，让 refreshStepsConfig 重新按案字匹配默认值
     const templates = getDocTypeTemplates(docTypeKey);
     const templateSelect = document.getElementById('stepTemplate');
     const templateKeys = Object.keys(templates);
@@ -1025,8 +1053,13 @@ function generateByMaterial() {
         return;
     }
 
-    const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
-    if ((allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0)) {
+    const _org = localStorage.getItem('currentBusiness') || 'court';
+    const _cw = parseCaseWord(caseItem.caseNumber, _org);
+    const allPresets = getAllElementPresets(caseItem.cause, _org, _cw);
+    // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
+    const _matDocType = document.getElementById('matDocType')?.value || '';
+    const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
+    if (_matDocType === 'judgment' && _hasElements) {
         showPreElementConfirmModal(allPresets, () => {
             doGenerateByMaterial(null);
         }, (elementAnswers) => {
@@ -1047,10 +1080,14 @@ function autoGenerateWithAllElements() {
         return;
     }
 
-    const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
+    const _org2 = localStorage.getItem('currentBusiness') || 'court';
+    const _cw2 = parseCaseWord(caseItem.caseNumber, _org2);
+    const allPresets = getAllElementPresets(caseItem.cause, _org2, _cw2);
     const hasPresets = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
+    // v1.27: 要件仅在「裁判文书」(judgment) 时才自动引入
+    const _autoDocType = document.getElementById('matDocType')?.value || getUrlParam('docType') || '';
 
-    if (hasPresets) {
+    if (_autoDocType === 'judgment' && hasPresets) {
         const elementAnswers = [];
         (allPresets.standard || []).forEach(p => {
             elementAnswers.push({
@@ -1154,18 +1191,92 @@ function getSignerLabel(orgType) {
 function initStepsGen() {
     refreshStepsConfig();
     renderStepGenConfig();
+    resetStepFlowUI();
     renderSteps();
+}
+
+// 重置分步生成流程 UI（切换 tab/文书类型时调用）
+function resetStepFlowUI() {
+    stepGenerationStarted = false;
+    const flowArea = document.getElementById('stepFlowArea');
+    const startBtn = document.getElementById('startStepsBtn');
+    const nextArea = document.getElementById('stepNextActionArea');
+    if (flowArea) flowArea.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'inline-flex';
+    if (nextArea) nextArea.style.display = 'none';
 }
 
 function refreshStepsConfig() {
     const docTypeKey = currentGenMethod === 'steps'
         ? stepDocType
         : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
-    // v1.22: 按案字匹配 workflow 取步骤序列
     const caseWord = extractCaseWordFromCaseNumber();
-    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord);
+    // v1.22: 渲染步骤方案下拉（多 workflow 时显示），并按选中 workflow 取步骤
+    // v1.28: 仅匹配分步型 workflow（材料型由材料生成 tab 单独处理）
+    renderStepPlanSelect(docTypeKey, caseWord);
+    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, currentStepPlanId);
     stepStates = stepsConfig.map(() => 'waiting');
     stepData = {};
+}
+
+// v1.22: 渲染步骤方案下拉（仅多 workflow 时显示）
+// v1.28: 仅匹配分步型 workflow（type='step'）
+function renderStepPlanSelect(docTypeKey, caseWord) {
+    const planItem = document.getElementById('stepPlanItem');
+    const planSelect = document.getElementById('stepPlan');
+    if (!planItem || !planSelect) return;
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    // v1.28: 仅取分步型 workflow
+    const workflows = (typeof getWorkflowsForDocType === 'function')
+        ? getWorkflowsForDocType(org, docTypeKey, 'step') : [];
+    if (workflows.length <= 1) {
+        planItem.style.display = 'none';
+        currentStepPlanId = workflows[0] ? workflows[0].id : '';
+        return;
+    }
+    // 多 workflow：显示下拉，默认选中案字匹配项
+    planItem.style.display = '';
+    const defaultWf = (typeof getWorkflowByCaseWord === 'function')
+        ? getWorkflowByCaseWord(org, docTypeKey, caseWord) : workflows[0];
+    const defaultId = defaultWf ? defaultWf.id : workflows[0].id;
+    if (!currentStepPlanId || !workflows.find(w => w.id === currentStepPlanId)) {
+        currentStepPlanId = defaultId;
+    }
+    planSelect.innerHTML = workflows.map(wf =>
+        `<option value="${wf.id}" ${wf.id === currentStepPlanId ? 'selected' : ''}>${wf.name}步骤</option>`
+    ).join('');
+}
+
+// v1.22: 切换步骤方案
+function onStepPlanChange(wfId) {
+    currentStepPlanId = wfId;
+    const caseWord = extractCaseWordFromCaseNumber();
+    stepsConfig = getStepsConfigForDocTypeWithFallback(stepDocType, caseWord, currentStepPlanId);
+    stepStates = stepsConfig.map(() => 'waiting');
+    stepData = {};
+    expandedStepIndex = -1;
+    renderSteps();
+}
+
+// v1.28: 材料生成 tab 切换/初始化时，按案字匹配材料型 workflow（用户侧不感知，仅用于内部流程选择）
+// 不返回任何 UI 反馈，仅记录到 currentMaterialWorkflowId（如需后续日志/调试使用）
+let currentMaterialWorkflowId = '';
+function refreshMaterialWorkflow() {
+    const docTypeKey = (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '')
+        || (document.getElementById('stepDocType') ? document.getElementById('stepDocType').value : '');
+    const caseWord = extractCaseWordFromCaseNumber();
+    if (!docTypeKey) {
+        currentMaterialWorkflowId = '';
+        return;
+    }
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    if (typeof getMaterialWorkflowByCaseWord !== 'function') {
+        currentMaterialWorkflowId = '';
+        return;
+    }
+    const wf = getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord);
+    currentMaterialWorkflowId = wf ? wf.id : '';
+    // 调试用：console.log('[case-files] 材料生成匹配 workflow:', currentMaterialWorkflowId);
 }
 
 // v1.22: 从当前案件案号提取案字（如 民初/民终/刑初...）
@@ -1185,12 +1296,28 @@ function extractCaseWordFromCaseNumber() {
 }
 
 // v1.22: 优先走 case-data.js 的 getStepsConfigForDocType（按案字匹配 workflow）
+// v1.28: 仅匹配分步型 workflow（type='step'）
 // 保留原有 fallback 逻辑：未匹配到 workflow 时回退到内置 stepConfigsByOrg
-function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord) {
+function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, stepPlanId) {
     // 1. 优先用 case-data.js 的全局函数（读 localStorage.adminWorkflows）
-    if (typeof getStepsConfigForDocType === 'function' && docTypeKey) {
-        const steps = getStepsConfigForDocType(docTypeKey, caseWord);
-        if (steps && steps.length > 0) return steps;
+    if (typeof getWorkflowsForDocType === 'function' && docTypeKey) {
+        const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+        // v1.28: 仅取分步型 workflow
+        const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
+        if (workflows.length > 0) {
+            // 优先用用户选中的 workflow
+            if (stepPlanId) {
+                const selected = workflows.find(w => w.id === stepPlanId);
+                if (selected && Array.isArray(selected.steps) && selected.steps.length > 0) {
+                    return selected.steps;
+                }
+            }
+            // 否则按案字匹配
+            if (typeof getStepsConfigForDocType === 'function') {
+                const steps = getStepsConfigForDocType(docTypeKey, caseWord);
+                if (steps && steps.length > 0) return steps;
+            }
+        }
     }
     // 2. fallback：内置 stepConfigsByOrg + fallbackMap
     const orgConfigs = (typeof stepConfigsByOrg !== 'undefined')
@@ -1531,21 +1658,77 @@ async function generateSingleStep(stepIndex, options = {}) {
 function updateStepGenerationButtons() {
     const startBtn = document.getElementById('startStepsBtn');
     const compileBtn = document.getElementById('compileStepsBtn');
-    if (!startBtn || !compileBtn) return;
+    const nextArea = document.getElementById('stepNextActionArea');
+    const nextBtn = document.getElementById('stepNextBtn');
+
+    // 兼容旧版 DOM（若页面未升级则保持原逻辑）
+    if (compileBtn) {
+        const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
+        compileBtn.style.display = allDone ? 'inline-flex' : 'none';
+    }
+
+    if (!startBtn || !nextArea || !nextBtn) {
+        // 旧版页面兜底
+        if (startBtn) {
+            const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
+            const hasDone = stepsConfig.some((s, i) => stepStates[i] === 'done');
+            startBtn.style.display = isGenerating || allDone ? 'none' : 'inline-flex';
+            startBtn.innerHTML = hasDone ? '<i class="fas fa-forward"></i> 生成剩余步骤' : '<i class="fas fa-play"></i> 开始生成';
+        }
+        return;
+    }
+
+    // 新交互：未点击【开始生成】前只显示 startBtn
+    if (!stepGenerationStarted) {
+        startBtn.style.display = 'inline-flex';
+        startBtn.innerHTML = '<i class="fas fa-play"></i> 开始生成';
+        nextArea.style.display = 'none';
+        return;
+    }
+
+    // 已开始：隐藏顶部开始按钮
+    startBtn.style.display = 'none';
+
+    // 生成中不显示下一步按钮
+    if (isGenerating) {
+        nextArea.style.display = 'none';
+        return;
+    }
 
     const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
-    const hasDone = stepsConfig.some((s, i) => stepStates[i] === 'done');
+    const hasWaiting = stepsConfig.some((s, i) => stepStates[i] !== 'done');
 
-    compileBtn.style.display = allDone ? 'inline-flex' : 'none';
-    startBtn.style.display = isGenerating || allDone ? 'none' : 'inline-flex';
-    startBtn.textContent = hasDone ? '生成剩余步骤' : '开始生成';
+    if (allDone) {
+        // 全部完成：显示【生成文书】
+        nextArea.style.display = 'flex';
+        nextBtn.innerHTML = '<i class="fas fa-file-alt"></i> 生成文书';
+    } else if (hasWaiting) {
+        // 还有未生成步骤：显示【生成剩余步骤】
+        nextArea.style.display = 'flex';
+        nextBtn.innerHTML = '<i class="fas fa-forward"></i> 生成剩余步骤';
+    } else {
+        nextArea.style.display = 'none';
+    }
 }
 
 async function startStepGeneration() {
     if (guardReadOnly('startStepGeneration')) return;
     if (isGenerating) return;
 
-    // 校验所有未生成步骤的材料；已生成步骤不再校验
+    if (!validateStepMaterials()) return;
+
+    // 进入分步生成流程：显示提示与步骤列表
+    stepGenerationStarted = true;
+    const flowArea = document.getElementById('stepFlowArea');
+    if (flowArea) flowArea.style.display = 'block';
+    updateStepGenerationButtons();
+
+    // 开始生成第一步
+    await continueStepGeneration();
+}
+
+// 校验所有未生成步骤的材料
+function validateStepMaterials() {
     const safeLimit = getSafeContextLimit();
     for (let i = 0; i < stepsConfig.length; i++) {
         if (stepStates[i] === 'done') continue;
@@ -1555,9 +1738,21 @@ async function startStepGeneration() {
         const mats = getEffectiveStepMaterials(stepId);
         if (mats.size === 0) {
             showNotification(`请为「${stepTitle}」至少选择 1 件材料`, 'warning');
-            const el = document.getElementById(`step_${i}`);
-            if (el) el.classList.add('expanded');
-            return;
+            // 若流程区域已显示则展开对应步骤
+            const flowArea = document.getElementById('stepFlowArea');
+            if (flowArea && flowArea.style.display !== 'none') {
+                const el = document.getElementById(`step_${i}`);
+                if (el) el.classList.add('expanded');
+            } else if (flowArea) {
+                // 未开始时先显示流程区域让用户选择材料
+                stepGenerationStarted = true;
+                flowArea.style.display = 'block';
+                renderSteps();
+                const el = document.getElementById(`step_${i}`);
+                if (el) el.classList.add('expanded');
+            }
+            updateStepGenerationButtons();
+            return false;
         }
         const stepTokens = [...mats].reduce((sum, id) => {
             const f = caseItem.files.find(x => x.id === id);
@@ -1565,20 +1760,39 @@ async function startStepGeneration() {
         }, 0);
         if (stepTokens > safeLimit) {
             showNotification(`「${stepTitle}」预估 ${formatNumber(stepTokens)} tokens，超出当前模型安全上限 ${formatNumber(safeLimit)} tokens，请减少材料`, 'warning');
-            const el = document.getElementById(`step_${i}`);
-            if (el) el.classList.add('expanded');
-            return;
+            const flowArea = document.getElementById('stepFlowArea');
+            if (flowArea && flowArea.style.display !== 'none') {
+                const el = document.getElementById(`step_${i}`);
+                if (el) el.classList.add('expanded');
+            }
+            return false;
         }
     }
+    return true;
+}
 
-    for (let i = 0; i < stepsConfig.length; i++) {
-        if (stepStates[i] === 'done') continue;
-        const ok = await generateSingleStep(i, { silent: true });
-        if (!ok) return;
-        await sleep(300);
+// 继续生成下一个未完成的步骤；全部完成后按钮显示为【生成文书】
+async function continueStepGeneration() {
+    if (guardReadOnly('continueStepGeneration')) return;
+    if (isGenerating) return;
+
+    const nextIndex = stepsConfig.findIndex((s, i) => stepStates[i] !== 'done');
+    if (nextIndex === -1) {
+        // 全部已完成，点击即编译文书
+        compileSteps();
+        return;
     }
 
-    showNotification('全部步骤已生成完成，可编辑后编译文书', 'success');
+    const ok = await generateSingleStep(nextIndex, { silent: true });
+    if (!ok) return;
+
+    // 生成完成后滚动到当前步骤
+    const el = document.getElementById(`step_${nextIndex}`);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    updateStepGenerationButtons();
 }
 
 // 步骤内容生成器
@@ -1748,8 +1962,12 @@ function regenerateStep(index) {
 
 function compileSteps() {
     if (guardReadOnly('compileSteps')) return;
-    const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
-    if ((allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0)) {
+    const _org3 = localStorage.getItem('currentBusiness') || 'court';
+    const _cw3 = parseCaseWord(caseItem.caseNumber, _org3);
+    const allPresets = getAllElementPresets(caseItem.cause, _org3, _cw3);
+    // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
+    const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
+    if (stepDocType === 'judgment' && _hasElements3) {
         showPreElementConfirmModal(allPresets, () => {
             doCompileSteps(null);
         }, (elementAnswers) => {

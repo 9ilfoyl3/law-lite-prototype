@@ -122,24 +122,37 @@ function getDocTypeTemplates(docTypeKey) {
 }
 
 // ============ v1.22: workflow 配置（挂在文书类型下）============
+// v1.28: workflow 扩展为节点流程，新增 type 字段：'step'=分步型 | 'material'=材料型
 // 数据持久化：localStorage.adminWorkflows（按业务系统分组）
-// 结构：{ [org]: { [docTypeKey]: [{id, name, caseWords, steps, isBuiltin}] } }
+// 结构：{ [org]: { [docTypeKey]: [{id, name, type, caseWords, steps, isBuiltin}] } }
 // 与 stepConfigsByOrg 的关系：adminWorkflows 存在时整体覆盖内置步骤数组
 
 // 获取当前业务系统下某文书类型的 workflow 列表（合并内置 + 自定义）
-// 返回数组：[{id, name, caseWords, steps, isBuiltin}]
-function getWorkflowsForDocType(org, docTypeKey) {
+// typeFilter: 'step' | 'material' | undefined（不过滤）
+// 返回数组：[{id, name, type, caseWords, steps, isBuiltin}]
+function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
     // 1. 取内置 workflow（首次访问时从 stepConfigsByOrg 迁移）
     const builtinSteps = (typeof stepConfigsByOrg !== 'undefined'
         && stepConfigsByOrg[org]
         && stepConfigsByOrg[org][docTypeKey]) || null;
     const builtins = [];
     if (builtinSteps && Array.isArray(builtinSteps)) {
+        // v1.28: 内置分步型 workflow（迁移自 stepConfigsByOrg）
         builtins.push({
             id: 'wf-' + docTypeKey + '-default',
             name: '默认',
+            type: 'step',             // v1.28: 分步型
             caseWords: [],            // 空 = 兜底
-            steps: builtinSteps.map(s => ({ id: s.id, title: s.title, icon: s.icon })),
+            steps: builtinSteps.map(s => ({ id: s.id, title: s.title })),
+            isBuiltin: true
+        });
+        // v1.28: 内置材料型 workflow（默认兜底）
+        builtins.push({
+            id: 'wf-' + docTypeKey + '-material-default',
+            name: '默认-材料生成',
+            type: 'material',         // 材料型：无人工交互节点
+            caseWords: [],
+            steps: [],
             isBuiltin: true
         });
     }
@@ -153,17 +166,33 @@ function getWorkflowsForDocType(org, docTypeKey) {
         console.error('[case-data] getWorkflowsForDocType 读取 adminWorkflows 失败:', e);
     }
     // 3. 合并：自定义存在时整体覆盖内置
+    let result;
     if (customs.length > 0) {
-        return customs;
+        // v1.28: 兼容旧数据——无 type 字段按 'step' 处理；材料型 steps 强制为 []
+        result = customs.map(wf => {
+            const type = wf.type || 'step';
+            return {
+                ...wf,
+                type: type,
+                steps: type === 'material' ? [] : (wf.steps || [])
+            };
+        });
+    } else {
+        result = builtins;
     }
-    return builtins;
+    // v1.28: 按类型过滤
+    if (typeFilter) {
+        return result.filter(wf => (wf.type || 'step') === typeFilter);
+    }
+    return result;
 }
 
-// 根据案字匹配 workflow，返回其 steps 数组
-// 匹配规则：精确匹配 caseWords → 兜底 workflow(caseWords=[]) → 第一个 workflow → 内置 stepConfigsByOrg
+// 根据案字匹配【分步型】workflow，返回其 steps 数组
+// 匹配规则：精确匹配 caseWords → 兜底分步型 workflow(caseWords=[]) → 第一个分步型 → 内置 stepConfigsByOrg
 function getStepsConfigForDocType(docTypeKey, caseWord) {
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    const workflows = getWorkflowsForDocType(org, docTypeKey);
+    // v1.28: 仅匹配分步型 workflow
+    const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
     if (workflows.length === 0) {
         // 回退到内置 stepConfigsByOrg
         const fallback = (typeof stepConfigsByOrg !== 'undefined'
@@ -183,7 +212,7 @@ function getStepsConfigForDocType(docTypeKey, caseWord) {
     if (fallbackWf && Array.isArray(fallbackWf.steps) && fallbackWf.steps.length > 0) {
         return fallbackWf.steps;
     }
-    // 3. 第一个 workflow
+    // 3. 第一个分步型 workflow
     if (workflows[0] && Array.isArray(workflows[0].steps)) {
         return workflows[0].steps;
     }
@@ -193,6 +222,41 @@ function getStepsConfigForDocType(docTypeKey, caseWord) {
 // 统计某文书类型下的 workflow 数量（供管理后台表格显示）
 function countWorkflowsForDocType(org, docTypeKey) {
     return getWorkflowsForDocType(org, docTypeKey).length;
+}
+
+// v1.22: 根据案字匹配【分步型】workflow 对象（含 id/name/steps），用于用户侧"步骤方案"下拉默认选中
+// 匹配规则：精确匹配 caseWords → 兜底分步型 workflow(caseWords=[]) → 第一个分步型 → null
+function getWorkflowByCaseWord(org, docTypeKey, caseWord) {
+    const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
+    if (workflows.length === 0) return null;
+    // 1. 精确匹配案字
+    if (caseWord) {
+        const matched = workflows.find(wf => Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0);
+        if (matched) return matched;
+    }
+    // 2. 兜底 workflow
+    const fallback = workflows.find(wf => !Array.isArray(wf.caseWords) || wf.caseWords.length === 0);
+    if (fallback) return fallback;
+    // 3. 第一个
+    return workflows[0];
+}
+
+// v1.28: 根据案字匹配【材料型】workflow 对象，用于用户侧材料生成 tab 流程选择
+// 匹配规则：精确匹配 caseWords → 兜底材料型 workflow(caseWords=[]) → 第一个材料型 → null
+// 用户侧不暴露此匹配，仅用于内部流程选择
+function getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord) {
+    const workflows = getWorkflowsForDocType(org, docTypeKey, 'material');
+    if (workflows.length === 0) return null;
+    // 1. 精确匹配案字
+    if (caseWord) {
+        const matched = workflows.find(wf => Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0);
+        if (matched) return matched;
+    }
+    // 2. 兜底 workflow
+    const fallback = workflows.find(wf => !Array.isArray(wf.caseWords) || wf.caseWords.length === 0);
+    if (fallback) return fallback;
+    // 3. 第一个
+    return workflows[0];
 }
 
 // v1.17: docTemplates 数据结构升级——把字符串值统一转为对象 {name, docType, causes, content}
@@ -324,7 +388,7 @@ function getTemplateName(tpl) {
     return tpl.name || '';
 }
 
-// v1.13: 获取「生成需求说明」提示词模板
+// v1.13: 获取「提示词」提示词模板
 // 优先级：管理后台 adminPromptTemplates（为空回退默认） + 用户侧 myPromptTemplates（追加，标记 source='mine'）
 // v1.23: 过滤掉 enabled === false 的项；内置提示词停用记录于 __builtinDisabled__ 字典
 function getReqTemplates(org, docTypeKey) {
@@ -768,18 +832,78 @@ const elementPresetsByCause = {
 // 获取案由对应的预设要件，无精确匹配时返回通用要件
 // org 参数（可选）：业务系统 key（court/procuratorate/justice），传入时优先读取
 //                  localStorage.adminElementPresets[org][cause] 的管理后台自定义覆盖
-function getElementPresets(cause, org) {
-    // 1. 管理后台自定义覆盖优先
+// 从案件 caseNumber 解析案字（如 "(2024)粤01民初123号" → "民初"）
+// 匹配规则：在 caseWordListByOrg[org] 中查找哪个案字出现在 caseNumber 中
+function parseCaseWord(caseNumber, org) {
+    if (!caseNumber || !org) return '';
+    const words = caseWordListByOrg[org] || [];
+    for (const w of words) {
+        if (caseNumber.indexOf(w) >= 0) return w;
+    }
+    return '';
+}
+
+// 遍历案由树，返回某案由的所有祖先案由名（从直接父级到根）
+// 如 '民间借贷纠纷' → ['合同纠纷', '民事案由']
+function getAncestorCauses(org, cause) {
+    if (!cause || !org) return [];
+    const tree = causeTreeDataByOrg[org] || [];
+    const ancestors = [];
+    function search(nodes, path) {
+        for (const node of nodes) {
+            const nodeName = typeof node === 'string' ? node : node.name;
+            if (nodeName === cause) {
+                ancestors.push(...path);
+                return true;
+            }
+            if (typeof node !== 'string' && Array.isArray(node.children)) {
+                const children = node.children.map(c => typeof c === 'string' ? c : c.name);
+                if (search(node.children, [...path, node.name])) return true;
+            }
+        }
+        return false;
+    }
+    search(tree, []);
+    return ancestors;
+}
+
+// 按案字过滤要件：返回 caseWords 包含 caseWord 或为空（通用）的要件
+function filterElementsByCaseWord(elements, caseWord) {
+    if (!Array.isArray(elements)) return [];
+    if (!caseWord) return elements; // 无案字时返回全部
+    return elements.filter(p => {
+        const cw = p.caseWords;
+        return !Array.isArray(cw) || cw.length === 0 || cw.indexOf(caseWord) >= 0;
+    });
+}
+
+// v1.25: 要件按案字分组 + 继承查找
+// cause: 案由名；org: 业务系统；caseWord: 案字（可选）
+// 查找顺序：当前案由admin覆盖 → 祖先案由admin覆盖 → 内置 → 通用要件
+// 每层都按案字过滤
+function getElementPresets(cause, org, caseWord) {
+    // 1. 当前案由的 admin 覆盖
     if (cause && org) {
         try {
             const adminData = JSON.parse(localStorage.getItem('adminElementPresets') || '{}');
             const orgData = adminData[org] || {};
-            if (orgData[cause]) return orgData[cause];
+            if (orgData[cause]) {
+                return filterElementsByCaseWord(orgData[cause], caseWord);
+            }
+            // 2. 继承：向上查找祖先案由的配置
+            const ancestors = getAncestorCauses(org, cause);
+            for (const anc of ancestors) {
+                if (orgData[anc]) {
+                    return filterElementsByCaseWord(orgData[anc], caseWord);
+                }
+            }
         } catch (e) { /* ignore */ }
     }
-    // 2. 内置要件
-    if (cause && elementPresetsByCause[cause]) return elementPresetsByCause[cause];
-    // 3. 通用要件
+    // 3. 内置要件（同样按案字过滤；内置要件无 caseWords 字段，视为通用）
+    if (cause && elementPresetsByCause[cause]) {
+        return filterElementsByCaseWord(elementPresetsByCause[cause], caseWord);
+    }
+    // 4. 通用要件
     return [
         { name: '主体资格', desc: '相关主体的资格及身份认定', question: '各方主体名称、身份及主体资格情况？' },
         { name: '事实认定', desc: '案件事实的认定及证据', question: '需要认定的核心事实有哪些？' },
@@ -804,13 +928,13 @@ function setMyElementPresets(cause, elements) {
     localStorage.setItem(MY_ELEMENTS_STORAGE_KEY, JSON.stringify(data));
 }
 
-function getAllElementPresets(cause, org) {
-    const standard = getElementPresets(cause, org).map(p => ({ ...p, source: 'standard' }));
-    const mine = getMyElementPresets(cause).map(p => ({ ...p, source: 'mine' }));
+function getAllElementPresets(cause, org, caseWord) {
+    const standard = getElementPresets(cause, org, caseWord).map(p => ({ ...p, source: 'standard' }));
+    const mine = filterElementsByCaseWord(getMyElementPresets(cause), caseWord).map(p => ({ ...p, source: 'mine' }));
     return { standard, mine };
 }
 
-// 生成需求说明内置模板，按业务系统 × 文书类型分组
+// 提示词内置模板，按业务系统 × 文书类型分组
 const defaultRequirementTemplates = {
     court: {
         judgment: [

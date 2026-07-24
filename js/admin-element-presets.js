@@ -16,6 +16,7 @@
 
     // ===== 工具函数 =====
     const STORAGE_KEY = 'adminElementPresets';
+    const CW_STORAGE_KEY = 'adminCauseCaseWords';
 
     function getStorage() {
         try {
@@ -35,6 +36,35 @@
         const all = getStorage();
         all[org] = data;
         saveStorage(all);
+    }
+
+    // ===== 案字适配存储（按业务系统 × 案由分组） =====
+    function getCwStorage() {
+        try {
+            return JSON.parse(localStorage.getItem(CW_STORAGE_KEY)) || {};
+        } catch (e) { return {}; }
+    }
+    function getCwOrgData(org) {
+        return getCwStorage()[org] || {};
+    }
+    function getCauseCaseWords(org, cause) {
+        if (!cause) return [];
+        return getCwOrgData(org)[cause] || [];
+    }
+    function setCauseCaseWords(org, cause, words) {
+        const all = getCwStorage();
+        if (!all[org]) all[org] = {};
+        if (!words || words.length === 0) {
+            delete all[org][cause];
+        } else {
+            all[org][cause] = words;
+        }
+        localStorage.setItem(CW_STORAGE_KEY, JSON.stringify(all));
+    }
+
+    // 获取当前业务系统的全部案字列表
+    function getCaseWordList(org) {
+        return (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[org]) || [];
     }
 
     // 当前业务系统的案由树（直接返回 causeTreeDataByOrg[org]，保留 3 级结构）
@@ -87,16 +117,16 @@
     }
 
     // 获取某案由下的"生效"要件列表（自定义覆盖优先，否则内置）
-    // 返回数组，每项追加 isBuiltin 标记用于 UI 显示
+    // 返回数组，每项追加 isBuiltin 标记用于 UI 显示；保留 caseWords 字段
     function getEffectiveElements(org, cause) {
         const orgData = getOrgData(org);
         if (orgData[cause]) {
             // 已有自定义覆盖
             return (orgData[cause] || []).map(p => ({ ...p, isBuiltin: false }));
         }
-        // 回退到内置
+        // 回退到内置（内置要件无 caseWords 字段，视为通用）
         if (cause && elementPresetsByCause[cause]) {
-            return elementPresetsByCause[cause].map(p => ({ ...p, isBuiltin: true }));
+            return elementPresetsByCause[cause].map(p => ({ ...p, isBuiltin: true, caseWords: p.caseWords || [] }));
         }
         // 通用要件（仅当 cause 不在内置表中时）
         return [
@@ -334,12 +364,14 @@
         const empty = document.getElementById('emptyState');
         const emptyText = document.getElementById('emptyText');
         const emptyHint = document.getElementById('emptyHint');
+        const cwBar = document.getElementById('caseWordBar');
 
         if (!currentCause) {
             rightTitle.firstChild.nodeValue = '全部要件';
             rightSub.textContent = '';
             addBtn.disabled = true;
             resetBtn.style.display = 'none';
+            cwBar.style.display = 'none';
             tbody.innerHTML = '';
             empty.style.display = 'block';
             emptyText.textContent = '请先在左侧选择一个案由';
@@ -355,6 +387,9 @@
         addBtn.disabled = false;
         resetBtn.style.display = overridden ? 'inline-flex' : 'none';
 
+        // 渲染案字适配栏
+        renderCaseWordBar();
+
         if (elements.length === 0) {
             tbody.innerHTML = '';
             empty.style.display = 'block';
@@ -368,6 +403,11 @@
             const badge = p.isBuiltin
                 ? '<span class="tpl-badge builtin">内置</span>'
                 : '<span class="tpl-badge custom">自定义</span>';
+            // 适用案字标签
+            const cw = Array.isArray(p.caseWords) ? p.caseWords : [];
+            const cwCell = cw.length
+                ? cw.map(w => '<span class="cw-tag">' + escapeHtml(w) + '</span>').join('')
+                : '<span class="cw-tag universal">通用</span>';
             // 内置要件：可编辑（另存为自定义），不可删除
             // 自定义要件：可编辑、可删除
             const actions = '<button class="action-btn edit" onclick="editElement(' + idx + ')">编辑</button>'
@@ -378,11 +418,44 @@
                 + '<td class="tpl-name-cell">' + escapeHtml(p.name || '') + '</td>'
                 + '<td class="tpl-desc-cell">' + escapeHtml(p.desc || '') + '</td>'
                 + '<td class="tpl-question-cell">' + escapeHtml(p.question || '') + '</td>'
+                + '<td>' + cwCell + '</td>'
                 + '<td>' + badge + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
         }).join('');
     }
+
+    // ===== 渲染案字适配栏 =====
+    function renderCaseWordBar() {
+        const cwBar = document.getElementById('caseWordBar');
+        const cwChips = document.getElementById('caseWordChips');
+        const wordList = getCaseWordList(currentOrg);
+        if (!wordList.length) {
+            cwBar.style.display = 'none';
+            return;
+        }
+        cwBar.style.display = 'flex';
+        const selected = getCauseCaseWords(currentOrg, currentCause);
+        cwChips.innerHTML = wordList.map(w => {
+            const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
+            return '<span class="cw-chip' + checked + '" onclick="toggleCauseCaseWord(\'' + escQuote(w) + '\')">'
+                + '<i class="fas fa-check cw-check"></i>'
+                + escapeHtml(w)
+                + '</span>';
+        }).join('');
+    }
+
+    window.toggleCauseCaseWord = function(word) {
+        const list = getCauseCaseWords(currentOrg, currentCause);
+        const idx = list.indexOf(word);
+        if (idx >= 0) {
+            list.splice(idx, 1);
+        } else {
+            list.push(word);
+        }
+        setCauseCaseWords(currentOrg, currentCause, list);
+        renderCaseWordBar();
+    };
 
     // ===== 新增/编辑弹窗 =====
     window.openAddModal = function() {
@@ -397,6 +470,7 @@
         document.getElementById('tplName').value = '';
         document.getElementById('tplDesc').value = '';
         document.getElementById('tplQuestion').value = '';
+        renderModalCaseWords([]);
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
     };
@@ -412,9 +486,39 @@
         document.getElementById('tplName').value = p.name || '';
         document.getElementById('tplDesc').value = p.desc || '';
         document.getElementById('tplQuestion').value = p.question || '';
+        renderModalCaseWords(Array.isArray(p.caseWords) ? p.caseWords : []);
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
     };
+
+    // 渲染弹窗中的适用案字多选
+    // 优先用该案由已勾选的适配案字；若该案由未勾选任何案字，则用业务系统全部案字
+    function renderModalCaseWords(selected) {
+        const container = document.getElementById('modalCaseWords');
+        const causeWords = getCauseCaseWords(currentOrg, currentCause);
+        const wordList = causeWords.length ? causeWords : getCaseWordList(currentOrg);
+        if (!wordList.length) {
+            container.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">当前业务系统无案字配置</span>';
+            return;
+        }
+        container.innerHTML = wordList.map(w => {
+            const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
+            return '<span class="cw-chip' + checked + '" data-cw="' + escapeHtml(w) + '" onclick="toggleModalCaseWord(this)">'
+                + '<i class="fas fa-check cw-check"></i>'
+                + escapeHtml(w)
+                + '</span>';
+        }).join('');
+    }
+
+    window.toggleModalCaseWord = function(el) {
+        el.classList.toggle('checked');
+    };
+
+    // 收集弹窗中已勾选的案字
+    function collectModalCaseWords() {
+        const chips = document.querySelectorAll('#modalCaseWords .cw-chip.checked');
+        return Array.from(chips).map(c => c.getAttribute('data-cw') || '');
+    }
 
     window.closeModal = function() {
         document.getElementById('tplModal').classList.remove('show');
@@ -445,10 +549,11 @@
         const orgData = getOrgData(currentOrg);
         // 取生效列表作为基线（若已有覆盖则在覆盖基础上修改；否则基于内置另存为完整覆盖）
         const baseline = getEffectiveElements(currentOrg, currentCause).map(p => ({
-            name: p.name, desc: p.desc, question: p.question
+            name: p.name, desc: p.desc, question: p.question, caseWords: Array.isArray(p.caseWords) ? p.caseWords : []
         }));
 
-        const newItem = { name: name, desc: desc, question: question };
+        const modalCw = collectModalCaseWords();
+        const newItem = { name: name, desc: desc, question: question, caseWords: modalCw };
 
         if (editingIndex >= 0) {
             // 编辑：替换指定下标
@@ -499,6 +604,8 @@
             const orgData = getOrgData(currentOrg);
             delete orgData[currentCause];
             setOrgData(currentOrg, orgData);
+            // 同时清理该案由的案字适配配置
+            setCauseCaseWords(currentOrg, currentCause, []);
             renderLeft();
             renderRight();
             showNotification('已恢复为内置要件', 'success');

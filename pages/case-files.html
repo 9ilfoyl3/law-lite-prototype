@@ -1200,6 +1200,13 @@
             margin-top: 16px;
             max-width: 640px;
         }
+        .step-start-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            max-width: 640px;
+        }
 
         /* ===== Right Column: Result ===== */
         .result-col {
@@ -2130,7 +2137,7 @@
                                         <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial()"></select>
                                     </div>
                                     <div class="gen-form-row">
-                                        <label class="gen-form-label">需求说明</label>
+                                        <label class="gen-form-label">提示词</label>
                                         <div class="req-template-tags" id="matReqTemplates"></div>
                                         <textarea class="gen-form-textarea" id="matRequirement" placeholder="可选：描述特殊要求或关注点" oninput="syncStepConfigFromMaterial()"></textarea>
                                     </div>
@@ -2152,6 +2159,10 @@
                                         <label>文书类型</label>
                                         <select id="stepDocType" onchange="onStepDocTypeChange(this.value)"></select>
                                     </div>
+                                    <div class="step-gen-config-item" id="stepPlanItem" style="display:none;">
+                                        <label>步骤方案</label>
+                                        <select id="stepPlan" onchange="onStepPlanChange(this.value)"></select>
+                                    </div>
                                     <div class="step-gen-config-item">
                                         <label>文书模板</label>
                                         <select id="stepTemplate" onchange="onStepTemplateChange(this.value)"></select>
@@ -2159,7 +2170,7 @@
                                 </div>
                                 <div class="step-gen-config-row">
                                     <div class="step-gen-config-item full">
-                                        <label>生成需求说明</label>
+                                        <label>提示词</label>
                                         <textarea id="stepRequirement" rows="2" placeholder="可选：描述特殊要求或关注点，帮助 AI 更好理解需求" onchange="onStepRequirementChange(this.value)"></textarea>
                                     </div>
                                 </div>
@@ -2168,18 +2179,22 @@
                                 <i class="fas fa-info-circle"></i>
                                 <span>已选材料预估超出当前模型单次上下文限制，已切换为分步生成，请为每一步手动选择所需材料。</span>
                             </div>
-                            <div class="step-view-hint">
-                                <i class="fas fa-lightbulb"></i>
-                                <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐 step 生成。当前模型安全上下文上限 <strong id="stepHintLimit">102400</strong> tokens。</span>
-                            </div>
-                            <div class="steps-list" id="stepsList"></div>
-                            <div class="steps-bottom-actions">
+                            <div class="step-start-actions">
                                 <button class="gen-start-btn" id="startStepsBtn" onclick="startStepGeneration()">
                                     <i class="fas fa-play"></i> 开始生成
                                 </button>
-                                <button class="gen-start-btn" id="compileStepsBtn" onclick="compileSteps()" style="display:none;">
-                                    <i class="fas fa-check"></i> 确认并编译文书
-                                </button>
+                            </div>
+                            <div id="stepFlowArea" style="display:none;">
+                                <div class="step-view-hint">
+                                    <i class="fas fa-lightbulb"></i>
+                                    <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐 step 生成。当前模型安全上下文上限 <strong id="stepHintLimit">102400</strong> tokens。</span>
+                                </div>
+                                <div class="steps-list" id="stepsList"></div>
+                                <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;">
+                                    <button class="gen-start-btn" id="stepNextBtn" onclick="continueStepGeneration()">
+                                        <i class="fas fa-forward"></i> 生成剩余步骤
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2344,8 +2359,8 @@
     </div>
 
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=41"></script>
-    <script src="../js/case-files.js?v=60"></script>
+    <script src="../js/case-data.js?v=42"></script>
+    <script src="../js/case-files.js?v=62"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

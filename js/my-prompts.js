@@ -1,4 +1,4 @@
-// ============ My Prompts (用户侧自定义生成需求说明提示词) ============
+// ============ My Prompts (用户侧自定义提示词) ============
 // v1.0 个人提示词维护，按文书类型分组
 // 数据持久化：localStorage.myPromptTemplates（按业务系统×文书类型分组）
 // 用户侧联动：case-data.js getReqTemplates 在返回时追加 my 数据（标记 source='mine'）
@@ -232,8 +232,8 @@
             + '</div>'
             + '<div class="form-group">'
             + '<label class="form-label">提示词正文 <span class="required">*</span></label>'
-            + '<textarea class="form-textarea" id="formText" placeholder="点击标签后填入「生成需求说明」文本框的内容，支持多行">' + escapeHtml(text) + '</textarea>'
-            + '<div class="form-hint">点击标签后内容将覆盖「生成需求说明」文本框</div>'
+            + '<textarea class="form-textarea" id="formText" placeholder="点击标签后填入「提示词」文本框的内容，支持多行">' + escapeHtml(text) + '</textarea>'
+            + '<div class="form-hint">点击标签后内容将覆盖「提示词」文本框</div>'
             + '</div>'
             + '<div class="form-actions">'
             + '<button class="btn btn-primary" onclick="saveItem()">保存</button>'

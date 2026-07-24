@@ -1,5 +1,5 @@
 // ============ Admin Prompt Templates Management ============
-// v1.0 提示词管理：维护各文书类型的「生成需求说明」提示词
+// v1.0 提示词管理：维护各文书类型的「提示词」提示词
 // 数据持久化：localStorage.adminPromptTemplates（按业务系统×文书类型分组）
 // 用户侧联动：case-data.js getReqTemplates 优先读此 key，为空回退到 defaultRequirementTemplates
 
@@ -253,7 +253,7 @@
             return;
         }
         // text 允许为空（用于「其他自定义」这类清空需求的标签），但需提示
-        if (!text && !confirm('提示词正文为空，用户点击该标签会清空需求说明输入框。确认保存？')) {
+        if (!text && !confirm('提示词正文为空，用户点击该标签会清空提示词输入框。确认保存？')) {
             return;
         }
 

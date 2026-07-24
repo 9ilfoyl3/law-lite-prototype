@@ -280,6 +280,26 @@
         }
         .toast.show { opacity: 1; visibility: visible; }
         .toast.success { background: var(--success-color); }
+
+        /* 案字适配选择栏 */
+        .case-word-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); flex-wrap: wrap; border-radius: 10px 10px 0 0; }
+        .case-word-bar .cw-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+        .case-word-bar .cw-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .cw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-secondary); transition: all 0.15s; user-select: none; }
+        .cw-chip:hover { border-color: var(--accent-primary); }
+        .cw-chip.checked { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 500; }
+        .cw-chip .cw-check { display: none; font-size: 9px; }
+        .cw-chip.checked .cw-check { display: inline; }
+        .case-word-bar .cw-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+        /* 要件卡片上的案字标签 */
+        .cw-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+        .cw-tag { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .cw-tag.universal { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+
+        /* 表单中的适用案字多选 */
+        .form-cw-select { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); min-height: 40px; }
+        .form-cw-empty { font-size: 12px; color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -295,6 +315,10 @@
                 <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
                 <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
             </div>
+        </div>
+        <div style="margin-bottom:16px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;display:flex;align-items:center;gap:8px;">
+            <i class="fas fa-info-circle"></i>
+            <span>此处维护的「我的要件」仅在生成「裁判文书」类文书时才会询问是否引入辅助生成；其他文书类型（庭审提纲、执行文书、材料总结等）不会触发要件引入。</span>
         </div>
 
         <div class="main-layout">
@@ -325,6 +349,11 @@
                     </div>
 
                     <div id="myElementsSection" style="display:none;">
+                        <div class="case-word-bar" id="caseWordBar" style="display:none;">
+                            <span class="cw-label">适配案字：</span>
+                            <div class="cw-chips" id="caseWordChips"></div>
+                            <span class="cw-hint">勾选该案由适用的案字；不勾选则适配全部</span>
+                        </div>
                         <div class="element-list" id="myElementList"></div>
                     </div>
 
@@ -339,7 +368,7 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="../js/case-data.js?v=41"></script>
+    <script src="../js/case-data.js?v=43"></script>
     <script>
         const causeListEl = document.getElementById('causeList');
         const currentCauseTitleEl = document.getElementById('currentCauseTitle');
@@ -354,6 +383,97 @@
         let editingId = null;
         let searchKeyword = '';
         const PINNED_KEY = 'myPinnedCauses';
+        const MY_CW_KEY = 'myCauseCaseWords';
+
+        // ===== 案字适配存储（按业务系统 × 案由分组） =====
+        function getMyCwStorage() {
+            try { return JSON.parse(localStorage.getItem(MY_CW_KEY)) || {}; }
+            catch (e) { return {}; }
+        }
+        function getMyCauseCaseWords(org, cause) {
+            if (!cause) return [];
+            return (getMyCwStorage()[org] || {})[cause] || [];
+        }
+        function setMyCauseCaseWords(org, cause, words) {
+            const all = getMyCwStorage();
+            if (!all[org]) all[org] = {};
+            if (!words || words.length === 0) {
+                delete all[org][cause];
+            } else {
+                all[org][cause] = words;
+            }
+            localStorage.setItem(MY_CW_KEY, JSON.stringify(all));
+        }
+        function getCaseWordList(org) {
+            return (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[org]) || [];
+        }
+
+        // ===== 渲染案字适配栏 =====
+        function renderCaseWordBar() {
+            const cwBar = document.getElementById('caseWordBar');
+            const cwChips = document.getElementById('caseWordChips');
+            if (!cwBar || !cwChips) return;
+            const wordList = getCaseWordList(currentBusiness);
+            if (!wordList.length) {
+                cwBar.style.display = 'none';
+                return;
+            }
+            cwBar.style.display = 'flex';
+            const selected = getMyCauseCaseWords(currentBusiness, currentCause);
+            cwChips.innerHTML = wordList.map(w => {
+                const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
+                return '<span class="cw-chip' + checked + '" onclick="toggleCauseCaseWord(\'' + escQuote(w) + '\')">'
+                    + '<i class="fas fa-check cw-check"></i>'
+                    + escapeHtml(w)
+                    + '</span>';
+            }).join('');
+        }
+
+        function toggleCauseCaseWord(word) {
+            const list = getMyCauseCaseWords(currentBusiness, currentCause);
+            const idx = list.indexOf(word);
+            if (idx >= 0) list.splice(idx, 1);
+            else list.push(word);
+            setMyCauseCaseWords(currentBusiness, currentCause, list);
+            renderCaseWordBar();
+        }
+
+        // 渲染表单中的适用案字多选
+        function renderFormCaseWords(idx, selected) {
+            const container = document.getElementById('formCaseWords_' + idx);
+            if (!container) return;
+            const causeWords = getMyCauseCaseWords(currentBusiness, currentCause);
+            const wordList = causeWords.length ? causeWords : getCaseWordList(currentBusiness);
+            if (!wordList.length) {
+                container.innerHTML = '<span class="form-cw-empty">当前业务系统无案字配置</span>';
+                return;
+            }
+            container.innerHTML = wordList.map(w => {
+                const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
+                return '<span class="cw-chip' + checked + '" data-cw="' + escapeHtml(w) + '" onclick="toggleFormCaseWord(this)">'
+                    + '<i class="fas fa-check cw-check"></i>'
+                    + escapeHtml(w)
+                    + '</span>';
+            }).join('');
+        }
+
+        function toggleFormCaseWord(el) {
+            el.classList.toggle('checked');
+        }
+
+        // 收集表单中已勾选的案字
+        function collectFormCaseWords(idx) {
+            const chips = document.querySelectorAll('#formCaseWords_' + idx + ' .cw-chip.checked');
+            return Array.from(chips).map(c => c.getAttribute('data-cw') || '');
+        }
+
+        // 渲染要件卡片上的案字标签
+        function renderElementCwTags(caseWords) {
+            if (!Array.isArray(caseWords) || caseWords.length === 0) {
+                return '<div class="cw-tags"><span class="cw-tag universal">通用</span></div>';
+            }
+            return '<div class="cw-tags">' + caseWords.map(w => '<span class="cw-tag">' + escapeHtml(w) + '</span>').join('') + '</div>';
+        }
 
         // ===== 置顶案由存储（按业务系统分组） =====
         function getPinned(org) {
@@ -648,6 +768,7 @@
             currentCauseTitleEl.textContent = currentCause;
             addElementBtn.style.display = 'inline-flex';
 
+            renderCaseWordBar();
             renderMyElements();
             myElementsSection.style.display = 'block';
         }
@@ -669,6 +790,7 @@
                                 <div class="element-name">${p.name}</div>
                                 <div class="element-desc">${p.desc || ''}</div>
                                 <div class="element-question">${p.question || ''}</div>
+                                ${renderElementCwTags(p.caseWords)}
                             </div>
                             <div class="element-actions">
                                 <button class="btn btn-secondary btn-sm" onclick="editMyElement(${idx})"><i class="fas fa-edit"></i> 编辑</button>
@@ -685,8 +807,7 @@
         }
 
         function renderMyElementForm(item, idx) {
-            const isNew = item === null;
-            const data = item || { name: '', desc: '', question: '' };
+            const data = item || { name: '', desc: '', question: '', caseWords: [] };
             return `
                 <div class="element-item" style="background:var(--accent-light);border-color:#bfdbfe;">
                     <div class="form-group">
@@ -701,6 +822,11 @@
                         <label class="form-label">问题</label>
                         <textarea class="form-textarea" id="editQuestion_${idx}" placeholder="生成文书前需要确认的单一问题">${escapeHtml(data.question || '')}</textarea>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">适用案字</label>
+                        <div class="form-cw-select" id="formCaseWords_${idx}"></div>
+                        <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">勾选该要件适用的案字；不勾选 = 通用（该案由下所有案字适用）</div>
+                    </div>
                     <div class="element-actions" style="justify-content:flex-end;">
                         <button class="btn btn-secondary btn-sm" onclick="cancelEdit()">取消</button>
                         <button class="btn btn-primary btn-sm" onclick="saveMyElement(${idx})">保存</button>
@@ -712,13 +838,18 @@
         function addMyElement() {
             editingId = -1;
             renderMyElements();
+            renderFormCaseWords(-1, []);
             const input = document.getElementById('editName_-1');
             if (input) input.focus();
         }
 
         function editMyElement(idx) {
             editingId = idx;
+            const mine = getMyElementPresets(currentCause);
+            const item = mine[idx] || {};
+            const cw = Array.isArray(item.caseWords) ? item.caseWords : [];
             renderMyElements();
+            renderFormCaseWords(idx, cw);
         }
 
         function cancelEdit() {
@@ -734,11 +865,12 @@
                 showToast('要件名称和问题不能为空', 'error');
                 return;
             }
+            const caseWords = collectFormCaseWords(idx);
             const mine = getMyElementPresets(currentCause);
             if (idx === -1) {
-                mine.push({ name, desc, question });
+                mine.push({ name, desc, question, caseWords });
             } else {
-                mine[idx] = { name, desc, question };
+                mine[idx] = { name, desc, question, caseWords };
             }
             setMyElementPresets(currentCause, mine);
             editingId = null;

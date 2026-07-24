@@ -23,7 +23,7 @@ function getFirstTemplate(docTypeKey) {
     return Object.keys(templates)[0] || '';
 }
 
-// 渲染需求说明内置模板标签（快速生成 / 批量生成共用）
+// 渲染提示词内置模板标签（快速生成 / 批量生成共用）
 function renderReqTemplates(containerId, docTypeKey, textareaId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -756,7 +756,11 @@ function buildGenElementHintHtml(caseItem) {
     try {
         if (!caseItem) return '';
         if (typeof getAllElementPresets !== 'function') return '';
-        const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
+        // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入，其他文书类型不显示要件提示
+        if (quickState.docType !== 'judgment') return '';
+        const _org = localStorage.getItem('currentBusiness') || 'court';
+        const _cw = parseCaseWord(caseItem.caseNumber, _org);
+        const allPresets = getAllElementPresets(caseItem.cause, _org, _cw);
         const standardCount = (allPresets.standard || []).length;
         const mineCount = (allPresets.mine || []).length;
         const totalCount = standardCount + mineCount;
@@ -815,7 +819,7 @@ function buildGenConfigHtml() {
         </div>
 
         <div class="gen-form-group">
-            <label class="gen-form-label">生成需求说明</label>
+            <label class="gen-form-label">提示词</label>
             <div id="genReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
             <textarea class="gen-form-textarea" id="genRequirement"
                       placeholder="可选：描述特殊要求或关注点，帮助 AI 更好理解需求"
@@ -859,9 +863,12 @@ function startQuickGen() {
         template: quickState.template,
         requirement: quickState.requirement || '',
         source: 'list',
-        autoGen: '1',
-        autoIntroduceElements: '1'
+        autoGen: '1'
     });
+    // v1.27: 仅「裁判文书」(judgment) 才自动引入要件，其他文书类型不触发要件流程
+    if (quickState.docType === 'judgment') {
+        params.set('autoIntroduceElements', '1');
+    }
     window.location.href = `case-files.html?${params.toString()}`;
 }
 
@@ -1063,7 +1070,7 @@ function renderBatchConfig() {
                     <span>系统将根据单个案件全部材料的预估 Token 数自动选择生成方式：未超过当前模型上下文限制时使用材料生成；超过限制时将自动跳过该案并记录失败原因，您可在批量任务结束后进入案件详情页单独处理。</span>
                 </div>
                 <div class="full">
-                    <label class="drawer-form-label">生成需求说明</label>
+                    <label class="drawer-form-label">提示词</label>
                     <div id="batchReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
                     <textarea class="drawer-form-textarea" id="batchRequirement"
                               placeholder="可选：描述特殊要求或关注点，帮助 AI 更好理解需求"
@@ -1081,14 +1088,14 @@ function renderBatchConfig() {
         </div>
     `;
 
-    // 渲染需求说明内置模板标签
+    // 渲染提示词内置模板标签
     renderReqTemplates('batchReqTemplates', batchState.docType, 'batchRequirement');
 }
 
 function onBatchDocTypeChange(docType) {
     batchState.docType = docType;
     batchState.template = getFirstTemplate(docType);
-    batchState.requirement = '';  // 切换文书类型时清空需求说明
+    batchState.requirement = '';  // 切换文书类型时清空提示词
     renderBatchConfig();
 }
 
