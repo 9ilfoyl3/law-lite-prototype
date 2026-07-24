@@ -35,13 +35,20 @@
         saveStorage(all);
     }
 
-    // 获取当前业务系统的文书类型映射
+    // 获取当前业务系统的文书类型映射（v1.21: 统一走 getAdminDocTypes 合并源）
     function getDocTypes(org) {
-        return defaultDocTypesByOrg[org] || {};
+        return getAdminDocTypes(org) || {};
+    }
+
+    // 获取当前业务系统下被停用的内置提示词索引字典
+    // 存于 adminPromptTemplates[org].__builtinDisabled__，结构：{ docTypeKey: [index1, index2] }
+    function getBuiltinDisabledMap(org) {
+        const orgData = getOrgData(org);
+        return (orgData.__builtinDisabled__ && typeof orgData.__builtinDisabled__ === 'object') ? orgData.__builtinDisabled__ : {};
     }
 
     // 获取当前业务系统+文书类型下的提示词列表（内置 + 自定义）
-    // 返回统一结构：[{name, text, isBuiltin, index}]
+    // 返回统一结构：[{name, text, isBuiltin, index, enabled}]
     function getAllPrompts(org, docTypeKey) {
         const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
         const customs = (getOrgData(org)[docTypeKey]) || [];
@@ -52,14 +59,17 @@
                 name: p.name || '',
                 text: p.text || '',
                 isBuiltin: false,
-                index: i
+                index: i,
+                enabled: p.enabled !== false
             }));
         }
+        const disabledArr = getBuiltinDisabledMap(org)[docTypeKey] || [];
         return defaults.map((p, i) => ({
             name: p.name || '',
             text: p.text || '',
             isBuiltin: true,
-            index: i
+            index: i,
+            enabled: !disabledArr.includes(i)
         }));
     }
 
@@ -158,15 +168,23 @@
                 const needCollapse = text.length > 80;
                 const tagClass = item.isBuiltin ? 'builtin' : 'custom';
                 const tagText = item.isBuiltin ? '内置' : '自定义';
+                const isEnabled = item.enabled !== false;
+                const statusBadge = isEnabled
+                    ? '<span class="status-badge status-on">已启用</span>'
+                    : '<span class="status-badge status-off">已停用</span>';
+                const toggleBtn = isEnabled
+                    ? '<button class="action-btn toggle-off" onclick="togglePromptEnabled(\'' + g.docTypeKey + '\',' + item.index + ')">停用</button>'
+                    : '<button class="action-btn toggle-on" onclick="togglePromptEnabled(\'' + g.docTypeKey + '\',' + item.index + ')">启用</button>';
                 const actions = item.isBuiltin
-                    ? '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>'
+                    ? '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>' + toggleBtn
                     : '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>'
+                      + toggleBtn
                       + '<button class="action-btn delete" onclick="deletePrompt(\'' + g.docTypeKey + '\',' + item.index + ')">删除</button>';
                 html += '<div class="pt-item">'
                     + '<div class="pt-item-tag ' + tagClass + '">' + tagText + '</div>'
                     + '<div class="pt-item-body">'
                     + '<div class="pt-item-text' + (needCollapse ? ' collapsed' : '') + '">' + (escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空提示词）</span>') + '</div>'
-                    + '<div class="pt-item-meta">标签：' + escapeHtml(item.name) + '</div>'
+                    + '<div class="pt-item-meta"><span>标签：' + escapeHtml(item.name) + '</span>' + statusBadge + '</div>'
                     + '</div>'
                     + '<div class="pt-item-actions">' + actions + '</div>'
                     + '</div>';
@@ -248,20 +266,35 @@
         // 编辑内置提示词：把内置数据全部拷贝为自定义，再修改对应项
         if (editingIsBuiltin && editingDocType === docType) {
             const defaults = (defaultRequirementTemplates[currentOrg] && defaultRequirementTemplates[currentOrg][docType]) || [];
-            orgData[docType] = defaults.map(p => ({ name: p.name, text: p.text }));
-            orgData[docType][editingIndex] = { name: name, text: text };
+            const disabledArr = getBuiltinDisabledMap(currentOrg)[docType] || [];
+            // 拷贝内置数组，保留原停用状态
+            orgData[docType] = defaults.map((p, i) => ({
+                name: p.name,
+                text: p.text,
+                enabled: !disabledArr.includes(i)
+            }));
+            // 被编辑的项继承原停用状态（编辑不改变启用状态）
+            orgData[docType][editingIndex] = { name: name, text: text, enabled: !disabledArr.includes(editingIndex) };
+            // 清理 __builtinDisabled__ 中该 docTypeKey（已全部转为自定义）
+            if (orgData.__builtinDisabled__ && orgData.__builtinDisabled__[docType]) {
+                delete orgData.__builtinDisabled__[docType];
+            }
         } else if (editingDocType !== null && !editingIsBuiltin && editingDocType === docType) {
-            // 编辑自定义提示词（同文书类型）
-            orgData[docType][editingIndex] = { name: name, text: text };
+            // 编辑自定义提示词（同文书类型）：保留原 enabled
+            const origItem = orgData[docType][editingIndex];
+            const origEnabled = (origItem && origItem.enabled !== false);
+            orgData[docType][editingIndex] = { name: name, text: text, enabled: origEnabled };
         } else if (editingDocType !== null && !editingIsBuiltin && editingDocType !== docType) {
-            // 编辑自定义提示词但改了文书类型：先从原数组移除，再追加到新数组
+            // 编辑自定义提示词但改了文书类型：先从原数组移除，再追加到新数组（保留 enabled）
             const oldArr = orgData[editingDocType] || [];
+            const origItem = oldArr[editingIndex];
+            const origEnabled = (origItem && origItem.enabled !== false);
             oldArr.splice(editingIndex, 1);
             orgData[editingDocType] = oldArr;
-            orgData[docType].push({ name: name, text: text });
+            orgData[docType].push({ name: name, text: text, enabled: origEnabled });
         } else {
             // 新增
-            orgData[docType].push({ name: name, text: text });
+            orgData[docType].push({ name: name, text: text, enabled: true });
         }
 
         setOrgData(currentOrg, orgData);
@@ -269,6 +302,43 @@
         renderLeft();
         renderRight();
         showNotification(editingDocType !== null ? '提示词已更新' : '提示词已新增', 'success');
+    };
+
+    // ===== 启用/停用切换 =====
+    window.togglePromptEnabled = function(docTypeKey, index) {
+        const items = getAllPrompts(currentOrg, docTypeKey);
+        const item = items[index];
+        if (!item) return;
+        const newEnabled = item.enabled === false; // 反转
+        if (item.isBuiltin) {
+            // 内置提示词：操作 __builtinDisabled__ 字典
+            const orgData = getOrgData(currentOrg);
+            if (!orgData.__builtinDisabled__ || typeof orgData.__builtinDisabled__ !== 'object') {
+                orgData.__builtinDisabled__ = {};
+            }
+            if (!Array.isArray(orgData.__builtinDisabled__[docTypeKey])) {
+                orgData.__builtinDisabled__[docTypeKey] = [];
+            }
+            const arr = orgData.__builtinDisabled__[docTypeKey];
+            const i = arr.indexOf(index);
+            if (newEnabled) {
+                // 启用：从停用列表移除
+                if (i >= 0) arr.splice(i, 1);
+            } else {
+                // 停用：加入列表
+                if (i < 0) arr.push(index);
+            }
+            setOrgData(currentOrg, orgData);
+        } else {
+            // 自定义提示词：直接修改 enabled 字段
+            const orgData = getOrgData(currentOrg);
+            if (Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey][index]) {
+                orgData[docTypeKey][index].enabled = newEnabled;
+                setOrgData(currentOrg, orgData);
+            }
+        }
+        renderRight();
+        showNotification(newEnabled ? '提示词已启用' : '提示词已停用', 'success');
     };
 
     // ===== 删除 =====

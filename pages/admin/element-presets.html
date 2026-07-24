@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>要件管理 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-logo { width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 12px; margin-bottom: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 16px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        /* 主内容区 */
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+        .header { height: var(--header-height); background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 50; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { color: var(--text-muted); font-size: 10px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-menu { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+        .user-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        .content { padding: 24px 32px; flex: 1; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .page-title-wrap h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .page-title-wrap p { font-size: 14px; color: var(--text-secondary); margin: 4px 0 0; }
+        .business-switch { display: flex; gap: 4px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; }
+        .business-switch-btn { padding: 6px 14px; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+        .business-switch-btn.active { background: var(--accent-primary); color: white; }
+
+        /* 主体两栏 */
+        .tpl-body { display: flex; gap: 16px; min-height: 480px; }
+        .tpl-left { width: 260px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px; height: fit-content; max-height: calc(100vh - 220px); overflow-y: auto; }
+
+        /* 左侧搜索框 */
+        .cause-search-wrap { padding: 4px 4px 8px; position: sticky; top: -8px; background: var(--bg-secondary); z-index: 5; }
+        .cause-search-box { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; }
+        .cause-search-box:focus-within { border-color: var(--accent-primary); }
+        .cause-search-box i { color: var(--text-muted); font-size: 12px; }
+        .cause-search-box input { border: none; outline: none; background: transparent; font-size: 13px; flex: 1; font-family: inherit; color: var(--text-primary); }
+        .cause-search-box input::placeholder { color: var(--text-muted); }
+        .cause-search-clear { cursor: pointer; color: var(--text-muted); font-size: 12px; display: none; }
+        .cause-search-clear:hover { color: var(--text-primary); }
+
+        /* 置顶分组 */
+        .pinned-section { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
+        .pinned-header { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .pinned-header i { font-size: 10px; color: var(--accent-warning); }
+
+        /* 左侧树形结构 */
+        .cause-tree-root { display: flex; flex-direction: column; gap: 2px; }
+        .cause-tree-all { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; margin-bottom: 4px; }
+        .cause-tree-all:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .cause-tree-all.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .cause-tree-all .count { margin-left: auto; font-size: 11px; color: var(--text-muted); background: var(--bg-primary); padding: 1px 6px; border-radius: 8px; }
+        .cause-tree-all.active .count { background: #dbeafe; color: var(--accent-primary); }
+
+        .cause-level-1 { display: flex; flex-direction: column; }
+        .cause-level-1-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+        .cause-level-1-header:hover { background: var(--bg-primary); }
+        .cause-level-1-header.selected { background: var(--accent-light); }
+        .cause-level-1-header.selected .cause-level-1-name { color: var(--accent-primary); font-weight: 600; }
+        .cause-level-1-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+        .cause-level-1-header .count { font-size: 11px; color: var(--text-muted); }
+        .cause-expand-icon { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; width: 12px; text-align: center; }
+        .cause-level-1.expanded > .cause-level-1-header .cause-expand-icon { transform: rotate(90deg); }
+        .cause-level-2-container { display: none; flex-direction: column; gap: 2px; padding-left: 16px; padding-bottom: 4px; }
+        .cause-level-1.expanded > .cause-level-2-container { display: flex; }
+
+        .cause-level-2 { display: flex; flex-direction: column; }
+        .cause-level-2-header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .cause-level-2-header:hover { background: var(--bg-primary); }
+        .cause-level-2-header.selected { background: var(--accent-light); }
+        .cause-level-2-header.selected .cause-level-2-name { color: var(--accent-primary); font-weight: 600; }
+        .cause-level-2-name { font-size: 12px; font-weight: 500; color: var(--text-primary); flex: 1; }
+        .cause-level-2-header .count { font-size: 11px; color: var(--text-muted); }
+        .cause-level-2.expanded > .cause-level-2-header .cause-expand-icon { transform: rotate(90deg); }
+        .cause-level-3-container { display: none; flex-direction: column; gap: 2px; padding-left: 16px; padding-bottom: 4px; }
+        .cause-level-2.expanded > .cause-level-3-container { display: flex; }
+
+        .cause-leaf { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .cause-leaf:hover { background: var(--bg-primary); }
+        .cause-leaf.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .cause-leaf .override-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-warning); flex-shrink: 0; }
+        .cause-leaf-name { font-size: 12px; color: var(--text-primary); flex: 1; }
+        .cause-leaf.active .cause-leaf-name { color: var(--accent-primary); }
+        .cause-leaf .count { font-size: 10px; color: var(--text-muted); background: var(--bg-primary); padding: 1px 5px; border-radius: 8px; }
+        .cause-leaf.active .count { background: #dbeafe; color: var(--accent-primary); }
+        .pin-btn { cursor: pointer; color: var(--text-muted); font-size: 11px; opacity: 0; transition: all 0.15s; flex-shrink: 0; padding: 2px; }
+        .cause-leaf:hover .pin-btn { opacity: 0.6; }
+        .pin-btn:hover { opacity: 1 !important; color: var(--accent-warning); }
+        .pin-btn.pinned { opacity: 1; color: var(--accent-warning); }
+        .pinned-section .cause-leaf .pin-btn { opacity: 1; color: var(--accent-warning); }
+        .no-match-tip { padding: 16px 12px; text-align: center; font-size: 12px; color: var(--text-muted); }
+
+        .tpl-right { flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .tpl-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-color); gap: 12px; }
+        .tpl-toolbar .title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .tpl-toolbar .title .sub { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+        .toolbar-right { display: flex; gap: 8px; align-items: center; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: #f3f4f6; }
+        .btn-ghost-danger { background: transparent; color: var(--accent-danger); border: 1px dashed #fecaca; }
+        .btn-ghost-danger:hover { background: #fef2f2; }
+
+        .tpl-table { width: 100%; border-collapse: collapse; }
+        .tpl-table thead th { background: var(--bg-primary); padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border-color); }
+        .tpl-table tbody td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+        .tpl-table tbody tr:last-child td { border-bottom: none; }
+        .tpl-table tbody tr:hover { background: var(--bg-primary); }
+        .tpl-name-cell { font-weight: 500; color: var(--text-primary); }
+        .tpl-question-cell { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+        .tpl-desc-cell { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+        .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
+        .tpl-badge.custom { background: #fef3c7; color: #92400e; }
+        .tpl-action-cell { white-space: nowrap; }
+        .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; margin-right: 4px; font-family: inherit; }
+        .action-btn:hover { background: #f3f4f6; }
+        .action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
+        .action-btn.edit:hover { background: var(--accent-light); }
+        .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
+        .action-btn.delete:hover { background: #fef2f2; }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
+        .empty-state p { font-size: 14px; margin: 0; }
+        .empty-state .hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+
+        /* 弹窗 */
+        .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-mask.show { display: flex; }
+        .modal-box { background: var(--bg-secondary); border-radius: 10px; padding: 24px; width: 560px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--text-primary); }
+        .modal-box h3 .badge { font-size: 12px; font-weight: 500; margin-left: 8px; color: var(--text-muted); }
+        .form-row { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-label .required { color: var(--accent-danger); }
+        .form-input, .form-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent-primary); }
+        .form-textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; resize: vertical; min-height: 70px; box-sizing: border-box; line-height: 1.5; }
+        .form-textarea:focus { outline: none; border-color: var(--accent-primary); }
+        .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { background: #f3f4f6; color: #374151; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-confirm { background: var(--accent-primary); color: white; }
+        .btn-confirm:hover { background: #1d4ed8; }
+        .btn-confirm.danger { background: var(--accent-danger); }
+        .btn-confirm.danger:hover { background: #b91c1c; }
+
+        /* 通知 */
+        .notification { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; background: var(--bg-secondary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 2000; font-size: 14px; display: flex; align-items: center; gap: 8px; animation: slideIn 0.2s ease; }
+        .notification.success { border-left: 4px solid var(--accent-success); color: #065f46; }
+        .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
+        .notification.warning { border-left: 4px solid var(--accent-warning); color: #92400e; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-balance-scale"></i></div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
+                    <a href="element-presets.html" class="nav-item active"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>要件管理</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-avatar">管</div>
+                        <div>
+                            <div class="user-name">管理员</div>
+                            <div class="user-role">系统管理员</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1>要件管理</h1>
+                        <p>维护各业务系统的标准要件，按案由分组；用户侧生成文书时与「我的要件」合并展示</p>
+                    </div>
+                    <div class="business-switch">
+                        <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
+                        <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
+                        <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
+                    </div>
+                </div>
+
+                <div class="tpl-body">
+                    <div class="tpl-left">
+                        <div class="cause-search-wrap">
+                            <div class="cause-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="causeSearchInput" placeholder="搜索案由..." oninput="filterCauseTree()">
+                                <i class="fas fa-times-circle cause-search-clear" id="causeSearchClear" onclick="clearCauseSearch()"></i>
+                            </div>
+                        </div>
+                        <div id="tplLeft">
+                            <!-- 由 JS 渲染 -->
+                        </div>
+                    </div>
+                    <div class="tpl-right">
+                        <div class="tpl-toolbar">
+                            <span class="title" id="rightTitle">全部要件<span class="sub" id="rightSub"></span></span>
+                            <div class="toolbar-right">
+                                <button class="btn btn-ghost-danger" id="resetCauseBtn" onclick="resetCurrentCause()" style="display:none;" title="清除该案由的自定义覆盖，恢复内置要件">
+                                    <i class="fas fa-undo"></i> 恢复内置
+                                </button>
+                                <button class="btn btn-primary" id="addBtn" onclick="openAddModal()" disabled>
+                                    <i class="fas fa-plus"></i> 新增要件
+                                </button>
+                            </div>
+                        </div>
+                        <table class="tpl-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:18%;">要件名</th>
+                                    <th style="width:22%;">说明</th>
+                                    <th style="width:32%;">问题</th>
+                                    <th style="width:10%;">来源</th>
+                                    <th style="width:120px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tplTbody"></tbody>
+                        </table>
+                        <div id="emptyState" class="empty-state" style="display:none;">
+                            <i class="fas fa-puzzle-piece"></i>
+                            <p id="emptyText">请先在左侧选择一个案由</p>
+                            <p class="hint" id="emptyHint">选择案由后可新增/编辑/删除该案由下的标准要件</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div class="modal-mask" id="tplModal">
+        <div class="modal-box">
+            <h3 id="modalTitle">新增要件<span class="badge" id="modalCauseBadge"></span></h3>
+            <div class="form-row">
+                <label class="form-label">要件名 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="tplName" placeholder="如：借款合意">
+            </div>
+            <div class="form-row">
+                <label class="form-label">要件说明</label>
+                <input type="text" class="form-input" id="tplDesc" placeholder="简要说明该要件的含义">
+            </div>
+            <div class="form-row">
+                <label class="form-label">问题 <span class="required">*</span></label>
+                <textarea class="form-textarea" id="tplQuestion" placeholder="生成文书前需要确认的单一问题"></textarea>
+                <div class="form-hint">每个要件仅包含一个问题；用户在生成文书时可对该问题预生成答案</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-confirm" onclick="saveElement()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-mask" id="confirmModal">
+        <div class="modal-box" style="width:400px;">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmText" style="font-size:14px; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;"></p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-confirm danger" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script src="../../js/case-data.js"></script>
+    <script src="../../js/admin-element-presets.js?v=1"></script>
+</body>
+</html>

@@ -63,13 +63,13 @@
         return Array.isArray(c.documents) ? c.documents.length : 0;
     }
 
-    // 判断是否有 OCR 异常
+    // 判断是否有 解析异常
     function hasOcrError(c) {
         if (!Array.isArray(c.files)) return false;
         return c.files.some(f => f && f.ocrStatus === 'error');
     }
 
-    // OCR 异常材料数
+    // 解析异常材料数
     function getOcrErrorCount(c) {
         if (!Array.isArray(c.files)) return 0;
         return c.files.filter(f => f && f.ocrStatus === 'error').length;
@@ -151,7 +151,7 @@
             const ocrError = hasOcrError(c);
             const ocrErrCount = getOcrErrorCount(c);
             const fileCountCell = ocrError
-                ? `<span class="file-count-cell has-error" title="存在 ${ocrErrCount} 份 OCR 识别异常材料">${c.fileCount || 0}</span>`
+                ? `<span class="file-count-cell has-error" title="存在 ${ocrErrCount} 份 解析异常材料">${c.fileCount || 0}</span>`
                 : `${c.fileCount || 0}`;
             const checked = selectedIds.has(c.id) ? 'checked' : '';
 

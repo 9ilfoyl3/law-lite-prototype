@@ -137,10 +137,6 @@ function applyReadOnlyMode() {
         headerRight.insertBefore(badge, headerRight.firstChild);
     }
 
-    // 隐藏「我的要件」按钮（只读下不允许编辑要件）
-    const myElementsBtn = headerRight ? headerRight.querySelector('[onclick="openMyElements()"]') : null;
-    if (myElementsBtn) myElementsBtn.style.display = 'none';
-
     // 隐藏材料树工具栏的「全选」「删除」按钮
     const selectAllBtn = document.getElementById('selectAllBtn');
     if (selectAllBtn) selectAllBtn.style.display = 'none';
@@ -866,19 +862,34 @@ function initMaterialGen() {
     syncStepConfigFromMaterial();
 }
 
+// v1.24: 构建模板下拉 HTML，按来源分组（标准 / 我的）
+// templates: 对象 {key: {name, source, ...}}；selectedKey: 当前选中 key
+function buildTemplateSelectHtml(templates, selectedKey) {
+    const stdOpts = [], myOpts = [];
+    const keys = Object.keys(templates);
+    keys.forEach(key => {
+        const val = templates[key];
+        const name = getTemplateName(val);
+        const sel = key === selectedKey ? 'selected' : '';
+        const opt = `<option value="${key}" ${sel}>${name}</option>`;
+        if (val && val.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
+    });
+    if (stdOpts.length && myOpts.length) {
+        return `<optgroup label="标准模板">${stdOpts.join('')}</optgroup><optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+    } else if (stdOpts.length) {
+        return stdOpts.join('');
+    } else if (myOpts.length) {
+        return `<optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+    }
+    return `<option value="">暂无可用模板</option>`;
+}
+
 function onMatDocTypeChange(shouldSync = true) {
     const docTypeKey = document.getElementById('matDocType').value;
     const templates = getDocTypeTemplates(docTypeKey);
     const templateSelect = document.getElementById('matTemplate');
     const templateKeys = Object.keys(templates);
-    const templateOptions = Object.entries(templates).map(([key, val]) => {
-        const name = getTemplateName(val);
-        const label = (val && val.source === 'mine') ? `${name}（我的）` : name;
-        return `<option value="${key}">${label}</option>`;
-    }).join('');
-    templateSelect.innerHTML = templateOptions
-        ? `${templateOptions}<option disabled>──────────</option><option value="custom">自定义模板</option>`
-        : `<option value="">暂无可用模板</option><option value="custom">自定义模板</option>`;
+    templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
     if (templateKeys.length) {
         templateSelect.value = templateKeys[0];
     }
@@ -898,10 +909,20 @@ function renderMatReqTemplates(docTypeKey) {
         return;
     }
     container.style.display = 'flex';
-    container.innerHTML = templates.map(t => {
+    // v1.24: 先标准后我的，两类同时存在时中间插分隔线
+    const std = templates.filter(t => t.source !== 'mine');
+    const mine = templates.filter(t => t.source === 'mine');
+    const renderTag = t => {
         const cls = t.source === 'mine' ? 'req-template-tag mine' : 'req-template-tag';
         return `<button type="button" class="${cls}" onclick="applyMatReqTemplate(this)" data-text="${(t.text || '').replace(/"/g, '&quot;')}">${t.name}</button>`;
-    }).join('');
+    };
+    let html = '';
+    if (std.length) html += std.map(renderTag).join('');
+    if (mine.length) {
+        if (std.length) html += '<span class="req-template-divider"></span>';
+        html += mine.map(renderTag).join('');
+    }
+    container.innerHTML = html;
 }
 
 function applyMatReqTemplate(btn) {
@@ -936,14 +957,7 @@ function syncMaterialConfigFromStep() {
     const templates = getDocTypeTemplates(stepDocType);
     const templateKeys = Object.keys(templates);
     if (matTemplateEl) {
-        const templateOptions = Object.entries(templates).map(([key, val]) => {
-            const name = getTemplateName(val);
-            const label = (val && val.source === 'mine') ? `${name}（我的）` : name;
-            return `<option value="${key}" ${key === stepTemplate ? 'selected' : ''}>${label}</option>`;
-        }).join('');
-        matTemplateEl.innerHTML = templateOptions
-            ? `${templateOptions}<option disabled>──────────</option><option value="custom">自定义模板</option>`
-            : `<option value="">暂无可用模板</option><option value="custom">自定义模板</option>`;
+        matTemplateEl.innerHTML = buildTemplateSelectHtml(templates, stepTemplate);
         if (templates[stepTemplate]) {
             matTemplateEl.value = stepTemplate;
         } else if (templateKeys.length) {
@@ -971,14 +985,7 @@ function renderStepGenConfig() {
 
     const templates = getDocTypeTemplates(currentDocType);
     const templateKeys = Object.keys(templates);
-    const templateOptions = Object.entries(templates).map(([key, val]) => {
-        const name = getTemplateName(val);
-        const label = (val && val.source === 'mine') ? `${name}（我的）` : name;
-        return `<option value="${key}" ${key === stepTemplate ? 'selected' : ''}>${label}</option>`;
-    }).join('');
-    templateSelect.innerHTML = templateOptions
-        ? `${templateOptions}<option disabled>──────────</option><option value="custom">自定义模板</option>`
-        : `<option value="">暂无可用模板</option><option value="custom">自定义模板</option>`;
+    templateSelect.innerHTML = buildTemplateSelectHtml(templates, stepTemplate);
     if (templateKeys.length && !templates[stepTemplate]) {
         stepTemplate = templateKeys[0];
         templateSelect.value = stepTemplate;
@@ -992,14 +999,7 @@ function onStepDocTypeChange(docTypeKey) {
     const templates = getDocTypeTemplates(docTypeKey);
     const templateSelect = document.getElementById('stepTemplate');
     const templateKeys = Object.keys(templates);
-    const templateOptions = Object.entries(templates).map(([key, val]) => {
-        const name = getTemplateName(val);
-        const label = (val && val.source === 'mine') ? `${name}（我的）` : name;
-        return `<option value="${key}">${label}</option>`;
-    }).join('');
-    templateSelect.innerHTML = templateOptions
-        ? `${templateOptions}<option disabled>──────────</option><option value="custom">自定义模板</option>`
-        : `<option value="">暂无可用模板</option><option value="custom">自定义模板</option>`;
+    templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
     stepTemplate = templateKeys[0] || '';
     if (stepTemplate) templateSelect.value = stepTemplate;
     refreshStepsConfig();
@@ -1025,7 +1025,7 @@ function generateByMaterial() {
         return;
     }
 
-    const allPresets = getAllElementPresets(caseItem.cause);
+    const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
     if ((allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0)) {
         showPreElementConfirmModal(allPresets, () => {
             doGenerateByMaterial(null);
@@ -1047,7 +1047,7 @@ function autoGenerateWithAllElements() {
         return;
     }
 
-    const allPresets = getAllElementPresets(caseItem.cause);
+    const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
     const hasPresets = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
 
     if (hasPresets) {
@@ -1161,13 +1161,41 @@ function refreshStepsConfig() {
     const docTypeKey = currentGenMethod === 'steps'
         ? stepDocType
         : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
-    stepsConfig = getStepsConfigForDocType(docTypeKey);
+    // v1.22: 按案字匹配 workflow 取步骤序列
+    const caseWord = extractCaseWordFromCaseNumber();
+    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord);
     stepStates = stepsConfig.map(() => 'waiting');
     stepData = {};
 }
 
-function getStepsConfigForDocType(docTypeKey) {
-    const orgConfigs = stepConfigsByOrg[org] || stepConfigsByOrg.court;
+// v1.22: 从当前案件案号提取案字（如 民初/民终/刑初...）
+function extractCaseWordFromCaseNumber() {
+    try {
+        const cn = (typeof currentCaseNumber !== 'undefined' && currentCaseNumber)
+            || (typeof currentCase !== 'undefined' && currentCase && currentCase.caseNumber)
+            || '';
+        if (!cn) return '';
+        const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+        const wordList = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[org]) || [];
+        for (const w of wordList) {
+            if (cn.indexOf(w) >= 0) return w;
+        }
+    } catch (e) { /* ignore */ }
+    return '';
+}
+
+// v1.22: 优先走 case-data.js 的 getStepsConfigForDocType（按案字匹配 workflow）
+// 保留原有 fallback 逻辑：未匹配到 workflow 时回退到内置 stepConfigsByOrg
+function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord) {
+    // 1. 优先用 case-data.js 的全局函数（读 localStorage.adminWorkflows）
+    if (typeof getStepsConfigForDocType === 'function' && docTypeKey) {
+        const steps = getStepsConfigForDocType(docTypeKey, caseWord);
+        if (steps && steps.length > 0) return steps;
+    }
+    // 2. fallback：内置 stepConfigsByOrg + fallbackMap
+    const orgConfigs = (typeof stepConfigsByOrg !== 'undefined')
+        ? (stepConfigsByOrg[org] || stepConfigsByOrg.court)
+        : {};
     if (docTypeKey && orgConfigs[docTypeKey]) return orgConfigs[docTypeKey];
 
     const fallbackMap = {
@@ -1720,7 +1748,7 @@ function regenerateStep(index) {
 
 function compileSteps() {
     if (guardReadOnly('compileSteps')) return;
-    const allPresets = getAllElementPresets(caseItem.cause);
+    const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
     if ((allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0)) {
         showPreElementConfirmModal(allPresets, () => {
             doCompileSteps(null);

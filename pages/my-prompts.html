@@ -19,6 +19,7 @@
             --border-color: #e2e8f0;
             --accent-primary: #2563eb;
             --accent-light: #eff6ff;
+            --accent-warning: #f59e0b;
             --danger-color: #dc2626;
             --success-color: #16a34a;
         }
@@ -99,6 +100,8 @@
             font-size: 11px; font-weight: 500; margin-left: 6px;
             background: #d1fae5; color: #065f46;
         }
+        .item-badge.status-on { background: #d1fae5; color: #065f46; }
+        .item-badge.status-off { background: #f3f4f6; color: #6b7280; }
         .item-meta { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
         .item-text-preview {
             font-size: 12px; color: var(--text-secondary); margin-top: 6px;
@@ -117,6 +120,10 @@
         .action-btn.edit:hover { background: var(--accent-light); }
         .action-btn.delete { color: var(--danger-color); border-color: #fecaca; }
         .action-btn.delete:hover { background: #fef2f2; }
+        .action-btn.toggle-on { color: var(--success-color); border-color: #bbf7d0; }
+        .action-btn.toggle-on:hover { background: #f0fdf4; }
+        .action-btn.toggle-off { color: var(--accent-warning); border-color: #fde68a; }
+        .action-btn.toggle-off:hover { background: #fffbeb; }
 
         .form-group { margin-bottom: 12px; }
         .form-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
@@ -194,7 +201,7 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="../js/case-data.js?v=40"></script>
+    <script src="../js/case-data.js?v=41"></script>
     <script src="../js/my-prompts.js?v=1"></script>
 </body>
 </html>

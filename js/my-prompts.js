@@ -33,7 +33,7 @@
     }
 
     function getDocTypes(org) {
-        return defaultDocTypesByOrg[org] || {};
+        return getAdminDocTypes(org) || {};
     }
 
     function escapeHtml(s) {
@@ -95,6 +95,49 @@
         renderList();
     };
 
+    // 渲染单个提示词卡片（非编辑态）
+    function renderCard(docType, index, item, docTypeName) {
+        const name = (item && item.name) || '';
+        const text = (item && item.text) || '';
+        const previewText = text.length > 200 ? text.slice(0, 200) + '…' : text;
+        const isEnabled = item && item.enabled !== false;
+        const statusBadge = isEnabled
+            ? '<span class="item-badge status-on">已启用</span>'
+            : '<span class="item-badge status-off">已停用</span>';
+        const toggleBtn = isEnabled
+            ? '<button class="action-btn toggle-off" onclick="toggleEnabled(\'' + docType + '\',' + index + ')">停用</button>'
+            : '<button class="action-btn toggle-on" onclick="toggleEnabled(\'' + docType + '\',' + index + ')">启用</button>';
+        return '<div class="item-card">'
+            + '<div class="item-row">'
+            + '<div>'
+            + '<span class="item-name">' + escapeHtml(name) + '</span>'
+            + '<span class="item-badge">我的</span>'
+            + statusBadge
+            + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
+            + (previewText ? '<div class="item-text-preview">' + escapeHtml(previewText) + '</div>' : '')
+            + '</div>'
+            + '<div class="item-actions">'
+            + '<button class="action-btn edit" onclick="editItem(\'' + docType + '\',' + index + ')">编辑</button>'
+            + toggleBtn
+            + '<button class="action-btn delete" onclick="deleteItem(\'' + docType + '\',' + index + ')">删除</button>'
+            + '</div>'
+            + '</div>'
+            + '</div>';
+    }
+
+    // 切换启用/停用状态
+    window.toggleEnabled = function(docType, index) {
+        const orgData = getOrgData(currentOrg);
+        if (!Array.isArray(orgData[docType])) return;
+        const item = orgData[docType][index];
+        if (!item) return;
+        const isEnabled = item.enabled !== false;
+        item.enabled = !isEnabled;
+        setOrgData(currentOrg, orgData);
+        renderList();
+        showToast(isEnabled ? '已停用' : '已启用', 'success');
+    };
+
     // ===== 渲染右侧列表 =====
     function renderList() {
         const docTypes = getDocTypes(currentOrg);
@@ -136,23 +179,7 @@
                 return renderEditForm(it);
             }
             const docTypeName = (docTypes[it.docType] || {}).name || it.docType;
-            const name = (it.item && it.item.name) || '';
-            const text = (it.item && it.item.text) || '';
-            const previewText = text.length > 200 ? text.slice(0, 200) + '…' : text;
-            return '<div class="item-card">'
-                + '<div class="item-row">'
-                + '<div>'
-                + '<span class="item-name">' + escapeHtml(name) + '</span>'
-                + '<span class="item-badge">我的</span>'
-                + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
-                + (previewText ? '<div class="item-text-preview">' + escapeHtml(previewText) + '</div>' : '')
-                + '</div>'
-                + '<div class="item-actions">'
-                + '<button class="action-btn edit" onclick="editItem(\'' + it.docType + '\',' + it.index + ')">编辑</button>'
-                + '<button class="action-btn delete" onclick="deleteItem(\'' + it.docType + '\',' + it.index + ')">删除</button>'
-                + '</div>'
-                + '</div>'
-                + '</div>';
+            return renderCard(it.docType, it.index, it.item, docTypeName);
         }).join('');
         listEl.innerHTML = html;
     }
@@ -243,9 +270,15 @@
         // 确保目标数组存在
         if (!Array.isArray(orgData[newDocType])) orgData[newDocType] = [];
 
+        // 编辑时保留原 enabled 字段；新增时默认启用
+        let prevEnabled = true;
+        if (oldIndex !== -1 && Array.isArray(orgData[oldDocType]) && orgData[oldDocType][oldIndex]) {
+            prevEnabled = orgData[oldDocType][oldIndex].enabled !== false;
+        }
+
         if (oldIndex === -1) {
             // 新增
-            orgData[newDocType].push({ name: newName, text: newText });
+            orgData[newDocType].push({ name: newName, text: newText, enabled: true });
         } else {
             // 编辑：先从原数组移除
             if (Array.isArray(orgData[oldDocType])) {
@@ -253,7 +286,7 @@
                 // 若原数组空了，保留空数组也无妨；不主动删除 key 以保持结构稳定
             }
             // 加入目标数组（若 docType 未变，等于在原位置之后追加；这里接受位置变化）
-            orgData[newDocType].push({ name: newName, text: newText });
+            orgData[newDocType].push({ name: newName, text: newText, enabled: prevEnabled });
         }
 
         setOrgData(currentOrg, orgData);

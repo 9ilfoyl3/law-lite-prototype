@@ -72,25 +72,137 @@ function getCurrentDocTypes() {
     return Object.assign({}, defaultDocTypesByOrg[currentBusiness] || {}, current.docTypes || {});
 }
 
-// 根据文书类型获取可用模板（按业务系统过滤）
+// v1.21: 获取合并管理后台自定义后的文书类型映射（供 admin/my-* 页面统一读取）
+// 返回 {key: {name, icon, isBuiltin, templates?}}
+function getAdminDocTypes(org) {
+    const defaults = defaultDocTypesByOrg[org] || {};
+    let customs = {};
+    try {
+        const all = JSON.parse(localStorage.getItem('adminDocTypes')) || {};
+        customs = all[org] || {};
+    } catch (e) {
+        console.error('[case-data] getAdminDocTypes 读取 adminDocTypes 失败:', e);
+    }
+    const result = {};
+    // 内置类型
+    Object.entries(defaults).forEach(([key, cfg]) => {
+        result[key] = {
+            name: cfg.name || key,
+            icon: cfg.icon || 'fa-folder',
+            isBuiltin: true,
+            templates: cfg.templates || []
+        };
+    });
+    // 自定义覆盖（整体覆盖同名内置 key）
+    Object.entries(customs).forEach(([key, cfg]) => {
+        if (cfg && typeof cfg === 'object') {
+            result[key] = {
+                name: cfg.name || key,
+                icon: cfg.icon || 'fa-folder',
+                isBuiltin: false
+            };
+        }
+    });
+    return result;
+}
+
+// 根据文书类型获取可用模板（反查：遍历所有模板，取 docType 匹配的）
+// v1.21: 不再依赖 type.templates 数组，改为反查模板自身 docType 字段
 function getDocTypeTemplates(docTypeKey) {
     const types = getCurrentDocTypes();
-    const type = types[docTypeKey];
-    if (!type) return {};
+    if (!types[docTypeKey]) return {};
     const allTemplates = getCurrentTemplates();
     const filtered = {};
-    (type.templates || []).forEach(key => {
-        if (allTemplates[key]) filtered[key] = allTemplates[key];
+    Object.entries(allTemplates).forEach(([key, tpl]) => {
+        if (tpl && tpl.docType === docTypeKey) {
+            filtered[key] = tpl;
+        }
     });
     return filtered;
 }
 
+// ============ v1.22: workflow 配置（挂在文书类型下）============
+// 数据持久化：localStorage.adminWorkflows（按业务系统分组）
+// 结构：{ [org]: { [docTypeKey]: [{id, name, caseWords, steps, isBuiltin}] } }
+// 与 stepConfigsByOrg 的关系：adminWorkflows 存在时整体覆盖内置步骤数组
+
+// 获取当前业务系统下某文书类型的 workflow 列表（合并内置 + 自定义）
+// 返回数组：[{id, name, caseWords, steps, isBuiltin}]
+function getWorkflowsForDocType(org, docTypeKey) {
+    // 1. 取内置 workflow（首次访问时从 stepConfigsByOrg 迁移）
+    const builtinSteps = (typeof stepConfigsByOrg !== 'undefined'
+        && stepConfigsByOrg[org]
+        && stepConfigsByOrg[org][docTypeKey]) || null;
+    const builtins = [];
+    if (builtinSteps && Array.isArray(builtinSteps)) {
+        builtins.push({
+            id: 'wf-' + docTypeKey + '-default',
+            name: '默认',
+            caseWords: [],            // 空 = 兜底
+            steps: builtinSteps.map(s => ({ id: s.id, title: s.title, icon: s.icon })),
+            isBuiltin: true
+        });
+    }
+    // 2. 取自定义 workflow（localStorage.adminWorkflows）
+    let customs = [];
+    try {
+        const all = JSON.parse(localStorage.getItem('adminWorkflows')) || {};
+        const orgData = all[org] || {};
+        customs = orgData[docTypeKey] || [];
+    } catch (e) {
+        console.error('[case-data] getWorkflowsForDocType 读取 adminWorkflows 失败:', e);
+    }
+    // 3. 合并：自定义存在时整体覆盖内置
+    if (customs.length > 0) {
+        return customs;
+    }
+    return builtins;
+}
+
+// 根据案字匹配 workflow，返回其 steps 数组
+// 匹配规则：精确匹配 caseWords → 兜底 workflow(caseWords=[]) → 第一个 workflow → 内置 stepConfigsByOrg
+function getStepsConfigForDocType(docTypeKey, caseWord) {
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const workflows = getWorkflowsForDocType(org, docTypeKey);
+    if (workflows.length === 0) {
+        // 回退到内置 stepConfigsByOrg
+        const fallback = (typeof stepConfigsByOrg !== 'undefined'
+            && stepConfigsByOrg[org]
+            && stepConfigsByOrg[org][docTypeKey]) || [];
+        return fallback;
+    }
+    // 1. 精确匹配案字
+    if (caseWord) {
+        const matched = workflows.find(wf => Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0);
+        if (matched && Array.isArray(matched.steps) && matched.steps.length > 0) {
+            return matched.steps;
+        }
+    }
+    // 2. 兜底 workflow（caseWords 为空数组）
+    const fallbackWf = workflows.find(wf => !Array.isArray(wf.caseWords) || wf.caseWords.length === 0);
+    if (fallbackWf && Array.isArray(fallbackWf.steps) && fallbackWf.steps.length > 0) {
+        return fallbackWf.steps;
+    }
+    // 3. 第一个 workflow
+    if (workflows[0] && Array.isArray(workflows[0].steps)) {
+        return workflows[0].steps;
+    }
+    return [];
+}
+
+// 统计某文书类型下的 workflow 数量（供管理后台表格显示）
+function countWorkflowsForDocType(org, docTypeKey) {
+    return getWorkflowsForDocType(org, docTypeKey).length;
+}
+
 // v1.17: docTemplates 数据结构升级——把字符串值统一转为对象 {name, docType, causes, content}
+// v1.24: 反查表改用 defaultDocTypesByOrg（保留原始 templates 数组），避免 system.docTypes
+//        被 mergeAdminDocTypes 覆盖后丢失 templates 导致内置模板 docType 补全失败
 function normalizeDocTemplates(org, system) {
     if (!system.docTemplates) return;
-    // 构建 docType key → 模板 key 的反查表，用于补全 docType 字段
+    // 用 defaultDocTypesByOrg 构建 docType key → 模板 key 的反查表
     const templateToDocType = {};
-    Object.entries(system.docTypes || {}).forEach(([typeKey, typeCfg]) => {
+    Object.entries(defaultDocTypesByOrg[org] || {}).forEach(([typeKey, typeCfg]) => {
         (typeCfg.templates || []).forEach(tplKey => {
             templateToDocType[tplKey] = typeKey;
         });
@@ -114,12 +226,24 @@ function normalizeDocTemplates(org, system) {
 }
 
 // 合并管理后台自定义模板（localStorage.adminDocTemplates）
+// v1.23: 支持 enabled 状态控制；内置模板停用记录于 __builtinDisabled__ 数组
 function mergeAdminDocTemplates(org, system) {
     try {
         const adminData = JSON.parse(localStorage.getItem('adminDocTemplates')) || {};
         const custom = adminData[org] || {};
+
+        // 处理内置模板停用：从 system.docTemplates 中删除被停用的内置 key
+        const builtinDisabled = Array.isArray(custom.__builtinDisabled__) ? custom.__builtinDisabled__ : [];
+        builtinDisabled.forEach(key => {
+            if (system.docTemplates[key]) {
+                delete system.docTemplates[key];
+            }
+        });
+
+        // 合并自定义模板（跳过 __builtinDisabled__ 元数据 key 和已停用的项）
         Object.entries(custom).forEach(([key, val]) => {
-            if (val && typeof val === 'object') {
+            if (key === '__builtinDisabled__') return;
+            if (val && typeof val === 'object' && val.enabled !== false) {
                 system.docTemplates[key] = {
                     name: val.name || key,
                     docType: val.docType || '',
@@ -135,12 +259,13 @@ function mergeAdminDocTemplates(org, system) {
 
 // v1.13: 合并用户侧自定义模板（localStorage.myDocTemplates）
 // key 加 my- 前缀避免与 admin/内置冲突；标记 source='mine' 供 UI 加「我的」标识
+// v1.23: 过滤掉 enabled === false 的已停用项
 function mergeMyDocTemplates(org, system) {
     try {
         const myData = JSON.parse(localStorage.getItem('myDocTemplates')) || {};
         const my = myData[org] || {};
         Object.entries(my).forEach(([key, val]) => {
-            if (val && typeof val === 'object') {
+            if (val && typeof val === 'object' && val.enabled !== false) {
                 system.docTemplates['my-' + key] = {
                     name: val.name || key,
                     docType: val.docType || '',
@@ -152,6 +277,27 @@ function mergeMyDocTemplates(org, system) {
         });
     } catch (e) {
         console.error('[case-data] mergeMyDocTemplates 失败:', e);
+    }
+}
+
+// v1.21: 合并管理后台自定义文书类型（localStorage.adminDocTypes）
+// 覆盖语义：adminDocTypes[org][key] 整体覆盖 defaultDocTypesByOrg[org][key]
+function mergeAdminDocTypes(org, system) {
+    try {
+        const all = JSON.parse(localStorage.getItem('adminDocTypes')) || {};
+        const customs = all[org] || {};
+        Object.entries(customs).forEach(([key, cfg]) => {
+            if (cfg && typeof cfg === 'object') {
+                // 覆盖同名内置 key（保留原 key，name/icon 用自定义值）
+                system.docTypes[key] = {
+                    name: cfg.name || key,
+                    icon: cfg.icon || 'fa-folder'
+                    // 注意：不保留 templates 数组，模板归属由模板自身 docType 决定
+                };
+            }
+        });
+    } catch (e) {
+        console.error('[case-data] mergeAdminDocTypes 失败:', e);
     }
 }
 
@@ -180,28 +326,49 @@ function getTemplateName(tpl) {
 
 // v1.13: 获取「生成需求说明」提示词模板
 // 优先级：管理后台 adminPromptTemplates（为空回退默认） + 用户侧 myPromptTemplates（追加，标记 source='mine'）
+// v1.23: 过滤掉 enabled === false 的项；内置提示词停用记录于 __builtinDisabled__ 字典
 function getReqTemplates(org, docTypeKey) {
     // 基础数据：admin 或默认
     let base = [];
+    let useDefault = false;
     try {
         const adminData = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
         const orgData = adminData[org];
         if (orgData && Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey].length > 0) {
-            base = orgData[docTypeKey];
+            // admin 数据存在：过滤掉 enabled === false 的项
+            base = orgData[docTypeKey].filter(p => !p || p.enabled !== false);
         } else {
-            base = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
+            useDefault = true;
         }
     } catch (e) {
         console.error('[case-data] getReqTemplates 读取 adminPromptTemplates 失败:', e);
-        base = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
+        useDefault = true;
     }
-    // 追加用户侧自定义
+    if (useDefault) {
+        const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
+        base = defaults.slice();
+        // 内置提示词停用：读取 __builtinDisabled__ 字典，过滤对应 index
+        try {
+            const adminData = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+            const orgData = adminData[org] || {};
+            const disabledMap = (orgData.__builtinDisabled__ && typeof orgData.__builtinDisabled__ === 'object') ? orgData.__builtinDisabled__ : {};
+            const disabledArr = disabledMap[docTypeKey] || [];
+            if (disabledArr.length > 0) {
+                base = base.filter((_, i) => !disabledArr.includes(i));
+            }
+        } catch (e) {
+            console.error('[case-data] getReqTemplates 读取 __builtinDisabled__ 失败:', e);
+        }
+    }
+    // 追加用户侧自定义（过滤掉 enabled === false）
     try {
         const myData = JSON.parse(localStorage.getItem('myPromptTemplates')) || {};
         const myOrg = myData[org] || {};
         const my = myOrg[docTypeKey] || [];
         if (my.length > 0) {
-            const myMarked = my.map(p => ({ name: p.name || '', text: p.text || '', source: 'mine' }));
+            const myMarked = my
+                .filter(p => !p || p.enabled !== false)
+                .map(p => ({ name: p.name || '', text: p.text || '', source: 'mine' }));
             return [...base, ...myMarked];
         }
     } catch (e) {
@@ -599,9 +766,20 @@ const elementPresetsByCause = {
 };
 
 // 获取案由对应的预设要件，无精确匹配时返回通用要件
-function getElementPresets(cause) {
+// org 参数（可选）：业务系统 key（court/procuratorate/justice），传入时优先读取
+//                  localStorage.adminElementPresets[org][cause] 的管理后台自定义覆盖
+function getElementPresets(cause, org) {
+    // 1. 管理后台自定义覆盖优先
+    if (cause && org) {
+        try {
+            const adminData = JSON.parse(localStorage.getItem('adminElementPresets') || '{}');
+            const orgData = adminData[org] || {};
+            if (orgData[cause]) return orgData[cause];
+        } catch (e) { /* ignore */ }
+    }
+    // 2. 内置要件
     if (cause && elementPresetsByCause[cause]) return elementPresetsByCause[cause];
-    // 通用要件
+    // 3. 通用要件
     return [
         { name: '主体资格', desc: '相关主体的资格及身份认定', question: '各方主体名称、身份及主体资格情况？' },
         { name: '事实认定', desc: '案件事实的认定及证据', question: '需要认定的核心事实有哪些？' },
@@ -626,8 +804,8 @@ function setMyElementPresets(cause, elements) {
     localStorage.setItem(MY_ELEMENTS_STORAGE_KEY, JSON.stringify(data));
 }
 
-function getAllElementPresets(cause) {
-    const standard = getElementPresets(cause).map(p => ({ ...p, source: 'standard' }));
+function getAllElementPresets(cause, org) {
+    const standard = getElementPresets(cause, org).map(p => ({ ...p, source: 'standard' }));
     const mine = getMyElementPresets(cause).map(p => ({ ...p, source: 'mine' }));
     return { standard, mine };
 }
@@ -800,6 +978,8 @@ function migrateDataIfNeeded() {
             normalizeDocTemplates(org, system);
             // 合并管理后台自定义模板（localStorage.adminDocTemplates）
             mergeAdminDocTemplates(org, system);
+            // v1.21: 合并管理后台自定义文书类型（localStorage.adminDocTypes）
+            mergeAdminDocTypes(org, system);
             // v1.13: 合并用户侧自定义模板（localStorage.myDocTemplates）
             mergeMyDocTemplates(org, system);
             // v1.13: 司法局业务从调解改为行政复议，强制完整覆盖
@@ -1006,6 +1186,14 @@ function getCurrentTemplates() { return getCurrentBusiness().docTemplates; }
 function initCaseData() {
     Object.entries(businessSystems).forEach(([org, system]) => {
         if (org === '_dataVersion' || !system || !Array.isArray(system.cases)) return;
+        // v1.24: 合并默认 docTypes/docTemplates 并 normalize，每次加载都执行（幂等）
+        // 修复：旧数据可能存储字符串形式模板，需转为对象并补全 docType 字段
+        system.docTypes = Object.assign({}, defaultDocTypesByOrg[org] || {}, system.docTypes || {});
+        system.docTemplates = Object.assign({}, defaultDocTemplatesByOrg[org] || {}, system.docTemplates || {});
+        normalizeDocTemplates(org, system);
+        mergeAdminDocTemplates(org, system);
+        mergeAdminDocTypes(org, system);
+        mergeMyDocTemplates(org, system);
         const caseWords = caseWordListByOrg[org];
         system.cases.forEach(c => {
             if (!c.caseWord && caseWords && caseWords.length) {

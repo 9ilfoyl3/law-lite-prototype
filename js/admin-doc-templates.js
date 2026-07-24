@@ -34,9 +34,9 @@
         saveStorage(all);
     }
 
-    // 获取当前业务系统的文书类型映射
+    // 获取当前业务系统的文书类型映射（v1.21: 统一走 getAdminDocTypes 合并源）
     function getDocTypes(org) {
-        return defaultDocTypesByOrg[org] || {};
+        return getAdminDocTypes(org) || {};
     }
 
     // 获取当前业务系统的内置模板（来自 defaultDocTemplatesByOrg，字符串映射）
@@ -44,12 +44,25 @@
         return defaultDocTemplatesByOrg[org] || {};
     }
 
+    // 获取当前业务系统下被停用的内置模板 key 列表
+    // 存于 adminDocTemplates[org].__builtinDisabled__ 数组中
+    function getBuiltinDisabled(org) {
+        const orgData = getOrgData(org);
+        return Array.isArray(orgData.__builtinDisabled__) ? orgData.__builtinDisabled__ : [];
+    }
+    function setBuiltinDisabled(org, arr) {
+        const orgData = getOrgData(org);
+        orgData.__builtinDisabled__ = arr;
+        setOrgData(org, orgData);
+    }
+
     // 获取当前业务系统的全部模板（内置 + 自定义）
-    // 返回统一对象结构：{key: {name, docType, causes, content, isBuiltin}}
+    // 返回统一对象结构：{key: {name, docType, causes, content, isBuiltin, enabled}}
     function getAllTemplates(org) {
         const docTypes = getDocTypes(org);
         const builtins = getBuiltinTemplates(org);
         const customs = getOrgData(org);
+        const builtinDisabled = getBuiltinDisabled(org);
 
         // 反查表：模板 key → 文书类型 key
         const tplToDocType = {};
@@ -67,18 +80,21 @@
                 docType: tplToDocType[key] || '',
                 causes: [],
                 content: '',
-                isBuiltin: true
+                isBuiltin: true,
+                enabled: !builtinDisabled.includes(key)
             };
         });
         // 自定义模板（对象，覆盖同名内置）
         Object.entries(customs).forEach(([key, val]) => {
+            if (key === '__builtinDisabled__') return; // 跳过内置停用列表
             if (val && typeof val === 'object') {
                 result[key] = {
                     name: val.name || key,
                     docType: val.docType || tplToDocType[key] || '',
                     causes: Array.isArray(val.causes) ? val.causes : [],
                     content: val.content || '',
-                    isBuiltin: false
+                    isBuiltin: false,
+                    enabled: val.enabled !== false
                 };
             }
         });
@@ -191,14 +207,23 @@
             const badge = t.isBuiltin
                 ? '<span class="tpl-badge builtin">内置</span>'
                 : '<span class="tpl-badge custom">自定义</span>';
+            const isEnabled = t.enabled !== false;
+            const statusBadge = isEnabled
+                ? '<span class="status-badge status-on">已启用</span>'
+                : '<span class="status-badge status-off">已停用</span>';
+            const toggleBtn = isEnabled
+                ? '<button class="action-btn toggle-off" onclick="toggleTemplateEnabled(\'' + key + '\')">停用</button>'
+                : '<button class="action-btn toggle-on" onclick="toggleTemplateEnabled(\'' + key + '\')">启用</button>';
             const actions = t.isBuiltin
-                ? '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
+                ? '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>' + toggleBtn
                 : '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
+                  + toggleBtn
                   + '<button class="action-btn delete" onclick="deleteTemplate(\'' + key + '\')">删除</button>';
             return '<tr>'
                 + '<td class="tpl-name-cell">' + escapeHtml(t.name) + badge + '</td>'
                 + '<td>' + escapeHtml(docTypeName) + '</td>'
                 + '<td>' + causesCell + '</td>'
+                + '<td>' + statusBadge + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
         }).join('');
@@ -314,18 +339,63 @@
             while (orgData[key]) key = genTemplateKey(name, docType) + Math.floor(Math.random() * 100);
         }
 
+        // 编辑时继承原启用状态；新增默认启用
+        let origEnabled = true;
+        if (editingKey) {
+            const all = getAllTemplates(currentOrg);
+            const origT = all[editingKey];
+            if (origT) origEnabled = origT.enabled !== false;
+        }
+
         orgData[key] = {
             name: name,
             docType: docType,
             causes: causes,
-            content: content
+            content: content,
+            enabled: origEnabled
         };
+
+        // 编辑内置模板后，该 key 变为自定义；从 __builtinDisabled__ 清理冗余 key
+        if (editingKey && editingIsBuiltin) {
+            let arr = getBuiltinDisabled(currentOrg);
+            if (arr.includes(editingKey)) {
+                orgData.__builtinDisabled__ = arr.filter(k => k !== editingKey);
+            }
+        }
+
         setOrgData(currentOrg, orgData);
 
         closeModal();
         renderLeft();
         renderRight();
         showNotification(editingKey ? '模板已更新' : '模板已新增', 'success');
+    };
+
+    // ===== 启用/停用切换 =====
+    window.toggleTemplateEnabled = function(key) {
+        const all = getAllTemplates(currentOrg);
+        const t = all[key];
+        if (!t) return;
+        const newEnabled = t.enabled === false; // 反转：当前停用→启用；当前启用→停用
+        if (t.isBuiltin) {
+            // 内置模板：操作 __builtinDisabled__ 数组
+            let arr = getBuiltinDisabled(currentOrg);
+            if (newEnabled) {
+                arr = arr.filter(k => k !== key);
+            } else {
+                if (!arr.includes(key)) arr.push(key);
+            }
+            setBuiltinDisabled(currentOrg, arr);
+        } else {
+            // 自定义模板：直接修改 enabled 字段
+            const orgData = getOrgData(currentOrg);
+            if (orgData[key] && typeof orgData[key] === 'object') {
+                orgData[key].enabled = newEnabled;
+                setOrgData(currentOrg, orgData);
+            }
+        }
+        renderRight();
+        showNotification(newEnabled ? '模板已启用' : '模板已停用', 'success');
     };
 
     // ===== 删除 =====

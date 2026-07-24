@@ -38,8 +38,9 @@
 | 用户管理 | [pages/admin/users.html](pages/admin/users.html) | 用户全生命周期管理、批量导入/删除 |
 | 系统运行报告 | [pages/admin/system-report.html](pages/admin/system-report.html) | 系统运行报告生成与查看，支持周报/月报/自定义 |
 | 知识库分类管理 | [pages/admin/knowledge-base.html](pages/admin/knowledge-base.html) | 全员公开库分类体系维护 |
-| 知识库文档管理 | [pages/admin/knowledge-documents.html](pages/admin/knowledge-documents.html) | 知识库文档上传、状态管理、OCR索引 |
+| 知识库文档管理 | [pages/admin/knowledge-documents.html](pages/admin/knowledge-documents.html) | 知识库文档上传、状态管理、解析索引 |
 | 案由管理 | [pages/admin/cause-management.html](pages/admin/cause-management.html) | 三级案由层级结构维护（供案由明鉴模块使用） |
+| 文书类型管理 | [pages/admin/doc-types.html](pages/admin/doc-types.html) | 各业务系统文书类型维护（文书模板/提示词的父级分类） |
 | 风控与审计 | [pages/admin/risk-audit.html](pages/admin/risk-audit.html) | 敏感词库、拦截记录、全链路审计日志 |
 | 系统初始化配置 | [pages/admin/settings.html](pages/admin/settings.html) | 系统信息、安全策略、运行参数配置 |
 | 模型配置与用量 | [pages/admin/model-management.html](pages/admin/model-management.html) | 模型列表、法院授权、Token配额与用量统计 |

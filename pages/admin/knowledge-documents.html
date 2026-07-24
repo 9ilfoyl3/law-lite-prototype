@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -396,6 +396,8 @@
                     <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
                     <a href="knowledge-base.html" class="nav-item active"><i class="fas fa-book"></i><span>知识库管理</span></a>
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
+                    <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
                     <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
@@ -439,7 +441,7 @@
             <div class="page-content">
                 <div class="page-header">
                     <h1 class="page-title">知识库文档管理</h1>
-                    <p class="page-subtitle">管理知识库中的文档，支持上传、状态管理、OCR索引</p>
+                    <p class="page-subtitle">管理知识库中的文档，支持上传、状态管理、解析索引</p>
                 </div>
 
                 <div class="stats-grid">
@@ -717,7 +719,7 @@
         function deleteDoc(id) {
             const doc = documents.find(d => d.id === id);
             if (!doc) return;
-            if (!confirm(`确定要删除"${doc.name}"吗？删除后对应的OCR文本和索引将同步清除，此操作不可恢复。`)) return;
+            if (!confirm(`确定要删除"${doc.name}"吗？删除后对应的解析文本和索引将同步清除，此操作不可恢复。`)) return;
             documents = documents.filter(d => d.id !== id);
             saveToStorage();
             renderDocuments();

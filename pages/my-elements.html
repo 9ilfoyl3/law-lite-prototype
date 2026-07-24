@@ -7,8 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>我的要件 - AI辅助办案系统</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="../libs/font-awesome-all.min.css" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -66,7 +65,7 @@
             gap: 20px;
         }
         .cause-sidebar {
-            width: 240px;
+            width: 260px;
             flex-shrink: 0;
             background: var(--bg-primary);
             border: 1px solid var(--border-color);
@@ -81,28 +80,75 @@
             background: var(--bg-secondary);
         }
         .cause-list {
-            max-height: calc(100vh - 220px);
+            max-height: calc(100vh - 260px);
             overflow-y: auto;
+            padding: 8px;
         }
-        .cause-item {
-            padding: 12px 16px;
-            font-size: 13px;
-            cursor: pointer;
-            border-bottom: 1px solid var(--border-color);
-            transition: all 0.15s;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .cause-item:hover { background: var(--bg-secondary); }
-        .cause-item.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
-        .cause-item .count {
-            font-size: 11px;
-            padding: 2px 6px;
-            background: var(--bg-tertiary);
-            border-radius: 10px;
-            color: var(--text-secondary);
-        }
+        /* 左侧搜索框 */
+        .cause-search-wrap { padding: 4px 4px 8px; position: sticky; top: -8px; background: var(--bg-primary); z-index: 5; }
+        .cause-search-box { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; }
+        .cause-search-box:focus-within { border-color: var(--accent-primary); }
+        .cause-search-box i { color: var(--text-muted); font-size: 12px; }
+        .cause-search-box input { border: none; outline: none; background: transparent; font-size: 13px; flex: 1; font-family: inherit; color: var(--text-primary); }
+        .cause-search-box input::placeholder { color: var(--text-muted); }
+        .cause-search-clear { cursor: pointer; color: var(--text-muted); font-size: 12px; display: none; }
+        .cause-search-clear:hover { color: var(--text-primary); }
+
+        /* 置顶分组 */
+        .pinned-section { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
+        .pinned-header { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .pinned-header i { font-size: 10px; color: var(--accent-primary); }
+
+        /* 左侧案由树（3 级结构，与新增案件案由选择器一致） */
+        .cause-tree-root { display: flex; flex-direction: column; gap: 2px; }
+        .cause-tree-all { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; margin-bottom: 4px; }
+        .cause-tree-all:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .cause-tree-all.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .cause-tree-all .count { margin-left: auto; font-size: 11px; color: var(--text-muted); background: var(--bg-tertiary); padding: 1px 6px; border-radius: 8px; }
+        .cause-tree-all.active .count { background: #dbeafe; color: var(--accent-primary); }
+
+        .cause-level-1 { display: flex; flex-direction: column; }
+        .cause-level-1-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+        .cause-level-1-header:hover { background: var(--bg-secondary); }
+        .cause-level-1-header.selected { background: var(--accent-light); }
+        .cause-level-1-header.selected .cause-level-1-name { color: var(--accent-primary); font-weight: 600; }
+        .cause-level-1-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+        .cause-level-1-header .count { font-size: 11px; color: var(--text-muted); }
+        .cause-expand-icon { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; width: 12px; text-align: center; }
+        .cause-level-1.expanded > .cause-level-1-header .cause-expand-icon { transform: rotate(90deg); }
+        .cause-level-2-container { display: none; flex-direction: column; gap: 2px; padding-left: 16px; padding-bottom: 4px; }
+        .cause-level-1.expanded > .cause-level-2-container { display: flex; }
+
+        .cause-level-2 { display: flex; flex-direction: column; }
+        .cause-level-2-header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .cause-level-2-header:hover { background: var(--bg-secondary); }
+        .cause-level-2-header.selected { background: var(--accent-light); }
+        .cause-level-2-header.selected .cause-level-2-name { color: var(--accent-primary); font-weight: 600; }
+        .cause-level-2-name { font-size: 12px; font-weight: 500; color: var(--text-primary); flex: 1; }
+        .cause-level-2-header .count { font-size: 11px; color: var(--text-muted); }
+        .cause-level-2.expanded > .cause-level-2-header .cause-expand-icon { transform: rotate(90deg); }
+        .cause-level-3-container { display: none; flex-direction: column; gap: 2px; padding-left: 16px; padding-bottom: 4px; }
+        .cause-level-2.expanded > .cause-level-3-container { display: flex; }
+
+        .cause-leaf { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .cause-leaf:hover { background: var(--bg-secondary); }
+        .cause-leaf.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .cause-leaf .has-mine-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-primary); flex-shrink: 0; }
+        .cause-leaf-name { font-size: 12px; color: var(--text-primary); flex: 1; }
+        .cause-leaf.active .cause-leaf-name { color: var(--accent-primary); }
+        .cause-leaf .count { font-size: 10px; color: var(--text-muted); background: var(--bg-tertiary); padding: 1px 5px; border-radius: 8px; }
+        .cause-leaf.active .count { background: #dbeafe; color: var(--accent-primary); }
+        .pin-btn { cursor: pointer; color: var(--text-muted); font-size: 11px; opacity: 0; transition: all 0.15s; flex-shrink: 0; padding: 2px; }
+        .cause-leaf:hover .pin-btn { opacity: 0.6; }
+        .pin-btn:hover { opacity: 1 !important; color: var(--accent-primary); }
+        .pin-btn.pinned { opacity: 1; color: var(--accent-primary); }
+        .pinned-section .cause-leaf .pin-btn { opacity: 1; color: var(--accent-primary); }
+        .no-match-tip { padding: 16px 12px; text-align: center; font-size: 12px; color: var(--text-muted); }
+
+        .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .business-switch { display: flex; gap: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; }
+        .business-switch-btn { padding: 6px 14px; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+        .business-switch-btn.active { background: var(--accent-primary); color: white; }
         .content-area {
             flex: 1;
             min-width: 0;
@@ -239,15 +285,31 @@
 <body>
     <div class="page-container">
         <a href="cases.html" class="back-link"><i class="fas fa-arrow-left"></i> 返回案件列表</a>
-        <div class="page-header">
-            <div class="page-title">我的要件</div>
-            <div class="page-subtitle">按案由维护个人自定义要件，生成文书时与标准要件一同作为可选上下文</div>
+        <div class="page-header-row">
+            <div class="page-header">
+                <div class="page-title">我的要件</div>
+                <div class="page-subtitle">按案由维护个人自定义要件，生成文书时与标准要件一同作为可选上下文</div>
+            </div>
+            <div class="business-switch" id="businessSwitch">
+                <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
+                <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
+                <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
+            </div>
         </div>
 
         <div class="main-layout">
             <div class="cause-sidebar">
                 <div class="sidebar-header">选择案由</div>
-                <div class="cause-list" id="causeList"></div>
+                <div class="cause-list">
+                    <div class="cause-search-wrap">
+                        <div class="cause-search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="causeSearchInput" placeholder="搜索案由..." oninput="filterCauseTree()">
+                            <i class="fas fa-times-circle cause-search-clear" id="causeSearchClear" onclick="clearCauseSearch()"></i>
+                        </div>
+                    </div>
+                    <div id="causeList"></div>
+                </div>
             </div>
 
             <div class="content-area">
@@ -277,7 +339,7 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="../js/case-data.js?v=39"></script>
+    <script src="../js/case-data.js?v=41"></script>
     <script>
         const causeListEl = document.getElementById('causeList');
         const currentCauseTitleEl = document.getElementById('currentCauseTitle');
@@ -286,24 +348,46 @@
         const emptyState = document.getElementById('emptyState');
         const addElementBtn = document.getElementById('addElementBtn');
 
+        // case-data.js 已声明全局 currentBusiness，此处直接复用/覆盖，不可重新 let/const
+        currentBusiness = localStorage.getItem('currentBusiness') || currentBusiness || 'court';
         let currentCause = '';
         let editingId = null;
+        let searchKeyword = '';
+        const PINNED_KEY = 'myPinnedCauses';
+
+        // ===== 置顶案由存储（按业务系统分组） =====
+        function getPinned(org) {
+            try {
+                const all = JSON.parse(localStorage.getItem(PINNED_KEY) || '{}');
+                return all[org] || [];
+            } catch (e) { return []; }
+        }
+        function setPinned(org, list) {
+            let all = {};
+            try { all = JSON.parse(localStorage.getItem(PINNED_KEY) || '{}'); } catch (e) {}
+            all[org] = list;
+            localStorage.setItem(PINNED_KEY, JSON.stringify(all));
+        }
+        function isPinned(org, name) {
+            return getPinned(org).indexOf(name) >= 0;
+        }
+        function matchSearch(name) {
+            if (!searchKeyword) return true;
+            return name.toLowerCase().indexOf(searchKeyword.toLowerCase()) >= 0;
+        }
 
         function init() {
+            // 同步业务系统按钮状态
+            document.querySelectorAll('.business-switch-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === currentBusiness);
+            });
+
             const urlCause = getUrlParam('cause');
-            const myData = getMyElementPresets();
-            const allCauses = Object.keys(elementPresetsByCause);
-            
-            if (urlCause && (elementPresetsByCause[urlCause] || (myData[urlCause] && myData[urlCause].length > 0))) {
+            if (urlCause) {
                 currentCause = urlCause;
-            } else if (urlCause) {
-                // URL 传入了案由但不在预设列表中，仍然选中它（用户可能要为其新增要件）
-                currentCause = urlCause;
-            } else if (allCauses.length > 0) {
-                // 没有传入案由参数时，默认选中第一个案由
-                currentCause = allCauses[0];
+                // 展开 URL 案由所在的父级节点
+                expandCausePath(urlCause);
             }
-            
             renderCauseList();
             if (currentCause) {
                 renderElements();
@@ -315,29 +399,233 @@
             return params.get(name) || '';
         }
 
-        function renderCauseList() {
-            let causes = Object.keys(elementPresetsByCause);
-            const myData = getMyElementPresets();
-            // 合并我的要件中独有的案由
-            Object.keys(myData).forEach(c => {
-                if (causes.indexOf(c) === -1 && myData[c] && myData[c].length > 0) {
-                    causes.push(c);
-                }
+        function getCauseTree() {
+            return causeTreeDataByOrg[currentBusiness] || causeTreeDataByOrg.court || [];
+        }
+
+        // 展开 URL 传入案由所在的 level-1 / level-2 父节点
+        function expandCausePath(causeName) {
+            const tree = getCauseTree();
+            tree.forEach(l1 => {
+                let found = false;
+                (l1.children || []).forEach(l2 => {
+                    if (typeof l2 === 'string') {
+                        if (l2 === causeName) found = true;
+                    } else if (Array.isArray(l2.children)) {
+                        if (l2.children.indexOf(causeName) >= 0) {
+                            found = true;
+                            l2.expanded = true;
+                        }
+                    }
+                });
+                if (found) l1.expanded = true;
             });
-            // 确保 URL 传入的案由出现在列表中
-            const urlCause = getUrlParam('cause');
-            if (urlCause && causes.indexOf(urlCause) === -1) {
-                causes.unshift(urlCause);
+        }
+
+        // 统计某节点下所有叶子案由的数量
+        function countLeaves(node) {
+            if (!node || !node.children) return 0;
+            let cnt = 0;
+            node.children.forEach(child => {
+                if (typeof child === 'string') cnt += 1;
+                else if (child && Array.isArray(child.children)) cnt += child.children.length;
+            });
+            return cnt;
+        }
+
+        function escQuote(s) {
+            if (!s) return '';
+            return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // 渲染左侧案由树（3 级结构）
+        function renderCauseList() {
+            const tree = getCauseTree();
+            const myData = getMyElementPresets();
+            const totalLeaves = tree.reduce((sum, l1) => sum + countLeaves(l1), 0);
+            const pinned = getPinned(currentBusiness);
+
+            let html = '<div class="cause-tree-root">'
+                + '<div class="cause-tree-all' + (currentCause === '' ? ' active' : '') + '" onclick="selectCause(\'\')">'
+                + '<i class="fas fa-layer-group"></i><span>全部</span>'
+                + '<span class="count">' + totalLeaves + '</span></div>';
+
+            // 置顶分组（仅在非搜索状态下显示）
+            if (!searchKeyword && pinned.length > 0) {
+                html += '<div class="pinned-section">'
+                    + '<div class="pinned-header"><i class="fas fa-thumbtack"></i><span>置顶</span></div>';
+                pinned.forEach(name => {
+                    html += renderCauseLeaf(name, myData);
+                });
+                html += '</div>';
             }
-            causeListEl.innerHTML = causes.map(cause => {
-                const myCount = (myData[cause] || []).length;
-                return `
-                    <div class="cause-item ${cause === currentCause ? 'active' : ''}" onclick="selectCause('${cause}')">
-                        <span>${cause}</span>
-                        ${myCount > 0 ? `<span class="count">${myCount}</span>` : ''}
-                    </div>
-                `;
-            }).join('');
+
+            // 树形结构
+            let hasMatch = false;
+            tree.forEach((l1, i1) => {
+                // 搜索时判断该 l1 下是否有匹配的叶子
+                let l1HasMatch = false;
+                if (searchKeyword) {
+                    (l1.children || []).forEach(l2 => {
+                        if (typeof l2 === 'string') {
+                            if (matchSearch(l2)) l1HasMatch = true;
+                        } else {
+                            (l2.children || []).forEach(leaf => {
+                                if (matchSearch(leaf)) l1HasMatch = true;
+                            });
+                        }
+                    });
+                } else {
+                    l1HasMatch = true;
+                }
+                if (!l1HasMatch) return;
+
+                const l1ForceExpanded = searchKeyword ? ' expanded' : (l1.expanded ? ' expanded' : '');
+                const l1Selected = currentCause === l1.name ? ' selected' : '';
+                const l1Count = countLeaves(l1);
+                html += '<div class="cause-level-1' + l1ForceExpanded + '">'
+                    + '<div class="cause-level-1-header' + l1Selected + '">'
+                    + '<i class="fas fa-chevron-right cause-expand-icon" onclick="event.stopPropagation(); toggleCauseLevel1(' + i1 + ')"></i>'
+                    + '<span class="cause-level-1-name" onclick="event.stopPropagation(); selectCause(\'' + escQuote(l1.name) + '\')">' + escapeHtml(l1.name) + '</span>'
+                    + '<span class="count">' + l1Count + '</span>'
+                    + '</div>'
+                    + '<div class="cause-level-2-container">';
+
+                (l1.children || []).forEach((l2, i2) => {
+                    if (typeof l2 === 'string') {
+                        if (matchSearch(l2)) {
+                            html += renderCauseLeaf(l2, myData);
+                            hasMatch = true;
+                        }
+                    } else {
+                        let l2HasMatch = false;
+                        if (searchKeyword) {
+                            (l2.children || []).forEach(leaf => {
+                                if (matchSearch(leaf)) l2HasMatch = true;
+                            });
+                        } else {
+                            l2HasMatch = true;
+                        }
+                        if (!l2HasMatch) return;
+
+                        const l2ForceExpanded = searchKeyword ? ' expanded' : (l2.expanded ? ' expanded' : '');
+                        const l2Selected = currentCause === l2.name ? ' selected' : '';
+                        const l2Count = (l2.children || []).length;
+                        html += '<div class="cause-level-2' + l2ForceExpanded + '">'
+                            + '<div class="cause-level-2-header' + l2Selected + '">'
+                            + '<i class="fas fa-chevron-right cause-expand-icon" onclick="event.stopPropagation(); toggleCauseLevel2(' + i1 + ',' + i2 + ')"></i>'
+                            + '<span class="cause-level-2-name" onclick="event.stopPropagation(); selectCause(\'' + escQuote(l2.name) + '\')">' + escapeHtml(l2.name) + '</span>'
+                            + '<span class="count">' + l2Count + '</span>'
+                            + '</div>'
+                            + '<div class="cause-level-3-container">';
+                        (l2.children || []).forEach(leaf => {
+                            if (matchSearch(leaf)) {
+                                html += renderCauseLeaf(leaf, myData);
+                                hasMatch = true;
+                            }
+                        });
+                        html += '</div></div>';
+                    }
+                });
+
+                html += '</div></div>';
+            });
+
+            // 搜索无匹配提示
+            if (searchKeyword && !hasMatch) {
+                html += '<div class="no-match-tip"><i class="fas fa-search" style="margin-right:6px;opacity:0.4;"></i>无匹配案由</div>';
+            }
+
+            html += '</div>';
+            causeListEl.innerHTML = html;
+        }
+
+        // 渲染叶子案由项
+        function renderCauseLeaf(name, myData) {
+            const myCount = (myData[name] || []).length;
+            const dot = myCount > 0
+                ? '<span class="has-mine-dot" title="已配置我的要件"></span>'
+                : '<span class="has-mine-dot" style="visibility:hidden;"></span>';
+            const pinned = isPinned(currentBusiness, name);
+            const pinClass = pinned ? 'pin-btn pinned' : 'pin-btn';
+            const pinTitle = pinned ? '取消置顶' : '置顶';
+            return '<div class="cause-leaf' + (currentCause === name ? ' active' : '') + '" onclick="selectCause(\'' + escQuote(name) + '\')">'
+                + dot
+                + '<span class="cause-leaf-name">' + escapeHtml(name) + '</span>'
+                + (myCount > 0 ? '<span class="count">' + myCount + '</span>' : '')
+                + '<i class="fas fa-thumbtack ' + pinClass + '" title="' + pinTitle + '" onclick="event.stopPropagation(); togglePinCause(\'' + escQuote(name) + '\')"></i>'
+                + '</div>';
+        }
+
+        function toggleCauseLevel1(i1) {
+            const tree = getCauseTree();
+            if (tree[i1]) {
+                tree[i1].expanded = !tree[i1].expanded;
+                renderCauseList();
+            }
+        }
+
+        function toggleCauseLevel2(i1, i2) {
+            const tree = getCauseTree();
+            const l2 = tree[i1] && tree[i1].children && tree[i1].children[i2];
+            if (l2 && typeof l2 !== 'string') {
+                l2.expanded = !l2.expanded;
+                renderCauseList();
+            }
+        }
+
+        function switchBusiness(type) {
+            if (type === currentBusiness) return;
+            currentBusiness = type;
+            localStorage.setItem('currentBusiness', type);
+            document.querySelectorAll('.business-switch-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === type);
+            });
+            currentCause = '';
+            editingId = null;
+            searchKeyword = '';
+            const searchInput = document.getElementById('causeSearchInput');
+            if (searchInput) searchInput.value = '';
+            const clearBtn = document.getElementById('causeSearchClear');
+            if (clearBtn) clearBtn.style.display = 'none';
+            renderCauseList();
+            renderElements();
+        }
+
+        function togglePinCause(name) {
+            const list = getPinned(currentBusiness);
+            const idx = list.indexOf(name);
+            if (idx >= 0) {
+                list.splice(idx, 1);
+                showToast('已取消置顶「' + name + '」', 'success');
+            } else {
+                list.push(name);
+                showToast('已置顶「' + name + '」', 'success');
+            }
+            setPinned(currentBusiness, list);
+            renderCauseList();
+        }
+
+        function filterCauseTree() {
+            const input = document.getElementById('causeSearchInput');
+            const clearBtn = document.getElementById('causeSearchClear');
+            searchKeyword = (input.value || '').trim();
+            clearBtn.style.display = searchKeyword ? 'block' : 'none';
+            renderCauseList();
+        }
+
+        function clearCauseSearch() {
+            const input = document.getElementById('causeSearchInput');
+            input.value = '';
+            searchKeyword = '';
+            document.getElementById('causeSearchClear').style.display = 'none';
+            renderCauseList();
+            input.focus();
         }
 
         function selectCause(cause) {
@@ -467,11 +755,6 @@
             renderCauseList();
             renderMyElements();
             showToast('删除成功', 'success');
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         function showToast(msg, type) {

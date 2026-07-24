@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文书类型管理 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-logo { width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 12px; margin-bottom: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 16px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        /* 主内容区 */
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+        .header { height: var(--header-height); background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 50; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { color: var(--text-muted); font-size: 10px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-menu { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+        .user-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        .content { padding: 24px 32px; flex: 1; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .page-title-wrap h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .page-title-wrap p { font-size: 14px; color: var(--text-secondary); margin: 4px 0 0; }
+        .business-switch { display: flex; gap: 4px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; }
+        .business-switch-btn { padding: 6px 14px; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+        .business-switch-btn.active { background: var(--accent-primary); color: white; }
+
+        /* 表格容器 */
+        .tpl-right { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .tpl-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+        .tpl-toolbar .title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .tpl-toolbar .hint { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+
+        .tpl-table { width: 100%; border-collapse: collapse; }
+        .tpl-table thead th { background: var(--bg-primary); padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border-color); }
+        .tpl-table tbody td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .tpl-table tbody tr:last-child td { border-bottom: none; }
+        .tpl-table tbody tr:hover { background: var(--bg-primary); }
+        .tpl-name-cell { font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+        .tpl-name-cell i { color: var(--accent-primary); font-size: 14px; }
+        .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 6px; }
+        .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
+        .tpl-badge.custom { background: #d1fae5; color: #065f46; }
+        .count-cell { font-size: 13px; color: var(--text-secondary); }
+        .count-cell.zero { color: var(--text-muted); }
+        .count-cell.has { color: var(--accent-primary); font-weight: 500; }
+        .tpl-action-cell { white-space: nowrap; }
+        .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; margin-right: 4px; font-family: inherit; }
+        .action-btn:hover { background: #f3f4f6; }
+        .action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
+        .action-btn.edit:hover { background: var(--accent-light); }
+        .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
+        .action-btn.delete:hover { background: #fef2f2; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
+        .empty-state p { font-size: 14px; margin: 0; }
+
+        /* 弹窗 */
+        .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-mask.show { display: flex; }
+        .modal-box { background: var(--bg-secondary); border-radius: 10px; padding: 24px; width: 520px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--text-primary); }
+        .form-row { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-label .required { color: var(--accent-danger); }
+        .form-input { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; }
+        .form-input:focus { outline: none; border-color: var(--accent-primary); }
+        .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        /* 图标选择网格 */
+        .icon-picker { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); max-height: 180px; overflow-y: auto; }
+        .icon-option { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 4px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.15s; background: var(--bg-secondary); font-size: 11px; color: var(--text-secondary); }
+        .icon-option i { font-size: 16px; margin-bottom: 4px; color: var(--text-secondary); }
+        .icon-option:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .icon-option:hover i { color: var(--accent-primary); }
+        .icon-option.selected { border-color: var(--accent-primary); background: var(--accent-light); color: var(--accent-primary); }
+        .icon-option.selected i { color: var(--accent-primary); }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { background: #f3f4f6; color: #374151; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-confirm { background: var(--accent-primary); color: white; }
+        .btn-confirm:hover { background: #1d4ed8; }
+        .btn-confirm.danger { background: var(--accent-danger); }
+        .btn-confirm.danger:hover { background: #b91c1c; }
+
+        /* workflow 展开行 */
+        .expand-btn { width: 28px; height: 28px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+        .expand-btn:hover { background: var(--bg-primary); color: var(--accent-primary); }
+        .expand-btn.expanded i { transform: rotate(90deg); }
+        .wf-count-cell { font-size: 13px; color: var(--accent-primary); font-weight: 500; }
+        .wf-count-cell.zero { color: var(--text-muted); font-weight: 400; }
+        tr.wf-sub-row { background: #fafbfc; }
+        tr.wf-sub-row td { padding: 0; border-bottom: 1px solid var(--border-color); }
+        .wf-sub-wrap { padding: 16px 20px 20px; }
+        .wf-sub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .wf-sub-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .wf-sub-title .hint { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+        .wf-sub-table { width: 100%; border-collapse: collapse; background: var(--bg-secondary); border-radius: 6px; overflow: hidden; }
+        .wf-sub-table thead th { background: var(--bg-primary); padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+        .wf-sub-table tbody td { padding: 10px 12px; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6; }
+        .wf-sub-table tbody tr:last-child td { border-bottom: none; }
+        .wf-sub-table tbody tr:hover { background: var(--bg-primary); }
+        .wf-name-cell { font-weight: 500; color: var(--text-primary); }
+        .wf-badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 500; margin-left: 6px; }
+        .wf-badge.builtin { background: #dbeafe; color: #1e40af; }
+        .wf-badge.custom { background: #d1fae5; color: #065f46; }
+        .wf-badge.fallback { background: #fef3c7; color: #92400e; }
+        .case-word-tag { display: inline-block; padding: 2px 8px; background: var(--accent-light); color: var(--accent-primary); border-radius: 4px; font-size: 11px; margin-right: 4px; }
+        .case-word-fallback { font-size: 12px; color: var(--accent-warning); font-weight: 500; }
+
+        /* 步骤编辑器 */
+        .step-editor-row { display: grid; grid-template-columns: 140px 1fr 130px 90px; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #f3f4f6; align-items: center; }
+        .step-editor-row:last-child { border-bottom: none; }
+        .step-editor-row input, .step-editor-row select { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; font-family: inherit; background: var(--bg-secondary); }
+        .step-editor-row input:focus, .step-editor-row select:focus { outline: none; border-color: var(--accent-primary); }
+        .step-editor-actions { display: flex; gap: 4px; }
+        .step-action-btn { width: 26px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 11px; }
+        .step-action-btn:hover { background: var(--bg-primary); color: var(--accent-primary); }
+        .step-action-btn.delete { color: var(--accent-danger); }
+        .step-action-btn.delete:hover { background: #fef2f2; }
+        .step-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .step-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+        /* 案字选择 */
+        .case-word-option { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; cursor: pointer; background: var(--bg-secondary); color: var(--text-secondary); user-select: none; }
+        .case-word-option:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .case-word-option.selected { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); }
+        .case-word-option input { margin: 0; }
+        .notification { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; background: var(--bg-secondary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 2000; font-size: 14px; display: flex; align-items: center; gap: 8px; animation: slideIn 0.2s ease; max-width: 360px; }
+        .notification.success { border-left: 4px solid var(--accent-success); color: #065f46; }
+        .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
+        .notification.warning { border-left: 4px solid var(--accent-warning); color: #92400e; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-balance-scale"></i></div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-types.html" class="nav-item active"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
+                    <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>文书类型管理</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-avatar">管</div>
+                        <div>
+                            <div class="user-name">管理员</div>
+                            <div class="user-role">系统管理员</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1>文书类型管理</h1>
+                        <p>维护各业务系统的文书类型，作为模板与提示词的分类容器</p>
+                    </div>
+                    <div class="business-switch">
+                        <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
+                        <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
+                        <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
+                    </div>
+                </div>
+
+                <div class="tpl-right">
+                    <div class="tpl-toolbar">
+                        <span class="title" id="rightTitle">全部类型</span>
+                        <button class="btn btn-primary" onclick="openAddModal()">
+                            <i class="fas fa-plus"></i> 新增类型
+                        </button>
+                    </div>
+                    <table class="tpl-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;"></th>
+                                <th>类型名称</th>
+                                <th style="width:80px;">图标</th>
+                                <th style="width:90px;">模板数</th>
+                                <th style="width:90px;">提示词数</th>
+                                <th style="width:90px;">workflow</th>
+                                <th style="width:90px;">来源</th>
+                                <th style="width:140px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tplTbody"></tbody>
+                    </table>
+                    <div id="emptyState" class="empty-state" style="display:none;">
+                        <i class="fas fa-folder-tree"></i>
+                        <p>暂无文书类型，点击「新增类型」创建</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div class="modal-mask" id="tplModal">
+        <div class="modal-box">
+            <h3 id="modalTitle">新增类型</h3>
+            <div class="form-row">
+                <label class="form-label">类型名称 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="tplName" placeholder="如：司法建议书">
+                <div class="form-hint" id="nameHint">用于模板和提示词的分类，不可与现有类型重名</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">图标 <span class="required">*</span></label>
+                <div class="icon-picker" id="iconPicker"></div>
+                <div class="form-hint">从预设图标中选择一个，用于侧边栏与下拉显示</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-confirm" onclick="saveType()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-mask" id="confirmModal">
+        <div class="modal-box" style="width:400px;">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmText" style="font-size:14px; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;"></p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-confirm danger" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- workflow 编辑弹窗 -->
+    <div class="modal-mask" id="wfModal">
+        <div class="modal-box" style="width:680px;">
+            <h3 id="wfModalTitle">新增 workflow</h3>
+            <div class="form-row">
+                <label class="form-label">workflow 名称 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="wfName" placeholder="如：一审民事判决">
+                <div class="form-hint">仅管理后台可见，用户侧不显示此名称</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">匹配案字（不选 = 兜底 workflow）</label>
+                <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
+                <div class="form-hint">案字从案件案号自动识别；同一案字在多个 workflow 间不可重复</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">步骤序列 <span class="required">*</span></label>
+                <div id="wfStepsEditor" style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);"></div>
+                <button class="btn btn-cancel" style="margin-top:8px;" onclick="addWorkflowStep()">
+                    <i class="fas fa-plus"></i> 添加步骤
+                </button>
+                <div class="form-hint">步骤顺序即分步生成的执行顺序；步骤 id 在同一 workflow 内需唯一</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeWfModal()">取消</button>
+                <button class="btn btn-confirm" onclick="saveWorkflow()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script src="../../js/case-data.js"></script>
+    <script src="../../js/admin-doc-types.js?v=1"></script>
+</body>
+</html>

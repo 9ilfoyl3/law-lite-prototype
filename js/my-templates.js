@@ -32,7 +32,7 @@
     }
 
     function getDocTypes(org) {
-        return defaultDocTypesByOrg[org] || {};
+        return getAdminDocTypes(org) || {};
     }
 
     // 从 causeTreeDataByOrg 提取案由分组
@@ -53,6 +53,11 @@
             groups.push({ name: level1.name, items: items });
         });
         return groups;
+    }
+
+    // 返回当前业务系统的 3 级案由树（level-1 → level-2 → 叶子）
+    function getCauseTree() {
+        return causeTreeDataByOrg[currentOrg] || causeTreeDataByOrg.court || [];
     }
 
     function genKey() {
@@ -109,6 +114,50 @@
         renderList();
     };
 
+    // 渲染单个模板卡片（非编辑态）
+    function renderCard(key, t, docTypes) {
+        const docTypeName = (docTypes[t.docType] || {}).name || '-';
+        const causes = Array.isArray(t.causes) ? t.causes : [];
+        const causesCell = causes.length
+            ? '<div class="item-causes">' + causes.map(c => '<span class="cause-chip">' + escapeHtml(c) + '</span>').join('') + '</div>'
+            : '<div class="item-causes"><span class="cause-chip universal">通用</span></div>';
+        const isEnabled = t.enabled !== false; // 缺省视为 true
+        const statusBadge = isEnabled
+            ? '<span class="item-badge status-on">已启用</span>'
+            : '<span class="item-badge status-off">已停用</span>';
+        const toggleBtn = isEnabled
+            ? '<button class="action-btn toggle-off" onclick="toggleEnabled(\'' + key + '\')">停用</button>'
+            : '<button class="action-btn toggle-on" onclick="toggleEnabled(\'' + key + '\')">启用</button>';
+        return '<div class="item-card">'
+            + '<div class="item-row">'
+            + '<div>'
+            + '<span class="item-name">' + escapeHtml(t.name || key) + '</span>'
+            + '<span class="item-badge">我的</span>'
+            + statusBadge
+            + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
+            + causesCell
+            + '</div>'
+            + '<div class="item-actions">'
+            + '<button class="action-btn edit" onclick="editItem(\'' + key + '\')">编辑</button>'
+            + toggleBtn
+            + '<button class="action-btn delete" onclick="deleteItem(\'' + key + '\')">删除</button>'
+            + '</div>'
+            + '</div>'
+            + '</div>';
+    }
+
+    // 切换启用/停用状态
+    window.toggleEnabled = function(key) {
+        const orgData = getOrgData(currentOrg);
+        const t = orgData[key];
+        if (!t) return;
+        const isEnabled = t.enabled !== false;
+        t.enabled = !isEnabled;
+        setOrgData(currentOrg, orgData);
+        renderList();
+        showToast(isEnabled ? '已停用' : '已启用', 'success');
+    };
+
     // ===== 渲染右侧列表 =====
     function renderList() {
         const docTypes = getDocTypes(currentOrg);
@@ -124,6 +173,15 @@
 
         const listEl = document.getElementById('itemList');
         const empty = document.getElementById('emptyState');
+
+        // 新增模式下，即使列表为空也要在顶部渲染编辑表单
+        if (editingKey === '__new__') {
+            empty.style.display = 'none';
+            const existingHtml = list.map(([key, t]) => renderCard(key, t, docTypes)).join('');
+            listEl.innerHTML = renderEditForm('__new__', null) + existingHtml;
+            return;
+        }
+
         if (list.length === 0) {
             listEl.innerHTML = '';
             empty.style.display = 'block';
@@ -132,29 +190,11 @@
         empty.style.display = 'none';
 
         listEl.innerHTML = list.map(([key, t]) => {
-            const docTypeName = (docTypes[t.docType] || {}).name || '-';
-            const causes = Array.isArray(t.causes) ? t.causes : [];
-            const causesCell = causes.length
-                ? '<div class="item-causes">' + causes.map(c => '<span class="cause-chip">' + escapeHtml(c) + '</span>').join('') + '</div>'
-                : '<div class="item-causes"><span class="cause-chip universal">通用</span></div>';
             // 如果是编辑中的项，渲染表单
             if (editingKey === key) {
                 return renderEditForm(key, t);
             }
-            return '<div class="item-card">'
-                + '<div class="item-row">'
-                + '<div>'
-                + '<span class="item-name">' + escapeHtml(t.name || key) + '</span>'
-                + '<span class="item-badge">我的</span>'
-                + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
-                + causesCell
-                + '</div>'
-                + '<div class="item-actions">'
-                + '<button class="action-btn edit" onclick="editItem(\'' + key + '\')">编辑</button>'
-                + '<button class="action-btn delete" onclick="deleteItem(\'' + key + '\')">删除</button>'
-                + '</div>'
-                + '</div>'
-                + '</div>';
+            return renderCard(key, t, docTypes);
         }).join('');
     }
 
@@ -220,24 +260,74 @@
     }
 
     function renderCausePicker(selectedCauses) {
-        const groups = getCauseGroups(currentOrg);
+        const tree = getCauseTree();
         const selectedSet = new Set(selectedCauses || []);
-        if (groups.length === 0) {
+        if (!tree || tree.length === 0) {
             return '<div style="font-size:11px;color:var(--text-muted);">该业务系统暂无案由数据</div>';
         }
-        return groups.map(g => {
-            const opts = g.items.map(name => {
-                const checked = selectedSet.has(name);
-                return '<label class="cause-picker-option' + (checked ? ' checked' : '') + '">'
-                    + '<input type="checkbox" value="' + escapeHtml(name) + '"' + (checked ? ' checked' : '') + ' onchange="toggleCauseChip(this)">'
-                    + '<span>' + escapeHtml(name) + '</span></label>';
-            }).join('');
-            return '<div class="cause-picker-group"><div class="cause-picker-group-title">' + escapeHtml(g.name) + '</div>' + opts + '</div>';
-        }).join('');
+        return tree.map(l1 => renderCauseNode(l1, selectedSet, 1)).join('');
     }
+
+    function renderCauseNode(node, selectedSet, level) {
+        // 叶子节点（字符串）
+        if (typeof node === 'string') {
+            const checked = selectedSet.has(node);
+            return '<label class="cause-tree-leaf' + (checked ? ' checked' : '') + '">'
+                + '<input type="checkbox" value="' + escapeHtml(node) + '"' + (checked ? ' checked' : '') + ' onchange="toggleCauseChip(this)">'
+                + '<span>' + escapeHtml(node) + '</span></label>';
+        }
+        const children = node.children || [];
+        const hasChildren = children.length > 0;
+        const nodeId = 'ct-' + level + '-' + Math.random().toString(36).slice(2, 9);
+        const leafNames = collectCauseLeaves(node);
+        const selectedCount = leafNames.filter(n => selectedSet.has(n)).length;
+        const badge = hasChildren ? '<span class="cause-tree-count">' + selectedCount + '/' + leafNames.length + '</span>' : '';
+        const childHtml = hasChildren
+            ? '<div class="cause-tree-children" id="' + nodeId + '">'
+                + children.map(c => renderCauseNode(c, selectedSet, level + 1)).join('')
+                + '</div>'
+            : '';
+        return '<div class="cause-tree-node level-' + level + '">'
+            + '<div class="cause-tree-title" onclick="toggleCauseTree(\'' + nodeId + '\', this)">'
+            + (hasChildren ? '<span class="cause-tree-arrow">▼</span>' : '<span class="cause-tree-arrow-placeholder"></span>')
+            + '<span class="cause-tree-name">' + escapeHtml(node.name) + '</span>'
+            + badge
+            + '</div>'
+            + childHtml
+            + '</div>';
+    }
+
+    function collectCauseLeaves(node) {
+        if (typeof node === 'string') return [node];
+        if (!node.children) return [];
+        return node.children.reduce((acc, c) => acc.concat(collectCauseLeaves(c)), []);
+    }
+
+    window.toggleCauseTree = function(nodeId, titleEl) {
+        const el = document.getElementById(nodeId);
+        if (!el) return;
+        const collapsed = el.style.display === 'none';
+        el.style.display = collapsed ? '' : 'none';
+        const arrow = titleEl.querySelector('.cause-tree-arrow');
+        if (arrow) arrow.textContent = collapsed ? '▼' : '▶';
+    };
 
     window.toggleCauseChip = function(cb) {
         cb.parentElement.classList.toggle('checked', cb.checked);
+        // 向上更新各祖先节点的计数徽章
+        let container = cb.closest('.cause-tree-children');
+        while (container) {
+            const node = container.closest('.cause-tree-node');
+            if (!node) break;
+            const title = node.querySelector(':scope > .cause-tree-title');
+            const countEl = title && title.querySelector('.cause-tree-count');
+            if (countEl) {
+                const all = container.querySelectorAll('input[type="checkbox"]');
+                const checked = container.querySelectorAll('input[type="checkbox"]:checked');
+                countEl.textContent = checked.length + '/' + all.length;
+            }
+            container = node.parentElement ? node.parentElement.closest('.cause-tree-children') : null;
+        }
     };
 
     function getSelectedCauses() {
@@ -268,11 +358,14 @@
             key = genKey();
             while (orgData[key]) key = genKey();
         }
+        // 编辑时保留原 enabled 字段；新增时默认启用
+        const prevEnabled = existingKey && orgData[key] ? (orgData[key].enabled !== false) : true;
         orgData[key] = {
             name: name,
             docType: docType,
             causes: causes,
-            content: content
+            content: content,
+            enabled: prevEnabled
         };
         setOrgData(currentOrg, orgData);
 

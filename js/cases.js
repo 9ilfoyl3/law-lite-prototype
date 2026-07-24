@@ -36,10 +36,20 @@ function renderReqTemplates(containerId, docTypeKey, textareaId) {
         return;
     }
     container.style.display = 'flex';
-    container.innerHTML = templates.map(t => {
+    // v1.24: 先标准后我的，两类同时存在时中间插分隔线
+    const std = templates.filter(t => t.source !== 'mine');
+    const mine = templates.filter(t => t.source === 'mine');
+    const renderTag = t => {
         const cls = t.source === 'mine' ? 'req-template-tag mine' : 'req-template-tag';
         return `<button type="button" class="${cls}" onclick="applyReqTemplate('${textareaId}', this)" data-text="${(t.text || '').replace(/"/g, '&quot;')}">${t.name}</button>`;
-    }).join('');
+    };
+    let html = '';
+    if (std.length) html += std.map(renderTag).join('');
+    if (mine.length) {
+        if (std.length) html += '<span class="req-template-divider"></span>';
+        html += mine.map(renderTag).join('');
+    }
+    container.innerHTML = html;
 }
 
 function applyReqTemplate(textareaId, btn) {
@@ -249,10 +259,10 @@ function renderCaseList(cases = getCurrentCases()) {
             </div>
             <div class="case-name" onclick="openCaseFiles('${c.id}')" title="点击查看案件文件">${c.caseName || c.caseNumber}</div>
             <div class="case-col" style="text-align:center;">${c.updatedAt || c.date || '-'}</div>
-            <div class="case-col case-files-col ${hasOcrError(c) ? 'ocr-error' : ''}" onclick="openOcrPanel('${c.id}')" title="${hasOcrError(c) ? `存在${getOcrErrorCount(c)}个材料OCR识别异常，点击查看` : '点击查看OCR识别状态'}">
+            <div class="case-col case-files-col ${hasOcrError(c) ? 'ocr-error' : ''}" onclick="openOcrPanel('${c.id}')" title="${hasOcrError(c) ? `存在${getOcrErrorCount(c)}个材料解析异常，点击查看` : '点击查看文件解析状态'}">
                 <span class="case-file-count">
                     <i class="fas fa-file"></i> ${hasOcrError(c) ? `${(c.fileCount || 0) - getOcrErrorCount(c)}/${c.fileCount || 0}` : (c.fileCount || 0)}
-                    ${hasOcrError(c) ? `<span class="ocr-error-badge">识别异常</span>` : ''}
+                    ${hasOcrError(c) ? `<span class="ocr-error-badge">解析异常</span>` : ''}
                 </span>
             </div>
             ${extraCols}
@@ -746,7 +756,7 @@ function buildGenElementHintHtml(caseItem) {
     try {
         if (!caseItem) return '';
         if (typeof getAllElementPresets !== 'function') return '';
-        const allPresets = getAllElementPresets(caseItem.cause);
+        const allPresets = getAllElementPresets(caseItem.cause, localStorage.getItem('currentBusiness') || 'court');
         const standardCount = (allPresets.standard || []).length;
         const mineCount = (allPresets.mine || []).length;
         const totalCount = standardCount + mineCount;
@@ -771,17 +781,23 @@ function buildGenConfigHtml() {
     const docTypeOptions = Object.entries(docTypes)
         .map(([k, v]) => `<option value="${k}" ${k === quickState.docType ? 'selected' : ''}>${v.name}</option>`)
         .join('');
-    const templateOptions = Object.entries(templates)
-        .map(([k, v]) => {
-            const name = getTemplateName(v);
-            // v1.20: 用户侧自定义模板（source='mine'）名称后追加「（我的）」标识
-            const label = (v && v.source === 'mine') ? `${name}（我的）` : name;
-            return `<option value="${k}" ${k === quickState.template ? 'selected' : ''}>${label}</option>`;
-        })
-        .join('');
-    const templateSelectHtml = templateOptions
-        ? `${templateOptions}<option disabled>──────────</option><option value="custom">自定义模板</option>`
-        : `<option value="">暂无可用模板</option><option value="custom">自定义模板</option>`;
+    // v1.24: 模板按来源分组（标准 / 我的）
+    const stdOpts = [], myOpts = [];
+    Object.entries(templates).forEach(([k, v]) => {
+        const name = getTemplateName(v);
+        const opt = `<option value="${k}" ${k === quickState.template ? 'selected' : ''}>${name}</option>`;
+        if (v && v.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
+    });
+    let templateSelectHtml;
+    if (stdOpts.length && myOpts.length) {
+        templateSelectHtml = `<optgroup label="标准模板">${stdOpts.join('')}</optgroup><optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+    } else if (stdOpts.length) {
+        templateSelectHtml = stdOpts.join('');
+    } else if (myOpts.length) {
+        templateSelectHtml = `<optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+    } else {
+        templateSelectHtml = `<option value="">暂无可用模板</option>`;
+    }
 
     return `
         <div class="gen-form-group">
@@ -905,7 +921,7 @@ function openDocumentPreviewWindow(doc, caseId, versionType) {
     const caseInfo = caseId ? findCaseById(caseId)?.caseItem : null;
     const caseNo = caseInfo ? caseInfo.caseNumber : '';
     const causeName = caseInfo ? caseInfo.cause : '';
-    previewWin.document.write('<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>' + doc.title + ' - 文书预览</title>\n    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">\n    <style>\n        body { font-family: "Noto Serif SC", "SimSun", serif; margin: 0; padding: 40px; background: #f5f5f5; }\n        .preview-container { max-width: 800px; margin: 0 auto; background: white; padding: 50px 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }\n        .preview-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #333; }\n        .preview-title { font-size: 22px; font-weight: 700; margin: 0 0 10px; color: #1a1a1a; }\n        .preview-meta { font-size: 14px; color: #666; }\n        .preview-content { font-size: 16px; line-height: 1.8; color: #333; }\n        .preview-content p { margin: 1em 0; text-indent: 2em; }\n        .preview-content h2 { font-size: 18px; font-weight: 600; margin: 2em 0 1em; color: #1a1a1a; }\n        .preview-content h3 { font-size: 16px; font-weight: 600; margin: 1.5em 0 0.8em; color: #1a1a1a; }\n        .preview-content strong { font-weight: 600; }\n        .preview-content .align-center { text-align: center; }\n        .preview-footer { margin-top: 60px; text-align: right; font-size: 14px; color: #666; }\n        @media print {\n            body { background: white; padding: 0; }\n            .preview-container { box-shadow: none; padding: 20px; }\n        }\n    </style>\n</head>\n<body>\n    <div class="preview-container">\n        <div class="preview-header">\n            <div class="preview-title">' + doc.title + '</div>\n            <div class="preview-meta">' + caseNo + ' · ' + causeName + '</div>\n        </div>\n        <div class="preview-content">' + content + '</div>\n        <div class="preview-footer">文书生成时间：' + new Date().toLocaleString() + '</div>\n    </div>\n</body>\n</html>');
+    previewWin.document.write('<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>' + doc.title + ' - 文书预览</title>\n    <style>\n        body { font-family: "Noto Serif SC", "SimSun", serif; margin: 0; padding: 40px; background: #f5f5f5; }\n        .preview-container { max-width: 800px; margin: 0 auto; background: white; padding: 50px 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }\n        .preview-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #333; }\n        .preview-title { font-size: 22px; font-weight: 700; margin: 0 0 10px; color: #1a1a1a; }\n        .preview-meta { font-size: 14px; color: #666; }\n        .preview-content { font-size: 16px; line-height: 1.8; color: #333; }\n        .preview-content p { margin: 1em 0; text-indent: 2em; }\n        .preview-content h2 { font-size: 18px; font-weight: 600; margin: 2em 0 1em; color: #1a1a1a; }\n        .preview-content h3 { font-size: 16px; font-weight: 600; margin: 1.5em 0 0.8em; color: #1a1a1a; }\n        .preview-content strong { font-weight: 600; }\n        .preview-content .align-center { text-align: center; }\n        .preview-footer { margin-top: 60px; text-align: right; font-size: 14px; color: #666; }\n        @media print {\n            body { background: white; padding: 0; }\n            .preview-container { box-shadow: none; padding: 20px; }\n        }\n    </style>\n</head>\n<body>\n    <div class="preview-container">\n        <div class="preview-header">\n            <div class="preview-title">' + doc.title + '</div>\n            <div class="preview-meta">' + caseNo + ' · ' + causeName + '</div>\n        </div>\n        <div class="preview-content">' + content + '</div>\n        <div class="preview-footer">文书生成时间：' + new Date().toLocaleString() + '</div>\n    </div>\n</body>\n</html>');
     previewWin.document.close();
 }
 
@@ -962,19 +978,26 @@ function renderBatchConfig() {
     const docTypeOptions = Object.entries(docTypes)
         .map(([k, v]) => '<option value="' + k + '" ' + (k === batchState.docType ? 'selected' : '') + '>' + v.name + '</option>')
         .join('');
-    const templateOptions = Object.entries(templates)
-        .map(([k, v]) => {
-            const name = getTemplateName(v);
-            const label = (v && v.source === 'mine') ? name + '（我的）' : name;
-            return '<option value="' + k + '" ' + (k === batchState.template ? 'selected' : '') + '>' + label + '</option>';
-        })
-        .join('');
-    const batchTemplateSelectHtml = templateOptions
-        ? `${templateOptions}<option disabled>──────────</option><option value="custom">自定义模板</option>`
-        : `<option value="">暂无可用模板</option><option value="custom">自定义模板</option>`;
+    // v1.24: 模板按来源分组（标准 / 我的）
+    const stdOpts = [], myOpts = [];
+    Object.entries(templates).forEach(([k, v]) => {
+        const name = getTemplateName(v);
+        const opt = '<option value="' + k + '" ' + (k === batchState.template ? 'selected' : '') + '>' + name + '</option>';
+        if (v && v.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
+    });
+    let batchTemplateSelectHtml;
+    if (stdOpts.length && myOpts.length) {
+        batchTemplateSelectHtml = '<optgroup label="标准模板">' + stdOpts.join('') + '</optgroup><optgroup label="我的模板">' + myOpts.join('') + '</optgroup>';
+    } else if (stdOpts.length) {
+        batchTemplateSelectHtml = stdOpts.join('');
+    } else if (myOpts.length) {
+        batchTemplateSelectHtml = '<optgroup label="我的模板">' + myOpts.join('') + '</optgroup>';
+    } else {
+        batchTemplateSelectHtml = '<option value="">暂无可用模板</option>';
+    }
     const labels = current.partiesLabels;
 
-    // OCR 预检：扫描选中案件的 OCR 异常
+    // 解析预检：扫描选中案件的 解析异常
     const ocrWarningCases = selectedCases.filter(c => c.files && c.files.some(f => f.ocrStatus === 'error'));
     const hasOcrWarning = ocrWarningCases.length > 0;
     const ocrWarningHtml = hasOcrWarning ? `
@@ -982,7 +1005,7 @@ function renderBatchConfig() {
             <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
                 <i class="fas fa-exclamation-triangle" style="color:#d97706;margin-top:2px;"></i>
                 <div style="flex:1;">
-                    <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:4px;">${ocrWarningCases.length} 个案件存在 OCR 识别失败的材料</div>
+                    <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:4px;">${ocrWarningCases.length} 个案件存在 解析失败的材料</div>
                     <div style="font-size:12px;color:#a16207;line-height:1.5;">${ocrWarningCases.map(c => c.caseName || c.caseNumber).join('、')}</div>
                 </div>
             </div>
@@ -1006,7 +1029,7 @@ function renderBatchConfig() {
                     return `
                     <div class="batch-selected-item" data-case-id="${c.id}">
                         <div class="info">
-                            <div class="case-no">${c.caseName || c.caseNumber}${hasOcrError ? ' <span style="display:inline-block;padding:1px 6px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:500;margin-left:6px;">OCR异常</span>' : ''}</div>
+                            <div class="case-no">${c.caseName || c.caseNumber}${hasOcrError ? ' <span style="display:inline-block;padding:1px 6px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:500;margin-left:6px;">解析异常</span>' : ''}</div>
                             <div class="case-meta">${c.caseNumber} · ${c.cause}</div>
                         </div>
                         <button class="batch-remove-btn" onclick="removeBatchCase('${c.id}')" title="移除">
@@ -1162,7 +1185,7 @@ function getBatchFailReason(caseItem) {
     const hasOcrError = caseItem.files.some(f => f.ocrStatus === 'error');
     if (hasOcrError) {
         if (batchState.ocrStrategy === 'skip') {
-            return '跳过：存在 OCR 识别失败的材料';
+            return '跳过：存在解析失败的材料';
         }
         // partial 模式：不阻断，仅用已识别材料生成
     }
@@ -1708,7 +1731,7 @@ function openCaseFiles(caseId) {
     }
 }
 
-// ===== OCR / 文书 / 同步弹窗占位函数（避免未实现功能报运行时错误） =====
+// ===== 解析 / 文书 / 同步弹窗占位函数（避免未实现功能报运行时错误） =====
 let ocrPanelCaseId = '';
 let ocrCurrentTab = 'done';
 
@@ -1742,11 +1765,11 @@ function renderOcrList(tab) {
     const displayFiles = tab === 'done' ? doneFiles : pendingFiles;
 
     if (displayFiles.length === 0) {
-        listEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;"><div class="empty-title">${tab === 'done' ? '暂无已完成 OCR 的文件' : '暂无未完成 OCR 的文件'}</div></div>`;
+        listEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;"><div class="empty-title">${tab === 'done' ? '暂无已完成解析的文件' : '暂无未完成解析的文件'}</div></div>`;
     } else {
         listEl.innerHTML = displayFiles.map(f => {
             const statusClass = f.ocrStatus === 'done' ? 'done' : (f.ocrStatus === 'error' ? 'error' : 'pending');
-            const statusText = f.ocrStatus === 'done' ? '识别完成' : (f.ocrStatus === 'error' ? '识别失败' : '识别中');
+            const statusText = f.ocrStatus === 'done' ? '解析完成' : (f.ocrStatus === 'error' ? '解析失败' : '解析中');
             const statusIcon = f.ocrStatus === 'done' ? 'fa-check-circle' : (f.ocrStatus === 'error' ? 'fa-exclamation-circle' : 'fa-clock');
             return `
                 <div class="ocr-item">
@@ -1756,7 +1779,7 @@ function renderOcrList(tab) {
                     </div>
                     <div class="ocr-actions">
                         <span class="ocr-status ${statusClass}"><i class="fas ${statusIcon}"></i> ${statusText}</span>
-                        ${f.ocrStatus !== 'done' ? `<button class="btn btn-secondary" onclick="retryOcr('${f.id}')">重新识别</button>` : ''}
+                        ${f.ocrStatus !== 'done' ? `<button class="btn btn-secondary" onclick="retryOcr('${f.id}')">重新解析</button>` : ''}
                     </div>
                 </div>
             `;
@@ -1815,7 +1838,7 @@ function retryAllOcr() {
     });
     renderOcrList('pending');
     renderCaseList();
-    showNotification('已重新提交 OCR 识别任务', 'success');
+    showNotification('已重新提交解析任务', 'success');
 }
 
 function retryOcr(fileId) {
@@ -1826,7 +1849,7 @@ function retryOcr(fileId) {
         f.ocrStatus = 'pending';
         renderOcrList('pending');
         renderCaseList();
-        showNotification('已重新提交该文件 OCR 识别任务', 'success');
+        showNotification('已重新提交该文件解析任务', 'success');
     }
 }
 
@@ -2367,6 +2390,10 @@ function openMyTemplates() {
 function openMyPrompts() {
     const orgParam = encodeURIComponent(localStorage.getItem('currentBusiness') || 'court');
     window.open('my-prompts.html?org=' + orgParam, '_blank');
+}
+// 打开「我的要件」页面（无当前案由上下文，由用户在页面左侧案由列表自行选择）
+function openMyElements() {
+    window.open('my-elements.html', '_blank');
 }
 
 function openAllDocsPanel() {
