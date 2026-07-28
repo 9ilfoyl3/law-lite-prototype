@@ -25,8 +25,7 @@
 | 登录页 | [pages/login.html](pages/login.html) | 系统入口，支持普通用户/管理员身份切换登录 |
 | AI聊天（核心工作区） | [pages/chat.html](pages/chat.html) | 自然语言交互入口，支持七大智能体任务发起与处理 |
 | 历史任务 | [pages/tasks.html](pages/tasks.html) | 按任务类型展示历史任务记录，与普通AI聊天会话分离 |
-| 案件管理 | [pages/cases.html](pages/cases.html) | 案件列表、状态追踪、关联操作 |
-| 文书管理 | [pages/documents.html](pages/documents.html) | 文书模板与已生成文书的管理 |
+| 案件管理 | [pages/cases.html](pages/cases.html) | 案件列表、状态追踪、关联操作（含文书生成与文书详情，不再单设文书管理页） |
 | 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理 |
 | 个人设置 | [pages/settings.html](pages/settings.html) | 账户信息、全员公开库管理（管理员权限） |
 

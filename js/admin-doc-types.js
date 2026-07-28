@@ -207,7 +207,7 @@
 
         let rowsHtml = '';
         if (workflows.length === 0) {
-            rowsHtml = '<tr><td colspan="6" class="step-empty">暂无 workflow，点击「新增 workflow」创建</td></tr>';
+            rowsHtml = '<tr><td colspan="7" class="step-empty">暂无 workflow，点击「新增 workflow」创建</td></tr>';
         } else {
             rowsHtml = workflows.map(wf => {
                 const wfType = wf.type || 'step';
@@ -218,6 +218,11 @@
                 const typeBadge = wfType === 'material'
                     ? '<span class="wf-type-badge material">一步生成型</span>'
                     : '<span class="wf-type-badge step">分步生成型</span>';
+                // v1.35: 使用模型列（新增）
+                const modelObj = (typeof getModelById === 'function') ? getModelById(wf.modelId) : null;
+                const modelHtml = modelObj
+                    ? '<span class="wf-model-tag">' + escapeHtml(modelObj.name) + '</span>'
+                    : '<span class="case-word-fallback">未设置</span>';
                 const caseWordsHtml = (!wf.caseWords || wf.caseWords.length === 0)
                     ? '<span class="case-word-fallback">兜底</span>'
                     : wf.caseWords.map(w => '<span class="case-word-tag">' + escapeHtml(w) + '</span>').join('');
@@ -238,6 +243,7 @@
                 return '<tr>'
                     + '<td class="wf-name-cell">' + escapeHtml(wf.name) + wfBadge + '</td>'
                     + '<td>' + typeBadge + '</td>'
+                    + '<td>' + modelHtml + '</td>'
                     + '<td>' + caseWordsHtml + '</td>'
                     + '<td>' + causesHtml + '</td>'
                     + '<td>' + wfBadge + '</td>'
@@ -254,7 +260,7 @@
             + '  <button class="btn btn-primary" onclick="openAddWfModal(\'' + docTypeKey + '\')"><i class="fas fa-plus"></i> 新增 workflow</button>'
             + '</div>'
             + '<table class="wf-sub-table"><thead><tr>'
-            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th>匹配案字</th><th>匹配案由</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
+            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th style="width:100px;">使用模型</th><th>匹配案字</th><th>匹配案由</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
             + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
             + '</div></td></tr>';
     }
@@ -353,6 +359,8 @@
         const materialRadio = document.getElementById('wfTypeMaterial');
         if (stepRadio) stepRadio.checked = true;
         if (materialRadio) materialRadio.checked = false;
+        // v1.35: 重置使用模型下拉（默认千问3.6）
+        renderWfModelSelect(DEFAULT_MODEL_ID);
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderCausesPicker(docTypeKey, wfSelectedCauses);
         document.getElementById('wfModal').classList.add('show');
@@ -379,6 +387,8 @@
         const materialRadio = document.getElementById('wfTypeMaterial');
         if (stepRadio) stepRadio.checked = (wfEditingType === 'step');
         if (materialRadio) materialRadio.checked = (wfEditingType === 'material');
+        // v1.35: 回填使用模型
+        renderWfModelSelect(wf.modelId || DEFAULT_MODEL_ID);
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderCausesPicker(docTypeKey, wfSelectedCauses);
         document.getElementById('wfModal').classList.add('show');
@@ -406,6 +416,18 @@
         renderCaseWordsPicker(wfEditingDocType, wfSelectedCaseWords);
         renderCausesPicker(wfEditingDocType, wfSelectedCauses);
     };
+
+    // v1.35: 渲染 workflow 使用模型下拉框（仅展示 deployed=true 的已部署模型）
+    function renderWfModelSelect(selectedModelId) {
+        const select = document.getElementById('wfModel');
+        if (!select) return;
+        const models = (typeof getDeployedModels === 'function') ? getDeployedModels() : [];
+        select.innerHTML = models.map(m =>
+            '<option value="' + m.id + '"' + (m.id === selectedModelId ? ' selected' : '') + '>'
+            + escapeHtml(m.name) + '（' + (m.limit >= 1000 ? (m.limit / 1000) + 'K' : m.limit) + '）'
+            + '</option>'
+        ).join('');
+    }
 
     function renderCaseWordsPicker(docTypeKey, selected) {
         const picker = document.getElementById('wfCaseWordsPicker');
@@ -584,12 +606,16 @@
         const arr = orgData[wfEditingDocType];
 
         // v1.32: 新 workflow 对象（不再写 steps 字段）
+        // v1.35: 新增 modelId 字段（使用模型）
+        const wfModelSelect = document.getElementById('wfModel');
+        const finalModelId = wfModelSelect ? wfModelSelect.value : DEFAULT_MODEL_ID;
         const newWf = {
             id: finalWfId,
             name: name,
             type: wfEditingType,
             caseWords: newCaseWords,
             causes: newCauses,             // v1.32: 匹配案由
+            modelId: finalModelId,         // v1.35: 使用模型（agentflow 平台 workflow 内部大模型节点的镜像映射）
             isBuiltin: false
         };
         if (wfEditingId) {

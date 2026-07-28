@@ -1,4 +1,5 @@
 // ============ Cases Page JavaScript ============
+// v1.24 模型改为只读：quick gen 弹框与批量生成均按 workflow 的 modelId 推导模型（agentflow 平台镜像），新增 resolveWorkflowModelForCase 工具方法；onGenModelChange 置为 no-op；startQuickGen 不再向 URL 传 model 参数
 // v1.23 色系统一：批量栏/批量生成全屏面板/队列当前项改为蓝色系，仅保留行内「生成文书」按钮橙色单点强调（cases.html 内联样式与 CSS 改动，本文件无逻辑变更）
 // v1.22 列配置面板改为锚定按钮下方的下拉面板（去 fixed）；案件名称追加常驻外链图标 + hover 下划线，增强可点击性
 // v1.21 新增「我的模板」「我的提示词」入口（openMyTemplates/openMyPrompts），从 case-files.html 迁移至案件列表页头部
@@ -666,12 +667,25 @@ function doExecuteCaseDelete() {
 }
 
 // ===== 生成文书弹框 =====
+// v1.24: 模型由 workflow 的 modelId 决定（agentflow 平台镜像），用户侧不可修改
+// 按案件 + 文书类型 + 案字 + 案由 匹配 workflow 后取其 modelId
+function resolveWorkflowModelForCase(caseItem, docTypeKey) {
+    if (!caseItem || !docTypeKey) return DEFAULT_MODEL_ID;
+    if (typeof getWorkflowModelId !== 'function') return DEFAULT_MODEL_ID;
+    const _org = localStorage.getItem('currentBusiness') || 'court';
+    const _cw = parseCaseWord(caseItem.caseNumber, _org);
+    const _cause = caseItem.cause || '';
+    // 列表页快速生成固定走一步生成型 workflow（material）
+    return getWorkflowModelId(_org, docTypeKey, _cw, _cause, 'material');
+}
+
 function openGenModal(caseId) {
     const c = getCurrentCases().find(x => x.id === caseId);
     if (!c) return;
     const firstDocType = getFirstDocType();
     quickState.caseId = caseId;
-    quickState.model = getCurrentModelId();
+    // v1.24: 模型由 workflow 决定，按案件 + 文书类型 匹配
+    quickState.model = resolveWorkflowModelForCase(c, firstDocType);
     quickState.docType = firstDocType;
     quickState.template = getFirstTemplate(firstDocType);
     quickState.requirement = '';
@@ -692,12 +706,15 @@ function onGenDocTypeChange(docType) {
     quickState.docType = docType;
     quickState.template = getFirstTemplate(docType);
     quickState.requirement = '';
+    // v1.24: 文书类型变化后重新计算 workflow 模型
+    const c = getCurrentCases().find(x => x.id === quickState.caseId);
+    if (c) quickState.model = resolveWorkflowModelForCase(c, docType);
     renderGenModalBody();
 }
 
+// v1.24: onGenModelChange 已废弃，模型改为只读，保留为 no-op 防止报错
 function onGenModelChange(modelId) {
-    quickState.model = modelId;
-    renderGenModalBody();
+    // no-op: 模型由 workflow 决定，用户不可修改
 }
 
 function getAllMaterialsTokens(caseItem) {
@@ -721,7 +738,8 @@ function updateGenContextHint() {
 function renderGenModalBody() {
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     const body = document.getElementById('genModalBody');
-    const modelOptions = AI_MODELS.map(m => `<option value="${m.id}" ${m.id === quickState.model ? 'selected' : ''}>${m.name}（${formatNumber(m.limit)}）</option>`).join('');
+    // v1.24: 模型下拉改为只读，仅展示当前 workflow 匹配的模型
+    const currentModel = AI_MODELS.find(m => m.id === quickState.model) || AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID);
 
     const totalTokens = c ? getAllMaterialsTokens(c) : 0;
     const safeLimit = getSafeContextLimit(quickState.model);
@@ -738,10 +756,11 @@ function renderGenModalBody() {
 
     body.innerHTML = `
         <div class="gen-form-group">
-            <label class="gen-form-label">当前模型 <i class="fas fa-info-circle model-info-icon" title="该配置功能为管理后台功能，用户不可见，方便演示展示"></i></label>
-            <select class="gen-form-select" id="genModelSelect" onchange="onGenModelChange(this.value)">
-                ${modelOptions}
+            <label class="gen-form-label">当前模型 <i class="fas fa-info-circle model-info-icon" title="模型由 workflow 配置决定（agentflow 平台镜像），用户不可修改"></i></label>
+            <select class="gen-form-select" id="genModelSelect" disabled>
+                <option value="${currentModel.id}" selected>${currentModel.name}（${formatNumber(currentModel.limit)}）</option>
             </select>
+            <div class="gen-form-hint" style="font-size:12px;color:var(--text-muted, #9ca3af);margin-top:4px;">由当前文书类型对应的 workflow 决定，不可手动切换</div>
         </div>
 
         <div class="gen-context-hint ok" id="genContextHint"></div>
@@ -861,9 +880,9 @@ function startQuickGen() {
 
     // 未超限时跳转案件详情页，默认使用全部材料并自动触发生成，与详情页配置生成文书的体验统一
     closeGenModal();
+    // v1.24: 不再传 model 参数，详情页会按 workflow 自动匹配模型
     const params = new URLSearchParams({
         caseId: quickState.caseId,
-        model: quickState.model,
         docType: quickState.docType,
         template: quickState.template,
         requirement: quickState.requirement || '',
@@ -1208,9 +1227,7 @@ function getBatchFailReason(caseItem) {
 }
 
 async function runBatch() {
-    const modelId = getCurrentModelId();
-    const safeLimit = getSafeContextLimit(modelId);
-
+    // v1.24: 批量生成每个案件按其自身 caseWord+cause 匹配 workflow 模型（可能不同）
     for (let i = 0; i < batchState.results.length; i++) {
         const r = batchState.results[i];
         // 跳过已完成的项（重试失败案件时不重复生成已成功的）
@@ -1232,6 +1249,9 @@ async function runBatch() {
             continue;
         }
 
+        // v1.24: 按案件 + 文书类型匹配 workflow 模型
+        const modelId = resolveWorkflowModelForCase(c, batchState.docType);
+        const safeLimit = getSafeContextLimit(modelId);
         const totalTokens = getAllMaterialsTokens(c);
         if (totalTokens > safeLimit) {
             // C 方案：超限自动跳过并记录失败原因，不再弹窗选择

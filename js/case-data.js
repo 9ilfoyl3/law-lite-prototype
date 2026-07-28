@@ -1,4 +1,5 @@
 // ============ Shared Case Data ============
+// v1.35 token 估算简化：AI_MODELS 新增千问3.6/DeepSeek v4 + deployed 字段；CONTEXT_SAFETY_RATIO 默认0.85且可配置；新增 estimateTextTokens 与 getDeployedModels
 // v1.34 文书类型与要件新增启用/停用状态：mergeAdminDocTypes 跳过 enabled===false 的类型；filterElementsByCaseWord 过滤停用要件
 // v1.33 文书模板移除 causes 字段：normalizeDocTemplates / mergeAdminDocTemplates / mergeMyDocTemplates 不再写入 causes；getFilteredDocTypeTemplates 不再按 cause 过滤
 // v1.13 新增用户侧自定义支持：mergeMyDocTemplates 合并 myDocTemplates；getReqTemplates 追加 myPromptTemplates
@@ -6,17 +7,30 @@
 // v1.11 将 getCurrentDocTypes / getDocTypeTemplates / formatNumber 等共享辅助函数下沉至本文件，供 cases / case-files / document-detail 共用
 
 // ===== 模型上下文限制配置 =====
-// 根据当前所选 AI 模型的上下文窗口（tokens）控制「材料生成」单次可处理的材料总量，
-// 超过安全阈值时自动切换为分步生成
+// v1.35: 新增千问3.6（128K）与 DeepSeek v4（256K），标记 deployed 字段；用户侧模型下拉仅展示 deployed=true
+// 原 4 个通用模型保留作为历史兼容（deployed=false，不在用户侧展示）
 const AI_MODELS = [
-    { id: 'gpt4o-mini', name: '轻量模型', limit: 16000 },
-    { id: 'claude35-sonnet', name: '标准模型', limit: 32000 },
-    { id: 'gpt4o', name: '旗舰模型', limit: 128000 },
-    { id: 'claude3-opus', name: '长文本模型', limit: 200000 }
+    { id: 'gpt4o-mini', name: '轻量模型', limit: 16000, deployed: false },
+    { id: 'claude35-sonnet', name: '标准模型', limit: 32000, deployed: false },
+    { id: 'gpt4o', name: '旗舰模型', limit: 128000, deployed: false },
+    { id: 'claude3-opus', name: '长文本模型', limit: 200000, deployed: false },
+    { id: 'qwen3.6', name: '千问 3.6', limit: 128000, deployed: true },
+    { id: 'deepseek-v4', name: 'DeepSeek v4', limit: 256000, deployed: true }
 ];
-const DEFAULT_MODEL_ID = 'gpt4o';
-const CONTEXT_SAFETY_RATIO = 0.8; // 保留 20% 余量给系统提示、输出与指令
+const DEFAULT_MODEL_ID = 'qwen3.6';
+const DEFAULT_SAFETY_RATIO = 0.85; // v1.35: 默认 85%（保留 15% 余量给系统提示、输出与指令）
 
+// v1.35: 获取可配置的安全阈值（管理后台 model-management.html 配置，持久化 localStorage.aiTokenSafetyRatio）
+function getSafetyRatio() {
+    const stored = localStorage.getItem('aiTokenSafetyRatio');
+    if (stored) {
+        const r = parseFloat(stored);
+        if (!isNaN(r) && r >= 0.8 && r <= 0.95) return r;
+    }
+    return DEFAULT_SAFETY_RATIO;
+}
+
+// v1.35: 按 workflow 的 modelId 获取模型；若无 modelId 回退到 DEFAULT_MODEL_ID
 function getCurrentModelId() {
     return localStorage.getItem('ai_current_model') || DEFAULT_MODEL_ID;
 }
@@ -32,8 +46,36 @@ function getModelContextLimit(modelId) {
     return model ? model.limit : AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID).limit;
 }
 
+// v1.35: 安全上限 = 模型 limit × 可配置阈值
 function getSafeContextLimit(modelId) {
-    return Math.floor(getModelContextLimit(modelId) * CONTEXT_SAFETY_RATIO);
+    return Math.floor(getModelContextLimit(modelId) * getSafetyRatio());
+}
+
+// v1.35: 估算文本 token 数（用于模板正文与提示词）
+// 中文文本近似 1 字符 ≈ 1.5 tokens，英文 1 单词 ≈ 1.3 tokens；这里取简化值 1.5
+function estimateTextTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(String(text).length * 1.5);
+}
+
+// v1.35: 获取已部署模型列表（用户侧与 workflow 配置使用）
+function getDeployedModels() {
+    return AI_MODELS.filter(m => m.deployed);
+}
+
+// v1.35: 按 id 获取模型对象
+function getModelById(id) {
+    return AI_MODELS.find(m => m.id === id) || AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID);
+}
+
+// v1.35: 获取业务系统对话模块默认模型（管理后台 model-management 配置）
+function getChatModelByOrg(org) {
+    try {
+        const all = JSON.parse(localStorage.getItem('aiChatModelByOrg') || '{}');
+        return all[org] || DEFAULT_MODEL_ID;
+    } catch (e) {
+        return DEFAULT_MODEL_ID;
+    }
 }
 
 // ===== 材料分类配置 =====
@@ -160,6 +202,7 @@ const agentflowWorkflowList = [
 // 返回数组：[{id, name, type, caseWords, causes, isBuiltin}]
 function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
     // 1. 取内置 workflow（v1.32: 每个 docType 生成两个内置 workflow，不再迁移 stepConfigsByOrg 的 steps）
+    // v1.35: 内置 workflow 默认使用 DEFAULT_MODEL_ID（千问3.6）
     const builtins = [];
     // v1.32: 分步生成型 workflow
     builtins.push({
@@ -168,6 +211,7 @@ function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
         type: 'step',
         caseWords: [],
         causes: [],
+        modelId: DEFAULT_MODEL_ID,
         isBuiltin: true
     });
     // v1.32: 直接生成型 workflow
@@ -177,6 +221,7 @@ function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
         type: 'material',
         caseWords: [],
         causes: [],
+        modelId: DEFAULT_MODEL_ID,
         isBuiltin: true
     });
     // 2. 取自定义 workflow（localStorage.adminWorkflows）
@@ -296,6 +341,16 @@ function getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord, cause) {
     const workflows = getWorkflowsForDocType(org, docTypeKey, 'material');
     if (workflows.length === 0) return null;
     return matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
+}
+
+// v1.35: 获取匹配 workflow 的使用模型 id（供用户侧 case-files.js token 估算使用）
+// 按生成方式 + 案字 + 案由匹配 workflow，返回其 modelId；无匹配时回退 DEFAULT_MODEL_ID
+function getWorkflowModelId(org, docTypeKey, caseWord, cause, genMethod) {
+    const typeFilter = genMethod === 'material' ? 'material' : 'step';
+    const workflows = getWorkflowsForDocType(org, docTypeKey, typeFilter);
+    if (workflows.length === 0) return DEFAULT_MODEL_ID;
+    const matched = matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
+    return (matched && matched.modelId) ? matched.modelId : DEFAULT_MODEL_ID;
 }
 
 // v1.17: docTemplates 数据结构升级——把字符串值统一转为对象 {name, docType, content}

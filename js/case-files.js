@@ -1,4 +1,5 @@
 // ============ Case Files Page JavaScript ============
+// v2.20 模型改为只读展示：模型由 workflow 的 modelId 决定（agentflow 平台镜像），新增 refreshModelFromWorkflow 在文书类型/生成方式/初始化/重新配置等时机刷新；onModelChange 置为 no-op；applyListGenParams/applyRegenerateConfig/reconfigWithLatestSnapshot 不再从 URL 或历史文书恢复模型
 // v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/提示词/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
 // v2.18 workflow 匹配维度升级为案字+案由：getWorkflowByCaseWord/getMaterialWorkflowByCaseWord/getStepsConfigForDocType 调用补 cause 参数
 // v2.17 workflow 区分分步型/材料型：分步生成 tab 仅匹配 step 型，材料生成 tab 新增 refreshMaterialWorkflow 匹配 material 型（用户侧不感知）
@@ -225,16 +226,12 @@ function initPage() {
     // 应用只读模式
     if (isReadOnly) applyReadOnlyMode();
 
-    // 初始化当前模型选择器
-    const modelSelect = document.getElementById('modelSelect');
-    if (modelSelect) {
-        const savedModel = getCurrentModelId();
-        modelSelect.value = AI_MODELS.some(m => m.id === savedModel) ? savedModel : DEFAULT_MODEL_ID;
-    }
-
     // 初始化生成方式
     initMaterialGen();
     initStepsGen();
+
+    // v2.20: 初始化模型只读展示（由 workflow 的 modelId 决定，须在 initMaterialGen/initStepsGen 之后调用）
+    refreshModelFromWorkflow();
 
     // 渲染材料树
     renderMaterialTree();
@@ -317,16 +314,10 @@ function initPage() {
 
 // 应用从案件列表页传入的生成参数
 function applyListGenParams() {
-    const model = getUrlParam('model');
+    // v2.20: 模型由 workflow 决定，不再从 URL 读取 model 参数
     const docType = getUrlParam('docType');
     const template = getUrlParam('template');
     const requirement = getUrlParam('requirement');
-
-    const modelSelect = document.getElementById('modelSelect');
-    if (modelSelect && model && AI_MODELS.some(m => m.id === model)) {
-        modelSelect.value = model;
-        onModelChange();
-    }
 
     const docTypeSelect = document.getElementById('matDocType');
     if (docTypeSelect && docType) {
@@ -632,13 +623,41 @@ function getCurrentModel() {
     return AI_MODELS.find(m => m.id === getCurrentModelId()) || AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID);
 }
 
-function onModelChange() {
-    const select = document.getElementById('modelSelect');
-    if (select) {
-        localStorage.setItem('ai_current_model', select.value);
+// v2.20: 模型由 workflow 的 modelId 决定（agentflow 平台镜像），用户侧不可修改
+// 在文书类型/生成方式/初始化/重新配置等时机调用，刷新模型下拉为只读展示
+function refreshModelFromWorkflow() {
+    const modelSelect = document.getElementById('modelSelect');
+    if (!modelSelect) return;
+    const docTypeKey = (currentGenMethod === 'steps')
+        ? (document.getElementById('stepDocType') ? document.getElementById('stepDocType').value : '')
+        : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
+    if (!docTypeKey || typeof getWorkflowModelId !== 'function') {
+        // 兜底：使用默认模型
+        const m = getModelById(DEFAULT_MODEL_ID);
+        modelSelect.innerHTML = `<option value="${m.id}" selected>${m.name}（${formatNumber(m.limit)}）</option>`;
+        modelSelect.disabled = true;
+        modelSelect.title = '模型由 workflow 配置决定，不可手动修改';
+        localStorage.setItem('ai_current_model', m.id);
+        updateContextUsageHint();
+        checkMaterialLimit();
+        return;
     }
+    const caseWord = extractCaseWordFromCaseNumber();
+    const cause = extractCauseFromCase();
+    const modelId = getWorkflowModelId(org, docTypeKey, caseWord, cause, currentGenMethod);
+    const model = getModelById(modelId);
+    modelSelect.innerHTML = `<option value="${model.id}" selected>${model.name}（${formatNumber(model.limit)}）</option>`;
+    modelSelect.disabled = true;
+    modelSelect.title = '模型由 workflow 配置决定，不可手动修改';
+    // 同步到 localStorage，供 case-data.js 的 getCurrentModelId() 读取
+    localStorage.setItem('ai_current_model', model.id);
     updateContextUsageHint();
     checkMaterialLimit();
+}
+
+// v2.20: onModelChange 已废弃，模型改为只读，保留为 no-op 防止报错
+function onModelChange() {
+    // no-op: 模型由 workflow 决定，用户不可修改
 }
 
 function updateContextUsageHint() {
@@ -720,6 +739,8 @@ function switchToStepView(options = {}) {
     renderStepGenConfig();
     resetStepFlowUI();
     renderSteps();
+    // v2.20: 切换到分步视图后，刷新模型只读展示（分步型 workflow 可能使用不同模型）
+    refreshModelFromWorkflow();
 }
 
 // 获取某步骤实际生效的关联材料（与核心材料表的交集，过滤已删除文件）
@@ -755,6 +776,8 @@ function backToMainView() {
     if (autoAlert) autoAlert.classList.remove('show');
     // v1.28: 切换回材料生成 tab 时，刷新材料型 workflow 匹配（用户侧不感知）
     refreshMaterialWorkflow();
+    // v2.20: 切换生成方式后刷新模型只读展示（一步/分步型 workflow 可能使用不同模型）
+    refreshModelFromWorkflow();
 }
 
 function toggleMaterialCol() {
@@ -795,12 +818,7 @@ function reconfigWithLatestSnapshot() {
         return tb - ta;
     })[0];
 
-    // 1. 模型
-    if (latestDoc.model) {
-        localStorage.setItem('ai_current_model', latestDoc.model);
-        const modelSelect = document.getElementById('modelSelect');
-        if (modelSelect) modelSelect.value = latestDoc.model;
-    }
+    // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 refreshModelFromWorkflow 自动刷新）
 
     // 2. 文书类型 / 模板 / 提示词（材料生成视图）
     if (latestDoc.docType) {
@@ -983,6 +1001,8 @@ function onMatDocTypeChange(shouldSync = true) {
     refreshMaterialWorkflow();
     updateMatGenerateButtonState();
     if (shouldSync) syncStepConfigFromMaterial();
+    // v2.20: 文书类型变化后刷新模型只读展示（不同 workflow 可能使用不同模型）
+    refreshModelFromWorkflow();
 }
 
 function renderMatReqTemplates(docTypeKey) {
@@ -2604,12 +2624,7 @@ function applyRegenerateConfig() {
         return;
     }
 
-    // 恢复模型
-    if (d.model) {
-        localStorage.setItem('ai_current_model', d.model);
-        const modelSelect = document.getElementById('modelSelect');
-        if (modelSelect) modelSelect.value = d.model;
-    }
+    // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 onMatDocTypeChange/refreshModelFromWorkflow 自动刷新）
 
     // 恢复材料生成视图配置
     if (d.docType) {

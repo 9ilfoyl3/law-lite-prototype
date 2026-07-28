@@ -152,6 +152,8 @@
         .wf-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
         .wf-type-badge.step { background: #dbeafe; color: #1e40af; }
         .wf-type-badge.material { background: #ede9fe; color: #5b21b6; }
+        /* v1.35: workflow 使用模型标签 */
+        .wf-model-tag { display: inline-block; padding: 2px 8px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; font-size: 11px; font-weight: 500; }
         .step-count-dash { color: var(--text-muted); font-size: 14px; }
 
         /* v1.32: workflow 类型 radio 行 */
@@ -347,6 +349,12 @@
                     </label>
                 </div>
                 <div class="form-hint">分步生成型 = 用户在分步生成 tab 按节点逐个确认；一步生成型 = 输入参数直接出文书结果，用于一步生成 tab</div>
+            </div>
+            <!-- v1.35: 使用模型（agentflow 平台 workflow 内部大模型节点的镜像映射，供前端 token 估算） -->
+            <div class="form-row">
+                <label class="form-label">使用模型 <span class="required">*</span></label>
+                <select id="wfModel" class="wf-id-select"></select>
+                <div class="form-hint">作为 agentflow 平台 workflow 内部大模型节点的镜像映射，供前端 token 估算使用；选项来自已部署模型列表</div>
             </div>
             <div class="form-row">
                 <label class="form-label">匹配案字（不选 = 案字兜底）</label>

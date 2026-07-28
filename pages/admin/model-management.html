@@ -135,7 +135,7 @@
 
         .tab-bar {
             display: flex; gap: 0; background: var(--bg-secondary); border-radius: 12px;
-            padding: 4px; margin-bottom: 24px; box-shadow: var(--card-shadow);
+            padding: 4px; margin-bottom: 16px; box-shadow: var(--card-shadow);
         }
 
         .tab-item {
@@ -310,6 +310,8 @@
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
+        .form-input:disabled, .form-select:disabled { background: #f3f4f6; color: var(--text-muted); cursor: not-allowed; }
+
         .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
 
         .modal-footer {
@@ -329,18 +331,6 @@
         .checkbox-item.checked { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); }
         .checkbox-item input { display: none; }
 
-        .alert-card {
-            background: var(--bg-secondary); border-radius: 12px;
-            box-shadow: var(--card-shadow); overflow: hidden; margin-bottom: 20px;
-        }
-
-        .alert-header {
-            padding: 16px 20px; border-bottom: 1px solid var(--border-color);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-
-        .alert-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
-
         .notification {
             position: fixed; top: 20px; right: 20px; padding: 14px 20px; border-radius: 10px;
             color: white; font-size: 14px; font-weight: 500; z-index: 2000;
@@ -355,7 +345,7 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* ===== 新增样式：模型编辑弹窗 ===== */
+        /* ===== 模型编辑弹窗 ===== */
         .modal-wide { max-width: 720px; }
 
         .section-divider {
@@ -408,48 +398,67 @@
         .thinking-card.disabled .form-input,
         .thinking-card.disabled .form-select { opacity: 0.5; pointer-events: none; }
 
-        /* 动态键值对编辑器 */
-        .kv-editor { margin-bottom: 16px; }
-        .kv-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-        .kv-table th {
-            font-size: 12px; font-weight: 600; color: var(--text-muted);
-            text-transform: uppercase; letter-spacing: 0.5px;
-            padding: 8px 10px; text-align: left; background: var(--bg-primary);
-            border: 1px solid var(--border-color);
+        /* ===== 法院切换器栏 ===== */
+        .court-selector-bar {
+            background: var(--bg-secondary); border-radius: 12px;
+            padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+            margin-bottom: 20px; box-shadow: var(--card-shadow);
         }
-        .kv-table th:last-child { width: 44px; text-align: center; }
-        .kv-table td { padding: 6px 6px; border: 1px solid var(--border-color); }
-        .kv-table td:last-child { text-align: center; }
-        .kv-table input {
-            width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px;
-            font-size: 13px; background: transparent; color: var(--text-primary);
-            font-family: inherit;
+        .court-selector-bar label {
+            font-size: 14px; font-weight: 500; color: var(--text-primary); white-space: nowrap;
         }
-        .kv-table input:focus {
-            outline: none; border-color: var(--accent-primary);
-            background: white;
+        .court-selector-bar select {
+            padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 14px; background: var(--bg-primary); color: var(--text-primary);
+            cursor: pointer; font-family: inherit; min-width: 240px;
         }
-        .kv-delete-btn {
-            width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-            background: transparent; border: none; border-radius: 4px;
-            color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 13px;
-        }
-        .kv-delete-btn:hover { background: #fee2e2; color: var(--accent-danger); }
+        .court-selector-bar select:focus { outline: none; border-color: var(--accent-primary); }
 
-        .kv-actions { display: flex; gap: 8px; }
-        .btn-dashed {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 8px 16px; border: 2px dashed var(--border-color); border-radius: 8px;
-            font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
-            background: transparent; color: var(--text-secondary); font-family: inherit;
+        /* ===== 高级配置折叠区 ===== */
+        .collapse-header {
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; transition: all 0.2s; user-select: none;
         }
-        .btn-dashed:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--accent-light); }
+        .collapse-header:hover { background: var(--accent-light); border-color: var(--accent-primary); }
+        .collapse-header-title {
+            font-size: 14px; font-weight: 600; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .collapse-header-summary {
+            font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+        }
+        .collapse-header i.collapse-arrow { transition: transform 0.2s; color: var(--text-muted); }
+        .collapse-header.expanded i.collapse-arrow { transform: rotate(90deg); }
+        .collapse-content { display: none; }
+        .collapse-header.expanded + .collapse-content { display: block; }
 
-        /* 配置概览列样式 */
-        .config-overview {
-            font-family: 'Courier New', Consolas, monospace;
-            font-size: 12px; color: var(--text-muted); line-height: 1.6;
-            max-width: 280px; word-break: break-all;
+        /* ===== 场景模型只读样式 ===== */
+        .scene-readonly {
+            background: #f3f4f6; color: var(--text-muted); padding: 8px 14px;
+            border-radius: 8px; font-size: 14px; border: 1px solid var(--border-color);
+        }
+
+        /* ===== 配额子区块 ===== */
+        .quota-section {
+            background: var(--bg-secondary); border-radius: 12px;
+            box-shadow: var(--card-shadow); margin-bottom: 20px; overflow: hidden;
+        }
+        .quota-section-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .quota-section-title {
+            font-size: 15px; font-weight: 600; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .quota-section-body { padding: 20px; }
+
+        /* ===== Token 阈值配置卡片 ===== */
+        .threshold-card {
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 24px; margin-bottom: 20px;
         }
 
         /* 查看配置弹窗 */
@@ -475,19 +484,6 @@
             font-size: 14px; font-weight: 600; color: var(--accent-primary);
             margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
         }
-
-        .view-params-group { margin-bottom: 16px; }
-        .view-params-group-title {
-            font-size: 13px; font-weight: 600; color: var(--text-secondary);
-            margin-bottom: 8px; padding-left: 4px;
-        }
-        .view-params-table { width: 100%; border-collapse: collapse; }
-        .view-params-table td {
-            padding: 6px 12px; font-size: 13px; border-bottom: 1px solid var(--border-color);
-        }
-        .view-params-table td:first-child { color: var(--text-muted); width: 30%; }
-        .view-params-table td:nth-child(2) { color: var(--text-muted); width: 25%; font-family: 'Courier New', Consolas, monospace; font-size: 12px; }
-        .view-params-table td:last-child { color: var(--text-primary); font-weight: 500; font-family: 'Courier New', Consolas, monospace; font-size: 12px; }
 
         @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
 
@@ -566,40 +562,47 @@
             <div class="page-content">
                 <div class="page-header">
                     <h1 class="page-title">模型配置与用量管理</h1>
-                    <p class="page-subtitle">管理系统AI模型列表、法院授权、Token配额与用量统计</p>
+                    <p class="page-subtitle">法院模型部署配置、场景默认模型、配额与用量管控</p>
                 </div>
 
+                <!-- 法院切换器 -->
+                <div class="court-selector-bar">
+                    <label><i class="fas fa-landmark" style="margin-right: 6px; color: var(--accent-primary);"></i>当前法院：</label>
+                    <select id="courtSelector" onchange="onCourtChange()"></select>
+                </div>
+
+                <!-- Tab 栏 -->
                 <div class="tab-bar">
-                    <button class="tab-item active" onclick="switchTab('models')">
-                        <i class="fas fa-microchip"></i>模型列表
+                    <button class="tab-item active" onclick="switchTab('models', event)">
+                        <i class="fas fa-microchip"></i>模型部署清单
                     </button>
-                    <button class="tab-item" onclick="switchTab('courts')">
-                        <i class="fas fa-landmark"></i>法院授权
+                    <button class="tab-item" onclick="switchTab('scenes', event)">
+                        <i class="fas fa-sliders-h"></i>场景模型配置
                     </button>
-                    <button class="tab-item" onclick="switchTab('usage')">
-                        <i class="fas fa-chart-pie"></i>用量统计
-                    </button>
-                    <button class="tab-item" onclick="switchTab('alerts')">
-                        <i class="fas fa-bell"></i>用量告警
+                    <button class="tab-item" onclick="switchTab('quota', event)">
+                        <i class="fas fa-chart-pie"></i>配额与用量
                     </button>
                 </div>
 
-                <!-- 模型列表 Tab -->
+                <!-- ===== Tab1: 模型部署清单 ===== -->
                 <div class="tab-content active" id="tab-models">
                     <div class="action-bar">
-                        <input type="text" class="search-input" id="modelSearch" placeholder="搜索模型名称或编码..." oninput="filterModels()">
-                        <button class="btn btn-primary btn-sm" onclick="openModelModal()"><i class="fas fa-plus"></i>新增模型</button>
+                        <input type="text" class="search-input" id="modelSearch" placeholder="搜索模型名称..." oninput="filterModels()">
+                        <div class="filter-group">
+                            <button class="btn btn-primary btn-sm" onclick="openModelModal()"><i class="fas fa-plus"></i>新增模型</button>
+                            <button class="btn btn-secondary btn-sm" id="referenceBtn" onclick="openReferenceModal()" style="display:none;"><i class="fas fa-share"></i>引用上级模型</button>
+                        </div>
                     </div>
                     <div class="content-card">
                         <table class="data-table">
                             <thead>
                                 <tr>
                                     <th>模型名称</th>
-                                    <th>编码</th>
-                                    <th>URL</th>
-                                    <th>模型分类</th>
-                                    <th>配置概览</th>
+                                    <th>服务商</th>
+                                    <th>API 地址</th>
                                     <th>状态</th>
+                                    <th>默认对话</th>
+                                    <th>引用来源</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -608,173 +611,198 @@
                     </div>
                 </div>
 
-                <!-- 法院授权 Tab -->
-                <div class="tab-content" id="tab-courts">
+                <!-- ===== Tab2: 场景模型配置 ===== -->
+                <div class="tab-content" id="tab-scenes">
                     <div class="action-bar">
-                        <div class="filter-group">
-                            <input type="text" class="search-input" id="courtSearch" placeholder="搜索法院名称..." oninput="filterCourts()">
-                            <select class="filter-select" id="courtLevelFilter" onchange="filterCourts()">
-                                <option value="">全部层级</option>
-                                <option value="中院">中院</option>
-                                <option value="基层法院">基层法院</option>
-                            </select>
-                            <select class="filter-select" id="courtStatusFilter" onchange="filterCourts()">
-                                <option value="">全部状态</option>
-                                <option value="正常">正常</option>
-                                <option value="超额停用">超额停用</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-primary btn-sm" onclick="openCourtModal()"><i class="fas fa-plus"></i>配置法院授权</button>
+                        <span style="font-size: 14px; color: var(--text-secondary);"><i class="fas fa-info-circle" style="margin-right: 6px; color: var(--accent-primary);"></i>配置各业务场景的默认模型；"对话基础问答"与 Tab1 默认对话模型联动，不可单独修改。</span>
+                        <button class="btn btn-primary btn-sm" onclick="saveSceneModels()"><i class="fas fa-save"></i>保存配置</button>
                     </div>
                     <div class="content-card">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>法院名称</th>
-                                    <th>层级</th>
-                                    <th>已授权模型</th>
-                                    <th>Token配额</th>
-                                    <th>使用率</th>
-                                    <th>状态</th>
-                                    <th>操作</th>
+                                    <th>场景名称</th>
+                                    <th>默认模型</th>
+                                    <th>运行时可覆盖</th>
+                                    <th>说明</th>
                                 </tr>
                             </thead>
-                            <tbody id="courtTableBody"></tbody>
+                            <tbody id="sceneTableBody"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- 用量统计 Tab -->
-                <div class="tab-content" id="tab-usage">
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon blue"><i class="fas fa-coins"></i></div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="totalTokens">2,450万</div>
-                                <div class="stat-label">总Token消耗</div>
-                            </div>
+                <!-- ===== Tab3: 配额与用量 ===== -->
+                <div class="tab-content" id="tab-quota">
+                    <!-- 子区块1：法院配额概览 -->
+                    <div class="quota-section">
+                        <div class="quota-section-header">
+                            <span class="quota-section-title"><i class="fas fa-landmark"></i>法院配额概览</span>
+                            <button class="btn btn-primary btn-sm" onclick="openQuotaModal()"><i class="fas fa-edit"></i>配置法院配额</button>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon green"><i class="fas fa-exchange-alt"></i></div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="totalCalls">18,642</div>
-                                <div class="stat-label">调用次数</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon orange"><i class="fas fa-building"></i></div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="activeCourts">5</div>
-                                <div class="stat-label">活跃法院</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon purple"><i class="fas fa-exclamation-triangle"></i></div>
-                            <div class="stat-info">
-                                <div class="stat-value" id="alertCount">2</div>
-                                <div class="stat-label">超限告警</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="action-bar">
-                        <div class="filter-group">
-                            <select class="filter-select" id="usageTimeDim">
-                                <option value="month" selected>按月</option>
-                                <option value="week">按周</option>
-                                <option value="day">按日</option>
-                            </select>
-                            <select class="filter-select" id="usageCourtFilter">
-                                <option value="">全部法院</option>
-                            </select>
-                            <select class="filter-select" id="usageModelFilter">
-                                <option value="">全部模型</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-secondary btn-sm" onclick="exportUsage()"><i class="fas fa-download"></i>导出Excel</button>
-                    </div>
-                    <div class="content-card">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>时间</th>
-                                    <th>法院名称</th>
-                                    <th>模型名称</th>
-                                    <th>调用次数</th>
-                                    <th>Token消耗</th>
-                                    <th>平均Token/次</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usageTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- 用量告警 Tab -->
-                <div class="tab-content" id="tab-alerts">
-                    <div class="alert-card">
-                        <div class="alert-header">
-                            <span class="alert-title">告警规则配置</span>
-                        </div>
-                        <div style="padding: 20px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                                <div class="form-group">
-                                    <label class="form-label">预警阈值</label>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <input type="number" class="form-input" id="alertThreshold" value="80" style="width: 80px;">
-                                        <span style="color: var(--text-secondary);">%</span>
+                        <div class="quota-section-body">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-icon blue"><i class="fas fa-coins"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="quotaTotal">-</div>
+                                        <div class="stat-label">总配额（tokens）</div>
                                     </div>
-                                    <div class="form-hint">使用率达到时发送提醒</div>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">超额停用</label>
-                                    <select class="form-select" id="autoStop">
-                                        <option value="开启" selected>开启</option>
-                                        <option value="关闭">关闭</option>
-                                    </select>
-                                    <div class="form-hint">达到100%时自动停用</div>
+                                <div class="stat-card">
+                                    <div class="stat-icon purple"><i class="fas fa-piggy-bank"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="quotaAllocated">-</div>
+                                        <div class="stat-label">已分配（tokens）</div>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">通知方式</label>
-                                    <select class="form-select" id="notifyMethod">
-                                        <option value="系统通知" selected>系统通知</option>
-                                    </select>
+                                <div class="stat-card">
+                                    <div class="stat-icon orange"><i class="fas fa-fire"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="quotaUsed">-</div>
+                                        <div class="stat-label">已消耗（tokens）</div>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">通知对象</label>
-                                    <select class="form-select" id="notifyTarget">
-                                        <option value="该法院管理员" selected>该法院管理员</option>
-                                    </select>
+                                <div class="stat-card">
+                                    <div class="stat-icon green"><i class="fas fa-balance-scale"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="quotaRemaining">-</div>
+                                        <div class="stat-label">剩余额度（tokens）</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div style="margin-top: 16px; text-align: right;">
-                                <button class="btn btn-primary btn-sm" onclick="saveAlertConfig()"><i class="fas fa-save"></i>保存配置</button>
+                            <div class="content-card">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>法院名称</th>
+                                            <th>层级</th>
+                                            <th>总配额</th>
+                                            <th>已分配</th>
+                                            <th>已消耗</th>
+                                            <th>剩余</th>
+                                            <th>使用率</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="courtQuotaTableBody"></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
-                    <div class="content-card">
-                        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 15px; font-weight: 600;">告警记录</span>
+
+                    <!-- 子区块2：部门/用户配额 -->
+                    <div class="quota-section">
+                        <div class="quota-section-header">
+                            <span class="quota-section-title"><i class="fas fa-building"></i>部门/用户配额</span>
+                            <button class="btn btn-primary btn-sm" onclick="openDeptQuotaModal()"><i class="fas fa-plus"></i>新增部门配额</button>
                         </div>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>时间</th>
-                                    <th>法院名称</th>
-                                    <th>告警类型</th>
-                                    <th>当前使用率</th>
-                                    <th>处理状态</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="alertTableBody"></tbody>
-                        </table>
+                        <div class="quota-section-body">
+                            <div class="content-card">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>部门/用户</th>
+                                            <th>配额</th>
+                                            <th>已用</th>
+                                            <th>使用率</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="deptQuotaTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 子区块3：Token 安全阈值 -->
+                    <div class="quota-section">
+                        <div class="quota-section-header">
+                            <span class="quota-section-title"><i class="fas fa-shield-halved"></i>Token 安全阈值</span>
+                        </div>
+                        <div class="quota-section-body">
+                            <div class="threshold-card">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                                    <label style="font-size: 14px; font-weight: 500; color: var(--text-primary);">当前阈值</label>
+                                    <span id="thresholdDisplay" style="font-size: 24px; font-weight: 700; color: var(--accent-primary);">85%</span>
+                                </div>
+                                <input type="range" id="thresholdSlider" min="80" max="95" step="1" value="85" style="width: 100%; accent-color: var(--accent-primary); cursor: pointer;">
+                                <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted);">
+                                    <span>80%</span>
+                                    <span>85%（默认）</span>
+                                    <span>95%</span>
+                                </div>
+                                <div id="thresholdHint" style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">当前阈值 85%，128K 模型可使用 108,800 tokens</div>
+                                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                                    <button class="btn btn-secondary btn-sm" onclick="resetThreshold()"><i class="fas fa-rotate-left"></i>恢复默认</button>
+                                    <button class="btn btn-primary btn-sm" onclick="saveThreshold()"><i class="fas fa-save"></i>保存配置</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 子区块4：用量明细 -->
+                    <div class="quota-section">
+                        <div class="quota-section-header">
+                            <span class="quota-section-title"><i class="fas fa-chart-line"></i>用量明细</span>
+                        </div>
+                        <div class="quota-section-body">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-icon blue"><i class="fas fa-coins"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="usageTotalTokens">-</div>
+                                        <div class="stat-label">总Token消耗</div>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon green"><i class="fas fa-exchange-alt"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="usageTotalCalls">-</div>
+                                        <div class="stat-label">调用次数</div>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon orange"><i class="fas fa-building"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="usageActiveDepts">-</div>
+                                        <div class="stat-label">活跃部门数</div>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon purple"><i class="fas fa-exclamation-triangle"></i></div>
+                                    <div class="stat-info">
+                                        <div class="stat-value" id="usageAlertCount">-</div>
+                                        <div class="stat-label">超限告警数</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="content-card">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>法院</th>
+                                            <th>部门/用户</th>
+                                            <th>模型</th>
+                                            <th>调用次数</th>
+                                            <th>Token消耗</th>
+                                            <th>平均Token/次</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usageTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- 模型编辑弹窗 -->
+    <!-- ===== 模型新增/编辑弹窗 ===== -->
     <div class="modal-backdrop" id="modelModal">
         <div class="modal modal-wide">
             <div class="modal-header">
@@ -792,129 +820,143 @@
                         <input type="text" class="form-input" id="modelName" placeholder="如 TuringYitian-32B(10.30.1.2)">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">编码 <span class="required">*</span></label>
-                        <input type="text" class="form-input" id="modelCode" placeholder="如 TuringYitian-32B">
-                        <div class="form-hint">系统唯一标识，编辑时不可修改</div>
+                        <label class="form-label">模型名称 <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="modelCode" placeholder="如 deepseek-chat、qwen-plus">
+                        <div class="form-hint">调用 API 时使用的 model 字段；编辑时不可修改</div>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label class="form-label">服务商 <span class="required">*</span></label>
+                        <select class="form-select" id="modelProvider" onchange="onProviderChange()">
+                            <option value="custom">自定义（OpenAI 兼容接口）</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="qwen">阿里云通义（Qwen）</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="zhipu">智谱 AI</option>
+                            <option value="baichuan">百川</option>
+                            <option value="minimax">MiniMax</option>
+                        </select>
+                        <div class="form-hint">选择服务商后自动填充 API 地址与思考参数格式</div>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">模型分类 <span class="required">*</span></label>
-                        <select class="form-select" id="modelCategory" onchange="onCategoryChange()">
+                        <select class="form-select" id="modelCategory">
                             <option value="DeepSeek">DeepSeek</option>
                             <option value="Qwen">Qwen</option>
                             <option value="BERT">BERT</option>
                             <option value="自研">自研</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">状态 <span class="required">*</span></label>
-                        <select class="form-select" id="modelStatus">
-                            <option value="启用">启用</option>
-                            <option value="禁用">禁用</option>
-                        </select>
-                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">状态 <span class="required">*</span></label>
+                    <select class="form-select" id="modelStatus">
+                        <option value="启用">启用</option>
+                        <option value="禁用">禁用</option>
+                    </select>
                 </div>
 
                 <!-- 区域二：连接配置 -->
-                <div class="section-divider"><i class="fas fa-plug"></i>连接配置</div>
+                <div class="section-divider">
+                    <i class="fas fa-plug"></i>连接配置
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="testConnection()" id="testConnBtn" style="margin-left: 12px;">
+                        <i class="fas fa-wifi"></i>测试连接
+                    </button>
+                    <span id="testConnResult" style="margin-left: 8px; font-size: 12px;"></span>
+                </div>
                 <div class="form-group">
-                    <label class="form-label">URL <span class="required">*</span></label>
+                    <label class="form-label">API 地址 <span class="required">*</span></label>
                     <input type="text" class="form-input" id="modelUrl" placeholder="如 http://10.30.1.2:1030/v1">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">ApiKey <span class="required">*</span></label>
-                    <input type="text" class="form-input" id="modelApiKey" placeholder="如 EMPTY1">
+                    <label class="form-label">API Key</label>
+                    <input type="text" class="form-input" id="modelApiKey" placeholder="输入 API 密钥（可选）">
+                    <div class="form-hint">部分本地部署模型可不填</div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">最大输入长度</label>
-                        <input type="number" class="form-input" id="modelMaxInputLength" placeholder="0表示不限制" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">计费方式</label>
-                        <select class="form-select" id="modelBilling">
-                            <option value="按Token">按Token</option>
-                            <option value="按调用次数">按调用次数</option>
-                            <option value="免费">免费</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">单价说明</label>
-                        <input type="text" class="form-input" id="modelPrice" placeholder="如 ￥0.008/千tokens">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">提供方</label>
-                        <input type="text" class="form-input" id="modelProvider" placeholder="如 自研、阿里云">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">最大上下文长度</label>
+                    <input type="number" class="form-input" id="modelMaxInputLength" placeholder="0表示不限制" value="0">
+                    <div class="form-hint">单位：tokens；0 = 不限制</div>
                 </div>
 
-                <!-- 区域三：模型参数 -->
-                <div class="section-divider"><i class="fas fa-sliders-h"></i>模型参数</div>
-
-                <!-- 思考模式配置卡片 -->
-                <div class="thinking-card" id="thinkingCard">
-                    <div class="thinking-card-title"><i class="fas fa-brain"></i>思考模式配置</div>
+                <!-- 区域三：常用参数 -->
+                <div class="section-divider"><i class="fas fa-sliders-h"></i>常用参数</div>
+                <div class="form-row">
                     <div class="form-group">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="thinkingEnabled" onchange="onThinkingToggle()">
-                            <span class="toggle-track"></span>
-                            <span class="toggle-label">启用思考模式</span>
-                        </label>
+                        <label class="form-label">温度 temperature</label>
+                        <input type="number" class="form-input" id="modelTemperature" placeholder="0.7" value="0.7" step="0.1" min="0" max="2">
+                        <div class="form-hint">范围 0~2，默认 0.7</div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">展示方式</label>
-                            <select class="form-select" id="thinkingDisplayStyle">
-                                <option value="collapsible">collapsible（可折叠）</option>
-                                <option value="inline">inline（内联）</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">思考Token上限</label>
-                            <input type="number" class="form-input" id="thinkingTokenLimit" placeholder="如 8192" value="8192">
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">最大生成长度 maxTokens</label>
+                        <input type="number" class="form-input" id="modelMaxTokens" placeholder="4096" value="4096" min="1" max="128000">
+                        <div class="form-hint">范围 1~128000，默认 4096</div>
                     </div>
-                    <div class="form-row">
+                </div>
+                <div class="form-group">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="modelStreamEnabled" checked>
+                        <span class="toggle-track"></span>
+                        <span class="toggle-label">启用流式输出</span>
+                    </label>
+                    <div class="form-hint">关闭后采用一次性返回</div>
+                </div>
+
+                <!-- 区域四：调用选项 -->
+                <div class="section-divider"><i class="fas fa-toggle-on"></i>调用选项</div>
+                <div class="form-group">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="modelIsDefaultChat" onchange="onDefaultChatToggle()">
+                        <span class="toggle-track"></span>
+                        <span class="toggle-label">设为默认对话模型</span>
+                    </label>
+                    <div class="form-hint">启用后设为当前法院默认对话模型，互斥（仅一个），需二次确认</div>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="modelAllowChat" checked>
+                        <span class="toggle-track"></span>
+                        <span class="toggle-label">允许在对话中选择</span>
+                    </label>
+                    <div class="form-hint">用户侧对话模型下拉是否可见</div>
+                </div>
+
+                <!-- 区域五：高级配置（折叠区） -->
+                <div class="collapse-header" id="advancedCollapse" onclick="toggleAdvanced()">
+                    <span class="collapse-header-title"><i class="fas fa-brain"></i>高级配置（思考模式）</span>
+                    <span class="collapse-header-summary">
+                        <span id="advancedSummary">思考模式：关闭</span>
+                        <i class="fas fa-chevron-right collapse-arrow"></i>
+                    </span>
+                </div>
+                <div class="collapse-content">
+                    <div class="thinking-card" id="thinkingCard">
+                        <div class="thinking-card-title"><i class="fas fa-brain"></i>思考模式配置</div>
                         <div class="form-group">
                             <label class="toggle-switch">
-                                <input type="checkbox" id="thinkingFilterEnglish" checked onchange="onFilterEnglishToggle()">
+                                <input type="checkbox" id="thinkingEnabled" onchange="onThinkingToggle()">
                                 <span class="toggle-track"></span>
-                                <span class="toggle-label">过滤思考输出中的英文</span>
+                                <span class="toggle-label">启用思考模式</span>
                             </label>
                         </div>
-                        <div class="form-group" id="filterModeGroup">
-                            <label class="form-label">英文过滤模式</label>
-                            <select class="form-select" id="thinkingFilterMode">
-                                <option value="remove">remove（移除英文片段）</option>
-                                <option value="translate">translate（翻译为中文）</option>
-                            </select>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">思考参数格式</label>
+                                <select class="form-select" id="thinkingParamFormat">
+                                    <option value="none">不写入思考参数</option>
+                                    <option value="reasoning_effort">reasoning_effort（OpenAI o 系列）</option>
+                                    <option value="thinking">thinking（Qwen3/Doubao）</option>
+                                    <option value="budget_tokens">budget_tokens（Claude）</option>
+                                </select>
+                                <div class="form-hint">决定智能体深度思考开启时如何写入 API</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">思考Token上限</label>
+                                <input type="number" class="form-input" id="thinkingTokenLimit" placeholder="如 8192" value="8192">
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- 动态键值对参数编辑器 -->
-                <div class="kv-editor">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">参数列表</span>
-                        <div class="kv-actions">
-                            <button type="button" class="btn-dashed" onclick="loadDefaultTemplate()"><i class="fas fa-magic"></i>加载默认模板</button>
-                            <button type="button" class="btn-dashed" onclick="addParamRow()"><i class="fas fa-plus"></i>添加参数</button>
-                        </div>
-                    </div>
-                    <table class="kv-table">
-                        <thead>
-                            <tr>
-                                <th>中文名称</th>
-                                <th>参数Key</th>
-                                <th>参数值</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="paramsTableBody"></tbody>
-                    </table>
                 </div>
             </div>
             <div class="modal-footer">
@@ -924,7 +966,7 @@
         </div>
     </div>
 
-    <!-- 查看配置弹窗 -->
+    <!-- ===== 查看配置弹窗 ===== -->
     <div class="modal-backdrop" id="viewModelModal">
         <div class="modal modal-wide">
             <div class="modal-header">
@@ -938,833 +980,1224 @@
         </div>
     </div>
 
-    <!-- 法院授权弹窗 -->
-    <div class="modal-backdrop" id="courtModal">
+    <!-- ===== 引用上级模型弹窗 ===== -->
+    <div class="modal-backdrop" id="referenceModal">
         <div class="modal">
             <div class="modal-header">
-                <h3 class="modal-title" id="courtModalTitle">配置法院授权</h3>
-                <button class="modal-close" onclick="closeCourtModal()"><i class="fas fa-times"></i></button>
+                <h3 class="modal-title">引用上级模型</h3>
+                <button class="modal-close" onclick="closeReferenceModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="referenceModalBody"></div>
+        </div>
+    </div>
+
+    <!-- ===== 法院配额编辑弹窗 ===== -->
+    <div class="modal-backdrop" id="quotaModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">配置法院配额</h3>
+                <button class="modal-close" onclick="closeQuotaModal()"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="courtEditId">
                 <div class="form-group">
-                    <label class="form-label">选择法院 <span class="required">*</span></label>
-                    <select class="form-select" id="courtName">
-                        <option value="">请选择法院</option>
-                        <option value="南京市中级人民法院">南京市中级人民法院</option>
-                        <option value="南京市玄武区人民法院">南京市玄武区人民法院</option>
-                        <option value="南京市鼓楼区人民法院">南京市鼓楼区人民法院</option>
-                        <option value="南京市建邺区人民法院">南京市建邺区人民法院</option>
-                        <option value="南京市秦淮区人民法院">南京市秦淮区人民法院</option>
-                    </select>
+                    <label class="form-label">法院名称</label>
+                    <input type="text" class="form-input" id="quotaCourtName" disabled>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">法院层级</label>
-                    <select class="form-select" id="courtLevel">
-                        <option value="中院">中院</option>
-                        <option value="基层法院">基层法院</option>
-                    </select>
+                    <label class="form-label">总配额（tokens） <span class="required">*</span></label>
+                    <input type="number" class="form-input" id="quotaTotalInput" placeholder="如 10000000">
+                    <div class="form-hint">单位：tokens</div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">可用模型列表 <span class="required">*</span></label>
-                    <div class="checkbox-group" id="modelCheckboxGroup"></div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Token配额 <span class="required">*</span></label>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="number" class="form-input" id="courtQuota" placeholder="如 1000" style="width: 150px;">
-                        <span style="color: var(--text-secondary);">万tokens</span>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">额度周期</label>
+                        <select class="form-select" id="quotaPeriod">
+                            <option value="按年">按年</option>
+                            <option value="按月">按月</option>
+                            <option value="永久">永久</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">重置日期</label>
+                        <input type="date" class="form-input" id="quotaResetDate">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">额度周期</label>
-                    <select class="form-select" id="quotaCycle">
-                        <option value="按月">按月</option>
-                        <option value="按年">按年</option>
-                        <option value="永久">永久</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">启用状态</label>
-                    <select class="form-select" id="courtStatus">
-                        <option value="正常">正常</option>
-                        <option value="超额停用">超额停用</option>
-                    </select>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="quotaEnabled" checked>
+                        <span class="toggle-track"></span>
+                        <span class="toggle-label">启用配额管控</span>
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeCourtModal()">取消</button>
-                <button class="btn btn-primary" onclick="saveCourt()">保存</button>
+                <button class="btn btn-secondary" onclick="closeQuotaModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveCourtQuota()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 部门配额编辑弹窗 ===== -->
+    <div class="modal-backdrop" id="deptQuotaModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="deptQuotaModalTitle">新增部门配额</h3>
+                <button class="modal-close" onclick="closeDeptQuotaModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deptEditId">
+                <div class="form-group">
+                    <label class="form-label">部门/用户名称 <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="deptName" placeholder="如 民一庭">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">配额（tokens） <span class="required">*</span></label>
+                    <input type="number" class="form-input" id="deptQuota" placeholder="如 1000000">
+                </div>
+                <div class="form-group">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="deptEnabled" checked>
+                        <span class="toggle-track"></span>
+                        <span class="toggle-label">启用服务</span>
+                    </label>
+                    <div class="form-hint">关闭后该部门无法调用 AI 服务</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeptQuotaModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveDeptQuota()">保存</button>
             </div>
         </div>
     </div>
 
     <script>
+    // ===== 权限控制 IIFE =====
     (function(){
-        var pages=JSON.parse(localStorage.getItem('adminRolePages')||'[]');
-        if(pages.length===0)return;
-        document.querySelectorAll('.sidebar-nav .nav-item,.sidebar-nav .nav-sub-item').forEach(function(item){
-            var href=item.getAttribute('href');
-            if(!href||href==='#')return;
-            var pageName=href.replace('.html','');
-            if(pages.indexOf(pageName)===-1){item.style.display='none';}
+        var pages = JSON.parse(localStorage.getItem('adminRolePages') || '[]');
+        if (pages.length === 0) return;
+        document.querySelectorAll('.sidebar-nav .nav-item, .sidebar-nav .nav-sub-item').forEach(function(item){
+            var href = item.getAttribute('href');
+            if (!href || href === '#') return;
+            var pageName = href.replace('.html', '');
+            if (pages.indexOf(pageName) === -1) { item.style.display = 'none'; }
         });
     })();
 
-        // ===== 默认参数模板 =====
-        var defaultTemplates = {
-            'DeepSeek': {
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.7' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '4096' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' },
-                    { label: 'TopK', key: 'topK', value: '50' },
-                    { label: '频率惩罚', key: 'frequencyPenalty', value: '0' },
-                    { label: '存在惩罚', key: 'presencePenalty', value: '0' },
-                    { label: '失败重试', key: 'retryOnFailure', value: 'true' },
-                    { label: '最大重试次数', key: 'maxRetries', value: '2' },
-                    { label: '超时时间', key: 'timeout', value: '60' }
-                ]
+    // ===== 法院列表 =====
+    var defaultCourts = [
+        { id: 'court-nj-zhongyuan', name: '南京市中级人民法院', level: '中院' },
+        { id: 'court-nj-xuanwu', name: '南京市玄武区人民法院', level: '基层法院', parent: 'court-nj-zhongyuan' },
+        { id: 'court-nj-gulou', name: '南京市鼓楼区人民法院', level: '基层法院', parent: 'court-nj-zhongyuan' },
+        { id: 'court-nj-qixia', name: '南京市栖霞区人民法院', level: '基层法院', parent: 'court-nj-zhongyuan' },
+        { id: 'court-nj-jiangning', name: '南京市江宁区人民法院', level: '基层法院', parent: 'court-nj-zhongyuan' }
+    ];
+
+    // ===== 默认模型数据（按法院分组）=====
+    var defaultModelsByCourt = {
+        'court-nj-zhongyuan': [
+            {
+                id: 'm1', courtId: 'court-nj-zhongyuan',
+                name: 'TuringYitian-32B(10.30.1.2)', code: 'TuringYitian-32B',
+                provider: 'custom', category: 'DeepSeek',
+                url: 'http://10.30.1.2:1030/v1', apiKey: 'EMPTY1', maxInputLength: 30000,
+                status: '启用', isDefaultChat: true, allowChat: true, streamEnabled: true,
+                temperature: 0.7, maxTokens: 4096,
+                thinkingMode: { enabled: true, paramFormat: 'reasoning_effort', token_limit: 8192 },
+                source: 'self', referencedFrom: null
             },
-            'Qwen': {
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.7' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '4096' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' },
-                    { label: 'TopK', key: 'topK', value: '50' },
-                    { label: '频率惩罚', key: 'frequencyPenalty', value: '0' },
-                    { label: '存在惩罚', key: 'presencePenalty', value: '0' },
-                    { label: '失败重试', key: 'retryOnFailure', value: 'true' },
-                    { label: '最大重试次数', key: 'maxRetries', value: '2' },
-                    { label: '超时时间', key: 'timeout', value: '60' }
-                ]
-            },
-            'BERT': {
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 4096, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.1' },
-                    { label: '是否流式输出', key: 'stream', value: 'false' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '1024' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' }
-                ]
-            },
-            '自研': {
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.5' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '2048' }
-                ]
+            {
+                id: 'm2', courtId: 'court-nj-zhongyuan',
+                name: 'DeepSeek-V3(10.30.2.5)', code: 'deepseek-chat',
+                provider: 'deepseek', category: 'DeepSeek',
+                url: 'http://10.30.2.5:8080/v1', apiKey: '', maxInputLength: 64000,
+                status: '启用', isDefaultChat: false, allowChat: true, streamEnabled: true,
+                temperature: 0.7, maxTokens: 8192,
+                thinkingMode: { enabled: false, paramFormat: 'none', token_limit: 8192 },
+                source: 'self', referencedFrom: null
             }
+        ],
+        'court-nj-xuanwu': [
+            {
+                id: 'm3', courtId: 'court-nj-xuanwu',
+                name: 'TuringYitian-32B(10.30.1.2)', code: 'TuringYitian-32B',
+                provider: 'custom', category: 'DeepSeek',
+                url: 'http://10.30.1.2:1030/v1', apiKey: 'EMPTY1', maxInputLength: 30000,
+                status: '启用', isDefaultChat: true, allowChat: true, streamEnabled: true,
+                temperature: 0.7, maxTokens: 4096,
+                thinkingMode: { enabled: false, paramFormat: 'none', token_limit: 8192 },
+                source: 'reference', referencedFrom: 'court-nj-zhongyuan'
+            }
+        ]
+    };
+
+    // ===== 默认场景列表 =====
+    var defaultScenes = [
+        { key: 'chat', name: '对话基础问答', overridable: true, desc: '与Tab1默认对话模型联动，不可单独修改', readonly: true },
+        { key: 'doc_gen', name: '裁判文书生成', overridable: false, desc: '需要更强生成能力' },
+        { key: 'doc_review', name: '文书质量评查', overridable: false, desc: '校验场景，建议低温度' },
+        { key: 'trial_outline', name: '庭审提纲生成', overridable: false, desc: '' },
+        { key: 'law_search', name: '法条检索与校验', overridable: false, desc: '' },
+        { key: 'cause_rec', name: '案由智能推荐', overridable: false, desc: '' },
+        { key: 'evidence', name: '证据梳理', overridable: false, desc: '' },
+        { key: 'qa', name: '法律知识问答', overridable: true, desc: '' }
+    ];
+
+    // ===== 默认场景模型配置（按法院分组）=====
+    var defaultSceneModelsByCourt = {
+        'court-nj-zhongyuan': {
+            'chat': 'm1', 'doc_gen': 'm1', 'doc_review': 'm1',
+            'trial_outline': 'm1', 'law_search': 'm1', 'cause_rec': 'm1',
+            'evidence': 'm1', 'qa': 'm2'
+        },
+        'court-nj-xuanwu': {
+            'chat': 'm3', 'doc_gen': 'm3', 'doc_review': 'm3',
+            'trial_outline': 'm3', 'law_search': 'm3', 'cause_rec': 'm3',
+            'evidence': 'm3', 'qa': 'm3'
+        }
+    };
+
+    // ===== 默认法院配额 =====
+    var defaultQuotaByCourt = {
+        'court-nj-zhongyuan': { total: 10000000, used: 4500000, period: '按年', resetDate: '2027-01-01', enabled: true },
+        'court-nj-xuanwu': { total: 2000000, used: 1900000, period: '按年', resetDate: '2027-01-01', enabled: true }
+    };
+
+    // ===== 默认部门配额（按法院分组）=====
+    var defaultQuotaByDept = {
+        'court-nj-zhongyuan': [
+            { id: 'd1', name: '民一庭', quota: 1000000, used: 820000, enabled: true },
+            { id: 'd2', name: '民二庭', quota: 800000, used: 450000, enabled: true },
+            { id: 'd3', name: '执行局', quota: 800000, used: 850000, enabled: false },
+            { id: 'd4', name: '刑庭', quota: 600000, used: 380000, enabled: true }
+        ],
+        'court-nj-xuanwu': [
+            { id: 'd5', name: '立案庭', quota: 500000, used: 480000, enabled: true },
+            { id: 'd6', name: '民庭', quota: 800000, used: 760000, enabled: true }
+        ]
+    };
+
+    // ===== 默认用量明细（按法院分组）=====
+    var defaultUsageByCourt = {
+        'court-nj-zhongyuan': [
+            { time: '2026-07-25 10:32', court: '南京市中级人民法院', dept: '民一庭', model: 'TuringYitian-32B(10.30.1.2)', calls: 1240, tokens: 820000, avg: 661 },
+            { time: '2026-07-25 14:15', court: '南京市中级人民法院', dept: '民二庭', model: 'DeepSeek-V3(10.30.2.5)', calls: 560, tokens: 450000, avg: 803 },
+            { time: '2026-07-24 09:20', court: '南京市中级人民法院', dept: '执行局', model: 'TuringYitian-32B(10.30.1.2)', calls: 850, tokens: 850000, avg: 1000 },
+            { time: '2026-07-24 16:48', court: '南京市中级人民法院', dept: '刑庭', model: 'TuringYitian-32B(10.30.1.2)', calls: 380, tokens: 380000, avg: 1000 }
+        ],
+        'court-nj-xuanwu': [
+            { time: '2026-07-25 11:08', court: '南京市玄武区人民法院', dept: '立案庭', model: 'TuringYitian-32B(10.30.1.2)', calls: 480, tokens: 480000, avg: 1000 },
+            { time: '2026-07-24 15:22', court: '南京市玄武区人民法院', dept: '民庭', model: 'TuringYitian-32B(10.30.1.2)', calls: 760, tokens: 760000, avg: 1000 }
+        ]
+    };
+
+    // ===== 状态变量 =====
+    var currentCourtId = null;
+    var editingModelId = null;
+    var editingDeptId = null;
+    var DEFAULT_SAFETY_RATIO_PCT = 85;
+
+    // ===== 数据访问层 =====
+    function getModelsByCourt(courtId) {
+        var data = JSON.parse(localStorage.getItem('aiModelsByCourt') || '{}');
+        if (!data[courtId]) {
+            // 复制默认数据（深拷贝）
+            data[courtId] = (defaultModelsByCourt[courtId] || []).map(function(m){ return JSON.parse(JSON.stringify(m)); });
+            localStorage.setItem('aiModelsByCourt', JSON.stringify(data));
+        }
+        return data[courtId];
+    }
+
+    function setModelsByCourt(courtId, models) {
+        var data = JSON.parse(localStorage.getItem('aiModelsByCourt') || '{}');
+        data[courtId] = models;
+        localStorage.setItem('aiModelsByCourt', JSON.stringify(data));
+    }
+
+    function getSceneModelsByCourt(courtId) {
+        var data = JSON.parse(localStorage.getItem('aiSceneModelsByCourt') || '{}');
+        if (!data[courtId]) {
+            data[courtId] = (defaultSceneModelsByCourt[courtId] || {}) ? JSON.parse(JSON.stringify(defaultSceneModelsByCourt[courtId])) : {};
+            // 确保所有场景都有默认值（空则为空字符串）
+            defaultScenes.forEach(function(s){
+                if (!data[courtId][s.key]) data[courtId][s.key] = '';
+            });
+            localStorage.setItem('aiSceneModelsByCourt', JSON.stringify(data));
+        }
+        return data[courtId];
+    }
+
+    function setSceneModelsByCourt(courtId, sceneModels) {
+        var data = JSON.parse(localStorage.getItem('aiSceneModelsByCourt') || '{}');
+        data[courtId] = sceneModels;
+        localStorage.setItem('aiSceneModelsByCourt', JSON.stringify(data));
+    }
+
+    function getQuotaByCourt(courtId) {
+        var data = JSON.parse(localStorage.getItem('aiQuotaByCourt') || '{}');
+        if (!data[courtId] && defaultQuotaByCourt[courtId]) {
+            data[courtId] = JSON.parse(JSON.stringify(defaultQuotaByCourt[courtId]));
+            localStorage.setItem('aiQuotaByCourt', JSON.stringify(data));
+        }
+        return data[courtId] || { total: 0, used: 0, period: '按年', resetDate: '2027-01-01', enabled: true };
+    }
+
+    function setQuotaByCourt(courtId, quota) {
+        var data = JSON.parse(localStorage.getItem('aiQuotaByCourt') || '{}');
+        data[courtId] = quota;
+        localStorage.setItem('aiQuotaByCourt', JSON.stringify(data));
+    }
+
+    function getQuotaByDept(courtId) {
+        var data = JSON.parse(localStorage.getItem('aiQuotaByDept') || '{}');
+        if (!data[courtId]) {
+            data[courtId] = (defaultQuotaByDept[courtId] || []).map(function(d){ return JSON.parse(JSON.stringify(d)); });
+            localStorage.setItem('aiQuotaByDept', JSON.stringify(data));
+        }
+        return data[courtId];
+    }
+
+    function setQuotaByDept(courtId, depts) {
+        var data = JSON.parse(localStorage.getItem('aiQuotaByDept') || '{}');
+        data[courtId] = depts;
+        localStorage.setItem('aiQuotaByDept', JSON.stringify(data));
+    }
+
+    function getUsageByCourt(courtId) {
+        var data = JSON.parse(localStorage.getItem('aiUsageStats') || '{}');
+        if (!data[courtId]) {
+            data[courtId] = (defaultUsageByCourt[courtId] || []).map(function(u){ return JSON.parse(JSON.stringify(u)); });
+            localStorage.setItem('aiUsageStats', JSON.stringify(data));
+        }
+        return data[courtId];
+    }
+
+    // ===== 法院相关 =====
+    function isMiddleCourt(courtId) {
+        var court = defaultCourts.find(function(c){ return c.id === courtId; });
+        return court && court.level === '中院';
+    }
+
+    function getCourtName(courtId) {
+        var court = defaultCourts.find(function(c){ return c.id === courtId; });
+        return court ? court.name : courtId;
+    }
+
+    function getCourtLevel(courtId) {
+        var court = defaultCourts.find(function(c){ return c.id === courtId; });
+        return court ? court.level : '';
+    }
+
+    // 获取当前用户可见的法院列表
+    // 简化逻辑：默认为中院管理员可看全部，基层法院仅看本院
+    // 此处通过 localStorage.adminRole 设置当前用户身份（如未设置则默认中院管理员）
+    function getAccessibleCourts() {
+        var role = localStorage.getItem('adminRole') || 'middle';
+        if (role === 'grassroots') {
+            // 基层法院管理员仅可选本院（默认第一个基层法院）
+            var stored = localStorage.getItem('adminMyCourtId');
+            if (stored) {
+                var c = defaultCourts.find(function(x){ return x.id === stored; });
+                if (c) return [c];
+            }
+            return defaultCourts.filter(function(c){ return c.level === '基层法院'; }).slice(0, 1);
+        }
+        // 中院管理员可选所有法院
+        return defaultCourts;
+    }
+
+    function initCourtSelector() {
+        var selector = document.getElementById('courtSelector');
+        var courts = getAccessibleCourts();
+        selector.innerHTML = courts.map(function(c){
+            return '<option value="' + c.id + '">' + c.name + ' (' + c.level + ')</option>';
+        }).join('');
+        if (courts.length > 0) {
+            currentCourtId = courts[0].id;
+            selector.value = currentCourtId;
+        }
+        // 基层法院显示"引用上级模型"按钮
+        var refBtn = document.getElementById('referenceBtn');
+        if (refBtn) {
+            refBtn.style.display = isMiddleCourt(currentCourtId) ? 'none' : 'inline-flex';
+        }
+    }
+
+    function getCurrentCourtId() {
+        return currentCourtId;
+    }
+
+    function onCourtChange() {
+        currentCourtId = document.getElementById('courtSelector').value;
+        // 刷新引用按钮显隐
+        var refBtn = document.getElementById('referenceBtn');
+        if (refBtn) {
+            refBtn.style.display = isMiddleCourt(currentCourtId) ? 'none' : 'inline-flex';
+        }
+        renderModels();
+        renderScenes();
+        renderQuotaOverview();
+        renderDeptQuota();
+        renderUsage();
+        showNotification('已切换至：' + getCourtName(currentCourtId), 'success');
+    }
+
+    // ===== Tab 切换 =====
+    function switchTab(tab, evt) {
+        document.querySelectorAll('.tab-item').forEach(function(t){ t.classList.remove('active'); });
+        document.querySelectorAll('.tab-content').forEach(function(t){ t.classList.remove('active'); });
+        if (evt && evt.currentTarget) {
+            evt.currentTarget.classList.add('active');
+        } else {
+            // 通过 onclick 字符串调用时回退
+            var btns = document.querySelectorAll('.tab-item');
+            btns.forEach(function(b){
+                if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + tab + "'") !== -1) {
+                    b.classList.add('active');
+                }
+            });
+        }
+        var content = document.getElementById('tab-' + tab);
+        if (content) content.classList.add('active');
+    }
+
+    // ===== 模型部署清单（Tab1）=====
+    function renderModels() {
+        var tbody = document.getElementById('modelTableBody');
+        var search = (document.getElementById('modelSearch').value || '').toLowerCase();
+        var models = getModelsByCourt(currentCourtId);
+        var providerNames = {
+            custom: '自定义', deepseek: 'DeepSeek', qwen: 'Qwen',
+            openai: 'OpenAI', zhipu: '智谱 AI', baichuan: '百川', minimax: 'MiniMax'
         };
 
-        // ===== 默认模型数据 =====
-        var defaultModels = [
-            {
-                id: 'm1', name: 'TuringYitian-32B(10.30.1.2)', code: 'TuringYitian-32B', category: 'DeepSeek',
-                url: 'http://10.30.1.2:1030/v1', apiKey: 'EMPTY1', maxInputLength: 30000,
-                billing: '按Token', price: '￥0.008/千tokens', provider: '自研', status: '启用',
-                thinkingMode: { enabled: true, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.01' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '4096' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' }
-                ]
-            },
-            {
-                id: 'm2', name: 'Qwen-14B(10.30.1.3)', code: 'Qwen-14B', category: 'Qwen',
-                url: 'http://10.30.1.3:1030/v1', apiKey: 'EMPTY2', maxInputLength: 28000,
-                billing: '按Token', price: '￥0.004/千tokens', provider: '阿里云', status: '启用',
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.7' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '4096' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' },
-                    { label: 'TopK', key: 'topK', value: '50' },
-                    { label: '频率惩罚', key: 'frequencyPenalty', value: '0' },
-                    { label: '存在惩罚', key: 'presencePenalty', value: '0' },
-                    { label: '失败重试', key: 'retryOnFailure', value: 'true' },
-                    { label: '最大重试次数', key: 'maxRetries', value: '2' },
-                    { label: '超时时间', key: 'timeout', value: '60' }
-                ]
-            },
-            {
-                id: 'm3', name: '法律BERT抽取模型(10.30.1.4)', code: 'bert-base-law', category: 'BERT',
-                url: 'http://10.30.1.4:1030/v1', apiKey: 'EMPTY3', maxInputLength: 512,
-                billing: '按调用次数', price: '￥0.002/次', provider: '自研', status: '启用',
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 4096, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.1' },
-                    { label: '是否流式输出', key: 'stream', value: 'false' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '1024' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' }
-                ]
-            },
-            {
-                id: 'm4', name: '法条校验模型V1(10.30.1.5)', code: 'law-check-v1', category: '自研',
-                url: 'http://10.30.1.5:1030/v1', apiKey: 'EMPTY4', maxInputLength: 20000,
-                billing: '免费', price: '-', provider: '自研', status: '启用',
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.5' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '2048' }
-                ]
-            },
-            {
-                id: 'm5', name: '法律文本向量化模型(10.30.1.6)', code: 'embedding-law', category: 'Qwen',
-                url: 'http://10.30.1.6:1030/v1', apiKey: 'EMPTY5', maxInputLength: 8000,
-                billing: '按Token', price: '￥0.001/千tokens', provider: '阿里云', status: '禁用',
-                thinkingMode: { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' },
-                params: [
-                    { label: '温度', key: 'temperature', value: '0.7' },
-                    { label: '是否流式输出', key: 'stream', value: 'true' },
-                    { label: '最大生成长度', key: 'maxTokens', value: '4096' },
-                    { label: '核采样阈值', key: 'topP', value: '0.9' },
-                    { label: 'TopK', key: 'topK', value: '50' },
-                    { label: '频率惩罚', key: 'frequencyPenalty', value: '0' },
-                    { label: '存在惩罚', key: 'presencePenalty', value: '0' },
-                    { label: '失败重试', key: 'retryOnFailure', value: 'true' },
-                    { label: '最大重试次数', key: 'maxRetries', value: '2' },
-                    { label: '超时时间', key: 'timeout', value: '60' }
-                ]
-            }
-        ];
-
-        let models = JSON.parse(localStorage.getItem('adminModels')) || defaultModels;
-
-        let courts = JSON.parse(localStorage.getItem('adminCourts')) || [
-            { id: 'c1', name: '南京市中级人民法院', level: '中院', models: ['TuringYitian-32B', 'Qwen-14B', 'bert-base-law', 'law-check-v1'], quota: 2000, used: 1450, cycle: '按月', status: '正常' },
-            { id: 'c2', name: '南京市玄武区人民法院', level: '基层法院', models: ['TuringYitian-32B', 'bert-base-law', 'law-check-v1'], quota: 500, used: 420, cycle: '按月', status: '正常' },
-            { id: 'c3', name: '南京市鼓楼区人民法院', level: '基层法院', models: ['TuringYitian-32B', 'bert-base-law'], quota: 500, used: 510, cycle: '按月', status: '超额停用' },
-            { id: 'c4', name: '南京市建邺区人民法院', level: '基层法院', models: ['TuringYitian-32B', 'law-check-v1'], quota: 300, used: 180, cycle: '按月', status: '正常' },
-            { id: 'c5', name: '南京市秦淮区人民法院', level: '基层法院', models: ['TuringYitian-32B', 'Qwen-14B', 'bert-base-law', 'law-check-v1'], quota: 800, used: 620, cycle: '按月', status: '正常' }
-        ];
-
-        let alertRecords = JSON.parse(localStorage.getItem('adminAlertRecords')) || [
-            { id: 'al1', time: '2026-04-28 10:15', court: '南京市鼓楼区人民法院', type: '超额', rate: '102%', status: '未处理' },
-            { id: 'al2', time: '2026-04-27 16:30', court: '南京市鼓楼区人民法院', type: '预警', rate: '85%', status: '已处理' },
-            { id: 'al3', time: '2026-04-26 09:20', court: '南京市玄武区人民法院', type: '预警', rate: '84%', status: '已处理' }
-        ];
-
-        let usageData = [
-            { time: '2026-04', court: '南京市中级人民法院', model: 'TuringYitian-32B(10.30.1.2)', calls: 3240, tokens: '580万', avg: '1,790' },
-            { time: '2026-04', court: '南京市中级人民法院', model: 'Qwen-14B(10.30.1.3)', calls: 860, tokens: '420万', avg: '4,884' },
-            { time: '2026-04', court: '南京市玄武区人民法院', model: 'TuringYitian-32B(10.30.1.2)', calls: 1850, tokens: '310万', avg: '1,676' },
-            { time: '2026-04', court: '南京市鼓楼区人民法院', model: 'TuringYitian-32B(10.30.1.2)', calls: 2100, tokens: '420万', avg: '2,000' },
-            { time: '2026-04', court: '南京市建邺区人民法院', model: 'TuringYitian-32B(10.30.1.2)', calls: 980, tokens: '150万', avg: '1,531' },
-            { time: '2026-04', court: '南京市秦淮区人民法院', model: 'TuringYitian-32B(10.30.1.2)', calls: 1420, tokens: '240万', avg: '1,690' },
-            { time: '2026-04', court: '南京市秦淮区人民法院', model: 'Qwen-14B(10.30.1.3)', calls: 320, tokens: '180万', avg: '5,625' }
-        ];
-
-        let editingModelId = null;
-        let editingCourtId = null;
-        var currentParams = [];
-
-        document.addEventListener('DOMContentLoaded', function() {
-            renderModels();
-            renderCourts();
-            renderUsage();
-            renderAlerts();
+        var filtered = models.filter(function(m){
+            return !search || (m.name || '').toLowerCase().indexOf(search) !== -1 || (m.code || '').toLowerCase().indexOf(search) !== -1;
         });
 
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            document.getElementById('tab-' + tab).classList.add('active');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:32px;">暂无模型，请点击"新增模型"或"引用上级模型"</td></tr>';
+            return;
         }
 
-        // ===== 生成配置概览文本 =====
-        function buildConfigOverview(model) {
-            var parts = [];
-            if (model.thinkingMode && model.thinkingMode.enabled) {
-                var tmStr = '思考:开(' + (model.thinkingMode.display_style || 'collapsible') + ',' + (model.thinkingMode.token_limit || 8192);
-                if (model.thinkingMode.filter_english !== false) {
-                    tmStr += ',英文过滤:' + (model.thinkingMode.english_filter_mode || 'remove');
-                }
-                tmStr += ')';
-                parts.push(tmStr);
+        tbody.innerHTML = filtered.map(function(m){
+            var defaultBadge = (m.isDefaultChat === true) ? ' <span class="badge badge-info">默认</span>' : '';
+            var chatBlocked = (m.allowChat === false) ? ' <span class="badge badge-muted">禁对话</span>' : '';
+            var urlDisplay = m.url || '-';
+            if (urlDisplay.length > 32) urlDisplay = urlDisplay.substring(0, 32) + '...';
+            var sourceLabel = m.source === 'reference' ? '<span class="badge badge-warning">引用自' + escapeHtml(getCourtName(m.referencedFrom)) + '</span>' : '<span class="badge badge-success">自建</span>';
+            var statusBadge = m.status === '启用' ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-muted">禁用</span>';
+            var defaultMark = (m.isDefaultChat === true) ? '<i class="fas fa-check-circle" style="color:var(--accent-success);"></i>' : '<span style="color:var(--text-muted);">-</span>';
+            var actions = '';
+            if (m.source === 'reference') {
+                actions = '<button class="action-btn" title="查看配置" onclick="openViewModelModal(\'' + m.id + '\')"><i class="fas fa-eye"></i></button>' +
+                    '<button class="action-btn" title="取消引用" onclick="deleteModel(\'' + m.id + '\')"><i class="fas fa-unlink"></i></button>';
             } else {
-                parts.push('思考:关');
+                actions = '<button class="action-btn" title="编辑" onclick="openEditModelModal(\'' + m.id + '\')"><i class="fas fa-edit"></i></button>' +
+                    '<button class="action-btn" title="查看配置" onclick="openViewModelModal(\'' + m.id + '\')"><i class="fas fa-eye"></i></button>' +
+                    '<button class="action-btn" title="删除" onclick="deleteModel(\'' + m.id + '\')"><i class="fas fa-trash-alt"></i></button>';
             }
-            if (model.params && model.params.length > 0) {
-                model.params.forEach(function(p) {
-                    parts.push(p.key + ':' + p.value);
-                });
+            return '<tr>' +
+                '<td style="font-weight:500;">' + escapeHtml(m.name) + defaultBadge + chatBlocked + '<br><code style="font-size:12px; background:var(--bg-primary); padding:2px 6px; border-radius:4px;">' + escapeHtml(m.code) + '</code></td>' +
+                '<td><span class="badge ' + categoryBadgeClass(m.category) + '">' + escapeHtml(providerNames[m.provider] || m.provider || '自定义') + '</span></td>' +
+                '<td style="font-size:13px; color:var(--text-secondary);" title="' + escapeHtml(m.url || '') + '">' + escapeHtml(urlDisplay) + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td style="text-align:center;">' + defaultMark + '</td>' +
+                '<td>' + sourceLabel + '</td>' +
+                '<td><div class="table-actions">' + actions + '</div></td>' +
+            '</tr>';
+        }).join('');
+    }
+
+    function categoryBadgeClass(cat) {
+        switch(cat) {
+            case 'DeepSeek': return 'badge-info';
+            case 'Qwen': return 'badge-warning';
+            case 'BERT': return 'badge-success';
+            case '自研': return 'badge-muted';
+            default: return 'badge-muted';
+        }
+    }
+
+    function filterModels() { renderModels(); }
+
+    // ===== 服务商默认配置 =====
+    function providerDefaultConfig(provider) {
+        switch (provider) {
+            case 'deepseek': return { urlPrefix: 'https://api.deepseek.com/v1', paramFormat: 'reasoning_effort', category: 'DeepSeek' };
+            case 'qwen':     return { urlPrefix: 'https://dashscope.aliyuncs.com/compatible-mode/v1', paramFormat: 'thinking', category: 'Qwen' };
+            case 'openai':   return { urlPrefix: 'https://api.openai.com/v1', paramFormat: 'reasoning_effort', category: '自研' };
+            case 'zhipu':    return { urlPrefix: 'https://open.bigmodel.cn/api/paas/v4', paramFormat: 'thinking', category: '自研' };
+            case 'baichuan': return { urlPrefix: 'https://api.baichuan-ai.com/v1', paramFormat: 'thinking', category: '自研' };
+            case 'minimax':  return { urlPrefix: 'https://api.minimax.chat/v1', paramFormat: 'none', category: '自研' };
+            case 'custom':
+            default:         return { urlPrefix: '', paramFormat: 'none', category: '自研' };
+        }
+    }
+
+    function onProviderChange() {
+        var provider = document.getElementById('modelProvider').value;
+        var cfg = providerDefaultConfig(provider);
+        var urlInput = document.getElementById('modelUrl');
+        // 仅在新增模型且 URL 为空时自动填充
+        if (!editingModelId && !urlInput.value.trim() && cfg.urlPrefix) {
+            urlInput.value = cfg.urlPrefix;
+        }
+        var pfSelect = document.getElementById('thinkingParamFormat');
+        if (pfSelect && cfg.paramFormat) {
+            pfSelect.value = cfg.paramFormat;
+        }
+        if (cfg.category) {
+            var catSelect = document.getElementById('modelCategory');
+            if (catSelect) catSelect.value = cfg.category;
+        }
+    }
+
+    // ===== 测试连接 =====
+    function testConnection() {
+        var url = document.getElementById('modelUrl').value.trim();
+        var code = document.getElementById('modelCode').value.trim();
+        var btn = document.getElementById('testConnBtn');
+        var result = document.getElementById('testConnResult');
+        if (!url || !code) {
+            result.innerHTML = '<span style="color:var(--accent-danger);"><i class="fas fa-times-circle"></i> 请先填写模型名称与 API 地址</span>';
+            return;
+        }
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>测试中...';
+        result.innerHTML = '<span style="color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> 正在连接 ' + (url.length > 30 ? url.substring(0, 30) + '...' : url) + '</span>';
+        setTimeout(function() {
+            if (url.indexOf('http') === 0) {
+                if (Math.random() > 0.1) {
+                    result.innerHTML = '<span style="color:var(--accent-success);"><i class="fas fa-check-circle"></i> 连接成功（响应耗时 ' + (Math.floor(Math.random() * 200) + 80) + 'ms）</span>';
+                } else {
+                    result.innerHTML = '<span style="color:var(--accent-warning);"><i class="fas fa-exclamation-circle"></i> 连接超时，请检查网络或 API 地址</span>';
+                }
+            } else {
+                result.innerHTML = '<span style="color:var(--accent-danger);"><i class="fas fa-times-circle"></i> API 地址格式无效，需以 http:// 或 https:// 开头</span>';
             }
-            return parts.join(' | ');
-        }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-wifi"></i>测试连接';
+        }, 1500);
+    }
 
-        // ===== 模型分类 badge 颜色 =====
-        function categoryBadgeClass(cat) {
-            switch(cat) {
-                case 'DeepSeek': return 'badge-info';
-                case 'Qwen': return 'badge-warning';
-                case 'BERT': return 'badge-success';
-                case '自研': return 'badge-muted';
-                default: return 'badge-muted';
-            }
-        }
-
-        // ===== 渲染模型列表 =====
-        function renderModels() {
-            const tbody = document.getElementById('modelTableBody');
-            const search = document.getElementById('modelSearch').value.toLowerCase();
-            const filtered = models.filter(m => !search || m.name.toLowerCase().includes(search) || m.code.toLowerCase().includes(search));
-
-            tbody.innerHTML = filtered.map(m => {
-                var overview = buildConfigOverview(m);
-                var urlDisplay = m.url || '-';
-                if (urlDisplay.length > 30) urlDisplay = urlDisplay.substring(0, 30) + '...';
-                return '<tr>' +
-                    '<td style="font-weight: 500;">' + m.name + '</td>' +
-                    '<td><code style="font-size: 13px; background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">' + m.code + '</code></td>' +
-                    '<td style="font-size: 13px; color: var(--text-secondary);" title="' + (m.url || '') + '">' + urlDisplay + '</td>' +
-                    '<td><span class="badge ' + categoryBadgeClass(m.category) + '">' + (m.category || '-') + '</span></td>' +
-                    '<td><div class="config-overview">' + overview + '</div></td>' +
-                    '<td><span class="badge ' + (m.status === '启用' ? 'badge-success' : 'badge-muted') + '">' + m.status + '</span></td>' +
-                    '<td><div class="table-actions">' +
-                        '<button class="action-btn" title="编辑" onclick="openEditModelModal(\'' + m.id + '\')"><i class="fas fa-edit"></i></button>' +
-                        '<button class="action-btn" title="查看配置" onclick="openViewModelModal(\'' + m.id + '\')"><i class="fas fa-eye"></i></button>' +
-                    '</div></td>' +
-                '</tr>';
-            }).join('');
-        }
-
-        function filterModels() { renderModels(); }
-
-        // ===== 参数编辑器 =====
-        function renderParamsTable() {
-            var tbody = document.getElementById('paramsTableBody');
-            if (currentParams.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">暂无参数，请点击"添加参数"或"加载默认模板"</td></tr>';
+    // ===== 默认对话模型互斥处理 =====
+    function onDefaultChatToggle() {
+        var checked = document.getElementById('modelIsDefaultChat').checked;
+        if (!checked) return;
+        var models = getModelsByCourt(currentCourtId);
+        var otherDefaults = models.filter(function(m){
+            return m.isDefaultChat === true && m.id !== editingModelId;
+        });
+        if (otherDefaults.length > 0) {
+            var names = otherDefaults.map(function(m){ return m.name; }).join('、');
+            if (!confirm('设为默认对话模型后，以下模型的默认标记将被取消：\n  ' + names + '\n\n是否继续？')) {
+                document.getElementById('modelIsDefaultChat').checked = false;
                 return;
             }
-            tbody.innerHTML = currentParams.map(function(p, i) {
-                return '<tr>' +
-                    '<td><input type="text" value="' + escapeHtml(p.label) + '" onchange="updateParam(' + i + ', \'label\', this.value)" placeholder="中文名称"></td>' +
-                    '<td><input type="text" value="' + escapeHtml(p.key) + '" onchange="updateParam(' + i + ', \'key\', this.value)" placeholder="参数Key"></td>' +
-                    '<td><input type="text" value="' + escapeHtml(p.value) + '" onchange="updateParam(' + i + ', \'value\', this.value)" placeholder="参数值"></td>' +
-                    '<td><button type="button" class="kv-delete-btn" onclick="removeParamRow(' + i + ')" title="删除"><i class="fas fa-trash-alt"></i></button></td>' +
-                '</tr>';
-            }).join('');
+        }
+    }
+
+    // ===== 思考模式开关联动 =====
+    function onThinkingToggle() {
+        var enabled = document.getElementById('thinkingEnabled').checked;
+        var card = document.getElementById('thinkingCard');
+        if (enabled) {
+            card.classList.remove('disabled');
+        } else {
+            card.classList.add('disabled');
+        }
+        updateAdvancedSummary();
+    }
+
+    // ===== 高级配置折叠区 =====
+    function toggleAdvanced() {
+        var header = document.getElementById('advancedCollapse');
+        header.classList.toggle('expanded');
+    }
+
+    function updateAdvancedSummary() {
+        var enabled = document.getElementById('thinkingEnabled').checked;
+        var summary = document.getElementById('advancedSummary');
+        if (enabled) {
+            var format = document.getElementById('thinkingParamFormat').value;
+            var limit = document.getElementById('thinkingTokenLimit').value;
+            summary.textContent = '思考模式：开启（' + format + ', ' + limit + ' tokens）';
+        } else {
+            summary.textContent = '思考模式：关闭';
+        }
+    }
+
+    // ===== 新增模型弹窗 =====
+    function openModelModal() {
+        editingModelId = null;
+        document.getElementById('modelModalTitle').textContent = '新增模型';
+        document.getElementById('modelEditId').value = '';
+        document.getElementById('modelName').value = '';
+        document.getElementById('modelCode').value = '';
+        document.getElementById('modelCode').disabled = false;
+        document.getElementById('modelProvider').value = 'custom';
+        document.getElementById('modelCategory').value = 'DeepSeek';
+        document.getElementById('modelStatus').value = '启用';
+        document.getElementById('modelUrl').value = '';
+        document.getElementById('modelApiKey').value = '';
+        document.getElementById('modelMaxInputLength').value = '0';
+        document.getElementById('modelTemperature').value = '0.7';
+        document.getElementById('modelMaxTokens').value = '4096';
+        document.getElementById('modelStreamEnabled').checked = true;
+        document.getElementById('modelIsDefaultChat').checked = false;
+        document.getElementById('modelAllowChat').checked = true;
+        document.getElementById('thinkingEnabled').checked = false;
+        document.getElementById('thinkingParamFormat').value = 'none';
+        document.getElementById('thinkingTokenLimit').value = '8192';
+        var testResult = document.getElementById('testConnResult');
+        if (testResult) testResult.innerHTML = '';
+        onThinkingToggle();
+        // 重置折叠区为收起
+        var collapse = document.getElementById('advancedCollapse');
+        if (collapse) collapse.classList.remove('expanded');
+        document.getElementById('modelModal').classList.add('show');
+    }
+
+    // ===== 编辑模型弹窗 =====
+    function openEditModelModal(id) {
+        var models = getModelsByCourt(currentCourtId);
+        var model = models.find(function(m){ return m.id === id; });
+        if (!model) return;
+        editingModelId = id;
+        document.getElementById('modelModalTitle').textContent = '编辑模型';
+        document.getElementById('modelEditId').value = id;
+        document.getElementById('modelName').value = model.name || '';
+        document.getElementById('modelCode').value = model.code || '';
+        document.getElementById('modelCode').disabled = true;
+        document.getElementById('modelProvider').value = model.provider || 'custom';
+        document.getElementById('modelCategory').value = model.category || 'DeepSeek';
+        document.getElementById('modelStatus').value = model.status || '启用';
+        document.getElementById('modelUrl').value = model.url || '';
+        document.getElementById('modelApiKey').value = model.apiKey || '';
+        document.getElementById('modelMaxInputLength').value = model.maxInputLength || 0;
+        document.getElementById('modelTemperature').value = model.temperature != null ? model.temperature : 0.7;
+        document.getElementById('modelMaxTokens').value = model.maxTokens || 4096;
+        document.getElementById('modelStreamEnabled').checked = model.streamEnabled !== false;
+        document.getElementById('modelIsDefaultChat').checked = model.isDefaultChat === true;
+        document.getElementById('modelAllowChat').checked = model.allowChat !== false;
+        var tm = model.thinkingMode || { enabled: false, paramFormat: 'none', token_limit: 8192 };
+        document.getElementById('thinkingEnabled').checked = tm.enabled;
+        document.getElementById('thinkingParamFormat').value = tm.paramFormat || 'none';
+        document.getElementById('thinkingTokenLimit').value = tm.token_limit || 8192;
+        var testResult = document.getElementById('testConnResult');
+        if (testResult) testResult.innerHTML = '';
+        onThinkingToggle();
+        var collapse = document.getElementById('advancedCollapse');
+        if (collapse) collapse.classList.remove('expanded');
+        document.getElementById('modelModal').classList.add('show');
+    }
+
+    function closeModelModal() {
+        document.getElementById('modelModal').classList.remove('show');
+        editingModelId = null;
+    }
+
+    // ===== 保存模型 =====
+    function saveModel() {
+        var name = document.getElementById('modelName').value.trim();
+        var code = document.getElementById('modelCode').value.trim();
+        var provider = document.getElementById('modelProvider').value;
+        var category = document.getElementById('modelCategory').value;
+        var status = document.getElementById('modelStatus').value;
+        var url = document.getElementById('modelUrl').value.trim();
+        var apiKey = document.getElementById('modelApiKey').value.trim();
+        var maxInputLength = parseInt(document.getElementById('modelMaxInputLength').value) || 0;
+        var temperature = parseFloat(document.getElementById('modelTemperature').value);
+        if (isNaN(temperature)) temperature = 0.7;
+        var maxTokens = parseInt(document.getElementById('modelMaxTokens').value) || 4096;
+        var streamEnabled = document.getElementById('modelStreamEnabled').checked;
+        var isDefaultChat = document.getElementById('modelIsDefaultChat').checked;
+        var allowChat = document.getElementById('modelAllowChat').checked;
+        var thinkingEnabled = document.getElementById('thinkingEnabled').checked;
+        var thinkingParamFormat = document.getElementById('thinkingParamFormat').value;
+        var thinkingTokenLimit = parseInt(document.getElementById('thinkingTokenLimit').value) || 8192;
+
+        if (!name || !code || !url) {
+            showNotification('请填写必填项（名称、模型名称、API 地址）', 'error');
+            return;
         }
 
-        function addParamRow() {
-            currentParams.push({ label: '', key: '', value: '' });
-            renderParamsTable();
-        }
+        var models = getModelsByCourt(currentCourtId);
+        var thinkingMode = {
+            enabled: thinkingEnabled,
+            paramFormat: thinkingParamFormat,
+            token_limit: thinkingTokenLimit
+        };
 
-        function removeParamRow(index) {
-            currentParams.splice(index, 1);
-            renderParamsTable();
-        }
-
-        function updateParam(index, field, value) {
-            if (currentParams[index]) {
-                currentParams[index][field] = value;
-            }
-        }
-
-        function loadDefaultTemplate() {
-            var category = document.getElementById('modelCategory').value;
-            var tpl = defaultTemplates[category];
-            if (!tpl) return;
-
-            currentParams = tpl.params.map(function(p) { return { label: p.label, key: p.key, value: p.value }; });
-
-            // 同步思考模式
-            document.getElementById('thinkingEnabled').checked = tpl.thinkingMode.enabled;
-            document.getElementById('thinkingDisplayStyle').value = tpl.thinkingMode.display_style;
-            document.getElementById('thinkingTokenLimit').value = tpl.thinkingMode.token_limit;
-            document.getElementById('thinkingFilterEnglish').checked = tpl.thinkingMode.filter_english !== false;
-            document.getElementById('thinkingFilterMode').value = tpl.thinkingMode.english_filter_mode || 'remove';
-            onThinkingToggle();
-            onFilterEnglishToggle();
-
-            renderParamsTable();
-            showNotification('已加载' + category + '类默认模板', 'success');
-        }
-
-        function onThinkingToggle() {
-            var enabled = document.getElementById('thinkingEnabled').checked;
-            var card = document.getElementById('thinkingCard');
-            if (enabled) {
-                card.classList.remove('disabled');
-            } else {
-                card.classList.add('disabled');
-            }
-            onFilterEnglishToggle();
-        }
-
-        function onFilterEnglishToggle() {
-            var filterEnglish = document.getElementById('thinkingFilterEnglish').checked;
-            var filterModeGroup = document.getElementById('filterModeGroup');
-            var filterModeSelect = document.getElementById('thinkingFilterMode');
-            if (filterEnglish) {
-                filterModeGroup.style.opacity = '1';
-                filterModeSelect.disabled = false;
-            } else {
-                filterModeGroup.style.opacity = '0.5';
-                filterModeSelect.disabled = true;
-            }
-        }
-
-        // ===== 分类切换确认 =====
-        var previousCategory = 'DeepSeek';
-        function onCategoryChange() {
-            var newCat = document.getElementById('modelCategory').value;
-            if (editingModelId && newCat !== previousCategory) {
-                if (!confirm('切换分类将重置模型参数为该分类的默认模板，是否继续？')) {
-                    document.getElementById('modelCategory').value = previousCategory;
-                    return;
-                }
-                // 加载新分类的默认模板
-                var tpl = defaultTemplates[newCat];
-                if (tpl) {
-                    currentParams = tpl.params.map(function(p) { return { label: p.label, key: p.key, value: p.value }; });
-                    document.getElementById('thinkingEnabled').checked = tpl.thinkingMode.enabled;
-                    document.getElementById('thinkingDisplayStyle').value = tpl.thinkingMode.display_style;
-                    document.getElementById('thinkingTokenLimit').value = tpl.thinkingMode.token_limit;
-                    document.getElementById('thinkingFilterEnglish').checked = tpl.thinkingMode.filter_english !== false;
-                    document.getElementById('thinkingFilterMode').value = tpl.thinkingMode.english_filter_mode || 'remove';
-                    onThinkingToggle();
-                    onFilterEnglishToggle();
-                    renderParamsTable();
-                }
-            }
-            previousCategory = newCat;
-        }
-
-        // ===== 新增模型弹窗 =====
-        function openModelModal() {
-            editingModelId = null;
-            previousCategory = 'DeepSeek';
-            document.getElementById('modelModalTitle').textContent = '新增模型';
-            document.getElementById('modelEditId').value = '';
-            document.getElementById('modelCode').value = '';
-            document.getElementById('modelCode').disabled = false;
-            document.getElementById('modelName').value = '';
-            document.getElementById('modelCategory').value = 'DeepSeek';
-            document.getElementById('modelStatus').value = '启用';
-            document.getElementById('modelUrl').value = '';
-            document.getElementById('modelApiKey').value = '';
-            document.getElementById('modelMaxInputLength').value = '0';
-            document.getElementById('modelBilling').value = '按Token';
-            document.getElementById('modelPrice').value = '';
-            document.getElementById('modelProvider').value = '';
-            document.getElementById('thinkingEnabled').checked = false;
-            document.getElementById('thinkingDisplayStyle').value = 'collapsible';
-            document.getElementById('thinkingTokenLimit').value = '8192';
-            document.getElementById('thinkingFilterEnglish').checked = true;
-            document.getElementById('thinkingFilterMode').value = 'remove';
-            onThinkingToggle();
-            onFilterEnglishToggle();
-            currentParams = [];
-            renderParamsTable();
-            document.getElementById('modelModal').classList.add('show');
-        }
-
-        // ===== 编辑模型弹窗 =====
-        function openEditModelModal(id) {
-            const model = models.find(m => m.id === id);
-            if (!model) return;
-            editingModelId = id;
-            previousCategory = model.category || 'DeepSeek';
-            document.getElementById('modelModalTitle').textContent = '编辑模型';
-            document.getElementById('modelEditId').value = id;
-            document.getElementById('modelCode').value = model.code;
-            document.getElementById('modelCode').disabled = true;
-            document.getElementById('modelName').value = model.name;
-            document.getElementById('modelCategory').value = model.category || 'DeepSeek';
-            document.getElementById('modelStatus').value = model.status;
-            document.getElementById('modelUrl').value = model.url || '';
-            document.getElementById('modelApiKey').value = model.apiKey || '';
-            document.getElementById('modelMaxInputLength').value = model.maxInputLength || 0;
-            document.getElementById('modelBilling').value = model.billing || '按Token';
-            document.getElementById('modelPrice').value = (model.price && model.price !== '-') ? model.price : '';
-            document.getElementById('modelProvider').value = model.provider || '';
-
-            var tm = model.thinkingMode || { enabled: false, display_style: 'collapsible', token_limit: 8192, filter_english: true, english_filter_mode: 'remove' };
-            document.getElementById('thinkingEnabled').checked = tm.enabled;
-            document.getElementById('thinkingDisplayStyle').value = tm.display_style || 'collapsible';
-            document.getElementById('thinkingTokenLimit').value = tm.token_limit || 8192;
-            document.getElementById('thinkingFilterEnglish').checked = tm.filter_english !== false;
-            document.getElementById('thinkingFilterMode').value = tm.english_filter_mode || 'remove';
-            onThinkingToggle();
-            onFilterEnglishToggle();
-
-            currentParams = (model.params || []).map(function(p) { return { label: p.label, key: p.key, value: p.value }; });
-            renderParamsTable();
-
-            document.getElementById('modelModal').classList.add('show');
-        }
-
-        function closeModelModal() { document.getElementById('modelModal').classList.remove('show'); editingModelId = null; }
-
-        // ===== 保存模型 =====
-        function saveModel() {
-            const code = document.getElementById('modelCode').value.trim();
-            const name = document.getElementById('modelName').value.trim();
-            const category = document.getElementById('modelCategory').value;
-            const status = document.getElementById('modelStatus').value;
-            const url = document.getElementById('modelUrl').value.trim();
-            const apiKey = document.getElementById('modelApiKey').value.trim();
-            const maxInputLength = parseInt(document.getElementById('modelMaxInputLength').value) || 0;
-            const billing = document.getElementById('modelBilling').value;
-            const price = document.getElementById('modelPrice').value.trim() || '-';
-            const provider = document.getElementById('modelProvider').value.trim();
-
-            const thinkingEnabled = document.getElementById('thinkingEnabled').checked;
-            const thinkingDisplayStyle = document.getElementById('thinkingDisplayStyle').value;
-            const thinkingTokenLimit = parseInt(document.getElementById('thinkingTokenLimit').value) || 8192;
-            const thinkingFilterEnglish = document.getElementById('thinkingFilterEnglish').checked;
-            const thinkingFilterMode = document.getElementById('thinkingFilterMode').value;
-
-            if (!code || !name || !url || !apiKey) { showNotification('请填写必填项（名称、编码、URL、ApiKey）', 'error'); return; }
-
-            var thinkingMode = {
-                enabled: thinkingEnabled,
-                display_style: thinkingDisplayStyle,
-                token_limit: thinkingTokenLimit,
-                filter_english: thinkingFilterEnglish,
-                english_filter_mode: thinkingFilterMode
-            };
-
-            var params = currentParams.filter(function(p) { return p.key.trim() !== ''; });
-
-            if (editingModelId) {
-                const model = models.find(m => m.id === editingModelId);
-                if (model) {
-                    Object.assign(model, { name, category, status, url, apiKey, maxInputLength, billing, price, provider, thinkingMode, params });
-                }
-                showNotification('模型已更新', 'success');
-            } else {
-                if (models.some(m => m.code === code)) { showNotification('模型编码已存在', 'error'); return; }
-                models.push({ id: 'm' + Date.now(), code, name, category, status, url, apiKey, maxInputLength, billing, price, provider, thinkingMode, params });
-                showNotification('模型已添加', 'success');
-            }
-            saveToStorage(); renderModels(); closeModelModal();
-        }
-
-        // ===== 查看配置弹窗 =====
-        function openViewModelModal(id) {
-            var model = models.find(m => m.id === id);
-            if (!model) return;
-
-            var html = '';
-
-            // 基础信息
-            html += '<div class="view-section">';
-            html += '<div class="view-section-title"><i class="fas fa-info-circle"></i>基础信息</div>';
-            html += '<div class="view-grid">';
-            html += '<div class="view-item"><span class="view-item-label">名称</span><span class="view-item-value">' + escapeHtml(model.name) + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">编码</span><span class="view-item-value"><code>' + escapeHtml(model.code) + '</code></span></div>';
-            html += '<div class="view-item"><span class="view-item-label">模型分类</span><span class="view-item-value">' + escapeHtml(model.category || '-') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">状态</span><span class="view-item-value">' + escapeHtml(model.status) + '</span></div>';
-            html += '</div></div>';
-
-            // 连接配置
-            html += '<div class="view-section">';
-            html += '<div class="view-section-title"><i class="fas fa-plug"></i>连接配置</div>';
-            html += '<div class="view-grid">';
-            html += '<div class="view-item"><span class="view-item-label">URL</span><span class="view-item-value" style="word-break:break-all;">' + escapeHtml(model.url || '-') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">ApiKey</span><span class="view-item-value">' + escapeHtml(model.apiKey || '-') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">最大输入长度</span><span class="view-item-value">' + (model.maxInputLength || 0) + (model.maxInputLength === 0 ? '（不限制）' : '') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">计费方式</span><span class="view-item-value">' + escapeHtml(model.billing || '-') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">单价说明</span><span class="view-item-value">' + escapeHtml(model.price || '-') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">提供方</span><span class="view-item-value">' + escapeHtml(model.provider || '-') + '</span></div>';
-            html += '</div></div>';
-
-            // 思考模式
-            html += '<div class="view-section">';
-            html += '<div class="view-section-title"><i class="fas fa-brain"></i>思考模式</div>';
-            var tm = model.thinkingMode || { enabled: false, display_style: 'collapsible', token_limit: 8192 };
-            html += '<div class="view-thinking-card">';
-            html += '<div class="view-thinking-title"><i class="fas fa-brain"></i>思考模式配置</div>';
-            html += '<div class="view-grid">';
-            html += '<div class="view-item"><span class="view-item-label">是否启用</span><span class="view-item-value">' + (tm.enabled ? '是' : '否') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">展示方式</span><span class="view-item-value">' + escapeHtml(tm.display_style || 'collapsible') + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">思考Token上限</span><span class="view-item-value">' + (tm.token_limit || 8192) + '</span></div>';
-            html += '<div class="view-item"><span class="view-item-label">英文过滤</span><span class="view-item-value">' + (tm.filter_english !== false ? '开启' : '关闭') + '</span></div>';
-            if (tm.filter_english !== false) {
-                html += '<div class="view-item"><span class="view-item-label">过滤模式</span><span class="view-item-value">' + escapeHtml(tm.english_filter_mode || 'remove') + '</span></div>';
-            }
-            html += '</div></div></div>';
-
-            // 参数分组
-            html += '<div class="view-section">';
-            html += '<div class="view-section-title"><i class="fas fa-sliders-h"></i>模型参数</div>';
-
-            var hyperParams = [];
-            var otherParams = [];
-            var hyperKeys = ['temperature', 'stream', 'maxTokens', 'topP', 'topK', 'frequencyPenalty', 'presencePenalty'];
-            (model.params || []).forEach(function(p) {
-                if (hyperKeys.indexOf(p.key) !== -1) {
-                    hyperParams.push(p);
-                } else {
-                    otherParams.push(p);
+        // 默认对话模型互斥
+        if (isDefaultChat) {
+            models.forEach(function(m){
+                if (m.id !== editingModelId && m.isDefaultChat === true) {
+                    m.isDefaultChat = false;
                 }
             });
-
-            if (hyperParams.length > 0) {
-                html += '<div class="view-params-group">';
-                html += '<div class="view-params-group-title">超参组</div>';
-                html += '<table class="view-params-table">';
-                hyperParams.forEach(function(p) {
-                    html += '<tr><td>' + escapeHtml(p.label) + '</td><td>' + escapeHtml(p.key) + '</td><td>' + escapeHtml(p.value) + '</td></tr>';
-                });
-                html += '</table></div>';
-            }
-
-            if (otherParams.length > 0) {
-                html += '<div class="view-params-group">';
-                html += '<div class="view-params-group-title">其他配置组</div>';
-                html += '<table class="view-params-table">';
-                otherParams.forEach(function(p) {
-                    html += '<tr><td>' + escapeHtml(p.label) + '</td><td>' + escapeHtml(p.key) + '</td><td>' + escapeHtml(p.value) + '</td></tr>';
-                });
-                html += '</table></div>';
-            }
-
-            if (hyperParams.length === 0 && otherParams.length === 0) {
-                html += '<div style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">暂无参数配置</div>';
-            }
-
-            html += '</div>';
-
-            document.getElementById('viewModelBody').innerHTML = html;
-            document.getElementById('viewModelModal').classList.add('show');
+            // 同步场景模型：对话基础问答场景联动
+            var sceneModels = getSceneModelsByCourt(currentCourtId);
+            sceneModels['chat'] = editingModelId || null;
+            setSceneModelsByCourt(currentCourtId, sceneModels);
         }
 
-        function closeViewModelModal() { document.getElementById('viewModelModal').classList.remove('show'); }
-
-        // ===== HTML转义 =====
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        }
-
-        // ===== 法院授权相关 =====
-        function renderCourts() {
-            const tbody = document.getElementById('courtTableBody');
-            const search = document.getElementById('courtSearch').value.toLowerCase();
-            const level = document.getElementById('courtLevelFilter').value;
-            const status = document.getElementById('courtStatusFilter').value;
-            const filtered = courts.filter(c => {
-                if (search && !c.name.toLowerCase().includes(search)) return false;
-                if (level && c.level !== level) return false;
-                if (status && c.status !== status) return false;
-                return true;
+        if (editingModelId) {
+            var model = models.find(function(m){ return m.id === editingModelId; });
+            if (model) {
+                model.name = name;
+                model.provider = provider;
+                model.category = category;
+                model.status = status;
+                model.url = url;
+                model.apiKey = apiKey;
+                model.maxInputLength = maxInputLength;
+                model.temperature = temperature;
+                model.maxTokens = maxTokens;
+                model.streamEnabled = streamEnabled;
+                model.isDefaultChat = isDefaultChat;
+                model.allowChat = allowChat;
+                model.thinkingMode = thinkingMode;
+            }
+            showNotification('模型已更新', 'success');
+        } else {
+            // 新增：检查 code 是否已存在
+            if (models.some(function(m){ return m.code === code; })) {
+                showNotification('模型名称（code）已存在', 'error');
+                return;
+            }
+            var newId = 'm' + Date.now();
+            models.push({
+                id: newId, courtId: currentCourtId,
+                name: name, code: code, provider: provider, category: category,
+                url: url, apiKey: apiKey, maxInputLength: maxInputLength,
+                status: status, isDefaultChat: isDefaultChat, allowChat: allowChat,
+                streamEnabled: streamEnabled, temperature: temperature, maxTokens: maxTokens,
+                thinkingMode: thinkingMode, source: 'self', referencedFrom: null
             });
-
-            tbody.innerHTML = filtered.map(c => {
-                const rate = Math.round(c.used / c.quota * 100);
-                const barClass = rate >= 100 ? 'red' : rate >= 80 ? 'orange' : 'green';
-                const modelNames = c.models.map(mCode => {
-                    const m = models.find(ml => ml.code === mCode);
-                    return m ? m.name : mCode;
-                });
-                return '<tr>' +
-                    '<td style="font-weight: 500;">' + c.name + '</td>' +
-                    '<td><span class="badge ' + (c.level === '中院' ? 'badge-info' : 'badge-muted') + '">' + c.level + '</span></td>' +
-                    '<td><div class="model-tags">' + modelNames.map(n => '<span class="model-tag">' + n + '</span>').join('') + '</div></td>' +
-                    '<td>' + c.quota + '万</td>' +
-                    '<td style="min-width: 150px;">' +
-                        '<div class="progress-bar"><div class="progress-fill ' + barClass + '" style="width: ' + Math.min(rate, 100) + '%;"></div></div>' +
-                        '<div class="usage-text">' + c.used + '万 / ' + c.quota + '万 (' + rate + '%)</div>' +
-                    '</td>' +
-                    '<td><span class="badge ' + (c.status === '正常' ? 'badge-success' : 'badge-danger') + '">' + c.status + '</span></td>' +
-                    '<td><div class="table-actions">' +
-                        '<button class="action-btn" title="配置" onclick="openEditCourtModal(\'' + c.id + '\')"><i class="fas fa-cog"></i></button>' +
-                        '<button class="action-btn" title="调整额度" onclick="adjustQuota(\'' + c.id + '\')"><i class="fas fa-sliders-h"></i></button>' +
-                    '</div></td>' +
-                '</tr>';
-            }).join('');
+            // 若法院只有1个模型，自动设为默认对话模型
+            if (models.length === 1) {
+                models[0].isDefaultChat = true;
+                var sm = getSceneModelsByCourt(currentCourtId);
+                sm['chat'] = newId;
+                setSceneModelsByCourt(currentCourtId, sm);
+            }
+            showNotification('模型已添加', 'success');
         }
+        setModelsByCourt(currentCourtId, models);
+        renderModels();
+        renderScenes();
+        closeModelModal();
+    }
 
-        function filterCourts() { renderCourts(); }
+    // ===== 查看配置弹窗 =====
+    function openViewModelModal(id) {
+        var models = getModelsByCourt(currentCourtId);
+        var model = models.find(function(m){ return m.id === id; });
+        if (!model) return;
+        var providerNames = {
+            custom: '自定义（OpenAI 兼容接口）', deepseek: 'DeepSeek', qwen: '阿里云通义（Qwen）',
+            openai: 'OpenAI', zhipu: '智谱 AI', baichuan: '百川', minimax: 'MiniMax'
+        };
+        var paramFormatNames = {
+            none: '不写入思考参数', reasoning_effort: 'reasoning_effort（OpenAI o 系列）',
+            thinking: 'thinking（Qwen3/Doubao）', budget_tokens: 'budget_tokens（Claude）'
+        };
+        var html = '';
+        html += '<div class="view-section">';
+        html += '<div class="view-section-title"><i class="fas fa-info-circle"></i>基础信息</div>';
+        html += '<div class="view-grid">';
+        html += '<div class="view-item"><span class="view-item-label">名称</span><span class="view-item-value">' + escapeHtml(model.name) + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">模型名称</span><span class="view-item-value"><code>' + escapeHtml(model.code) + '</code></span></div>';
+        html += '<div class="view-item"><span class="view-item-label">服务商</span><span class="view-item-value">' + escapeHtml(providerNames[model.provider] || model.provider || '-') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">模型分类</span><span class="view-item-value">' + escapeHtml(model.category || '-') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">状态</span><span class="view-item-value">' + escapeHtml(model.status || '-') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">引用来源</span><span class="view-item-value">' + (model.source === 'reference' ? '引用自 ' + escapeHtml(getCourtName(model.referencedFrom)) : '自建') + '</span></div>';
+        html += '</div></div>';
 
-        function openCourtModal() {
-            editingCourtId = null;
-            document.getElementById('courtModalTitle').textContent = '配置法院授权';
-            document.getElementById('courtEditId').value = '';
-            document.getElementById('courtName').value = '';
-            document.getElementById('courtName').disabled = false;
-            document.getElementById('courtLevel').value = '基层法院';
-            document.getElementById('courtQuota').value = '';
-            document.getElementById('quotaCycle').value = '按月';
-            document.getElementById('courtStatus').value = '正常';
-            renderModelCheckboxes([]);
-            document.getElementById('courtModal').classList.add('show');
+        html += '<div class="view-section">';
+        html += '<div class="view-section-title"><i class="fas fa-plug"></i>连接配置</div>';
+        html += '<div class="view-grid">';
+        html += '<div class="view-item"><span class="view-item-label">API 地址</span><span class="view-item-value" style="word-break:break-all;">' + escapeHtml(model.url || '-') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">API Key</span><span class="view-item-value">' + escapeHtml(model.apiKey || '-') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">最大上下文长度</span><span class="view-item-value">' + (model.maxInputLength || 0) + (model.maxInputLength === 0 ? '（不限制）' : ' tokens') + '</span></div>';
+        html += '</div></div>';
+
+        html += '<div class="view-section">';
+        html += '<div class="view-section-title"><i class="fas fa-sliders-h"></i>常用参数</div>';
+        html += '<div class="view-grid">';
+        html += '<div class="view-item"><span class="view-item-label">温度 temperature</span><span class="view-item-value">' + (model.temperature != null ? model.temperature : 0.7) + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">最大生成长度 maxTokens</span><span class="view-item-value">' + (model.maxTokens || 4096) + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">启用流式输出</span><span class="view-item-value">' + (model.streamEnabled !== false ? '是' : '否') + '</span></div>';
+        html += '</div></div>';
+
+        html += '<div class="view-section">';
+        html += '<div class="view-section-title"><i class="fas fa-toggle-on"></i>调用选项</div>';
+        html += '<div class="view-grid">';
+        html += '<div class="view-item"><span class="view-item-label">默认对话模型</span><span class="view-item-value">' + (model.isDefaultChat === true ? '是' : '否') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">允许在对话中选择</span><span class="view-item-value">' + (model.allowChat !== false ? '是' : '否') + '</span></div>';
+        html += '</div></div>';
+
+        html += '<div class="view-section">';
+        html += '<div class="view-section-title"><i class="fas fa-brain"></i>思考模式</div>';
+        var tm = model.thinkingMode || { enabled: false, paramFormat: 'none', token_limit: 8192 };
+        html += '<div class="view-thinking-card">';
+        html += '<div class="view-thinking-title"><i class="fas fa-brain"></i>思考模式配置</div>';
+        html += '<div class="view-grid">';
+        html += '<div class="view-item"><span class="view-item-label">是否启用</span><span class="view-item-value">' + (tm.enabled ? '是' : '否') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">思考参数格式</span><span class="view-item-value">' + escapeHtml(paramFormatNames[tm.paramFormat] || tm.paramFormat || '不写入思考参数') + '</span></div>';
+        html += '<div class="view-item"><span class="view-item-label">思考Token上限</span><span class="view-item-value">' + (tm.token_limit || 8192) + '</span></div>';
+        html += '</div></div></div>';
+
+        document.getElementById('viewModelBody').innerHTML = html;
+        document.getElementById('viewModelModal').classList.add('show');
+    }
+
+    function closeViewModelModal() {
+        document.getElementById('viewModelModal').classList.remove('show');
+    }
+
+    // ===== 删除模型 =====
+    function deleteModel(id) {
+        var models = getModelsByCourt(currentCourtId);
+        var model = models.find(function(m){ return m.id === id; });
+        if (!model) return;
+        if (!confirm('确定要' + (model.source === 'reference' ? '取消引用' : '删除') + '模型「' + model.name + '」吗？')) return;
+        var wasDefault = model.isDefaultChat === true;
+        models = models.filter(function(m){ return m.id !== id; });
+        // 若删除的是默认对话模型，且仍有其他模型，自动将第一个设为默认
+        if (wasDefault && models.length > 0) {
+            models[0].isDefaultChat = true;
+            var sm = getSceneModelsByCourt(currentCourtId);
+            sm['chat'] = models[0].id;
+            setSceneModelsByCourt(currentCourtId, sm);
         }
+        setModelsByCourt(currentCourtId, models);
+        renderModels();
+        renderScenes();
+        showNotification('模型已' + (model.source === 'reference' ? '取消引用' : '删除'), 'success');
+    }
 
-        function openEditCourtModal(id) {
-            const court = courts.find(c => c.id === id);
-            if (!court) return;
-            editingCourtId = id;
-            document.getElementById('courtModalTitle').textContent = '编辑法院授权';
-            document.getElementById('courtEditId').value = id;
-            document.getElementById('courtName').value = court.name;
-            document.getElementById('courtName').disabled = true;
-            document.getElementById('courtLevel').value = court.level;
-            document.getElementById('courtQuota').value = court.quota;
-            document.getElementById('quotaCycle').value = court.cycle;
-            document.getElementById('courtStatus').value = court.status;
-            renderModelCheckboxes(court.models);
-            document.getElementById('courtModal').classList.add('show');
+    // ===== 引用上级模型 =====
+    function openReferenceModal() {
+        if (isMiddleCourt(currentCourtId)) {
+            showNotification('中院无需引用上级模型', 'error');
+            return;
         }
-
-        function closeCourtModal() { document.getElementById('courtModal').classList.remove('show'); editingCourtId = null; }
-
-        function renderModelCheckboxes(selectedCodes) {
-            const group = document.getElementById('modelCheckboxGroup');
-            const enabledModels = models.filter(m => m.status === '启用');
-            group.innerHTML = enabledModels.map(m => {
-                const checked = selectedCodes.includes(m.code);
-                return '<label class="checkbox-item ' + (checked ? 'checked' : '') + '" onclick="toggleCheckbox(this)">' +
-                    '<input type="checkbox" value="' + escapeHtml(m.code) + '" ' + (checked ? 'checked' : '') + '>' +
-                    escapeHtml(m.name) +
-                '</label>';
-            }).join('');
+        var court = defaultCourts.find(function(c){ return c.id === currentCourtId; });
+        if (!court || !court.parent) {
+            showNotification('未找到上级法院', 'error');
+            return;
         }
-
-        function toggleCheckbox(el) {
-            const input = el.querySelector('input');
-            input.checked = !input.checked;
-            el.classList.toggle('checked', input.checked);
+        var parentModels = getModelsByCourt(court.parent);
+        var myModels = getModelsByCourt(currentCourtId);
+        var body = document.getElementById('referenceModalBody');
+        if (parentModels.length === 0) {
+            body.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">上级法院暂无可引用的模型</div>';
+        } else {
+            body.innerHTML = '<div style="margin-bottom:12px; font-size:13px; color:var(--text-secondary);">从上级法院「' + escapeHtml(getCourtName(court.parent)) + '」选择模型引用到本院：</div>' +
+                parentModels.map(function(m){
+                    var alreadyRef = myModels.some(function(x){ return x.code === m.code && x.source === 'reference'; });
+                    return '<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px;">' +
+                        '<div><div style="font-weight:500;">' + escapeHtml(m.name) + '</div><div style="font-size:12px; color:var(--text-muted); margin-top:4px;">' + escapeHtml(m.code) + ' | ' + escapeHtml(m.url || '') + '</div></div>' +
+                        (alreadyRef ? '<span class="badge badge-muted">已引用</span>' : '<button class="btn btn-primary btn-sm" onclick="referenceModel(\'' + m.id + '\')"><i class="fas fa-share"></i>引用</button>') +
+                    '</div>';
+                }).join('');
         }
+        body.innerHTML += '<div style="margin-top:16px; text-align:right;"><button class="btn btn-secondary" onclick="closeReferenceModal()">关闭</button></div>';
+        document.getElementById('referenceModal').classList.add('show');
+    }
 
-        function saveCourt() {
-            const name = document.getElementById('courtName').value;
-            const level = document.getElementById('courtLevel').value;
-            const quota = parseInt(document.getElementById('courtQuota').value);
-            const cycle = document.getElementById('quotaCycle').value;
-            const status = document.getElementById('courtStatus').value;
-            const selectedModels = [];
-            document.querySelectorAll('#modelCheckboxGroup input:checked').forEach(cb => selectedModels.push(cb.value));
+    function closeReferenceModal() {
+        document.getElementById('referenceModal').classList.remove('show');
+    }
 
-            if (!name) { showNotification('请选择法院', 'error'); return; }
-            if (!quota || quota <= 0) { showNotification('请输入有效的Token配额', 'error'); return; }
-            if (selectedModels.length === 0) { showNotification('请选择至少一个模型', 'error'); return; }
+    function referenceModel(modelId) {
+        var court = defaultCourts.find(function(c){ return c.id === currentCourtId; });
+        if (!court || !court.parent) return;
+        var parentModels = getModelsByCourt(court.parent);
+        var src = parentModels.find(function(m){ return m.id === modelId; });
+        if (!src) return;
+        var myModels = getModelsByCourt(currentCourtId);
+        if (myModels.some(function(x){ return x.code === src.code; })) {
+            showNotification('该模型已存在（code 重复）', 'error');
+            return;
+        }
+        var newModel = JSON.parse(JSON.stringify(src));
+        newModel.id = 'm' + Date.now();
+        newModel.courtId = currentCourtId;
+        newModel.source = 'reference';
+        newModel.referencedFrom = court.parent;
+        newModel.isDefaultChat = (myModels.length === 0); // 若为首个模型则设为默认
+        myModels.push(newModel);
+        setModelsByCourt(currentCourtId, myModels);
+        // 若是首个模型，同步场景模型
+        if (myModels.length === 1) {
+            var sm = getSceneModelsByCourt(currentCourtId);
+            sm['chat'] = newModel.id;
+            setSceneModelsByCourt(currentCourtId, sm);
+        }
+        renderModels();
+        renderScenes();
+        closeReferenceModal();
+        showNotification('已引用上级模型：' + src.name, 'success');
+    }
 
-            if (editingCourtId) {
-                const court = courts.find(c => c.id === editingCourtId);
-                if (court) { Object.assign(court, { level, models: selectedModels, quota, cycle, status }); }
-                showNotification('法院授权已更新', 'success');
+    // ===== 场景模型配置（Tab2）=====
+    function getAvailableModels() {
+        return getModelsByCourt(currentCourtId).filter(function(m){ return m.status === '启用'; });
+    }
+
+    function renderScenes() {
+        var tbody = document.getElementById('sceneTableBody');
+        var sceneModels = getSceneModelsByCourt(currentCourtId);
+        var available = getAvailableModels();
+        var models = getModelsByCourt(currentCourtId);
+
+        tbody.innerHTML = defaultScenes.map(function(scene){
+            var modelId = sceneModels[scene.key] || '';
+            var overrideMark = scene.overridable ? '<i class="fas fa-check-circle" style="color:var(--accent-success);"></i>' : '<i class="fas fa-times-circle" style="color:var(--text-muted);"></i>';
+            var modelSelect;
+            if (scene.readonly) {
+                // 对话基础问答：只读，显示默认对话模型名称
+                var defaultModel = models.find(function(m){ return m.isDefaultChat === true; });
+                var displayName = defaultModel ? defaultModel.name : '（未配置默认对话模型）';
+                modelSelect = '<div class="scene-readonly"><i class="fas fa-link" style="margin-right:6px;"></i>' + escapeHtml(displayName) + '</div>';
             } else {
-                if (courts.some(c => c.name === name)) { showNotification('该法院已配置', 'error'); return; }
-                courts.push({ id: 'c' + Date.now(), name, level, models: selectedModels, quota, used: 0, cycle, status });
-                showNotification('法院授权已添加', 'success');
+                var options = available.map(function(m){
+                    return '<option value="' + m.id + '"' + (m.id === modelId ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>';
+                }).join('');
+                modelSelect = '<select class="filter-select" style="width:100%;" onchange="onSceneModelChange(\'' + scene.key + '\', this.value)">' +
+                    '<option value="">（未选择）</option>' + options + '</select>';
             }
-            saveToStorage(); renderCourts(); closeCourtModal();
+            return '<tr>' +
+                '<td style="font-weight:500;">' + escapeHtml(scene.name) + '</td>' +
+                '<td>' + modelSelect + '</td>' +
+                '<td style="text-align:center;">' + overrideMark + '</td>' +
+                '<td style="font-size:13px; color:var(--text-secondary);">' + escapeHtml(scene.desc || '') + '</td>' +
+            '</tr>';
+        }).join('');
+    }
+
+    function onSceneModelChange(sceneKey, modelId) {
+        var sceneModels = getSceneModelsByCourt(currentCourtId);
+        sceneModels[sceneKey] = modelId;
+        setSceneModelsByCourt(currentCourtId, sceneModels);
+    }
+
+    function saveSceneModels() {
+        // 已在 onSceneModelChange 中即时持久化，此处仅提示
+        showNotification('场景模型配置已保存', 'success');
+    }
+
+    // ===== 配额与用量（Tab3）=====
+    function renderQuotaOverview() {
+        var quota = getQuotaByCourt(currentCourtId);
+        var depts = getQuotaByDept(currentCourtId);
+        var allocated = depts.reduce(function(sum, d){ return sum + (d.quota || 0); }, 0);
+        var used = quota.used || 0;
+        var total = quota.total || 0;
+        var remaining = total - used;
+
+        document.getElementById('quotaTotal').textContent = formatNumber(total);
+        document.getElementById('quotaAllocated').textContent = formatNumber(allocated);
+        document.getElementById('quotaUsed').textContent = formatNumber(used);
+        document.getElementById('quotaRemaining').textContent = formatNumber(remaining);
+
+        // 法院配额表格（单行）
+        var tbody = document.getElementById('courtQuotaTableBody');
+        var rate = total > 0 ? Math.round(used / total * 100) : 0;
+        var barClass = rate >= 100 ? 'red' : rate >= 80 ? 'orange' : 'green';
+        var statusBadge = quota.enabled ? (rate >= 100 ? '<span class="badge badge-danger">超限停服</span>' : '<span class="badge badge-success">正常</span>') : '<span class="badge badge-muted">已停用</span>';
+        tbody.innerHTML = '<tr>' +
+            '<td style="font-weight:500;">' + escapeHtml(getCourtName(currentCourtId)) + '</td>' +
+            '<td><span class="badge ' + (isMiddleCourt(currentCourtId) ? 'badge-info' : 'badge-muted') + '">' + escapeHtml(getCourtLevel(currentCourtId)) + '</span></td>' +
+            '<td>' + formatNumber(total) + '</td>' +
+            '<td>' + formatNumber(allocated) + '</td>' +
+            '<td>' + formatNumber(used) + '</td>' +
+            '<td>' + formatNumber(remaining) + '</td>' +
+            '<td style="min-width:140px;"><div class="progress-bar"><div class="progress-fill ' + barClass + '" style="width:' + Math.min(rate, 100) + '%;"></div></div><div class="usage-text">' + rate + '%</div></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td><button class="action-btn" title="调整总额" onclick="openQuotaModal()"><i class="fas fa-edit"></i></button></td>' +
+        '</tr>';
+    }
+
+    function openQuotaModal() {
+        var quota = getQuotaByCourt(currentCourtId);
+        document.getElementById('quotaCourtName').value = getCourtName(currentCourtId);
+        document.getElementById('quotaTotalInput').value = quota.total || 0;
+        document.getElementById('quotaPeriod').value = quota.period || '按年';
+        document.getElementById('quotaResetDate').value = quota.resetDate || '2027-01-01';
+        document.getElementById('quotaEnabled').checked = quota.enabled !== false;
+        document.getElementById('quotaModal').classList.add('show');
+    }
+
+    function closeQuotaModal() {
+        document.getElementById('quotaModal').classList.remove('show');
+    }
+
+    function saveCourtQuota() {
+        var total = parseInt(document.getElementById('quotaTotalInput').value);
+        if (isNaN(total) || total <= 0) {
+            showNotification('请输入有效的总配额', 'error');
+            return;
         }
+        var quota = getQuotaByCourt(currentCourtId);
+        quota.total = total;
+        quota.period = document.getElementById('quotaPeriod').value;
+        quota.resetDate = document.getElementById('quotaResetDate').value;
+        quota.enabled = document.getElementById('quotaEnabled').checked;
+        setQuotaByCourt(currentCourtId, quota);
+        renderQuotaOverview();
+        closeQuotaModal();
+        showNotification('法院配额已更新', 'success');
+    }
 
-        function adjustQuota(id) {
-            const court = courts.find(c => c.id === id);
-            if (!court) return;
-            const amount = prompt('当前额度：' + court.quota + '万tokens\n请输入调整后的总配额（万tokens）：', court.quota);
-            if (amount === null) return;
-            const newQuota = parseInt(amount);
-            if (isNaN(newQuota) || newQuota <= 0) { showNotification('请输入有效数字', 'error'); return; }
-            court.quota = newQuota;
-            if (court.used < newQuota) court.status = '正常';
-            saveToStorage(); renderCourts();
-            showNotification('额度已调整', 'success');
+    function renderDeptQuota() {
+        var tbody = document.getElementById('deptQuotaTableBody');
+        var depts = getQuotaByDept(currentCourtId);
+        if (depts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px;">暂无部门配额，请点击"新增部门配额"</td></tr>';
+            return;
         }
-
-        // ===== 用量统计 =====
-        function renderUsage() {
-            const tbody = document.getElementById('usageTableBody');
-            tbody.innerHTML = usageData.map(d => '<tr>' +
-                '<td>' + d.time + '</td>' +
-                '<td>' + d.court + '</td>' +
-                '<td>' + d.model + '</td>' +
-                '<td>' + d.calls.toLocaleString() + '</td>' +
-                '<td>' + d.tokens + '</td>' +
-                '<td>' + d.avg + '</td>' +
-            '</tr>').join('');
-
-            const courtFilter = document.getElementById('usageCourtFilter');
-            const modelFilter = document.getElementById('usageModelFilter');
-            const courtNames = [...new Set(usageData.map(d => d.court))];
-            const modelNames = [...new Set(usageData.map(d => d.model))];
-            courtFilter.innerHTML = '<option value="">全部法院</option>' + courtNames.map(c => '<option value="' + c + '">' + c + '</option>').join('');
-            modelFilter.innerHTML = '<option value="">全部模型</option>' + modelNames.map(m => '<option value="' + m + '">' + m + '</option>').join('');
-        }
-
-        // ===== 告警 =====
-        function renderAlerts() {
-            const tbody = document.getElementById('alertTableBody');
-            tbody.innerHTML = alertRecords.map(a => '<tr>' +
-                '<td style="white-space: nowrap;">' + a.time + '</td>' +
-                '<td>' + a.court + '</td>' +
-                '<td><span class="badge ' + (a.type === '超额' ? 'badge-danger' : 'badge-warning') + '">' + a.type + '</span></td>' +
-                '<td>' + a.rate + '</td>' +
-                '<td><span class="badge ' + (a.status === '已处理' ? 'badge-success' : 'badge-danger') + '">' + a.status + '</span></td>' +
-                '<td><div class="table-actions">' +
-                    (a.status === '未处理' ? '<button class="action-btn" title="追加额度" onclick="adjustQuota(\'' + (courts.find(c => c.name === a.court)?.id || '') + '\')"><i class="fas fa-plus-circle"></i></button>' : '') +
-                    (a.status === '未处理' ? '<button class="action-btn" title="标记已处理" onclick="markAlertProcessed(\'' + a.id + '\')"><i class="fas fa-check"></i></button>' : '') +
-                '</div></td>' +
-            '</tr>').join('');
-        }
-
-        function markAlertProcessed(id) {
-            const alert = alertRecords.find(a => a.id === id);
-            if (alert) { alert.status = '已处理'; saveToStorage(); renderAlerts(); showNotification('已标记为已处理', 'success'); }
-        }
-
-        function saveAlertConfig() { showNotification('告警配置已保存', 'success'); }
-
-        function exportUsage() {
-            let csv = '\uFEFF时间,法院名称,模型名称,调用次数,Token消耗,平均Token/次\n';
-            usageData.forEach(d => { csv += d.time + ',' + d.court + ',' + d.model + ',' + d.calls + ',' + d.tokens + ',' + d.avg + '\n'; });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'Token用量明细_' + new Date().toISOString().slice(0, 10) + '.csv';
-            link.click();
-            showNotification('导出成功', 'success');
-        }
-
-        function saveToStorage() {
-            localStorage.setItem('adminModels', JSON.stringify(models));
-            localStorage.setItem('adminCourts', JSON.stringify(courts));
-            localStorage.setItem('adminAlertRecords', JSON.stringify(alertRecords));
-        }
-
-        function showNotification(message, type) {
-            type = type || 'success';
-            const notification = document.createElement('div');
-            notification.className = 'notification ' + type;
-            notification.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i><span>' + message + '</span>';
-            document.body.appendChild(notification);
-            setTimeout(function() { notification.remove(); }, 2500);
-        }
-
-        function toggleUserDropdown() { document.getElementById('userDropdown').classList.toggle('show'); }
-
-        document.addEventListener('click', function(e) {
-            const userMenu = document.getElementById('userMenu');
-            if (userMenu && !userMenu.contains(e.target)) {
-                document.getElementById('userDropdown').classList.remove('show');
+        tbody.innerHTML = depts.map(function(d){
+            var rate = d.quota > 0 ? Math.round(d.used / d.quota * 100) : 0;
+            var barClass = rate >= 100 ? 'red' : rate >= 80 ? 'orange' : 'green';
+            // 超额硬管控：使用率>=100% 状态变超限停服 enabled=false
+            if (rate >= 100) d.enabled = false;
+            var statusBadge = d.enabled ? (rate >= 80 ? '<span class="badge badge-warning">预警</span>' : '<span class="badge badge-success">正常</span>') : '<span class="badge badge-danger">超限停服</span>';
+            var actions = '<button class="action-btn" title="调整配额" onclick="adjustDeptQuota(\'' + d.id + '\')"><i class="fas fa-sliders-h"></i></button>' +
+                '<button class="action-btn" title="查看详情" onclick="viewDeptDetail(\'' + d.id + '\')"><i class="fas fa-eye"></i></button>';
+            if (!d.enabled) {
+                actions += '<button class="action-btn" title="恢复服务" onclick="resumeDeptService(\'' + d.id + '\')"><i class="fas fa-play"></i></button>';
             }
+            return '<tr>' +
+                '<td style="font-weight:500;">' + escapeHtml(d.name) + '</td>' +
+                '<td>' + formatNumber(d.quota) + '</td>' +
+                '<td>' + formatNumber(d.used) + '</td>' +
+                '<td style="min-width:140px;"><div class="progress-bar"><div class="progress-fill ' + barClass + '" style="width:' + Math.min(rate, 100) + '%;"></div></div><div class="usage-text">' + rate + '%</div></td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td><div class="table-actions">' + actions + '</div></td>' +
+            '</tr>';
+        }).join('');
+        setQuotaByDept(currentCourtId, depts);
+    }
+
+    function openDeptQuotaModal() {
+        editingDeptId = null;
+        document.getElementById('deptQuotaModalTitle').textContent = '新增部门配额';
+        document.getElementById('deptEditId').value = '';
+        document.getElementById('deptName').value = '';
+        document.getElementById('deptQuota').value = '';
+        document.getElementById('deptEnabled').checked = true;
+        document.getElementById('deptQuotaModal').classList.add('show');
+    }
+
+    function closeDeptQuotaModal() {
+        document.getElementById('deptQuotaModal').classList.remove('show');
+        editingDeptId = null;
+    }
+
+    function saveDeptQuota() {
+        var name = document.getElementById('deptName').value.trim();
+        var quotaVal = parseInt(document.getElementById('deptQuota').value);
+        var enabled = document.getElementById('deptEnabled').checked;
+        if (!name) { showNotification('请输入部门/用户名称', 'error'); return; }
+        if (isNaN(quotaVal) || quotaVal <= 0) { showNotification('请输入有效的配额', 'error'); return; }
+
+        var depts = getQuotaByDept(currentCourtId);
+        if (editingDeptId) {
+            var d = depts.find(function(x){ return x.id === editingDeptId; });
+            if (d) {
+                d.name = name;
+                d.quota = quotaVal;
+                d.enabled = enabled;
+            }
+            showNotification('部门配额已更新', 'success');
+        } else {
+            depts.push({ id: 'd' + Date.now(), name: name, quota: quotaVal, used: 0, enabled: enabled });
+            showNotification('部门配额已添加', 'success');
+        }
+        setQuotaByDept(currentCourtId, depts);
+        renderDeptQuota();
+        closeDeptQuotaModal();
+    }
+
+    function adjustDeptQuota(id) {
+        var depts = getQuotaByDept(currentCourtId);
+        var d = depts.find(function(x){ return x.id === id; });
+        if (!d) return;
+        editingDeptId = id;
+        document.getElementById('deptQuotaModalTitle').textContent = '调整部门配额';
+        document.getElementById('deptEditId').value = id;
+        document.getElementById('deptName').value = d.name;
+        document.getElementById('deptName').disabled = false;
+        document.getElementById('deptQuota').value = d.quota;
+        document.getElementById('deptEnabled').checked = d.enabled;
+        document.getElementById('deptQuotaModal').classList.add('show');
+    }
+
+    function viewDeptDetail(id) {
+        var depts = getQuotaByDept(currentCourtId);
+        var d = depts.find(function(x){ return x.id === id; });
+        if (!d) return;
+        var rate = d.quota > 0 ? Math.round(d.used / d.quota * 100) : 0;
+        showNotification('部门「' + d.name + '」：配额 ' + formatNumber(d.quota) + '，已用 ' + formatNumber(d.used) + '，使用率 ' + rate + '%', 'success');
+    }
+
+    function resumeDeptService(id) {
+        var depts = getQuotaByDept(currentCourtId);
+        var d = depts.find(function(x){ return x.id === id; });
+        if (!d) return;
+        if (!confirm('确定要恢复部门「' + d.name + '」的 AI 服务吗？\n注意：当前使用率仍为 ' + Math.round(d.used / d.quota * 100) + '%，建议先调整配额。')) return;
+        d.enabled = true;
+        setQuotaByDept(currentCourtId, depts);
+        renderDeptQuota();
+        showNotification('部门「' + d.name + '」服务已恢复', 'success');
+    }
+
+    // ===== Token 安全阈值 =====
+    function initThresholdTab() {
+        var slider = document.getElementById('thresholdSlider');
+        var display = document.getElementById('thresholdDisplay');
+        if (!slider || !display) return;
+        var stored = localStorage.getItem('aiTokenSafetyRatio');
+        var pct = DEFAULT_SAFETY_RATIO_PCT;
+        if (stored) {
+            var r = parseFloat(stored);
+            if (!isNaN(r) && r >= 0.8 && r <= 0.95) {
+                pct = Math.round(r * 100);
+            }
+        }
+        slider.value = pct;
+        updateThresholdDisplay(pct);
+        slider.addEventListener('input', function(){
+            updateThresholdDisplay(parseInt(slider.value, 10));
         });
+    }
 
-        document.getElementById('modelModal').addEventListener('click', function(e) { if (e.target === this) closeModelModal(); });
-        document.getElementById('viewModelModal').addEventListener('click', function(e) { if (e.target === this) closeViewModelModal(); });
-        document.getElementById('courtModal').addEventListener('click', function(e) { if (e.target === this) closeCourtModal(); });
-
-        function logout() {
-            if (confirm('确定要退出登录吗？')) { window.location.href = '../../index.html'; }
+    function updateThresholdDisplay(pct) {
+        var display = document.getElementById('thresholdDisplay');
+        var hint = document.getElementById('thresholdHint');
+        if (display) display.textContent = pct + '%';
+        if (hint) {
+            var safe128k = Math.floor(128000 * pct / 100);
+            hint.textContent = '当前阈值 ' + pct + '%，128K 模型可使用 ' + safe128k.toLocaleString() + ' tokens';
         }
+    }
+
+    function saveThreshold() {
+        var slider = document.getElementById('thresholdSlider');
+        if (!slider) return;
+        var pct = parseInt(slider.value, 10);
+        if (isNaN(pct) || pct < 80 || pct > 95) {
+            showNotification('阈值必须在 80%–95% 之间', 'error');
+            return;
+        }
+        var ratio = pct / 100;
+        localStorage.setItem('aiTokenSafetyRatio', ratio.toString());
+        showNotification('Token 安全阈值已保存为 ' + pct + '%', 'success');
+    }
+
+    function resetThreshold() {
+        var slider = document.getElementById('thresholdSlider');
+        if (!slider) return;
+        slider.value = DEFAULT_SAFETY_RATIO_PCT;
+        updateThresholdDisplay(DEFAULT_SAFETY_RATIO_PCT);
+        localStorage.removeItem('aiTokenSafetyRatio');
+        showNotification('已恢复默认阈值 85%', 'success');
+    }
+
+    // ===== 用量明细 =====
+    function renderUsage() {
+        var usage = getUsageByCourt(currentCourtId);
+        var totalTokens = usage.reduce(function(s, u){ return s + (u.tokens || 0); }, 0);
+        var totalCalls = usage.reduce(function(s, u){ return s + (u.calls || 0); }, 0);
+        var activeDepts = new Set(usage.map(function(u){ return u.dept; })).size;
+        var alertCount = getQuotaByDept(currentCourtId).filter(function(d){ return !d.enabled; }).length;
+
+        document.getElementById('usageTotalTokens').textContent = formatNumber(totalTokens);
+        document.getElementById('usageTotalCalls').textContent = formatNumber(totalCalls);
+        document.getElementById('usageActiveDepts').textContent = activeDepts;
+        document.getElementById('usageAlertCount').textContent = alertCount;
+
+        var tbody = document.getElementById('usageTableBody');
+        if (usage.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:32px;">暂无用量数据</td></tr>';
+            return;
+        }
+        tbody.innerHTML = usage.map(function(u){
+            return '<tr>' +
+                '<td>' + escapeHtml(u.time) + '</td>' +
+                '<td>' + escapeHtml(u.court) + '</td>' +
+                '<td>' + escapeHtml(u.dept) + '</td>' +
+                '<td>' + escapeHtml(u.model) + '</td>' +
+                '<td>' + formatNumber(u.calls) + '</td>' +
+                '<td>' + formatNumber(u.tokens) + '</td>' +
+                '<td>' + formatNumber(u.avg) + '</td>' +
+            '</tr>';
+        }).join('');
+    }
+
+    // ===== 通用工具 =====
+    function formatNumber(n) {
+        if (n == null) return '-';
+        return Number(n).toLocaleString();
+    }
+
+    function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function showNotification(message, type) {
+        type = type || 'success';
+        var notification = document.createElement('div');
+        notification.className = 'notification ' + type;
+        notification.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i><span>' + message + '</span>';
+        document.body.appendChild(notification);
+        setTimeout(function(){ notification.remove(); }, 2500);
+    }
+
+    function toggleUserDropdown() {
+        document.getElementById('userDropdown').classList.toggle('show');
+    }
+
+    function logout() {
+        if (confirm('确定要退出登录吗？')) {
+            window.location.href = '../../index.html';
+        }
+    }
+
+    // ===== 初始化 =====
+    document.addEventListener('DOMContentLoaded', function(){
+        initCourtSelector();
+        renderModels();
+        renderScenes();
+        renderQuotaOverview();
+        renderDeptQuota();
+        renderUsage();
+        initThresholdTab();
+    });
+
+    // ===== 全局事件 =====
+    document.addEventListener('click', function(e){
+        var userMenu = document.getElementById('userMenu');
+        if (userMenu && !userMenu.contains(e.target)) {
+            var dd = document.getElementById('userDropdown');
+            if (dd) dd.classList.remove('show');
+        }
+    });
+
+    document.getElementById('modelModal').addEventListener('click', function(e){ if (e.target === this) closeModelModal(); });
+    document.getElementById('viewModelModal').addEventListener('click', function(e){ if (e.target === this) closeViewModelModal(); });
+    document.getElementById('referenceModal').addEventListener('click', function(e){ if (e.target === this) closeReferenceModal(); });
+    document.getElementById('quotaModal').addEventListener('click', function(e){ if (e.target === this) closeQuotaModal(); });
+    document.getElementById('deptQuotaModal').addEventListener('click', function(e){ if (e.target === this) closeDeptQuotaModal(); });
+
+    // 思考参数格式变化时更新摘要
+    document.getElementById('thinkingParamFormat').addEventListener('change', updateAdvancedSummary);
+    document.getElementById('thinkingTokenLimit').addEventListener('input', updateAdvancedSummary);
     </script>
 </body>
 </html>
