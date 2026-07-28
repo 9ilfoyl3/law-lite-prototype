@@ -548,53 +548,13 @@
             color: var(--text-primary);
         }
         .step-gen-config {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
             padding: 14px 16px;
             margin-bottom: 16px;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 10px;
         }
-        .step-gen-config-row {
-            display: flex;
-            gap: 12px;
-        }
-        .step-gen-config-item {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            flex: 1;
-            min-width: 0;
-        }
-        .step-gen-config-item.full { width: 100%; }
-        .step-gen-config-item label {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-        .step-gen-config-item select,
-        .step-gen-config-item textarea {
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 13px;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        .step-gen-config-item select:focus,
-        .step-gen-config-item textarea:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-        .step-gen-config-item textarea {
-            resize: vertical;
-            line-height: 1.5;
-        }
+        .step-gen-config .gen-form-row:last-child { margin-bottom: 0; }
         .step-view-hint {
             display: flex;
             align-items: flex-start;
@@ -2089,7 +2049,7 @@
                     </div>
                     <div class="gen-tabs">
                         <button class="gen-tab active" data-method="material" onclick="switchGenMethod('material')">
-                            <i class="fas fa-bolt"></i> 材料生成
+                            <i class="fas fa-bolt"></i> 一步生成
                         </button>
                         <button class="gen-tab" data-method="steps" onclick="switchGenMethod('steps')">
                             <i class="fas fa-list-ol"></i> 分步生成
@@ -2154,25 +2114,22 @@
                                 <span class="step-view-title">分步生成</span>
                             </div>
                             <div class="step-gen-config">
-                                <div class="step-gen-config-row">
-                                    <div class="step-gen-config-item">
-                                        <label>文书类型</label>
-                                        <select id="stepDocType" onchange="onStepDocTypeChange(this.value)"></select>
-                                    </div>
-                                    <div class="step-gen-config-item" id="stepPlanItem" style="display:none;">
-                                        <label>步骤方案</label>
-                                        <select id="stepPlan" onchange="onStepPlanChange(this.value)"></select>
-                                    </div>
-                                    <div class="step-gen-config-item">
-                                        <label>文书模板</label>
-                                        <select id="stepTemplate" onchange="onStepTemplateChange(this.value)"></select>
-                                    </div>
+                                <div class="gen-form-row">
+                                    <label class="gen-form-label">文书类型</label>
+                                    <select class="gen-form-select" id="stepDocType" onchange="onStepDocTypeChange(this.value)"></select>
                                 </div>
-                                <div class="step-gen-config-row">
-                                    <div class="step-gen-config-item full">
-                                        <label>提示词</label>
-                                        <textarea id="stepRequirement" rows="2" placeholder="可选：描述特殊要求或关注点，帮助 AI 更好理解需求" onchange="onStepRequirementChange(this.value)"></textarea>
-                                    </div>
+                                <div class="gen-form-row" id="stepPlanItem" style="display:none;">
+                                    <label class="gen-form-label">步骤方案</label>
+                                    <select class="gen-form-select" id="stepPlan" onchange="onStepPlanChange(this.value)"></select>
+                                </div>
+                                <div class="gen-form-row">
+                                    <label class="gen-form-label">文书模板</label>
+                                    <select class="gen-form-select" id="stepTemplate" onchange="onStepTemplateChange(this.value)"></select>
+                                </div>
+                                <div class="gen-form-row">
+                                    <label class="gen-form-label">提示词</label>
+                                    <div class="req-template-tags" id="stepReqTemplates"></div>
+                                    <textarea class="gen-form-textarea" id="stepRequirement" placeholder="可选：描述特殊要求或关注点" oninput="onStepRequirementChange(this.value)"></textarea>
                                 </div>
                             </div>
                             <div class="auto-switch-alert" id="autoSwitchAlert">
@@ -2192,7 +2149,7 @@
                                 <div class="steps-list" id="stepsList"></div>
                                 <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;">
                                     <button class="gen-start-btn" id="stepNextBtn" onclick="continueStepGeneration()">
-                                        <i class="fas fa-forward"></i> 生成剩余步骤
+                                        <i class="fas fa-file-alt"></i> 生成文书
                                     </button>
                                 </div>
                             </div>
@@ -2212,7 +2169,7 @@
                             <div class="result-tabs" id="resultTabs" style="display:none;">
                                 <button class="result-tab" data-tab="edit" onclick="switchResultTab('edit')">编辑</button>
                             </div>
-                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="setLayoutState('generating')" title="重新配置生成参数"><i class="fas fa-sliders-h"></i> <span>重新配置</span></button>
+                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="重新配置生成参数（默认回填最近一次历史文书快照）"><i class="fas fa-sliders-h"></i> <span>重新配置</span></button>
                         </div>
                     </div>
                     <div class="result-body" id="resultBody">
@@ -2359,8 +2316,8 @@
     </div>
 
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=42"></script>
-    <script src="../js/case-files.js?v=62"></script>
+    <script src="../js/case-data.js?v=47"></script>
+    <script src="../js/case-files.js?v=65"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

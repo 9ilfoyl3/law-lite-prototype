@@ -88,9 +88,6 @@
         .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 6px; }
         .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
         .tpl-badge.custom { background: #d1fae5; color: #065f46; }
-        .tpl-causes-cell { display: flex; flex-wrap: wrap; gap: 4px; }
-        .cause-chip { display: inline-block; padding: 2px 8px; background: #f3f4f6; color: #4b5563; border-radius: 10px; font-size: 12px; }
-        .cause-chip.universal { background: #fef3c7; color: #92400e; }
         .tpl-action-cell { white-space: nowrap; }
         .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; margin-right: 4px; font-family: inherit; }
         .action-btn:hover { background: #f3f4f6; }
@@ -116,13 +113,6 @@
         .form-textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; resize: vertical; min-height: 90px; box-sizing: border-box; line-height: 1.5; }
         .form-textarea:focus { outline: none; border-color: var(--accent-primary); }
         .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-        .cause-picker { border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; max-height: 160px; overflow-y: auto; background: var(--bg-primary); }
-        .cause-picker-group { margin-bottom: 8px; }
-        .cause-picker-group-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
-        .cause-picker-option { display: inline-flex; align-items: center; gap: 4px; margin: 2px 6px 2px 0; padding: 3px 8px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; font-size: 12px; cursor: pointer; }
-        .cause-picker-option input { margin: 0; }
-        .cause-picker-option.checked { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); }
 
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-cancel { background: #f3f4f6; color: #374151; }
@@ -167,6 +157,11 @@
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
                 </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
+                </div>
             </nav>
         </aside>
 
@@ -192,7 +187,7 @@
                 <div class="page-header">
                     <div class="page-title-wrap">
                         <h1>文书模板管理</h1>
-                        <p>维护各业务系统的文书模板，关联文书类型与案由</p>
+                        <p>维护各业务系统的文书模板，关联文书类型</p>
                     </div>
                     <div class="business-switch">
                         <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
@@ -217,7 +212,6 @@
                                 <tr>
                                     <th>模板名</th>
                                     <th>所属类型</th>
-                                    <th>关联案由</th>
                                     <th>状态</th>
                                     <th style="width:200px;">操作</th>
                                 </tr>
@@ -247,10 +241,6 @@
                 <select class="form-select" id="tplDocType"></select>
             </div>
             <div class="form-row">
-                <label class="form-label">关联案由 <span class="form-hint" style="display:inline;">（不选=通用模板，对所有案由可用）</span></label>
-                <div class="cause-picker" id="causePicker"></div>
-            </div>
-            <div class="form-row">
                 <label class="form-label">模板正文（可选）</label>
                 <textarea class="form-textarea" id="tplContent" placeholder="预设的模板正文片段，留空则由 AI 自动生成"></textarea>
                 <div class="form-hint">支持 \\n 换行；如需硬编码段落可在此填写</div>
@@ -276,7 +266,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js"></script>
-    <script src="../../js/admin-doc-templates.js?v=1"></script>
+    <script src="../../js/case-data.js?v=47"></script>
+    <script src="../../js/admin-doc-templates.js?v=2"></script>
 </body>
 </html>

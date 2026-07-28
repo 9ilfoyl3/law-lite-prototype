@@ -150,18 +150,33 @@
             const docCount = getDocCount(c);
             const ocrError = hasOcrError(c);
             const ocrErrCount = getOcrErrorCount(c);
+            const isDeleted = !!c.isDeleted;
             const fileCountCell = ocrError
                 ? `<span class="file-count-cell has-error" title="存在 ${ocrErrCount} 份 解析异常材料">${c.fileCount || 0}</span>`
                 : `${c.fileCount || 0}`;
             const checked = selectedIds.has(c.id) ? 'checked' : '';
+            const rowCls = [ocrError ? 'has-ocr-error' : '', isDeleted ? 'is-deleted-row' : ''].join(' ').trim();
+            const deletedBadge = isDeleted ? `<span class="deleted-badge" title="软删除于 ${c.deletedAt || '-'}">已删除</span>` : '';
+
+            // 已删除行操作列只显示「查看 / 恢复」，不显示「改承办人 / 删除」
+            const actionCell = isDeleted
+                ? `<div class="action-cell">
+                        <button class="action-btn view" onclick="window.AdminCases.viewCase('${c.id}')">查看</button>
+                        <button class="action-btn restore" onclick="window.AdminCases.restoreCase('${c.id}')">恢复</button>
+                   </div>`
+                : `<div class="action-cell">
+                        <button class="action-btn view" onclick="window.AdminCases.viewCase('${c.id}')">查看</button>
+                        <button class="action-btn handler" onclick="window.AdminCases.changeHandler('${c.id}')">改承办人</button>
+                        <button class="action-btn delete" onclick="window.AdminCases.deleteCase('${c.id}')">删除</button>
+                   </div>`;
 
             return `
-                <div class="grid-row ${ocrError ? 'has-ocr-error' : ''}" data-case-id="${c.id}">
+                <div class="grid-row ${rowCls}" data-case-id="${c.id}">
                     <div class="col-center">
                         <input type="checkbox" class="row-check" data-case-id="${c.id}" ${checked} onchange="window.AdminCases.toggleRow('${c.id}', this.checked)">
                     </div>
                     <div>
-                        <a class="case-name-link" href="../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}&readonly=1" target="_blank" title="${escapeHtml(c.caseName || '')}">${escapeHtml(c.caseName || '-')}</a>
+                        <a class="case-name-link" href="../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}&readonly=1" target="_blank" title="${escapeHtml(c.caseName || '')}">${escapeHtml(c.caseName || '-')}</a>${deletedBadge}
                     </div>
                     <div title="${escapeHtml(c.caseNumber || '')}">${escapeHtml(c.caseNumber || '-')}</div>
                     <div title="${escapeHtml(c.cause || '')}">${escapeHtml(c.cause || '-')}</div>
@@ -170,11 +185,7 @@
                     <div class="col-center">${fileCountCell}</div>
                     <div class="col-center">${docCount}</div>
                     <div class="col-center">${escapeHtml(c.updatedAt || '-')}</div>
-                    <div class="action-cell">
-                        <button class="action-btn view" onclick="window.AdminCases.viewCase('${c.id}')">查看</button>
-                        <button class="action-btn handler" onclick="window.AdminCases.changeHandler('${c.id}')">改承办人</button>
-                        <button class="action-btn delete" onclick="window.AdminCases.deleteCase('${c.id}')">删除</button>
-                    </div>
+                    ${actionCell}
                 </div>`;
         }).join('');
     }
@@ -272,6 +283,25 @@
                 saveBusinessSystems();
                 console.log(`[admin-cases] 删除案件: ${caseId} (${c.caseName})`);
                 showNotification('案件已删除', 'success');
+                loadData();
+                applyFilters();
+            }
+        );
+    }
+
+    // 恢复软删除案件：清除 isDeleted / deletedAt 字段，案件重新对用户侧可见
+    function restoreCase(caseId) {
+        const c = allCases.find(x => x.id === caseId);
+        if (!c) return;
+        showConfirm(
+            '恢复确认',
+            `确定恢复案件「${c.caseName}」吗？恢复后该案件将重新对法官可见。`,
+            () => {
+                delete c.isDeleted;
+                delete c.deletedAt;
+                saveBusinessSystems();
+                console.log(`[admin-cases] 恢复案件: ${caseId} (${c.caseName})`);
+                showNotification('案件已恢复，法官侧可见', 'success');
                 loadData();
                 applyFilters();
             }
@@ -577,6 +607,7 @@
         closeHandlerModal,
         execChangeHandler,
         deleteCase,
+        restoreCase,
         batchDelete,
         goPage,
         changePageSize,

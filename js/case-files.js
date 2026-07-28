@@ -1,4 +1,6 @@
 // ============ Case Files Page JavaScript ============
+// v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/提示词/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
+// v2.18 workflow 匹配维度升级为案字+案由：getWorkflowByCaseWord/getMaterialWorkflowByCaseWord/getStepsConfigForDocType 调用补 cause 参数
 // v2.17 workflow 区分分步型/材料型：分步生成 tab 仅匹配 step 型，材料生成 tab 新增 refreshMaterialWorkflow 匹配 material 型（用户侧不感知）
 // v2.16 移除「我的模板」「我的提示词」入口（迁移至案件列表页 cases.js）；清理 applyReadOnlyMode 中对应隐藏逻辑
 // v2.14 提示词标签优先读管理后台 adminPromptTemplates；模板渲染兼容对象结构
@@ -769,6 +771,83 @@ function setLayoutState(state) {
     }
 }
 
+// v2.19: 重新配置——默认回填最近一次历史文书的快照数据
+// 取 caseItem.documents 中 createdAt 最新的一条作为快照源
+// 回填内容：模型 / 文书类型 / 模板 / 提示词 / 已选材料集合 / 生成方式（含分步生成的 stepDocType/stepTemplate/stepRequirement）
+function reconfigWithLatestSnapshot() {
+    if (guardReadOnly('reconfigWithLatestSnapshot')) return;
+
+    // 先切回配置态
+    setLayoutState('generating');
+
+    // 取最近一次历史文书
+    const docs = (caseItem && Array.isArray(caseItem.documents)) ? caseItem.documents : [];
+    if (docs.length === 0) {
+        // 无历史文书：保持默认配置态（空表单 + 全部材料未勾选）
+        showNotification('已切换到配置态', 'info');
+        return;
+    }
+
+    // 按 createdAt 倒序取最新一条
+    const latestDoc = docs.slice().sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+    })[0];
+
+    // 1. 模型
+    if (latestDoc.model) {
+        localStorage.setItem('ai_current_model', latestDoc.model);
+        const modelSelect = document.getElementById('modelSelect');
+        if (modelSelect) modelSelect.value = latestDoc.model;
+    }
+
+    // 2. 文书类型 / 模板 / 提示词（材料生成视图）
+    if (latestDoc.docType) {
+        const matDocTypeEl = document.getElementById('matDocType');
+        if (matDocTypeEl) {
+            const docTypes = getCurrentDocTypes();
+            matDocTypeEl.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
+                `<option value="${key}" ${key === latestDoc.docType ? 'selected' : ''}>${cfg.name}</option>`
+            ).join('');
+        }
+        onMatDocTypeChange(false);
+        const matTemplateEl = document.getElementById('matTemplate');
+        if (matTemplateEl && latestDoc.template) matTemplateEl.value = latestDoc.template;
+        renderMatReqTemplates(latestDoc.docType);
+    }
+    if (latestDoc.requirement !== undefined) {
+        const matRequirementEl = document.getElementById('matRequirement');
+        if (matRequirementEl) matRequirementEl.value = latestDoc.requirement;
+    }
+
+    // 同步到分步生成视图配置
+    syncStepConfigFromMaterial();
+
+    // 3. 已选材料集合
+    selectedMaterialIds.clear();
+    if (Array.isArray(latestDoc.selectedMaterialIds) && latestDoc.selectedMaterialIds.length) {
+        latestDoc.selectedMaterialIds.forEach(id => selectedMaterialIds.add(id));
+    }
+    renderMaterialTree();
+    updateAllSelectedCounts();
+
+    // 4. 生成方式：若原为分步生成，切换到分步生成视图
+    if (latestDoc.genMethod === 'steps') {
+        switchToStepView({ auto: false });
+        // 重置分步生成流程状态，让用户重新走【开始生成】
+        stepGenerationStarted = false;
+        stepStates = stepsConfig.map(() => 'waiting');
+        stepData = {};
+        resetStepFlowUI();
+    } else {
+        // 材料生成视图：确保回到材料生成 tab
+        backToMainView && backToMainView();
+    }
+
+    showNotification('已加载最近一次历史文书的生成配置，可调整后再生成', 'success');
+}
+
 // 初始化左栏材料树宽度拖拽调节
 function initColResizer() {
     const resizer = document.getElementById('materialResizer');
@@ -1019,6 +1098,41 @@ function renderStepGenConfig() {
     }
 
     requirementTextarea.value = stepRequirement || '';
+    renderStepReqTemplates(currentDocType);
+}
+
+// 分步生成 tab 的提示词快捷按钮渲染（与材料生成共用数据，UI 容器不同）
+function renderStepReqTemplates(docTypeKey) {
+    const container = document.getElementById('stepReqTemplates');
+    if (!container) return;
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const templates = getReqTemplates(org, docTypeKey);
+    if (!templates.length) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'flex';
+    const std = templates.filter(t => t.source !== 'mine');
+    const mine = templates.filter(t => t.source === 'mine');
+    const renderTag = t => {
+        const cls = t.source === 'mine' ? 'req-template-tag mine' : 'req-template-tag';
+        return `<button type="button" class="${cls}" onclick="applyStepReqTemplate(this)" data-text="${(t.text || '').replace(/"/g, '&quot;')}">${t.name}</button>`;
+    };
+    let html = '';
+    if (std.length) html += std.map(renderTag).join('');
+    if (mine.length) {
+        if (std.length) html += '<span class="req-template-divider"></span>';
+        html += mine.map(renderTag).join('');
+    }
+    container.innerHTML = html;
+}
+
+function applyStepReqTemplate(btn) {
+    document.getElementById('stepRequirement').value = btn.dataset.text.replace(/\\n/g, '\n');
+    document.querySelectorAll('#stepReqTemplates .req-template-tag').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    onStepRequirementChange(document.getElementById('stepRequirement').value);
 }
 
 function onStepDocTypeChange(docTypeKey) {
@@ -1030,6 +1144,7 @@ function onStepDocTypeChange(docTypeKey) {
     templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
     stepTemplate = templateKeys[0] || '';
     if (stepTemplate) templateSelect.value = stepTemplate;
+    renderStepReqTemplates(docTypeKey);
     refreshStepsConfig();
     renderSteps();
 }
@@ -1211,17 +1326,20 @@ function refreshStepsConfig() {
         ? stepDocType
         : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
     const caseWord = extractCaseWordFromCaseNumber();
+    const cause = extractCauseFromCase();
     // v1.22: 渲染步骤方案下拉（多 workflow 时显示），并按选中 workflow 取步骤
     // v1.28: 仅匹配分步型 workflow（材料型由材料生成 tab 单独处理）
-    renderStepPlanSelect(docTypeKey, caseWord);
-    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, currentStepPlanId);
+    // v1.32: 匹配维度升级为案字+案由
+    renderStepPlanSelect(docTypeKey, caseWord, cause);
+    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, currentStepPlanId);
     stepStates = stepsConfig.map(() => 'waiting');
     stepData = {};
 }
 
 // v1.22: 渲染步骤方案下拉（仅多 workflow 时显示）
 // v1.28: 仅匹配分步型 workflow（type='step'）
-function renderStepPlanSelect(docTypeKey, caseWord) {
+// v1.32: 匹配维度升级为案字+案由
+function renderStepPlanSelect(docTypeKey, caseWord, cause) {
     const planItem = document.getElementById('stepPlanItem');
     const planSelect = document.getElementById('stepPlan');
     if (!planItem || !planSelect) return;
@@ -1234,10 +1352,10 @@ function renderStepPlanSelect(docTypeKey, caseWord) {
         currentStepPlanId = workflows[0] ? workflows[0].id : '';
         return;
     }
-    // 多 workflow：显示下拉，默认选中案字匹配项
+    // 多 workflow：显示下拉，默认选中案字+案由匹配项
     planItem.style.display = '';
     const defaultWf = (typeof getWorkflowByCaseWord === 'function')
-        ? getWorkflowByCaseWord(org, docTypeKey, caseWord) : workflows[0];
+        ? getWorkflowByCaseWord(org, docTypeKey, caseWord, cause) : workflows[0];
     const defaultId = defaultWf ? defaultWf.id : workflows[0].id;
     if (!currentStepPlanId || !workflows.find(w => w.id === currentStepPlanId)) {
         currentStepPlanId = defaultId;
@@ -1251,7 +1369,8 @@ function renderStepPlanSelect(docTypeKey, caseWord) {
 function onStepPlanChange(wfId) {
     currentStepPlanId = wfId;
     const caseWord = extractCaseWordFromCaseNumber();
-    stepsConfig = getStepsConfigForDocTypeWithFallback(stepDocType, caseWord, currentStepPlanId);
+    const cause = extractCauseFromCase();
+    stepsConfig = getStepsConfigForDocTypeWithFallback(stepDocType, caseWord, cause, currentStepPlanId);
     stepStates = stepsConfig.map(() => 'waiting');
     stepData = {};
     expandedStepIndex = -1;
@@ -1259,12 +1378,14 @@ function onStepPlanChange(wfId) {
 }
 
 // v1.28: 材料生成 tab 切换/初始化时，按案字匹配材料型 workflow（用户侧不感知，仅用于内部流程选择）
+// v1.32: 匹配维度升级为案字+案由
 // 不返回任何 UI 反馈，仅记录到 currentMaterialWorkflowId（如需后续日志/调试使用）
 let currentMaterialWorkflowId = '';
 function refreshMaterialWorkflow() {
     const docTypeKey = (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '')
         || (document.getElementById('stepDocType') ? document.getElementById('stepDocType').value : '');
     const caseWord = extractCaseWordFromCaseNumber();
+    const cause = extractCauseFromCase();
     if (!docTypeKey) {
         currentMaterialWorkflowId = '';
         return;
@@ -1274,7 +1395,7 @@ function refreshMaterialWorkflow() {
         currentMaterialWorkflowId = '';
         return;
     }
-    const wf = getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord);
+    const wf = getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord, cause);
     currentMaterialWorkflowId = wf ? wf.id : '';
     // 调试用：console.log('[case-files] 材料生成匹配 workflow:', currentMaterialWorkflowId);
 }
@@ -1284,6 +1405,7 @@ function extractCaseWordFromCaseNumber() {
     try {
         const cn = (typeof currentCaseNumber !== 'undefined' && currentCaseNumber)
             || (typeof currentCase !== 'undefined' && currentCase && currentCase.caseNumber)
+            || (typeof caseItem !== 'undefined' && caseItem && caseItem.caseNumber)
             || '';
         if (!cn) return '';
         const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
@@ -1295,10 +1417,24 @@ function extractCaseWordFromCaseNumber() {
     return '';
 }
 
+// v1.32: 从当前案件提取案由（用于 workflow 双维度匹配）
+function extractCauseFromCase() {
+    try {
+        if (typeof caseItem !== 'undefined' && caseItem && caseItem.cause) {
+            return caseItem.cause;
+        }
+        if (typeof currentCase !== 'undefined' && currentCase && currentCase.cause) {
+            return currentCase.cause;
+        }
+    } catch (e) { /* ignore */ }
+    return '';
+}
+
 // v1.22: 优先走 case-data.js 的 getStepsConfigForDocType（按案字匹配 workflow）
 // v1.28: 仅匹配分步型 workflow（type='step'）
+// v1.32: 匹配维度升级为案字+案由
 // 保留原有 fallback 逻辑：未匹配到 workflow 时回退到内置 stepConfigsByOrg
-function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, stepPlanId) {
+function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepPlanId) {
     // 1. 优先用 case-data.js 的全局函数（读 localStorage.adminWorkflows）
     if (typeof getWorkflowsForDocType === 'function' && docTypeKey) {
         const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
@@ -1312,9 +1448,9 @@ function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, stepPlanId) 
                     return selected.steps;
                 }
             }
-            // 否则按案字匹配
+            // 否则按案字+案由匹配
             if (typeof getStepsConfigForDocType === 'function') {
-                const steps = getStepsConfigForDocType(docTypeKey, caseWord);
+                const steps = getStepsConfigForDocType(docTypeKey, caseWord, cause);
                 if (steps && steps.length > 0) return steps;
             }
         }
@@ -1404,13 +1540,52 @@ function renderSteps() {
                             <button class="step-action-btn" onclick="editStep(${i})"><i class="fas fa-edit"></i> 编辑</button>
                             <button class="step-action-btn" onclick="regenerateStep(${i})"><i class="fas fa-redo"></i> 重新生成</button>
                         </div>
-                    ` : ''}
+                    ` : (state === 'waiting' && stepGenerationStarted && !isGenerating ? `
+                        <div class="step-actions">
+                            <button class="step-action-btn primary" onclick="generateSingleStepManually(${i})"><i class="fas fa-play"></i> 生成本步</button>
+                        </div>
+                    ` : '')}
                 </div>
             </div>
         `;
     }).join('');
 
     updateStepGenerationButtons();
+}
+
+// v2.19: 用户手动触发某一步的生成（替代原【生成剩余步骤】按钮）
+async function generateSingleStepManually(index) {
+    if (guardReadOnly('generateSingleStepManually')) return;
+    if (isGenerating) return;
+    if (index < 0 || index >= stepsConfig.length) return;
+    if (stepStates[index] === 'done') return;
+
+    // 校验该步是否已选择材料
+    const stepId = stepsConfig[index].id;
+    const stepTitle = stepsConfig[index].title;
+    const mats = getEffectiveStepMaterials(stepId);
+    if (mats.size === 0) {
+        showNotification(`请为「${stepTitle}」至少选择 1 件材料`, 'warning');
+        const el = document.getElementById(`step_${index}`);
+        if (el) el.classList.add('expanded');
+        expandedStepIndex = index;
+        renderSteps();
+        return;
+    }
+    const safeLimit = getSafeContextLimit();
+    const stepTokens = [...mats].reduce((sum, id) => {
+        const f = caseItem.files.find(x => x.id === id);
+        return sum + (f ? estimateFileTokens(f) : 0);
+    }, 0);
+    if (stepTokens > safeLimit) {
+        showNotification(`「${stepTitle}」预估 ${formatNumber(stepTokens)} tokens，超出当前模型安全上限 ${formatNumber(safeLimit)} tokens，请减少材料`, 'warning');
+        return;
+    }
+
+    expandedStepIndex = index;
+    await generateSingleStep(index, { silent: true });
+    const el = document.getElementById(`step_${index}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // 渲染步骤的关联材料区域（紧凑标签 + 弹窗选择）
@@ -1671,9 +1846,8 @@ function updateStepGenerationButtons() {
         // 旧版页面兜底
         if (startBtn) {
             const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
-            const hasDone = stepsConfig.some((s, i) => stepStates[i] === 'done');
             startBtn.style.display = isGenerating || allDone ? 'none' : 'inline-flex';
-            startBtn.innerHTML = hasDone ? '<i class="fas fa-forward"></i> 生成剩余步骤' : '<i class="fas fa-play"></i> 开始生成';
+            startBtn.innerHTML = '<i class="fas fa-play"></i> 开始生成';
         }
         return;
     }
@@ -1689,23 +1863,19 @@ function updateStepGenerationButtons() {
     // 已开始：隐藏顶部开始按钮
     startBtn.style.display = 'none';
 
-    // 生成中不显示下一步按钮
+    // 生成中不显示底部按钮
     if (isGenerating) {
         nextArea.style.display = 'none';
         return;
     }
 
     const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
-    const hasWaiting = stepsConfig.some((s, i) => stepStates[i] !== 'done');
 
+    // v2.19: 去除【生成剩余步骤】按钮——每步生成完成后由用户手动展开下一步并点击该步的【生成本步】按钮触发；
+    // 仅当全部步骤完成时显示【生成文书】
     if (allDone) {
-        // 全部完成：显示【生成文书】
         nextArea.style.display = 'flex';
         nextBtn.innerHTML = '<i class="fas fa-file-alt"></i> 生成文书';
-    } else if (hasWaiting) {
-        // 还有未生成步骤：显示【生成剩余步骤】
-        nextArea.style.display = 'flex';
-        nextBtn.innerHTML = '<i class="fas fa-forward"></i> 生成剩余步骤';
     } else {
         nextArea.style.display = 'none';
     }
@@ -1940,6 +2110,16 @@ function saveStep(index) {
     showNotification('步骤内容已保存', 'success');
 }
 
+// v2.19: 分步生成「重新生成」（重新回答）
+// PRD 逻辑（v1.33 / 用户侧PRD v1.3 登记，暂不实现）：
+//   当用户在步骤 N（N ≥ 1）点击「重新生成」时，逻辑上应同时重置步骤 1 ~ N 的状态（全部回到 waiting）
+//   与生成内容（清空 items / materials），即「该步及之前所有已完成步骤一并重新回答」。
+//   设计意图：分步生成步骤之间存在上下文依赖（后一步基于前一步的结果），单独重置某一步会破坏上下文一致性。
+// 当前原型实现：仅重置当前步（stepStates[index] = 'current'，重新生成该步内容）。
+//   递归重置逻辑已在 PRD 中登记，后续迭代实现。实现时需：
+//     1. for (let k = 0; k <= index; k++) { stepStates[k] = 'waiting'; stepData[stepsConfig[k].id] = { items: [], materials: new Set() }; }
+//     2. 将 expandedStepIndex 重置为 0，引导用户从第一步重新生成
+//     3. 调用 renderSteps() 与 updateStepGenerationButtons() 刷新 UI
 function regenerateStep(index) {
     if (isGenerating) return;
     const stepId = stepsConfig[index].id;

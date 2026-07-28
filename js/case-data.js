@@ -1,6 +1,8 @@
 // ============ Shared Case Data ============
+// v1.34 文书类型与要件新增启用/停用状态：mergeAdminDocTypes 跳过 enabled===false 的类型；filterElementsByCaseWord 过滤停用要件
+// v1.33 文书模板移除 causes 字段：normalizeDocTemplates / mergeAdminDocTemplates / mergeMyDocTemplates 不再写入 causes；getFilteredDocTypeTemplates 不再按 cause 过滤
 // v1.13 新增用户侧自定义支持：mergeMyDocTemplates 合并 myDocTemplates；getReqTemplates 追加 myPromptTemplates
-// v1.12 文书模板数据结构升级（字符串→对象，关联文书类型+案由）；新增 mergeAdminDocTemplates / getFilteredDocTypeTemplates / getTemplateName / getReqTemplates
+// v1.12 文书模板数据结构升级（字符串→对象，关联文书类型）；新增 mergeAdminDocTemplates / getFilteredDocTypeTemplates / getTemplateName / getReqTemplates
 // v1.11 将 getCurrentDocTypes / getDocTypeTemplates / formatNumber 等共享辅助函数下沉至本文件，供 cases / case-files / document-detail 共用
 
 // ===== 模型上下文限制配置 =====
@@ -123,39 +125,60 @@ function getDocTypeTemplates(docTypeKey) {
 
 // ============ v1.22: workflow 配置（挂在文书类型下）============
 // v1.28: workflow 扩展为节点流程，新增 type 字段：'step'=分步型 | 'material'=材料型
+// v1.32: workflow id 改为下拉框（数据来自 agentflow 平台 mock）；新增 causes 字段；
+//        移除 steps 字段（节点序列由 agentflow 平台内部决定）
 // 数据持久化：localStorage.adminWorkflows（按业务系统分组）
-// 结构：{ [org]: { [docTypeKey]: [{id, name, type, caseWords, steps, isBuiltin}] } }
-// 与 stepConfigsByOrg 的关系：adminWorkflows 存在时整体覆盖内置步骤数组
+// 结构：{ [org]: { [docTypeKey]: [{id, name, type, caseWords, causes, isBuiltin}] } }
+
+// v1.32: agentflow 平台 workflow 列表 mock（正式接入时替换为接口调用）
+// 模拟 agentflow 平台已编排的 workflow，管理后台从中下拉选择
+const agentflowWorkflowList = [
+    { id: 'wf-judgment-1st', name: '一审民事判决', description: '一审普通程序民事判决书生成流程' },
+    { id: 'wf-judgment-2nd', name: '二审民事判决', description: '二审民事判决书生成流程' },
+    { id: 'wf-judgment-simple', name: '简易程序判决', description: '简易程序民事判决书生成流程' },
+    { id: 'wf-judgment-ruling', name: '民事裁定', description: '民事裁定书生成流程' },
+    { id: 'wf-judgment-mediation', name: '民事调解', description: '民事调解书生成流程' },
+    { id: 'wf-trial-outline', name: '庭审提纲', description: '庭审提纲生成流程' },
+    { id: 'wf-court-investigation', name: '法庭调查提纲', description: '法庭调查提纲生成流程' },
+    { id: 'wf-execution-notice', name: '执行通知书', description: '执行通知书生成流程' },
+    { id: 'wf-property-report', name: '财产报告令', description: '财产报告令生成流程' },
+    { id: 'wf-service-notice', name: '送达回证', description: '送达回证生成流程' },
+    { id: 'wf-prosecution-indictment', name: '起诉书', description: '起诉书生成流程' },
+    { id: 'wf-prosecution-decision', name: '不起诉决定', description: '不起诉决定书生成流程' },
+    { id: 'wf-reconsideration-decision', name: '行政复议决定', description: '行政复议决定书生成流程' },
+    { id: 'wf-material-summary', name: '材料总结', description: '材料总结生成流程' },
+    { id: 'wf-judgment-direct', name: '裁判文书-直接生成', description: '裁判文书直接生成流程（无人工交互节点）' },
+    { id: 'wf-trial-direct', name: '庭审提纲-直接生成', description: '庭审提纲直接生成流程' },
+    { id: 'wf-execution-direct', name: '执行文书-直接生成', description: '执行文书直接生成流程' },
+    { id: 'wf-prosecution-direct', name: '检察文书-直接生成', description: '检察文书直接生成流程' },
+    { id: 'wf-reconsideration-direct', name: '行政复议-直接生成', description: '行政复议文书直接生成流程' },
+    { id: 'wf-material-summary-direct', name: '材料总结-直接生成', description: '材料总结直接生成流程' }
+];
 
 // 获取当前业务系统下某文书类型的 workflow 列表（合并内置 + 自定义）
 // typeFilter: 'step' | 'material' | undefined（不过滤）
-// 返回数组：[{id, name, type, caseWords, steps, isBuiltin}]
+// 返回数组：[{id, name, type, caseWords, causes, isBuiltin}]
 function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
-    // 1. 取内置 workflow（首次访问时从 stepConfigsByOrg 迁移）
-    const builtinSteps = (typeof stepConfigsByOrg !== 'undefined'
-        && stepConfigsByOrg[org]
-        && stepConfigsByOrg[org][docTypeKey]) || null;
+    // 1. 取内置 workflow（v1.32: 每个 docType 生成两个内置 workflow，不再迁移 stepConfigsByOrg 的 steps）
     const builtins = [];
-    if (builtinSteps && Array.isArray(builtinSteps)) {
-        // v1.28: 内置分步型 workflow（迁移自 stepConfigsByOrg）
-        builtins.push({
-            id: 'wf-' + docTypeKey + '-default',
-            name: '默认',
-            type: 'step',             // v1.28: 分步型
-            caseWords: [],            // 空 = 兜底
-            steps: builtinSteps.map(s => ({ id: s.id, title: s.title })),
-            isBuiltin: true
-        });
-        // v1.28: 内置材料型 workflow（默认兜底）
-        builtins.push({
-            id: 'wf-' + docTypeKey + '-material-default',
-            name: '默认-材料生成',
-            type: 'material',         // 材料型：无人工交互节点
-            caseWords: [],
-            steps: [],
-            isBuiltin: true
-        });
-    }
+    // v1.32: 分步生成型 workflow
+    builtins.push({
+        id: 'wf-' + docTypeKey + '-default',
+        name: '默认',
+        type: 'step',
+        caseWords: [],
+        causes: [],
+        isBuiltin: true
+    });
+    // v1.32: 直接生成型 workflow
+    builtins.push({
+        id: 'wf-' + docTypeKey + '-material-default',
+        name: '默认-直接生成',
+        type: 'material',
+        caseWords: [],
+        causes: [],
+        isBuiltin: true
+    });
     // 2. 取自定义 workflow（localStorage.adminWorkflows）
     let customs = [];
     try {
@@ -168,13 +191,13 @@ function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
     // 3. 合并：自定义存在时整体覆盖内置
     let result;
     if (customs.length > 0) {
-        // v1.28: 兼容旧数据——无 type 字段按 'step' 处理；材料型 steps 强制为 []
+        // v1.32: 兼容旧数据——无 type 字段按 'step' 处理；补全 causes 字段；steps 字段保留但不再使用
         result = customs.map(wf => {
             const type = wf.type || 'step';
             return {
                 ...wf,
                 type: type,
-                steps: type === 'material' ? [] : (wf.steps || [])
+                causes: Array.isArray(wf.causes) ? wf.causes : []
             };
         });
     } else {
@@ -187,11 +210,55 @@ function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
     return result;
 }
 
-// 根据案字匹配【分步型】workflow，返回其 steps 数组
-// 匹配规则：精确匹配 caseWords → 兜底分步型 workflow(caseWords=[]) → 第一个分步型 → 内置 stepConfigsByOrg
-function getStepsConfigForDocType(docTypeKey, caseWord) {
+// v1.32: 通用 workflow 匹配函数（按案字+案由双维度，5 级优先级）
+// 匹配规则优先级：
+//   1. 案字 + 案由 双精确匹配
+//   2. 案字精确 + 案由兜底（causes=[]）
+//   3. 案字兜底（caseWords=[]）+ 案由精确
+//   4. 案字兜底 + 案由兜底（全兜底）
+//   5. 第一个同类型 workflow
+function matchWorkflowByCaseWordAndCause(workflows, caseWord, cause) {
+    if (!workflows || workflows.length === 0) return null;
+    const hasCaseWord = !!caseWord;
+    const hasCause = !!cause;
+    // 1. 案字 + 案由 双精确
+    if (hasCaseWord && hasCause) {
+        const matched = workflows.find(wf =>
+            Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0
+            && Array.isArray(wf.causes) && wf.causes.indexOf(cause) >= 0
+        );
+        if (matched) return matched;
+    }
+    // 2. 案字精确 + 案由兜底
+    if (hasCaseWord) {
+        const matched = workflows.find(wf =>
+            Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0
+            && (!Array.isArray(wf.causes) || wf.causes.length === 0)
+        );
+        if (matched) return matched;
+    }
+    // 3. 案字兜底 + 案由精确
+    if (hasCause) {
+        const matched = workflows.find(wf =>
+            (!Array.isArray(wf.caseWords) || wf.caseWords.length === 0)
+            && Array.isArray(wf.causes) && wf.causes.indexOf(cause) >= 0
+        );
+        if (matched) return matched;
+    }
+    // 4. 全兜底
+    const fallback = workflows.find(wf =>
+        (!Array.isArray(wf.caseWords) || wf.caseWords.length === 0)
+        && (!Array.isArray(wf.causes) || wf.causes.length === 0)
+    );
+    if (fallback) return fallback;
+    // 5. 第一个
+    return workflows[0];
+}
+
+// 根据案字+案由匹配【分步生成型】workflow，返回其 steps 数组
+// v1.32: 匹配规则升级为案字+案由双维度；steps 字段保留兼容（旧数据），新数据无 steps 时回退到 stepConfigsByOrg
+function getStepsConfigForDocType(docTypeKey, caseWord, cause) {
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    // v1.28: 仅匹配分步型 workflow
     const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
     if (workflows.length === 0) {
         // 回退到内置 stepConfigsByOrg
@@ -200,23 +267,15 @@ function getStepsConfigForDocType(docTypeKey, caseWord) {
             && stepConfigsByOrg[org][docTypeKey]) || [];
         return fallback;
     }
-    // 1. 精确匹配案字
-    if (caseWord) {
-        const matched = workflows.find(wf => Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0);
-        if (matched && Array.isArray(matched.steps) && matched.steps.length > 0) {
-            return matched.steps;
-        }
+    const matched = matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
+    if (matched && Array.isArray(matched.steps) && matched.steps.length > 0) {
+        return matched.steps;
     }
-    // 2. 兜底 workflow（caseWords 为空数组）
-    const fallbackWf = workflows.find(wf => !Array.isArray(wf.caseWords) || wf.caseWords.length === 0);
-    if (fallbackWf && Array.isArray(fallbackWf.steps) && fallbackWf.steps.length > 0) {
-        return fallbackWf.steps;
-    }
-    // 3. 第一个分步型 workflow
-    if (workflows[0] && Array.isArray(workflows[0].steps)) {
-        return workflows[0].steps;
-    }
-    return [];
+    // v1.32: workflow 无 steps 字段时回退到内置 stepConfigsByOrg（节点序列由 agentflow 平台提供，前端 mock 仍用内置）
+    const fallback = (typeof stepConfigsByOrg !== 'undefined'
+        && stepConfigsByOrg[org]
+        && stepConfigsByOrg[org][docTypeKey]) || [];
+    return fallback;
 }
 
 // 统计某文书类型下的 workflow 数量（供管理后台表格显示）
@@ -224,44 +283,26 @@ function countWorkflowsForDocType(org, docTypeKey) {
     return getWorkflowsForDocType(org, docTypeKey).length;
 }
 
-// v1.22: 根据案字匹配【分步型】workflow 对象（含 id/name/steps），用于用户侧"步骤方案"下拉默认选中
-// 匹配规则：精确匹配 caseWords → 兜底分步型 workflow(caseWords=[]) → 第一个分步型 → null
-function getWorkflowByCaseWord(org, docTypeKey, caseWord) {
+// v1.22/v1.32: 根据案字+案由匹配【分步生成型】workflow 对象，用于用户侧"步骤方案"下拉默认选中
+function getWorkflowByCaseWord(org, docTypeKey, caseWord, cause) {
     const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
     if (workflows.length === 0) return null;
-    // 1. 精确匹配案字
-    if (caseWord) {
-        const matched = workflows.find(wf => Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0);
-        if (matched) return matched;
-    }
-    // 2. 兜底 workflow
-    const fallback = workflows.find(wf => !Array.isArray(wf.caseWords) || wf.caseWords.length === 0);
-    if (fallback) return fallback;
-    // 3. 第一个
-    return workflows[0];
+    return matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
 }
 
-// v1.28: 根据案字匹配【材料型】workflow 对象，用于用户侧材料生成 tab 流程选择
-// 匹配规则：精确匹配 caseWords → 兜底材料型 workflow(caseWords=[]) → 第一个材料型 → null
+// v1.28/v1.32: 根据案字+案由匹配【直接生成型】workflow 对象，用于用户侧材料生成 tab 流程选择
 // 用户侧不暴露此匹配，仅用于内部流程选择
-function getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord) {
+function getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord, cause) {
     const workflows = getWorkflowsForDocType(org, docTypeKey, 'material');
     if (workflows.length === 0) return null;
-    // 1. 精确匹配案字
-    if (caseWord) {
-        const matched = workflows.find(wf => Array.isArray(wf.caseWords) && wf.caseWords.indexOf(caseWord) >= 0);
-        if (matched) return matched;
-    }
-    // 2. 兜底 workflow
-    const fallback = workflows.find(wf => !Array.isArray(wf.caseWords) || wf.caseWords.length === 0);
-    if (fallback) return fallback;
-    // 3. 第一个
-    return workflows[0];
+    return matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
 }
 
-// v1.17: docTemplates 数据结构升级——把字符串值统一转为对象 {name, docType, causes, content}
+// v1.17: docTemplates 数据结构升级——把字符串值统一转为对象 {name, docType, content}
 // v1.24: 反查表改用 defaultDocTypesByOrg（保留原始 templates 数组），避免 system.docTypes
 //        被 mergeAdminDocTypes 覆盖后丢失 templates 导致内置模板 docType 补全失败
+// v1.33: 移除 causes 字段——模板不再单独维护案由关联，作为所属文书类型的下属
+//        localStorage 旧数据中的 causes 字段保留不删，运行时不再读取或写入
 function normalizeDocTemplates(org, system) {
     if (!system.docTemplates) return;
     // 用 defaultDocTypesByOrg 构建 docType key → 模板 key 的反查表
@@ -276,15 +317,14 @@ function normalizeDocTemplates(org, system) {
             system.docTemplates[key] = {
                 name: val,
                 docType: templateToDocType[key] || '',
-                causes: [],
                 content: ''
             };
         } else if (val && typeof val === 'object') {
             // 兼容对象结构，补全缺失字段
             if (val.name === undefined) val.name = key;
             if (!val.docType) val.docType = templateToDocType[key] || '';
-            if (!Array.isArray(val.causes)) val.causes = [];
             if (val.content === undefined) val.content = '';
+            // v1.33: 不再写入 causes 字段；旧数据中的 causes 字段保留不删
         }
     });
 }
@@ -311,7 +351,6 @@ function mergeAdminDocTemplates(org, system) {
                 system.docTemplates[key] = {
                     name: val.name || key,
                     docType: val.docType || '',
-                    causes: Array.isArray(val.causes) ? val.causes : [],
                     content: val.content || ''
                 };
             }
@@ -324,6 +363,7 @@ function mergeAdminDocTemplates(org, system) {
 // v1.13: 合并用户侧自定义模板（localStorage.myDocTemplates）
 // key 加 my- 前缀避免与 admin/内置冲突；标记 source='mine' 供 UI 加「我的」标识
 // v1.23: 过滤掉 enabled === false 的已停用项
+// v1.33: 不再写入 causes 字段；旧数据中的 causes 字段保留不删
 function mergeMyDocTemplates(org, system) {
     try {
         const myData = JSON.parse(localStorage.getItem('myDocTemplates')) || {};
@@ -333,7 +373,6 @@ function mergeMyDocTemplates(org, system) {
                 system.docTemplates['my-' + key] = {
                     name: val.name || key,
                     docType: val.docType || '',
-                    causes: Array.isArray(val.causes) ? val.causes : [],
                     content: val.content || '',
                     source: 'mine'
                 };
@@ -346,18 +385,24 @@ function mergeMyDocTemplates(org, system) {
 
 // v1.21: 合并管理后台自定义文书类型（localStorage.adminDocTypes）
 // 覆盖语义：adminDocTypes[org][key] 整体覆盖 defaultDocTypesByOrg[org][key]
+// v1.9: 不再复制 icon 字段
+// v1.34: 启用/停用状态——enabled === false 的类型在用户侧不展示（从 system.docTypes 中删除以覆盖内置默认）
 function mergeAdminDocTypes(org, system) {
     try {
         const all = JSON.parse(localStorage.getItem('adminDocTypes')) || {};
         const customs = all[org] || {};
         Object.entries(customs).forEach(([key, cfg]) => {
             if (cfg && typeof cfg === 'object') {
-                // 覆盖同名内置 key（保留原 key，name/icon 用自定义值）
-                system.docTypes[key] = {
-                    name: cfg.name || key,
-                    icon: cfg.icon || 'fa-folder'
-                    // 注意：不保留 templates 数组，模板归属由模板自身 docType 决定
-                };
+                if (cfg.enabled === false) {
+                    // 停用：从 system.docTypes 中删除（覆盖内置默认，用户侧不可见）
+                    delete system.docTypes[key];
+                } else {
+                    // 启用或默认：覆盖同名内置 key（保留原 key，name 用自定义值）
+                    system.docTypes[key] = {
+                        name: cfg.name || key
+                        // 注意：不保留 templates 数组，模板归属由模板自身 docType 决定
+                    };
+                }
             }
         });
     } catch (e) {
@@ -365,20 +410,11 @@ function mergeAdminDocTypes(org, system) {
     }
 }
 
-// 根据文书类型 + 案由获取可用模板（causes 为空 = 通用；无 cause 时返回全部该类型模板）
+// 根据文书类型获取可用模板
+// v1.33: 移除按 cause 过滤的逻辑——模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
+// 保留 cause 参数签名以减少调用方变更，运行时忽略该参数
 function getFilteredDocTypeTemplates(docTypeKey, cause) {
-    const templates = getDocTypeTemplates(docTypeKey);
-    if (!cause) return templates;
-    const filtered = {};
-    Object.entries(templates).forEach(([key, val]) => {
-        const causes = (val && Array.isArray(val.causes)) ? val.causes : [];
-        if (causes.length === 0 || causes.includes(cause)) {
-            filtered[key] = val;
-        }
-    });
-    // 兜底：过滤后无可用模板，返回全部该类型模板
-    if (Object.keys(filtered).length === 0) return templates;
-    return filtered;
+    return getDocTypeTemplates(docTypeKey);
 }
 
 // 获取模板显示名（兼容字符串和对象结构）
@@ -667,23 +703,24 @@ const caseWordListByOrg = {
 const DATA_VERSION = '1.16';
 
 // 保留默认的 docTypes 与 docTemplates 配置，用于 localStorage 加载后补全
+// v1.9: 移除文书类型 icon 字段
 const defaultDocTypesByOrg = {
     court: {
-        judgment: { name: '裁判文书', icon: 'fa-gavel', templates: ['judgment-civil-1st', 'judgment-civil-simple', 'ruling-civil', 'mediation-civil'] },
-        trial: { name: '庭审提纲', icon: 'fa-list-alt', templates: ['trial-outline', 'court-investigation-outline'] },
-        execution: { name: '执行文书', icon: 'fa-hammer', templates: ['execution-notice', 'property-report', 'service-notice'] },
-        materialSummary: { name: '材料总结', icon: 'fa-folder-open', templates: [] }
+        judgment: { name: '裁判文书', templates: ['judgment-civil-1st', 'judgment-civil-simple', 'ruling-civil', 'mediation-civil'] },
+        trial: { name: '庭审提纲', templates: ['trial-outline', 'court-investigation-outline'] },
+        execution: { name: '执行文书', templates: ['execution-notice', 'property-report', 'service-notice'] },
+        materialSummary: { name: '材料总结', templates: [] }
     },
     procuratorate: {
-        prosecution: { name: '检察文书', icon: 'fa-file-alt', templates: ['prosecution-indictment', 'prosecution-notice', 'prosecution-recommendation', 'prosecution-transfer', 'prosecution-detention'] },
-        nonProsecution: { name: '不起诉文书', icon: 'fa-ban', templates: ['prosecution-decision'] },
-        court: { name: '出庭文书', icon: 'fa-landmark', templates: ['prosecution-arraignment'] },
-        materialSummary: { name: '材料总结', icon: 'fa-folder-open', templates: [] }
+        prosecution: { name: '检察文书', templates: ['prosecution-indictment', 'prosecution-notice', 'prosecution-recommendation', 'prosecution-transfer', 'prosecution-detention'] },
+        nonProsecution: { name: '不起诉文书', templates: ['prosecution-decision'] },
+        court: { name: '出庭文书', templates: ['prosecution-arraignment'] },
+        materialSummary: { name: '材料总结', templates: [] }
     },
     justice: {
-        reconsideration: { name: '行政复议决定书', icon: 'fa-balance-scale', templates: ['reconsideration-decision', 'reconsideration-maintain', 'reconsideration-revoke', 'reconsideration-change', 'reconsideration-confirm'] },
-        notice: { name: '行政复议通知书', icon: 'fa-envelope', templates: ['reconsideration-accept-notice', 'reconsideration-reply-notice', 'reconsideration-hearing-notice'] },
-        materialSummary: { name: '材料总结', icon: 'fa-folder-open', templates: [] }
+        reconsideration: { name: '行政复议决定书', templates: ['reconsideration-decision', 'reconsideration-maintain', 'reconsideration-revoke', 'reconsideration-change', 'reconsideration-confirm'] },
+        notice: { name: '行政复议通知书', templates: ['reconsideration-accept-notice', 'reconsideration-reply-notice', 'reconsideration-hearing-notice'] },
+        materialSummary: { name: '材料总结', templates: [] }
     }
 };
 
@@ -868,10 +905,13 @@ function getAncestorCauses(org, cause) {
 }
 
 // 按案字过滤要件：返回 caseWords 包含 caseWord 或为空（通用）的要件
+// v1.34: 同时过滤 enabled === false 的停用要件（用户侧不展示）
 function filterElementsByCaseWord(elements, caseWord) {
     if (!Array.isArray(elements)) return [];
-    if (!caseWord) return elements; // 无案字时返回全部
-    return elements.filter(p => {
+    // 先过滤停用项（enabled !== false 才保留；内置要件无 enabled 字段，视为启用）
+    const active = elements.filter(p => p.enabled !== false);
+    if (!caseWord) return active; // 无案字时返回全部启用项
+    return active.filter(p => {
         const cw = p.caseWords;
         return !Array.isArray(cw) || cw.length === 0 || cw.indexOf(caseWord) >= 0;
     });
@@ -1098,7 +1138,8 @@ function migrateDataIfNeeded() {
             // 补全文书类型与模板配置：合并默认配置中新增的类型/模板，不覆盖用户已有配置
             system.docTypes = Object.assign({}, defaultDocTypesByOrg[org] || {}, system.docTypes || {});
             system.docTemplates = Object.assign({}, defaultDocTemplatesByOrg[org] || {}, system.docTemplates || {});
-            // v1.17: docTemplates 数据结构升级——字符串值统一转为对象 {name, docType, causes, content}
+            // v1.17: docTemplates 数据结构升级——字符串值统一转为对象 {name, docType, content}
+            // v1.33: causes 字段不再写入，旧数据保留不删
             normalizeDocTemplates(org, system);
             // 合并管理后台自定义模板（localStorage.adminDocTemplates）
             mergeAdminDocTemplates(org, system);
@@ -1133,10 +1174,10 @@ let businessSystems = {
         label: '审判业务',
         partiesLabels: ['原告', '被告'],
         docTypes: {
-            judgment: { name: '裁判文书', icon: 'fa-gavel', templates: ['judgment-civil-1st', 'judgment-civil-simple', 'ruling-civil', 'mediation-civil'] },
-            trial: { name: '庭审提纲', icon: 'fa-list-alt', templates: ['trial-outline', 'court-investigation-outline'] },
-            execution: { name: '执行文书', icon: 'fa-hammer', templates: ['execution-notice', 'property-report', 'service-notice'] },
-            materialSummary: { name: '材料总结', icon: 'fa-folder-open', templates: [] }
+            judgment: { name: '裁判文书', templates: ['judgment-civil-1st', 'judgment-civil-simple', 'ruling-civil', 'mediation-civil'] },
+            trial: { name: '庭审提纲', templates: ['trial-outline', 'court-investigation-outline'] },
+            execution: { name: '执行文书', templates: ['execution-notice', 'property-report', 'service-notice'] },
+            materialSummary: { name: '材料总结', templates: [] }
         },
         docTemplates: {
             'judgment-civil-1st': '民事判决书（一审普通程序）',
@@ -1191,10 +1232,10 @@ let businessSystems = {
         label: '公诉业务',
         partiesLabels: ['犯罪嫌疑人', '被害人'],
         docTypes: {
-            prosecution: { name: '检察文书', icon: 'fa-file-alt', templates: ['prosecution-indictment', 'prosecution-notice', 'prosecution-recommendation', 'prosecution-transfer', 'prosecution-detention'] },
-            nonProsecution: { name: '不起诉文书', icon: 'fa-ban', templates: ['prosecution-decision'] },
-            court: { name: '出庭文书', icon: 'fa-landmark', templates: ['prosecution-arraignment'] },
-            materialSummary: { name: '材料总结', icon: 'fa-folder-open', templates: [] }
+            prosecution: { name: '检察文书', templates: ['prosecution-indictment', 'prosecution-notice', 'prosecution-recommendation', 'prosecution-transfer', 'prosecution-detention'] },
+            nonProsecution: { name: '不起诉文书', templates: ['prosecution-decision'] },
+            court: { name: '出庭文书', templates: ['prosecution-arraignment'] },
+            materialSummary: { name: '材料总结', templates: [] }
         },
         docTemplates: {
             'prosecution-indictment': '起诉书',
@@ -1247,9 +1288,9 @@ let businessSystems = {
         label: '行政复议业务',
         partiesLabels: ['申请人', '被申请人'],
         docTypes: {
-            reconsideration: { name: '行政复议决定书', icon: 'fa-balance-scale', templates: ['reconsideration-decision', 'reconsideration-maintain', 'reconsideration-revoke', 'reconsideration-change', 'reconsideration-confirm'] },
-            notice: { name: '行政复议通知书', icon: 'fa-envelope', templates: ['reconsideration-accept-notice', 'reconsideration-reply-notice', 'reconsideration-hearing-notice'] },
-            materialSummary: { name: '材料总结', icon: 'fa-folder-open', templates: [] }
+            reconsideration: { name: '行政复议决定书', templates: ['reconsideration-decision', 'reconsideration-maintain', 'reconsideration-revoke', 'reconsideration-change', 'reconsideration-confirm'] },
+            notice: { name: '行政复议通知书', templates: ['reconsideration-accept-notice', 'reconsideration-reply-notice', 'reconsideration-hearing-notice'] },
+            materialSummary: { name: '材料总结', templates: [] }
         },
         docTemplates: {
             'reconsideration-decision': '行政复议决定书（通用）',
@@ -1352,6 +1393,54 @@ function initCaseData() {
             c.fileCount = (c.files || []).length;
         });
     });
+    // v1.9: 清理历史数据中残留的 icon 字段（文书类型与 workflow 步骤）
+    cleanupIconFields();
+}
+
+// v1.9: 清理 localStorage 中残留的 icon 字段（幂等，每次加载执行）
+function cleanupIconFields() {
+    // 1. 清理 businessSystems 内存对象中 docTypes 残留的 icon
+    try {
+        Object.entries(businessSystems).forEach(([org, system]) => {
+            if (org === '_dataVersion' || !system || !system.docTypes) return;
+            Object.values(system.docTypes).forEach(t => {
+                if (t && typeof t === 'object' && 'icon' in t) delete t.icon;
+            });
+        });
+    } catch (e) { console.error('[case-data] cleanupIconFields(businessSystems) 失败:', e); }
+
+    // 2. 清理 localStorage.adminDocTypes 中残留的 icon
+    try {
+        const all = JSON.parse(localStorage.getItem('adminDocTypes')) || {};
+        let changed = false;
+        Object.values(all).forEach(types => {
+            if (!types || typeof types !== 'object') return;
+            Object.values(types).forEach(t => {
+                if (t && typeof t === 'object' && 'icon' in t) { delete t.icon; changed = true; }
+            });
+        });
+        if (changed) localStorage.setItem('adminDocTypes', JSON.stringify(all));
+    } catch (e) { console.error('[case-data] cleanupIconFields(adminDocTypes) 失败:', e); }
+
+    // 3. 清理 localStorage.adminWorkflows 中 steps 残留的 icon
+    try {
+        const all = JSON.parse(localStorage.getItem('adminWorkflows')) || {};
+        let changed = false;
+        Object.values(all).forEach(docTypes => {
+            if (!docTypes || typeof docTypes !== 'object') return;
+            Object.values(docTypes).forEach(wfs => {
+                if (!Array.isArray(wfs)) return;
+                wfs.forEach(wf => {
+                    if (wf && Array.isArray(wf.steps)) {
+                        wf.steps.forEach(s => {
+                            if (s && typeof s === 'object' && 'icon' in s) { delete s.icon; changed = true; }
+                        });
+                    }
+                });
+            });
+        });
+        if (changed) localStorage.setItem('adminWorkflows', JSON.stringify(all));
+    } catch (e) { console.error('[case-data] cleanupIconFields(adminWorkflows) 失败:', e); }
 }
 
 const CASE_DATA_KEY = 'caseAssistant_businessSystems';

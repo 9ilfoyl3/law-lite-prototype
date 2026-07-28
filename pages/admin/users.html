@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -908,6 +908,11 @@
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
                 </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
+                </div>
 
 
             </nav>
@@ -980,23 +985,17 @@
                             <i class="fas fa-search"></i>
                             <input type="text" id="userSearch" placeholder="搜索用户名、部门...">
                         </div>
+                        <select class="filter-select" id="courtFilter" onchange="onCourtFilterChange()">
+                            <option value="">全部法院</option>
+                        </select>
                         <select class="filter-select" id="roleFilter">
                             <option value="">全部角色</option>
-                            <option value="admin">管理员</option>
+                            <option value="super_admin">超级管理员</option>
+                            <option value="court_admin">法院管理员</option>
                             <option value="user">普通用户</option>
                         </select>
                         <select class="filter-select" id="deptFilter">
                             <option value="">全部部门</option>
-                            <option value="立案庭">立案庭</option>
-                            <option value="刑事审判庭">刑事审判庭</option>
-                            <option value="民事审判庭">民事审判庭</option>
-                            <option value="行政审判庭">行政审判庭</option>
-                            <option value="执行局">执行局</option>
-                            <option value="审判监督庭">审判监督庭</option>
-                            <option value="司法警察大队">司法警察大队</option>
-                            <option value="办公室">办公室</option>
-                            <option value="政治部">政治部</option>
-                            <option value="研究室">研究室</option>
                         </select>
                         <select class="filter-select" id="statusFilter">
                             <option value="">全部状态</option>
@@ -1018,6 +1017,7 @@
                                         </div>
                                     </th>
                                     <th>用户信息</th>
+                                    <th>所属法院</th>
                                     <th>部门</th>
                                     <th>角色</th>
                                     <th>状态</th>
@@ -1060,19 +1060,15 @@
                     <input type="text" class="form-input" id="userName" placeholder="请输入用户名">
                 </div>
                 <div class="form-group">
+                    <label class="form-label">所属法院 <span class="required">*</span></label>
+                    <select class="form-select" id="userCourt" onchange="onUserCourtChange()">
+                        <option value="">请选择法院</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label class="form-label">部门 <span class="required">*</span></label>
                     <select class="form-select" id="userDept">
                         <option value="">请选择部门</option>
-                        <option value="立案庭">立案庭</option>
-                        <option value="刑事审判庭">刑事审判庭</option>
-                        <option value="民事审判庭">民事审判庭</option>
-                        <option value="行政审判庭">行政审判庭</option>
-                        <option value="执行局">执行局</option>
-                        <option value="审判监督庭">审判监督庭</option>
-                        <option value="司法警察大队">司法警察大队</option>
-                        <option value="办公室">办公室</option>
-                        <option value="政治部">政治部</option>
-                        <option value="研究室">研究室</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1083,7 +1079,8 @@
                     <label class="form-label">角色</label>
                     <select class="form-select" id="userRole">
                         <option value="user">普通用户</option>
-                        <option value="admin">管理员</option>
+                        <option value="court_admin">法院管理员</option>
+                        <option value="super_admin">超级管理员</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1174,46 +1171,97 @@
     })();
         const DEPARTMENTS = ['立案庭','刑事审判庭','民事审判庭','行政审判庭','执行局','审判监督庭','司法警察大队','办公室','政治部','研究室'];
 
+        // v1.1：用户数据结构新增 courtId（所属法院）、deptId（所属部门）；角色枚举改为 super_admin/court_admin/user
         let users = JSON.parse(localStorage.getItem('adminUsers')) || [
-            { id: 'u1', name: '张三', dept: '刑事审判庭', role: 'admin', status: 'active', lastLogin: '2026-02-08 10:30' },
-            { id: 'u2', name: '李四', dept: '民事审判庭', role: 'user', status: 'active', lastLogin: '2026-02-07 18:45' },
-            { id: 'u3', name: '王五', dept: '执行局', role: 'user', status: 'inactive', lastLogin: '2026-01-28 09:15' },
-            { id: 'u4', name: '赵六', dept: '立案庭', role: 'user', status: 'active', lastLogin: '2026-02-08 08:20' },
-            { id: 'u5', name: '陈七', dept: '政治部', role: 'admin', status: 'active', lastLogin: '2026-02-06 14:30' }
+            { id: 'u1', name: '张三', dept: '刑事审判庭', deptId: 'dept_002', courtId: 'court_b1', role: 'court_admin', status: 'active', lastLogin: '2026-02-08 10:30' },
+            { id: 'u2', name: '李四', dept: '民事审判庭', deptId: 'dept_003', courtId: 'court_b1', role: 'user', status: 'active', lastLogin: '2026-02-07 18:45' },
+            { id: 'u3', name: '王五', dept: '执行局', deptId: 'dept_005', courtId: 'court_b1', role: 'user', status: 'inactive', lastLogin: '2026-01-28 09:15' },
+            { id: 'u4', name: '赵六', dept: '立案庭', deptId: 'dept_001', courtId: 'court_b1', role: 'user', status: 'active', lastLogin: '2026-02-08 08:20' },
+            { id: 'u5', name: '陈七', dept: '政治部', deptId: 'dept_006', courtId: 'court_b1', role: 'user', status: 'active', lastLogin: '2026-02-06 14:30' },
+            { id: 'u6', name: '超管', dept: '', deptId: '', courtId: '', role: 'super_admin', status: 'active', lastLogin: '2026-02-08 09:00' }
         ];
 
+        let courts = JSON.parse(localStorage.getItem('adminCourtTree')) || [];
+        let departments = JSON.parse(localStorage.getItem('adminDepartments')) || [];
+        let currentRole = localStorage.getItem('adminRole') || 'super_admin';
+        let bindCourt = localStorage.getItem('adminRoleCourt') || '';
         let currentEditUserId = null;
         let importData = [];
 
         document.addEventListener('DOMContentLoaded', function() {
+            initCourtFilter();
             renderUsers();
         });
+
+        // 初始化法院筛选器：法院管理员固定本法院不可切换
+        function initCourtFilter() {
+            const courtFilter = document.getElementById('courtFilter');
+            if (currentRole === 'court_admin' && bindCourt) {
+                courtFilter.disabled = true;
+                const court = courts.find(c => c.id === bindCourt);
+                courtFilter.innerHTML = `<option value="${bindCourt}">${court ? escapeHtml(court.name) : '当前法院'}</option>`;
+            } else {
+                courtFilter.disabled = false;
+                courtFilter.innerHTML = '<option value="">全部法院</option>' + courts.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+            }
+            refreshDeptFilter();
+        }
+
+        function onCourtFilterChange() {
+            refreshDeptFilter();
+            renderUsers();
+        }
+
+        // 部门筛选器：按当前所选法院动态加载
+        function refreshDeptFilter() {
+            const courtId = document.getElementById('courtFilter').value;
+            const deptFilter = document.getElementById('deptFilter');
+            const list = courtId ? departments.filter(d => d.courtId === courtId) : departments;
+            deptFilter.innerHTML = '<option value="">全部部门</option>' + list.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+        }
+
+        function getCourtName(courtId) {
+            if (!courtId) return '-';
+            const court = courts.find(c => c.id === courtId);
+            return court ? court.name : '-';
+        }
+
+        function getDeptName(deptId) {
+            if (!deptId) return '-';
+            const dept = departments.find(d => d.id === deptId);
+            return dept ? dept.name : '-';
+        }
 
         function renderUsers() {
             const tbody = document.getElementById('userTableBody');
             const search = document.getElementById('userSearch').value.toLowerCase();
+            const courtId = document.getElementById('courtFilter').value;
             const role = document.getElementById('roleFilter').value;
-            const dept = document.getElementById('deptFilter').value;
+            const deptId = document.getElementById('deptFilter').value;
             const status = document.getElementById('statusFilter').value;
 
             const filtered = users.filter(u => {
                 if (search && !u.name.toLowerCase().includes(search) && !u.dept.toLowerCase().includes(search)) return false;
+                if (courtId && u.courtId !== courtId) return false;
                 if (role && u.role !== role) return false;
-                if (dept && u.dept !== dept) return false;
+                if (deptId && u.deptId !== deptId) return false;
                 if (status && u.status !== status) return false;
                 return true;
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:60px 20px;color:var(--text-muted);"><i class="fas fa-inbox" style="font-size:36px;margin-bottom:12px;display:block;"></i>暂无匹配的用户</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:60px 20px;color:var(--text-muted);"><i class="fas fa-inbox" style="font-size:36px;margin-bottom:12px;display:block;"></i>暂无匹配的用户</td></tr>';
                 updatePagination(0);
                 return;
             }
 
+            const roleTextMap = { super_admin: '超级管理员', court_admin: '法院管理员', user: '普通用户' };
+            const roleClassMap = { super_admin: 'admin', court_admin: 'admin', user: '' };
+
             tbody.innerHTML = filtered.map(u => {
                 const initial = u.name.charAt(0);
-                const roleClass = u.role === 'admin' ? 'admin' : '';
-                const roleText = u.role === 'admin' ? '管理员' : '普通用户';
+                const roleClass = roleClassMap[u.role] || '';
+                const roleText = roleTextMap[u.role] || '普通用户';
                 const statusClass = u.status === 'active' ? 'active' : 'inactive';
                 const statusText = u.status === 'active' ? '正常' : '禁用';
                 return `<tr data-id="${u.id}">
@@ -1227,7 +1275,8 @@
                             </div>
                         </div>
                     </td>
-                    <td>${escapeHtml(u.dept)}</td>
+                    <td>${escapeHtml(getCourtName(u.courtId))}</td>
+                    <td>${escapeHtml(getDeptName(u.deptId))}</td>
                     <td><span class="role-badge ${roleClass}">${roleText}</span></td>
                     <td><span class="status-badge ${statusClass}"><i class="fas fa-circle" style="font-size:6px"></i> ${statusText}</span></td>
                     <td>${u.lastLogin || '-'}</td>
@@ -1287,13 +1336,26 @@
             currentEditUserId = userId;
             const title = document.getElementById('userModalTitle');
             const passwordGroup = document.getElementById('userPassword').closest('.form-group');
+            const userCourtSelect = document.getElementById('userCourt');
+
+            // 填充法院下拉：法院管理员固定本法院不可切换
+            if (currentRole === 'court_admin' && bindCourt) {
+                userCourtSelect.disabled = true;
+                const court = courts.find(c => c.id === bindCourt);
+                userCourtSelect.innerHTML = `<option value="${bindCourt}">${court ? escapeHtml(court.name) : '当前法院'}</option>`;
+            } else {
+                userCourtSelect.disabled = false;
+                userCourtSelect.innerHTML = '<option value="">请选择法院</option>' + courts.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+            }
 
             if (userId) {
                 title.textContent = '编辑用户';
                 const user = users.find(u => u.id === userId);
                 if (user) {
                     document.getElementById('userName').value = user.name;
-                    document.getElementById('userDept').value = user.dept;
+                    document.getElementById('userCourt').value = user.courtId || '';
+                    refreshUserDeptSelect(user.courtId);
+                    document.getElementById('userDept').value = user.deptId || '';
                     document.getElementById('userRole').value = user.role;
                     document.getElementById('userStatus').value = user.status;
                 }
@@ -1301,6 +1363,14 @@
             } else {
                 title.textContent = '添加用户';
                 document.getElementById('userName').value = '';
+                // 法院管理员默认填本法院，超管留空
+                if (currentRole === 'court_admin' && bindCourt) {
+                    document.getElementById('userCourt').value = bindCourt;
+                    refreshUserDeptSelect(bindCourt);
+                } else {
+                    document.getElementById('userCourt').value = '';
+                    refreshUserDeptSelect('');
+                }
                 document.getElementById('userDept').value = '';
                 document.getElementById('userPassword').value = '';
                 document.getElementById('userRole').value = 'user';
@@ -1310,6 +1380,23 @@
             document.getElementById('userModal').classList.add('active');
         }
 
+        // 编辑弹窗中切换法院时，重新加载部门下拉
+        function onUserCourtChange() {
+            const courtId = document.getElementById('userCourt').value;
+            refreshUserDeptSelect(courtId);
+            document.getElementById('userDept').value = '';
+        }
+
+        function refreshUserDeptSelect(courtId) {
+            const deptSelect = document.getElementById('userDept');
+            if (!courtId) {
+                deptSelect.innerHTML = '<option value="">请选择部门</option>';
+                return;
+            }
+            const list = departments.filter(d => d.courtId === courtId && d.status !== 'inactive');
+            deptSelect.innerHTML = '<option value="">请选择部门</option>' + list.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+        }
+
         function closeModal() {
             document.getElementById('userModal').classList.remove('active');
             currentEditUserId = null;
@@ -1317,20 +1404,27 @@
 
         function saveUser() {
             const name = document.getElementById('userName').value.trim();
-            const dept = document.getElementById('userDept').value;
+            const courtId = document.getElementById('userCourt').value;
+            const deptId = document.getElementById('userDept').value;
             const password = document.getElementById('userPassword').value;
             const role = document.getElementById('userRole').value;
             const status = document.getElementById('userStatus').value;
 
             if (!name) { showNotification('请输入用户名', 'error'); return; }
-            if (!dept) { showNotification('请选择部门', 'error'); return; }
+            if (!courtId) { showNotification('请选择所属法院', 'error'); return; }
+            if (!deptId) { showNotification('请选择部门', 'error'); return; }
             if (!currentEditUserId && !password) { showNotification('请输入密码', 'error'); return; }
+
+            const dept = departments.find(d => d.id === deptId);
+            const deptName = dept ? dept.name : '';
 
             if (currentEditUserId) {
                 const user = users.find(u => u.id === currentEditUserId);
                 if (user) {
                     user.name = name;
-                    user.dept = dept;
+                    user.courtId = courtId;
+                    user.deptId = deptId;
+                    user.dept = deptName;
                     user.role = role;
                     user.status = status;
                 }
@@ -1338,7 +1432,7 @@
             } else {
                 const newUser = {
                     id: 'u' + Date.now(),
-                    name, dept, role, status,
+                    name, courtId, deptId, dept: deptName, role, status,
                     lastLogin: '-'
                 };
                 users.unshift(newUser);

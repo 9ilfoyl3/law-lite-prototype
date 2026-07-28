@@ -339,6 +339,52 @@
         .role-option.active .role-option-icon { background: var(--accent-primary); color: white; }
         .role-option-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
         .role-option-desc { font-size: 11px; color: var(--text-muted); }
+
+        /* 演示账号快捷区 v1.2 */
+        .demo-accounts {
+            margin-top: 20px;
+            padding: 16px;
+            background: var(--bg-primary);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+        }
+        .demo-accounts-title {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .demo-accounts-title i { color: var(--accent-warning); }
+        .demo-accounts-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .demo-btn {
+            flex: 1;
+            min-width: 90px;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+            text-align: center;
+        }
+        .demo-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+        .demo-btn .demo-btn-role { display: block; font-weight: 600; }
+        .demo-btn .demo-btn-account { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .demo-btn:hover .demo-btn-account { color: var(--accent-primary); }
     </style>
 </head>
 <body>
@@ -371,21 +417,14 @@
                     <div class="role-option-icon"><i class="fas fa-crown"></i></div>
                     <div class="role-option-info">
                         <div class="role-option-name">超级管理员</div>
-                        <div class="role-option-desc">全部权限</div>
+                        <div class="role-option-desc">系统级配置+全法院数据</div>
                     </div>
                 </div>
-                <div class="role-option" data-role="system_admin" onclick="selectRole(this)">
-                    <div class="role-option-icon"><i class="fas fa-server"></i></div>
+                <div class="role-option" data-role="court_admin" onclick="selectRole(this)">
+                    <div class="role-option-icon"><i class="fas fa-building"></i></div>
                     <div class="role-option-info">
-                        <div class="role-option-name">系统管理员</div>
-                        <div class="role-option-desc">系统配置</div>
-                    </div>
-                </div>
-                <div class="role-option" data-role="biz_admin" onclick="selectRole(this)">
-                    <div class="role-option-icon"><i class="fas fa-briefcase"></i></div>
-                    <div class="role-option-info">
-                        <div class="role-option-name">业务管理员</div>
-                        <div class="role-option-desc">业务管理</div>
+                        <div class="role-option-name">法院管理员</div>
+                        <div class="role-option-desc">本法院用户+部门</div>
                     </div>
                 </div>
             </div>
@@ -460,13 +499,43 @@
             </label>
             <a href="#" class="forgot-password">忘记密码？</a>
         </div>
+
+        <!-- 演示账号快捷区 v1.2：点击自动填入并切换 Tab/角色，验证码自动同步 -->
+        <div class="demo-accounts">
+            <div class="demo-accounts-title">
+                <i class="fas fa-flask"></i>
+                <span>演示账号（点击自动填入）</span>
+            </div>
+            <div class="demo-accounts-buttons">
+                <button type="button" class="demo-btn" onclick="fillDemoAccount('user')">
+                    <span class="demo-btn-role">普通用户</span>
+                    <span class="demo-btn-account">user / 123456</span>
+                </button>
+                <button type="button" class="demo-btn" onclick="fillDemoAccount('court_admin')">
+                    <span class="demo-btn-role">法院管理员</span>
+                    <span class="demo-btn-account">courtadmin / 123456</span>
+                </button>
+                <button type="button" class="demo-btn" onclick="fillDemoAccount('super_admin')">
+                    <span class="demo-btn-role">超级管理员</span>
+                    <span class="demo-btn-account">superadmin / 123456</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
+        // v1.1 角色：超级管理员 / 法院管理员（普通用户登录走业务端，不进入管理后台）
+        // super_admin: 全部菜单
+        // court_admin: 仅用户管理、部门维护、控制台、系统运行报告、案件管理（仅本法院）
         const ROLE_PERMISSIONS = {
-            super_admin: ['dashboard', 'users', 'data-dashboard', 'knowledge-base', 'knowledge-documents', 'cause-management', 'role-prompt', 'risk-audit', 'settings', 'model-management'],
-            system_admin: ['dashboard', 'users', 'data-dashboard', 'knowledge-base', 'knowledge-documents', 'cause-management', 'settings', 'model-management'],
-            biz_admin: ['dashboard', 'data-dashboard', 'knowledge-base', 'knowledge-documents', 'cause-management', 'role-prompt', 'risk-audit']
+            super_admin: ['dashboard', 'users', 'court-tree', 'department', 'cases', 'system-report', 'knowledge-base', 'knowledge-documents', 'cause-management', 'doc-types', 'element-presets', 'doc-templates', 'prompt-templates', 'risk-audit', 'settings', 'model-management'],
+            court_admin: ['dashboard', 'users', 'department', 'cases', 'system-report']
+        };
+
+        // 法院管理员默认绑定当前法院（mock）
+        const ROLE_COURT_BINDING = {
+            super_admin: null,       // null 表示全部法院
+            court_admin: 'court_b1'  // mock：某区基层人民法院
         };
 
         let selectedRole = 'super_admin';
@@ -475,6 +544,42 @@
             document.querySelectorAll('.role-option').forEach(r => r.classList.remove('active'));
             el.classList.add('active');
             selectedRole = el.dataset.role;
+        }
+
+        // v1.2 演示账号快捷填入
+        const DEMO_ACCOUNTS = {
+            user:        { tab: 'user',  role: null,          username: 'user',       password: '123456' },
+            court_admin: { tab: 'admin', role: 'court_admin', username: 'courtadmin', password: '123456' },
+            super_admin: { tab: 'admin', role: 'super_admin', username: 'superadmin', password: '123456' }
+        };
+
+        function fillDemoAccount(type) {
+            const acc = DEMO_ACCOUNTS[type];
+            if (!acc) return;
+
+            // 切换登录类型 Tab
+            loginTypeTabs.forEach(t => t.classList.remove('active'));
+            document.querySelector('.login-type-tab[data-type="' + acc.tab + '"]').classList.add('active');
+            const isAdmin = acc.tab === 'admin';
+            document.getElementById('adminRoleSelector').style.display = isAdmin ? 'block' : 'none';
+
+            // 切换管理员角色卡片
+            if (isAdmin) {
+                document.querySelectorAll('.role-option').forEach(r => r.classList.remove('active'));
+                const roleEl = document.querySelector('.role-option[data-role="' + acc.role + '"]');
+                if (roleEl) {
+                    roleEl.classList.add('active');
+                    selectedRole = acc.role;
+                }
+            }
+
+            // 填入账号密码
+            document.getElementById('username').value = acc.username;
+            document.getElementById('password').value = acc.password;
+
+            // 验证码自动同步填入（演示免输）
+            const code = captchaImage.textContent.trim().toUpperCase();
+            document.getElementById('captcha').value = code;
         }
 
         const togglePassword = document.getElementById('togglePassword');
@@ -489,7 +594,7 @@
         });
 
         const captchaImage = document.getElementById('captchaImage');
-        
+
         function generateCaptcha() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let captcha = '';
@@ -514,14 +619,14 @@
         });
 
         const loginForm = document.getElementById('loginForm');
-        
+
         loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            
+
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const captcha = document.getElementById('captcha').value.trim();
-            
+
             if (!username) { alert('请输入账号'); return; }
             if (!password) { alert('请输入密码'); return; }
             if (!captcha) { alert('请输入验证码'); return; }
@@ -534,10 +639,11 @@
             }
 
             const loginType = document.querySelector('.login-type-tab.active').dataset.type;
-            
+
             if (loginType === 'admin') {
                 localStorage.setItem('adminRole', selectedRole);
                 localStorage.setItem('adminRolePages', JSON.stringify(ROLE_PERMISSIONS[selectedRole]));
+                localStorage.setItem('adminRoleCourt', ROLE_COURT_BINDING[selectedRole] || '');
                 window.location.href = 'admin/dashboard.html';
             } else {
                 window.location.href = 'chat.html';

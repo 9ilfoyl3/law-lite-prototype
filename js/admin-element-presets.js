@@ -1,5 +1,6 @@
 // ============ Admin Element Presets Management ============
 // 要件管理：维护各业务系统的标准要件（按案由分组）
+// v1.2: 启用/停用状态——表格新增「状态」列与「停用/启用」按钮；内置要件首次停用自动生成自定义覆盖数组
 // 数据持久化：localStorage.adminElementPresets（按业务系统 × 案由分组）
 // 覆盖语义：adminElementPresets[org][cause] 一旦存在，整体覆盖 elementPresetsByCause[cause] 的内置要件
 // 用户侧联动：case-data.js getElementPresets(cause, org) 优先读此 key，为空回退到 const 内置
@@ -408,9 +409,18 @@
             const cwCell = cw.length
                 ? cw.map(w => '<span class="cw-tag">' + escapeHtml(w) + '</span>').join('')
                 : '<span class="cw-tag universal">通用</span>';
+            // v1.2: 启用/停用状态徽章与按钮
+            const isEnabled = p.enabled !== false;
+            const statusBadge = isEnabled
+                ? '<span class="status-badge enabled">已启用</span>'
+                : '<span class="status-badge disabled">已停用</span>';
+            const toggleBtn = isEnabled
+                ? '<button class="action-btn disable" onclick="toggleElementEnabled(' + idx + ')">停用</button>'
+                : '<button class="action-btn enable" onclick="toggleElementEnabled(' + idx + ')">启用</button>';
             // 内置要件：可编辑（另存为自定义），不可删除
             // 自定义要件：可编辑、可删除
             const actions = '<button class="action-btn edit" onclick="editElement(' + idx + ')">编辑</button>'
+                + toggleBtn
                 + (p.isBuiltin
                     ? '<button class="action-btn delete" disabled title="内置要件不可直接删除，如需删除请使用「恢复内置」后重新维护">删除</button>'
                     : '<button class="action-btn delete" onclick="deleteElement(' + idx + ')">删除</button>');
@@ -420,6 +430,7 @@
                 + '<td class="tpl-question-cell">' + escapeHtml(p.question || '') + '</td>'
                 + '<td>' + cwCell + '</td>'
                 + '<td>' + badge + '</td>'
+                + '<td>' + statusBadge + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
         }).join('');
@@ -548,19 +559,25 @@
 
         const orgData = getOrgData(currentOrg);
         // 取生效列表作为基线（若已有覆盖则在覆盖基础上修改；否则基于内置另存为完整覆盖）
+        // v1.2: 保留原 enabled 状态
         const baseline = getEffectiveElements(currentOrg, currentCause).map(p => ({
-            name: p.name, desc: p.desc, question: p.question, caseWords: Array.isArray(p.caseWords) ? p.caseWords : []
+            name: p.name, desc: p.desc, question: p.question,
+            caseWords: Array.isArray(p.caseWords) ? p.caseWords : [],
+            enabled: p.enabled !== false
         }));
 
         const modalCw = collectModalCaseWords();
-        const newItem = { name: name, desc: desc, question: question, caseWords: modalCw };
 
         if (editingIndex >= 0) {
-            // 编辑：替换指定下标
-            baseline[editingIndex] = newItem;
+            // 编辑：替换指定下标，保留原 enabled 状态
+            baseline[editingIndex] = {
+                name: name, desc: desc, question: question,
+                caseWords: modalCw,
+                enabled: baseline[editingIndex].enabled
+            };
         } else {
-            // 新增：追加
-            baseline.push(newItem);
+            // 新增：追加，默认启用
+            baseline.push({ name: name, desc: desc, question: question, caseWords: modalCw, enabled: true });
         }
 
         orgData[currentCause] = baseline;
@@ -570,6 +587,46 @@
         renderLeft();
         renderRight();
         showNotification(editingIndex >= 0 ? '要件已更新（已另存为自定义覆盖）' : '要件已新增', 'success');
+    };
+
+    // v1.2: 启用/停用要件
+    // - 自定义要件：直接修改 enabled 字段
+    // - 内置要件首次停用：自动生成自定义覆盖数组（保留所有内置要件，仅修改目标项 enabled 为 false）
+    // - 重新启用：将 enabled 改回 true，保留自定义覆盖（不自动恢复内置，避免丢失其他编辑）
+    window.toggleElementEnabled = function(idx) {
+        if (!currentCause) {
+            showNotification('请先选择案由', 'error');
+            return;
+        }
+        const elements = getEffectiveElements(currentOrg, currentCause);
+        const p = elements[idx];
+        if (!p) return;
+        const isEnabled = p.enabled !== false;
+        const orgData = getOrgData(currentOrg);
+        const hasOverride = !!orgData[currentCause];
+
+        if (!hasOverride) {
+            // 内置要件首次停用：生成自定义覆盖数组（保留所有内置要件，仅修改目标项的 enabled）
+            const baseline = elements.map(e => ({
+                name: e.name, desc: e.desc, question: e.question,
+                caseWords: Array.isArray(e.caseWords) ? e.caseWords : [],
+                enabled: true
+            }));
+            baseline[idx].enabled = false;
+            orgData[currentCause] = baseline;
+            setOrgData(currentOrg, orgData);
+        } else {
+            // 已有自定义覆盖：直接修改 enabled
+            const list = orgData[currentCause];
+            if (list[idx]) {
+                list[idx].enabled = !isEnabled;
+                setOrgData(currentOrg, orgData);
+            }
+        }
+
+        renderLeft();
+        renderRight();
+        showNotification(isEnabled ? '要件「' + (p.name || '') + '」已停用' : '要件「' + (p.name || '') + '」已启用', 'success');
     };
 
     // ===== 删除 =====

@@ -90,6 +90,14 @@
         .action-btn.edit:hover { background: var(--accent-light); }
         .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
         .action-btn.delete:hover { background: #fef2f2; }
+        /* v1.34: 启用/停用状态徽章与按钮 */
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .status-badge.enabled { background: #d1fae5; color: #065f46; }
+        .status-badge.disabled { background: #fee2e2; color: #991b1b; }
+        .action-btn.disable { color: var(--accent-warning); border-color: #fde68a; }
+        .action-btn.disable:hover { background: #fef3c7; }
+        .action-btn.enable { color: var(--accent-success); border-color: #a7f3d0; }
+        .action-btn.enable:hover { background: #d1fae5; }
 
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
@@ -140,13 +148,13 @@
         .case-word-tag { display: inline-block; padding: 2px 8px; background: var(--accent-light); color: var(--accent-primary); border-radius: 4px; font-size: 11px; margin-right: 4px; }
         .case-word-fallback { font-size: 12px; color: var(--accent-warning); font-weight: 500; }
 
-        /* v1.28: workflow 类型徽章 */
+        /* v1.32: workflow 类型徽章 */
         .wf-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
         .wf-type-badge.step { background: #dbeafe; color: #1e40af; }
         .wf-type-badge.material { background: #ede9fe; color: #5b21b6; }
         .step-count-dash { color: var(--text-muted); font-size: 14px; }
 
-        /* v1.28: workflow 类型 radio 行 */
+        /* v1.32: workflow 类型 radio 行 */
         .wf-type-radio-group { display: flex; gap: 16px; padding: 8px 0; }
         .wf-type-radio { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); background: var(--bg-secondary); transition: all 0.15s; }
         .wf-type-radio:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
@@ -154,24 +162,28 @@
         .wf-type-radio.selected { border-color: var(--accent-primary); background: var(--accent-light); color: var(--accent-primary); }
         .wf-material-hint { padding: 12px 14px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 6px; color: #5b21b6; font-size: 13px; line-height: 1.6; }
 
-        /* 步骤编辑器 */
-        .step-editor-row { display: grid; grid-template-columns: 140px 1fr 130px 90px; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #f3f4f6; align-items: center; }
-        .step-editor-row:last-child { border-bottom: none; }
-        .step-editor-row input, .step-editor-row select { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; font-family: inherit; background: var(--bg-secondary); }
-        .step-editor-row input:focus, .step-editor-row select:focus { outline: none; border-color: var(--accent-primary); }
-        .step-editor-actions { display: flex; gap: 4px; }
-        .step-action-btn { width: 26px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 11px; }
-        .step-action-btn:hover { background: var(--bg-primary); color: var(--accent-primary); }
-        .step-action-btn.delete { color: var(--accent-danger); }
-        .step-action-btn.delete:hover { background: #fef2f2; }
-        .step-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-        .step-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+        /* v1.32: workflow id 下拉框样式 */
+        .wf-id-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; cursor: pointer; }
+        .wf-id-select:focus { outline: none; border-color: var(--accent-primary); }
+        .wf-id-select:disabled { background: var(--bg-primary); cursor: not-allowed; color: var(--text-muted); }
+        .wf-name-readonly { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-primary); color: var(--text-muted); font-family: inherit; box-sizing: border-box; }
 
-        /* 案字选择 */
+        /* 案字/案由选择 */
         .case-word-option { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; cursor: pointer; background: var(--bg-secondary); color: var(--text-secondary); user-select: none; }
         .case-word-option:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
         .case-word-option.selected { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); }
         .case-word-option input { margin: 0; }
+
+        /* v1.32: 匹配案由选择器（案由树） */
+        .cause-picker-wrap { max-height: 200px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); }
+        .cause-tree-node { margin-bottom: 4px; }
+        .cause-tree-node-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; font-size: 13px; cursor: pointer; }
+        .cause-tree-node-row:hover { background: var(--bg-secondary); }
+        .cause-tree-toggle { width: 16px; cursor: pointer; color: var(--text-muted); font-size: 10px; }
+        .cause-tree-checkbox { margin: 0; }
+        .cause-tree-label { color: var(--text-primary); }
+        .cause-tree-children { margin-left: 20px; display: none; }
+        .cause-tree-children.expanded { display: block; }
         .notification { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; background: var(--bg-secondary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 2000; font-size: 14px; display: flex; align-items: center; gap: 8px; animation: slideIn 0.2s ease; max-width: 360px; }
         .notification.success { border-left: 4px solid var(--accent-success); color: #065f46; }
         .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
@@ -205,6 +217,11 @@
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
                 </div>
             </nav>
         </aside>
@@ -255,8 +272,8 @@
                                 <th style="width:90px;">模板数</th>
                                 <th style="width:90px;">提示词数</th>
                                 <th style="width:90px;">workflow</th>
-                                <th style="width:90px;">来源</th>
-                                <th style="width:140px;">操作</th>
+                                <th style="width:90px;">状态</th>
+                                <th style="width:180px;">操作</th>
                             </tr>
                         </thead>
                         <tbody id="tplTbody"></tbody>
@@ -302,52 +319,51 @@
     <div class="modal-mask" id="wfModal">
         <div class="modal-box" style="width:680px;">
             <h3 id="wfModalTitle">新增 workflow</h3>
-            <div class="form-row">
-                <label class="form-label">workflow 名称 <span class="required">*</span></label>
-                <input type="text" class="form-input" id="wfName" placeholder="如：一审民事判决">
-                <div class="form-hint">仅管理后台可见，用户侧不显示此名称</div>
-            </div>
-            <!-- v1.30: workflow id（新增可填，编辑内置只读） -->
+            <!-- v1.32: workflow id 改为下拉框（数据来自 agentflow 平台） -->
             <div class="form-row">
                 <label class="form-label">workflow id <span class="required">*</span></label>
-                <input type="text" class="form-input" id="wfId" placeholder="如：wf-judgment-1st">
-                <div class="form-hint">唯一标识，同一文书类型下不可重复；编辑内置 workflow 时只读</div>
+                <select class="wf-id-select" id="wfId" onchange="onWfIdChange()">
+                    <option value="">请从 agentflow 平台已编排的 workflow 中选择</option>
+                </select>
+                <div class="form-hint">数据来源于 agentflow 平台；同一文书类型下不可重复；编辑内置 workflow 时只读</div>
             </div>
-            <!-- v1.28/v1.29: workflow 类型 radio（命名简化为展示型/不展示型） -->
+            <!-- v1.32: workflow 名称改为只读，随 id 自动带出 -->
+            <div class="form-row">
+                <label class="form-label">workflow 名称</label>
+                <input type="text" class="wf-name-readonly" id="wfName" readonly placeholder="选择 workflow id 后自动带出">
+                <div class="form-hint">仅管理后台可见，用户侧不显示此名称</div>
+            </div>
+            <!-- v1.33: workflow 类型 radio（命名改为分步生成型/一步生成型） -->
             <div class="form-row">
                 <label class="form-label">workflow 类型 <span class="required">*</span></label>
                 <div class="wf-type-radio-group">
                     <label class="wf-type-radio" id="wfTypeStepLabel">
                         <input type="radio" name="wfType" id="wfTypeStep" value="step" checked onchange="onWfTypeChange('step')">
-                        <span>展示型（含人工交互节点）</span>
+                        <span>分步生成型（含人工交互节点）</span>
                     </label>
                     <label class="wf-type-radio" id="wfTypeMaterialLabel">
                         <input type="radio" name="wfType" id="wfTypeMaterial" value="material" onchange="onWfTypeChange('material')">
-                        <span>不展示型（无人工交互节点）</span>
+                        <span>一步生成型（无人工交互节点）</span>
                     </label>
                 </div>
-                <div class="form-hint">展示型 = 用户在分步生成 tab 按步骤逐个确认；不展示型 = 输入参数直接出文书结果，用于材料生成 tab</div>
+                <div class="form-hint">分步生成型 = 用户在分步生成 tab 按节点逐个确认；一步生成型 = 输入参数直接出文书结果，用于一步生成 tab</div>
             </div>
             <div class="form-row">
-                <label class="form-label">匹配案字（不选 = 兜底 workflow）</label>
+                <label class="form-label">匹配案字（不选 = 案字兜底）</label>
                 <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
                 <div class="form-hint">案字从案件案号自动识别；同一案字在多个<strong>同类型</strong> workflow 间不可重复</div>
             </div>
-            <!-- v1.28: 步骤序列行（仅展示型显示） -->
-            <div class="form-row" id="wfStepsRow">
-                <label class="form-label">步骤序列 <span class="required">*</span></label>
-                <div id="wfStepsEditor" style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);"></div>
-                <button class="btn btn-cancel" id="wfStepsAddBtn" style="margin-top:8px;" onclick="addWorkflowStep()">
-                    <i class="fas fa-plus"></i> 添加步骤
-                </button>
-                <div class="form-hint">步骤顺序即分步生成的执行顺序；步骤 id 在同一 workflow 内需唯一</div>
+            <!-- v1.32: 新增匹配案由选择器 -->
+            <div class="form-row">
+                <label class="form-label">匹配案由（不选 = 案由兜底）</label>
+                <div id="wfCausesPicker" class="cause-picker-wrap"></div>
+                <div class="form-hint">从当前业务系统案由树中选择（3 级）；不选任何案由 = 兜底；同一案由在多个<strong>同类型</strong> workflow 间不可重复</div>
             </div>
-            <!-- v1.28: 不展示型提示行（仅不展示型显示） -->
-            <div class="form-row" id="wfMaterialRow" style="display:none;">
-                <label class="form-label">不展示型 workflow 说明</label>
+            <!-- v1.32: workflow 类型说明 -->
+            <div class="form-row" id="wfMaterialRow">
                 <div class="wf-material-hint">
                     <i class="fas fa-info-circle"></i>
-                    不展示型 workflow 无人工交互节点，用户在材料生成 tab 中选择材料 + 模板 + 提示词后系统直接生成文书。无需配置步骤序列。
+                    节点序列由 agentflow 平台 workflow 内部决定，管理后台不再配置步骤序列。分步生成型 workflow 在用户分步生成 tab 中按节点逐个确认；一步生成型 workflow 在一步生成 tab 中输入参数后直接输出文书。
                 </div>
             </div>
             <div class="modal-actions">
@@ -359,7 +375,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js"></script>
-    <script src="../../js/admin-doc-types.js?v=5"></script>
+    <script src="../../js/case-data.js?v=47"></script>
+    <script src="../../js/admin-doc-types.js?v=7"></script>
 </body>
 </html>

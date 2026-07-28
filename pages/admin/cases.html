@@ -218,6 +218,14 @@
         .case-grid .grid-row.has-ocr-error::before {
             content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent-danger);
         }
+        .case-grid .grid-row.is-deleted-row { opacity: 0.55; background: #fafafa; }
+        .case-grid .grid-row.is-deleted-row::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #9ca3af;
+        }
+        .case-grid .deleted-badge {
+            display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 11px;
+            background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; margin-left: 6px; vertical-align: middle;
+        }
         .case-grid .col-center { text-align: center; }
         .case-grid .case-name-link { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
         .case-grid .case-name-link:hover { text-decoration: underline; }
@@ -239,6 +247,8 @@
         .case-grid .action-btn.handler:hover { background: #eff6ff; }
         .case-grid .action-btn.delete { color: #b91c1c; border-color: #fecaca; }
         .case-grid .action-btn.delete:hover { background: #fef2f2; }
+        .case-grid .action-btn.restore { color: #047857; border-color: #a7f3d0; }
+        .case-grid .action-btn.restore:hover { background: #ecfdf5; }
 
         /* 分页 */
         .pagination { display: flex; justify-content: space-between; align-items: center; padding: 16px 4px; margin-top: 12px; }
@@ -317,6 +327,11 @@
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
                 </div>
             </nav>
         </aside>

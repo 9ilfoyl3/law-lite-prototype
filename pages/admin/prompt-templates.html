@@ -132,6 +132,22 @@
         .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
         .notification.warning { border-left: 4px solid var(--accent-warning); color: #92400e; }
         @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* v1.2 历史按钮 + 历史弹窗样式 */
+        .action-btn.history { color: #6366f1; border-color: #c7d2fe; position: relative; }
+        .action-btn.history:hover:not(:disabled) { background: #eef2ff; }
+        .action-btn.history:disabled { color: var(--text-muted); border-color: var(--border-color); cursor: not-allowed; opacity: 0.6; }
+        .action-btn.history .hist-count { display: inline-block; margin-left: 4px; padding: 0 5px; min-width: 16px; height: 14px; line-height: 14px; font-size: 10px; font-weight: 600; background: #6366f1; color: white; border-radius: 7px; }
+        .action-btn.history:disabled .hist-count { display: none; }
+        .action-btn.restore { color: var(--accent-success); border-color: #bbf7d0; }
+        .action-btn.restore:hover { background: #f0fdf4; }
+
+        .history-list { display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; }
+        .history-item { padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); }
+        .history-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .history-time { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .history-name { font-size: 13px; color: var(--text-primary); margin-bottom: 4px; }
+        .history-text { font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; word-break: break-all; line-height: 1.5; padding: 6px 8px; background: var(--bg-secondary); border-radius: 4px; max-height: 80px; overflow: hidden; }
     </style>
 </head>
 <body>
@@ -160,6 +176,11 @@
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
                 </div>
             </nav>
         </aside>
@@ -194,9 +215,7 @@
                             <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
                             <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
                         </div>
-                        <button class="btn-restore" onclick="restoreDefault()">
-                            <i class="fas fa-rotate-left"></i> 恢复默认
-                        </button>
+                        <!-- v1.14 移除全局「恢复默认」按钮，改为单条历史版本回滚（见右侧每行的「历史」按钮） -->
                     </div>
                 </div>
 
@@ -256,9 +275,20 @@
         </div>
     </div>
 
+    <!-- v1.2 历史版本弹窗 -->
+    <div class="modal-mask" id="historyModal">
+        <div class="modal-box" style="width:560px;">
+            <h3 id="historyModalTitle">历史版本</h3>
+            <div class="history-list" id="historyList"></div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeHistoryModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div id="notificationContainer"></div>
 
     <script src="../../js/case-data.js"></script>
-    <script src="../../js/admin-prompt-templates.js?v=1"></script>
+    <script src="../../js/admin-prompt-templates.js?v=2"></script>
 </body>
 </html>

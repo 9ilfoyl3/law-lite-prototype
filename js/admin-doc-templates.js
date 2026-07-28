@@ -1,5 +1,6 @@
 // ============ Admin Doc Templates Management ============
-// v1.0 文书模板管理：维护各业务系统模板，关联文书类型与案由
+// v1.0 文书模板管理：维护各业务系统模板，关联文书类型
+// v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
 // 数据持久化：localStorage.adminDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTemplates 在加载时合并到 system.docTemplates
 
@@ -57,7 +58,7 @@
     }
 
     // 获取当前业务系统的全部模板（内置 + 自定义）
-    // 返回统一对象结构：{key: {name, docType, causes, content, isBuiltin, enabled}}
+    // 返回统一对象结构：{key: {name, docType, content, isBuiltin, enabled}}
     function getAllTemplates(org) {
         const docTypes = getDocTypes(org);
         const builtins = getBuiltinTemplates(org);
@@ -78,7 +79,6 @@
             result[key] = {
                 name: name,
                 docType: tplToDocType[key] || '',
-                causes: [],
                 content: '',
                 isBuiltin: true,
                 enabled: !builtinDisabled.includes(key)
@@ -91,7 +91,6 @@
                 result[key] = {
                     name: val.name || key,
                     docType: val.docType || tplToDocType[key] || '',
-                    causes: Array.isArray(val.causes) ? val.causes : [],
                     content: val.content || '',
                     isBuiltin: false,
                     enabled: val.enabled !== false
@@ -99,26 +98,6 @@
             }
         });
         return result;
-    }
-
-    // 从 causeTreeDataByOrg 提取当前业务系统的所有案由名称，按分组返回
-    function getCauseGroups(org) {
-        const tree = causeTreeDataByOrg[org] || [];
-        const groups = [];
-        tree.forEach(level1 => {
-            const items = [];
-            if (Array.isArray(level1.children)) {
-                level1.children.forEach(child => {
-                    if (typeof child === 'string') {
-                        items.push(child);
-                    } else if (child && Array.isArray(child.children)) {
-                        child.children.forEach(leaf => items.push(leaf));
-                    }
-                });
-            }
-            groups.push({ name: level1.name, items: items });
-        });
-        return groups;
     }
 
     // 生成唯一 key
@@ -201,9 +180,6 @@
 
         tbody.innerHTML = list.map(([key, t]) => {
             const docTypeName = (docTypes[t.docType] || {}).name || '-';
-            const causesCell = (t.causes && t.causes.length)
-                ? '<div class="tpl-causes-cell">' + t.causes.map(c => '<span class="cause-chip">' + escapeHtml(c) + '</span>').join('') + '</div>'
-                : '<span class="cause-chip universal">通用</span>';
             const badge = t.isBuiltin
                 ? '<span class="tpl-badge builtin">内置</span>'
                 : '<span class="tpl-badge custom">自定义</span>';
@@ -222,7 +198,6 @@
             return '<tr>'
                 + '<td class="tpl-name-cell">' + escapeHtml(t.name) + badge + '</td>'
                 + '<td>' + escapeHtml(docTypeName) + '</td>'
-                + '<td>' + causesCell + '</td>'
                 + '<td>' + statusBadge + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
@@ -242,7 +217,6 @@
         document.getElementById('tplName').value = '';
         document.getElementById('tplContent').value = '';
         fillDocTypeSelect('');
-        renderCausePicker([]);
         document.getElementById('tplDocType').disabled = false;
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
@@ -258,7 +232,6 @@
         document.getElementById('tplName').value = t.name;
         document.getElementById('tplContent').value = t.content || '';
         fillDocTypeSelect(t.docType);
-        renderCausePicker(t.causes || []);
         // 编辑内置时禁用文书类型切换，避免逻辑歧义（内置只能在原类型上覆盖）
         document.getElementById('tplDocType').disabled = editingIsBuiltin;
         document.getElementById('tplModal').classList.add('show');
@@ -278,39 +251,9 @@
         ).join('');
     }
 
-    function renderCausePicker(selectedCauses) {
-        const groups = getCauseGroups(currentOrg);
-        const selectedSet = new Set(selectedCauses || []);
-        const picker = document.getElementById('causePicker');
-        if (groups.length === 0) {
-            picker.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">该业务系统暂无案由数据</div>';
-            return;
-        }
-        picker.innerHTML = groups.map(g => {
-            const opts = g.items.map(name => {
-                const checked = selectedSet.has(name);
-                return '<label class="cause-picker-option' + (checked ? ' checked' : '') + '">'
-                    + '<input type="checkbox" value="' + escapeHtml(name) + '"' + (checked ? ' checked' : '') + ' onchange="toggleCauseChip(this)">'
-                    + '<span>' + escapeHtml(name) + '</span></label>';
-            }).join('');
-            return '<div class="cause-picker-group"><div class="cause-picker-group-title">' + escapeHtml(g.name) + '</div>' + opts + '</div>';
-        }).join('');
-    }
-
-    window.toggleCauseChip = function(cb) {
-        const label = cb.parentElement;
-        label.classList.toggle('checked', cb.checked);
-    };
-
-    function getSelectedCauses() {
-        const checks = document.querySelectorAll('#causePicker input[type="checkbox"]:checked');
-        return Array.from(checks).map(c => c.value);
-    }
-
     window.saveTemplate = function() {
         const name = document.getElementById('tplName').value.trim();
         const docType = document.getElementById('tplDocType').value;
-        const causes = getSelectedCauses();
         const content = document.getElementById('tplContent').value;
 
         if (!name) {
@@ -350,7 +293,6 @@
         orgData[key] = {
             name: name,
             docType: docType,
-            causes: causes,
             content: content,
             enabled: origEnabled
         };

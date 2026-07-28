@@ -2,6 +2,10 @@
 // v1.0 文书类型管理：维护各业务系统文书类型（模板/提示词的父级分类）
 // v1.28/v1.29 workflow 新增 type 字段（'step'=展示型 | 'material'=不展示型），弹窗加类型 radio，子表格加类型列
 // v1.29: 类型命名简化为展示型/不展示型（内部仍用 'step'/'material'）
+// v1.32: workflow 配置调整——id 改为下拉框（数据来自 agentflow 平台 mock）；类型命名改为分步生成型/直接生成型；
+//        新增「匹配案由」字段；移除步骤序列编辑器（节点序列由 agentflow 平台内部决定）
+// v1.33: 类型命名调整——「直接生成型」改为「一步生成型」（内部仍用 'material'），与用户侧 tab 命名「一步生成」对齐
+// v1.34: 启用/停用状态——表格新增「状态」列与「停用/启用」按钮；移除冗余「来源」列（保留类型名称列的内置/自定义徽章）
 // 数据持久化：localStorage.adminDocTypes（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTypes 在加载时合并到 system.docTypes
 
@@ -122,6 +126,15 @@
     // ===== 渲染表格 =====
     let expandedKeys = new Set(); // 当前展开的类型 key
 
+    // v1.34: 读取类型的启用状态（默认启用；自定义覆盖中 enabled===false 视为停用）
+    function getTypeEnabled(key) {
+        const orgData = getOrgData(currentOrg);
+        if (orgData[key]) {
+            return orgData[key].enabled !== false;
+        }
+        return true;  // 内置类型无覆盖，默认启用
+    }
+
     function renderTable() {
         const docTypes = getDocTypes(currentOrg);
         const rightTitle = document.getElementById('rightTitle');
@@ -146,10 +159,19 @@
             const badge = t.isBuiltin
                 ? '<span class="tpl-badge builtin">内置</span>'
                 : '<span class="tpl-badge custom">自定义</span>';
+            // v1.34: 状态徽章与停用/启用按钮
+            const isEnabled = getTypeEnabled(key);
+            const statusBadge = isEnabled
+                ? '<span class="status-badge enabled">已启用</span>'
+                : '<span class="status-badge disabled">已停用</span>';
+            const toggleBtn = isEnabled
+                ? '<button class="action-btn disable" onclick="toggleTypeEnabled(\'' + key + '\')">停用</button>'
+                : '<button class="action-btn enable" onclick="toggleTypeEnabled(\'' + key + '\')">启用</button>';
             const tplCountClass = tplCount > 0 ? 'count-cell has' : 'count-cell zero';
             const promptCountClass = promptCount > 0 ? 'count-cell has' : 'count-cell zero';
             const wfCountClass = wfCount > 0 ? 'wf-count-cell' : 'wf-count-cell zero';
             const actions = '<button class="action-btn edit" onclick="editType(\'' + key + '\')">编辑</button>'
+                + toggleBtn
                 + '<button class="action-btn delete" onclick="deleteType(\'' + key + '\')">删除</button>';
             const isExpanded = expandedKeys.has(key);
             const expandBtn = '<button class="expand-btn' + (isExpanded ? ' expanded' : '') + '" onclick="toggleWfExpand(\'' + key + '\')"><i class="fas fa-chevron-right"></i></button>';
@@ -160,7 +182,7 @@
                 + '<td class="' + tplCountClass + '">' + tplCount + '</td>'
                 + '<td class="' + promptCountClass + '">' + promptCount + '</td>'
                 + '<td class="' + wfCountClass + '">' + wfCount + '</td>'
-                + '<td>' + badge + '</td>'
+                + '<td>' + statusBadge + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
 
@@ -179,7 +201,7 @@
         const orgData = getWfOrgData(currentOrg);
         const isCustomized = orgData[docTypeKey] && Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey].length > 0;
 
-        // v1.28: 按类型分组统计，用于删除按钮禁用判断
+        // v1.32: 按类型分组统计，用于删除按钮禁用判断
         const stepWfs = workflows.filter(w => (w.type || 'step') === 'step');
         const materialWfs = workflows.filter(w => (w.type || 'step') === 'material');
 
@@ -192,20 +214,22 @@
                 const wfBadge = wf.isBuiltin
                     ? '<span class="wf-badge builtin">内置</span>'
                     : '<span class="wf-badge custom">自定义</span>';
-                // v1.28: 类型徽章
+                // v1.33: 类型徽章（命名改为分步生成型/一步生成型）
                 const typeBadge = wfType === 'material'
-                    ? '<span class="wf-type-badge material">不展示型</span>'
-                    : '<span class="wf-type-badge step">展示型</span>';
+                    ? '<span class="wf-type-badge material">一步生成型</span>'
+                    : '<span class="wf-type-badge step">分步生成型</span>';
                 const caseWordsHtml = (!wf.caseWords || wf.caseWords.length === 0)
                     ? '<span class="case-word-fallback">兜底</span>'
                     : wf.caseWords.map(w => '<span class="case-word-tag">' + escapeHtml(w) + '</span>').join('');
-                // v1.28: 不展示型步骤数显示「-」
-                const stepCountHtml = wfType === 'material' ? '<span class="step-count-dash">-</span>' : ((wf.steps && wf.steps.length) || 0);
-                // v1.28: 删除按钮禁用规则——同类型仅剩 1 个时禁用
+                // v1.32: 匹配案由列（新增）
+                const causesHtml = (!wf.causes || wf.causes.length === 0)
+                    ? '<span class="case-word-fallback">兜底</span>'
+                    : wf.causes.map(c => '<span class="case-word-tag">' + escapeHtml(c) + '</span>').join('');
+                // v1.32: 删除按钮禁用规则——同类型仅剩 1 个时禁用
                 const sameTypeCount = wfType === 'material' ? materialWfs.length : stepWfs.length;
                 const isOnlyOneOfSameType = sameTypeCount <= 1;
                 const deleteTitle = isOnlyOneOfSameType
-                    ? ('每个类型至少需保留 1 个' + (wfType === 'material' ? '不展示型' : '展示型') + ' workflow')
+                    ? ('每个类型至少需保留 1 个' + (wfType === 'material' ? '一步生成型' : '分步生成型') + ' workflow')
                     : '';
                 const deleteBtn = isOnlyOneOfSameType
                     ? '<button class="action-btn delete" disabled title="' + deleteTitle + '">删除</button>'
@@ -215,7 +239,7 @@
                     + '<td class="wf-name-cell">' + escapeHtml(wf.name) + wfBadge + '</td>'
                     + '<td>' + typeBadge + '</td>'
                     + '<td>' + caseWordsHtml + '</td>'
-                    + '<td>' + stepCountHtml + '</td>'
+                    + '<td>' + causesHtml + '</td>'
                     + '<td>' + wfBadge + '</td>'
                     + '<td class="tpl-action-cell">' + editBtn + deleteBtn + '</td>'
                     + '</tr>';
@@ -230,7 +254,7 @@
             + '  <button class="btn btn-primary" onclick="openAddWfModal(\'' + docTypeKey + '\')"><i class="fas fa-plus"></i> 新增 workflow</button>'
             + '</div>'
             + '<table class="wf-sub-table"><thead><tr>'
-            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th>匹配案字</th><th style="width:70px;">步骤数</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
+            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th>匹配案字</th><th>匹配案由</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
             + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
             + '</div></td></tr>';
     }
@@ -262,43 +286,77 @@
         saveWfStorage(all);
     }
     function genWfId(docTypeKey) {
+        // v1.32: 保留函数以兼容外部调用，但 saveWorkflow 不再使用（id 改为从下拉框取）
         return 'wf-' + docTypeKey + '-' + Date.now().toString(36);
     }
 
     // ===== workflow 新增/编辑弹窗 =====
     let wfEditingDocType = null;    // 当前编辑 workflow 所属的 docTypeKey
     let wfEditingId = null;         // 当前编辑的 workflow id（null=新增）
-    let wfEditingSteps = [];        // 步骤编辑器当前步骤列表
     let wfSelectedCaseWords = new Set();
-    let wfEditingType = 'step';     // v1.28: 当前编辑的 workflow 类型（'step' | 'material'）
-    let wfEditingBuiltin = false;   // v1.30: 是否编辑内置 workflow（控制 id 只读）
+    let wfSelectedCauses = new Set();   // v1.32: 选中的匹配案由
+    let wfEditingType = 'step';     // v1.32: 当前编辑的 workflow 类型（'step' | 'material'）
+    let wfEditingBuiltin = false;   // 是否编辑内置 workflow（控制 id 下拉只读）
+
+    // v1.32: 渲染 workflow id 下拉框（数据来自 agentflow 平台 mock 列表）
+    function renderWfIdSelect(docTypeKey, selectedId, isBuiltin) {
+        const select = document.getElementById('wfId');
+        const list = (typeof agentflowWorkflowList !== 'undefined') ? agentflowWorkflowList : [];
+        // 过滤掉当前 docType 下已被其他 workflow 占用的 id
+        const existingWfs = getWorkflowsForDocType(currentOrg, docTypeKey);
+        const usedIds = new Set(existingWfs.filter(w => w.id !== wfEditingId).map(w => w.id));
+        let options = '<option value="">请从 agentflow 平台已编排的 workflow 中选择</option>';
+        list.forEach(item => {
+            const isUsed = usedIds.has(item.id);
+            // 编辑内置时，原 id 即使不在列表也需展示
+            const isCurrentBuiltin = isBuiltin && item.id === selectedId;
+            if (isUsed && !isCurrentBuiltin) return;  // 已被占用且不是当前编辑项，跳过
+            const isSelected = item.id === selectedId;
+            const label = item.id + ' - ' + item.name + (item.description ? '（' + item.description + '）' : '');
+            options += '<option value="' + escapeHtml(item.id) + '"' + (isSelected ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+        });
+        // 编辑内置时，若原 id 不在 mock 列表中，补一个选项保证可显示
+        if (isBuiltin && selectedId && !list.some(item => item.id === selectedId)) {
+            options += '<option value="' + escapeHtml(selectedId) + '" selected>' + escapeHtml(selectedId) + '（内置，未在 agentflow 平台列表中）</option>';
+        }
+        select.innerHTML = options;
+        select.disabled = isBuiltin;  // v1.32: 编辑内置时下拉只读
+    }
+
+    // v1.32: workflow id 下拉框选择变化时，自动带出 name
+    window.onWfIdChange = function() {
+        const select = document.getElementById('wfId');
+        const id = select.value;
+        const nameInput = document.getElementById('wfName');
+        if (!id) {
+            nameInput.value = '';
+            return;
+        }
+        const list = (typeof agentflowWorkflowList !== 'undefined') ? agentflowWorkflowList : [];
+        const matched = list.find(item => item.id === id);
+        nameInput.value = matched ? matched.name : '';
+    };
 
     window.openAddWfModal = function(docTypeKey) {
         wfEditingDocType = docTypeKey;
         wfEditingId = null;
-        wfEditingSteps = [{ id: '', title: '' }];
         wfSelectedCaseWords = new Set();
-        wfEditingType = 'step';  // v1.28: 默认展示型
-        wfEditingBuiltin = false;  // v1.30: 新增非内置
+        wfSelectedCauses = new Set();
+        wfEditingType = 'step';  // v1.32: 默认分步生成型
+        wfEditingBuiltin = false;
         document.getElementById('wfModalTitle').textContent = '新增 workflow';
         document.getElementById('wfName').value = '';
-        // v1.30: workflow id 新增时清空可填
-        const wfIdInput = document.getElementById('wfId');
-        if (wfIdInput) {
-            wfIdInput.value = '';
-            wfIdInput.readOnly = false;
-            wfIdInput.placeholder = '如：wf-judgment-1st（不填将自动生成）';
-        }
-        // v1.28: 重置类型 radio
+        // v1.32: 渲染 workflow id 下拉框（新增模式）
+        renderWfIdSelect(docTypeKey, '', false);
+        // v1.32: 重置类型 radio
         const stepRadio = document.getElementById('wfTypeStep');
         const materialRadio = document.getElementById('wfTypeMaterial');
         if (stepRadio) stepRadio.checked = true;
         if (materialRadio) materialRadio.checked = false;
-        applyWfTypeUI();  // v1.28: 切换 UI 显示
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
-        renderStepsEditor(wfEditingSteps);
+        renderCausesPicker(docTypeKey, wfSelectedCauses);
         document.getElementById('wfModal').classList.add('show');
-        setTimeout(() => document.getElementById('wfName').focus(), 50);
+        setTimeout(() => document.getElementById('wfId').focus(), 50);
     };
 
     window.editWorkflow = function(docTypeKey, wfId) {
@@ -307,29 +365,22 @@
         if (!wf) return;
         wfEditingDocType = docTypeKey;
         wfEditingId = wfId;
-        wfEditingType = wf.type || 'step';  // v1.28: 兼容旧数据
-        wfEditingSteps = JSON.parse(JSON.stringify(wf.steps || []));
-        if (wfEditingSteps.length === 0) wfEditingSteps = [{ id: '', title: '' }];
+        wfEditingType = wf.type || 'step';
         wfSelectedCaseWords = new Set(wf.caseWords || []);
+        wfSelectedCauses = new Set(wf.causes || []);  // v1.32: 回填匹配案由
         const isBuiltin = !!wf.isBuiltin;
-        wfEditingBuiltin = isBuiltin;  // v1.30: 内置只读
+        wfEditingBuiltin = isBuiltin;
         document.getElementById('wfModalTitle').textContent = isBuiltin ? '编辑内置 workflow（另存为自定义覆盖）' : '编辑 workflow';
         document.getElementById('wfName').value = wf.name || '';
-        // v1.30: workflow id 编辑时回填；内置只读，自定义可改
-        const wfIdInput = document.getElementById('wfId');
-        if (wfIdInput) {
-            wfIdInput.value = wf.id || '';
-            wfIdInput.readOnly = isBuiltin;
-            wfIdInput.placeholder = isBuiltin ? '内置 workflow id 只读' : '如：wf-judgment-1st';
-        }
-        // v1.28: 设置类型 radio
+        // v1.32: 渲染 workflow id 下拉框（编辑模式，内置只读）
+        renderWfIdSelect(docTypeKey, wf.id || '', isBuiltin);
+        // v1.32: 设置类型 radio
         const stepRadio = document.getElementById('wfTypeStep');
         const materialRadio = document.getElementById('wfTypeMaterial');
         if (stepRadio) stepRadio.checked = (wfEditingType === 'step');
         if (materialRadio) materialRadio.checked = (wfEditingType === 'material');
-        applyWfTypeUI();
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
-        renderStepsEditor(wfEditingSteps);
+        renderCausesPicker(docTypeKey, wfSelectedCauses);
         document.getElementById('wfModal').classList.add('show');
     };
 
@@ -337,46 +388,24 @@
         document.getElementById('wfModal').classList.remove('show');
         wfEditingDocType = null;
         wfEditingId = null;
-        wfEditingSteps = [];
         wfSelectedCaseWords = new Set();
+        wfSelectedCauses = new Set();
         wfEditingType = 'step';
         wfEditingBuiltin = false;
-        // v1.30: 关闭时重置 id 输入框状态
-        const wfIdInput = document.getElementById('wfId');
-        if (wfIdInput) {
-            wfIdInput.value = '';
-            wfIdInput.readOnly = false;
+        const wfIdSelect = document.getElementById('wfId');
+        if (wfIdSelect) {
+            wfIdSelect.innerHTML = '<option value="">请从 agentflow 平台已编排的 workflow 中选择</option>';
+            wfIdSelect.disabled = false;
         }
     };
 
-    // v1.28: 切换 workflow 类型 radio 时调用
+    // v1.32: 切换 workflow 类型 radio 时调用（仅记录状态，不再切换步骤编辑器显示）
     window.onWfTypeChange = function(type) {
         wfEditingType = type;
-        applyWfTypeUI();
-        // 切换到不展示型时清空步骤（避免脏数据），切回展示型时若空则补一行
-        if (type === 'material') {
-            wfEditingSteps = [];
-        } else if (wfEditingSteps.length === 0) {
-            wfEditingSteps = [{ id: '', title: '' }];
-        }
-        renderStepsEditor(wfEditingSteps);
+        // 切换类型后，案字/案由选择器需重新渲染（占用关系按类型过滤）
+        renderCaseWordsPicker(wfEditingDocType, wfSelectedCaseWords);
+        renderCausesPicker(wfEditingDocType, wfSelectedCauses);
     };
-
-    // v1.28: 根据类型切换步骤编辑器/不展示型提示的显示
-    function applyWfTypeUI() {
-        const stepsRow = document.getElementById('wfStepsRow');
-        const materialRow = document.getElementById('wfMaterialRow');
-        const stepsAddBtn = document.getElementById('wfStepsAddBtn');
-        if (wfEditingType === 'material') {
-            if (stepsRow) stepsRow.style.display = 'none';
-            if (materialRow) materialRow.style.display = '';
-            if (stepsAddBtn) stepsAddBtn.style.display = 'none';
-        } else {
-            if (stepsRow) stepsRow.style.display = '';
-            if (materialRow) materialRow.style.display = 'none';
-            if (stepsAddBtn) stepsAddBtn.style.display = '';
-        }
-    }
 
     function renderCaseWordsPicker(docTypeKey, selected) {
         const picker = document.getElementById('wfCaseWordsPicker');
@@ -385,7 +414,7 @@
             picker.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">当前业务系统未配置案字列表</span>';
             return;
         }
-        // v1.28: 仅显示同类型 workflow 已占用的案字（不同类型间案字可重复）
+        // v1.32: 仅显示同类型 workflow 已占用的案字（不同类型间案字可重复）
         const usedWords = new Set();
         const existingWfs = getWorkflowsForDocType(currentOrg, docTypeKey);
         existingWfs.forEach(wf => {
@@ -411,127 +440,137 @@
         else wfSelectedCaseWords.delete(word);
     };
 
-    function renderStepsEditor(steps) {
-        const editor = document.getElementById('wfStepsEditor');
-        // v1.28: 不展示型不渲染步骤
-        if (wfEditingType === 'material') {
-            editor.innerHTML = '';
+    // v1.32: 渲染匹配案由选择器（3 级案由树）
+    function renderCausesPicker(docTypeKey, selected) {
+        const picker = document.getElementById('wfCausesPicker');
+        const tree = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentOrg]) || [];
+        if (tree.length === 0) {
+            picker.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">当前业务系统未配置案由树</span>';
             return;
         }
-        if (!steps || steps.length === 0) {
-            editor.innerHTML = '<div class="step-empty">点击下方「添加步骤」创建第一个步骤</div>';
-            return;
-        }
-        editor.innerHTML = steps.map((s, idx) => {
-            const isFirst = idx === 0;
-            const isLast = idx === steps.length - 1;
-            const onlyOne = steps.length === 1;
-            return '<div class="step-editor-row">'
-                + '<input type="text" placeholder="步骤 id" value="' + escapeHtml(s.id || '') + '" oninput="updateStep(' + idx + ', \'id\', this.value)">'
-                + '<input type="text" placeholder="步骤标题" value="' + escapeHtml(s.title || '') + '" oninput="updateStep(' + idx + ', \'title\', this.value)">'
-                + '<div class="step-editor-actions">'
-                + '<button class="step-action-btn" onclick="moveStep(' + idx + ', -1)" ' + (isFirst ? 'disabled' : '') + ' title="上移"><i class="fas fa-arrow-up"></i></button>'
-                + '<button class="step-action-btn" onclick="moveStep(' + idx + ', 1)" ' + (isLast ? 'disabled' : '') + ' title="下移"><i class="fas fa-arrow-down"></i></button>'
-                + '<button class="step-action-btn delete" onclick="removeStep(' + idx + ')" ' + (onlyOne ? 'disabled' : '') + ' title="删除"><i class="fas fa-trash"></i></button>'
-                + '</div></div>';
-        }).join('');
+        // 同类型 workflow 已占用的案由
+        const usedCauses = new Set();
+        const existingWfs = getWorkflowsForDocType(currentOrg, docTypeKey);
+        existingWfs.forEach(wf => {
+            if (wf.id !== wfEditingId
+                && (wf.type || 'step') === wfEditingType
+                && Array.isArray(wf.causes)) {
+                wf.causes.forEach(c => usedCauses.add(c));
+            }
+        });
+        picker.innerHTML = tree.map((root, rootIdx) => renderCauseTreeNode(root, 'root-' + rootIdx, selected, usedCauses)).join('');
     }
 
-    window.updateStep = function(idx, field, value) {
-        if (wfEditingSteps[idx]) wfEditingSteps[idx][field] = value;
+    // v1.32: 递归渲染案由树节点
+    function renderCauseTreeNode(node, key, selected, usedCauses) {
+        // node 可能是字符串（叶子）或对象 {name, children}
+        if (typeof node === 'string') {
+            const name = node;
+            const isSel = selected.has(name);
+            const isUsed = usedCauses.has(name);
+            const cls = isSel ? ' selected' : '';
+            const title = isUsed ? '已被同类型其他 workflow 匹配' : '';
+            return '<div class="cause-tree-node">'
+                + '<div class="cause-tree-node-row' + cls + '" title="' + title + '">'
+                + '<span class="cause-tree-toggle"></span>'
+                + '<input type="checkbox" class="cause-tree-checkbox" value="' + escapeHtml(name) + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleCause(\'' + escapeHtml(name) + '\', this.checked)">'
+                + '<span class="cause-tree-label">' + escapeHtml(name) + (isUsed ? ' ⚠' : '') + '</span>'
+                + '</div></div>';
+        }
+        const name = node.name || '';
+        const children = node.children || [];
+        const hasChildren = children.length > 0;
+        const toggleHtml = hasChildren ? '<span class="cause-tree-toggle" onclick="toggleCauseNode(\'' + key + '\')"><i class="fas fa-chevron-right"></i></span>' : '<span class="cause-tree-toggle"></span>';
+        let html = '<div class="cause-tree-node">'
+            + '<div class="cause-tree-node-row">'
+            + toggleHtml
+            + '<span class="cause-tree-label" style="font-weight:500;">' + escapeHtml(name) + '</span>'
+            + '</div>';
+        if (hasChildren) {
+            html += '<div class="cause-tree-children" id="cause-children-' + key + '">';
+            html += children.map((child, idx) => renderCauseTreeNode(child, key + '-' + idx, selected, usedCauses)).join('');
+            html += '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    window.toggleCause = function(name, checked) {
+        if (checked) wfSelectedCauses.add(name);
+        else wfSelectedCauses.delete(name);
     };
-    window.moveStep = function(idx, dir) {
-        const newIdx = idx + dir;
-        if (newIdx < 0 || newIdx >= wfEditingSteps.length) return;
-        const tmp = wfEditingSteps[idx];
-        wfEditingSteps[idx] = wfEditingSteps[newIdx];
-        wfEditingSteps[newIdx] = tmp;
-        renderStepsEditor(wfEditingSteps);
-    };
-    window.removeStep = function(idx) {
-        if (wfEditingSteps.length <= 1) return;
-        wfEditingSteps.splice(idx, 1);
-        renderStepsEditor(wfEditingSteps);
-    };
-    window.addWorkflowStep = function() {
-        if (wfEditingType === 'material') return;  // v1.28: 不展示型不允许加步骤
-        wfEditingSteps.push({ id: '', title: '' });
-        renderStepsEditor(wfEditingSteps);
+
+    // v1.32: 展开/折叠案由树节点
+    window.toggleCauseNode = function(key) {
+        const el = document.getElementById('cause-children-' + key);
+        if (!el) return;
+        el.classList.toggle('expanded');
+        const toggle = el.previousElementSibling.querySelector('.cause-tree-toggle i');
+        if (toggle) {
+            if (el.classList.contains('expanded')) {
+                toggle.style.transform = 'rotate(90deg)';
+            } else {
+                toggle.style.transform = '';
+            }
+        }
     };
 
     window.saveWorkflow = function() {
+        // v1.32: workflow id 从下拉框取，名称随 id 自动带出
+        const wfIdSelect = document.getElementById('wfId');
+        const finalWfId = wfIdSelect ? wfIdSelect.value.trim() : '';
+        if (!finalWfId) {
+            showNotification('请从 agentflow 平台 workflow 列表中选择 workflow id', 'error');
+            if (wfIdSelect) wfIdSelect.focus();
+            return;
+        }
         const name = document.getElementById('wfName').value.trim();
         if (!name) {
-            showNotification('请填写 workflow 名称', 'error');
-            document.getElementById('wfName').focus();
+            showNotification('workflow 名称缺失，请重新选择 workflow id', 'error');
+            if (wfIdSelect) wfIdSelect.focus();
             return;
         }
 
-        // v1.30: workflow id 处理——内置只读原值；自定义可填，不填自动生成
-        const wfIdInput = document.getElementById('wfId');
-        let finalWfId = wfIdInput ? wfIdInput.value.trim() : '';
-        if (wfEditingBuiltin) {
-            // 内置 workflow：保留原 id（覆盖内置时也沿用原 id）
-            finalWfId = wfEditingId || finalWfId;
-        } else if (!finalWfId) {
-            // 新增/编辑自定义未填 id：自动生成
-            finalWfId = genWfId(wfEditingDocType);
-        }
-
-        // v1.30: workflow id 同 docType 内唯一校验（排除自身）
+        // v1.32: workflow id 同 docType 内唯一校验（排除自身）——下拉框已过滤，但保留兜底校验
         const existingWfsForIdCheck = getWorkflowsForDocType(currentOrg, wfEditingDocType);
         const idConflict = existingWfsForIdCheck.find(wf => wf.id === finalWfId && wf.id !== wfEditingId);
         if (idConflict) {
             showNotification('workflow id「' + finalWfId + '」已被「' + idConflict.name + '」占用，请更换', 'error');
-            if (wfIdInput) wfIdInput.focus();
+            if (wfIdSelect) wfIdSelect.focus();
             return;
         }
 
-        // v1.28: 不展示型强制 steps=[]，展示型校验步骤
-        let cleanSteps = [];
-        if (wfEditingType === 'step') {
-            cleanSteps = wfEditingSteps.map(s => ({
-                id: (s.id || '').trim(),
-                title: (s.title || '').trim()
-            }));
-            const emptyStep = cleanSteps.find(s => !s.id || !s.title);
-            if (emptyStep) {
-                showNotification('每个步骤需填写 id 和标题', 'error');
-                return;
-            }
-            const idSet = new Set();
-            for (const s of cleanSteps) {
-                if (idSet.has(s.id)) {
-                    showNotification('步骤 id 重复：「' + s.id + '」', 'error');
-                    return;
-                }
-                idSet.add(s.id);
-            }
-        }
-
-        // v1.28: 案字冲突校验——仅与同类型 workflow 校验
+        // v1.32: 案字冲突校验——仅与同类型 workflow 校验
         const existingWfs = getWorkflowsForDocType(currentOrg, wfEditingDocType);
         const newCaseWords = Array.from(wfSelectedCaseWords);
+        const newCauses = Array.from(wfSelectedCauses);  // v1.32: 匹配案由
         for (const wf of existingWfs) {
             if (wf.id === wfEditingId) continue;
-            if ((wf.type || 'step') !== wfEditingType) continue;  // v1.28: 跨类型不冲突
-            const conflict = (wf.caseWords || []).find(w => newCaseWords.indexOf(w) >= 0);
-            if (conflict) {
-                showNotification('案字「' + conflict + '」已被同类型 workflow「' + wf.name + '」匹配', 'error');
+            if ((wf.type || 'step') !== wfEditingType) continue;  // 跨类型不冲突
+            const conflictWord = (wf.caseWords || []).find(w => newCaseWords.indexOf(w) >= 0);
+            if (conflictWord) {
+                showNotification('案字「' + conflictWord + '」已被同类型 workflow「' + wf.name + '」匹配', 'error');
+                return;
+            }
+            // v1.32: 案由冲突校验
+            const conflictCause = (wf.causes || []).find(c => newCauses.indexOf(c) >= 0);
+            if (conflictCause) {
+                showNotification('案由「' + conflictCause + '」已被同类型 workflow「' + wf.name + '」匹配', 'error');
                 return;
             }
         }
 
-        // v1.28: 兜底 workflow 唯一性校验——同类型内 caseWords 为空最多 1 个
-        if (newCaseWords.length === 0) {
+        // v1.32: 兜底 workflow 唯一性校验——同类型内 caseWords 与 causes 均为空最多 1 个
+        if (newCaseWords.length === 0 && newCauses.length === 0) {
             const existingFallback = existingWfs.find(wf =>
                 wf.id !== wfEditingId
                 && (wf.type || 'step') === wfEditingType
                 && (!Array.isArray(wf.caseWords) || wf.caseWords.length === 0)
+                && (!Array.isArray(wf.causes) || wf.causes.length === 0)
             );
             if (existingFallback) {
-                const typeLabel = wfEditingType === 'material' ? '不展示型' : '展示型';
-                showNotification('每个类型最多 1 个' + typeLabel + '兜底 workflow，已有「' + existingFallback.name + '」', 'error');
+                const typeLabel = wfEditingType === 'material' ? '一步生成型' : '分步生成型';
+                showNotification('每个类型最多 1 个' + typeLabel + '全兜底 workflow，已有「' + existingFallback.name + '」', 'error');
                 return;
             }
         }
@@ -544,28 +583,26 @@
         }
         const arr = orgData[wfEditingDocType];
 
-        // v1.30: 若自定义 workflow 改了 id，需用新 id 写入；同时按新 id 查找覆盖
+        // v1.32: 新 workflow 对象（不再写 steps 字段）
         const newWf = {
+            id: finalWfId,
             name: name,
-            type: wfEditingType,            // v1.28: workflow 类型
+            type: wfEditingType,
             caseWords: newCaseWords,
-            steps: cleanSteps,               // v1.28: 不展示型为 []
+            causes: newCauses,             // v1.32: 匹配案由
             isBuiltin: false
         };
         if (wfEditingId) {
             // 编辑：先按原 id 在数组中查找（可能是内置迁入的自定义记录，也可能是纯自定义）
             const idx = arr.findIndex(w => w.id === wfEditingId);
             if (idx >= 0) {
-                newWf.id = finalWfId;  // v1.30: 使用最终 id（可能被用户修改）
                 arr[idx] = newWf;
             } else {
-                // 编辑内置 workflow：作为自定义覆盖追加，沿用最终 id
-                newWf.id = finalWfId;
+                // 编辑内置 workflow：作为自定义覆盖追加
                 arr.push(newWf);
             }
         } else {
-            // 新增：使用最终 id
-            newWf.id = finalWfId;
+            // 新增
             arr.push(newWf);
         }
         setWfOrgData(currentOrg, orgData);
@@ -580,10 +617,10 @@
         const wf = workflows.find(w => w.id === wfId);
         if (!wf) return;
         const wfType = wf.type || 'step';
-        // v1.28: 同类型至少保留 1 个
+        // v1.32: 同类型至少保留 1 个
         const sameTypeWfs = workflows.filter(w => (w.type || 'step') === wfType);
         if (sameTypeWfs.length <= 1) {
-            const typeLabel = wfType === 'material' ? '不展示型' : '展示型';
+            const typeLabel = wfType === 'material' ? '一步生成型' : '分步生成型';
             showNotification('每个类型至少需保留 1 个' + typeLabel + ' workflow', 'warning');
             return;
         }
@@ -669,15 +706,59 @@
             while (orgData[key]) key = genTypeKey(name) + Math.floor(Math.random() * 100);
         }
 
+        // v1.34: 编辑时保留原 enabled 状态；新增默认启用
+        const existing = orgData[key];
+        const enabled = existing ? (existing.enabled !== false) : true;
         orgData[key] = {
             name: name,
-            isBuiltin: false
+            isBuiltin: false,
+            enabled: enabled
         };
         setOrgData(currentOrg, orgData);
 
         closeModal();
         renderTable();
         showNotification(editingKey ? '类型已更新' : '类型已新增', 'success');
+    };
+
+    // v1.34: 启用/停用类型
+    // - 自定义类型：直接修改 enabled 字段
+    // - 内置类型首次停用：自动生成自定义覆盖对象 { name: 原名, isBuiltin: false, enabled: false }
+    // - 重新启用：将 enabled 改回 true，保留自定义覆盖（不自动恢复内置，避免丢失其他编辑）
+    window.toggleTypeEnabled = function(key) {
+        const docTypes = getDocTypes(currentOrg);
+        const t = docTypes[key];
+        if (!t) return;
+        const orgData = getOrgData(currentOrg);
+        const isEnabled = getTypeEnabled(key);
+        const isBuiltinKey = Object.prototype.hasOwnProperty.call(defaultDocTypesByOrg[currentOrg] || {}, key);
+        const hasOverride = orgDataHasKey(currentOrg, key);
+
+        if (isEnabled) {
+            // 停用
+            if (isBuiltinKey && !hasOverride) {
+                // 内置类型首次停用：生成自定义覆盖对象
+                orgData[key] = {
+                    name: t.name,
+                    isBuiltin: false,
+                    enabled: false
+                };
+            } else {
+                // 自定义类型或已有覆盖：直接修改 enabled
+                orgData[key] = Object.assign({}, orgData[key], { enabled: false });
+            }
+            setOrgData(currentOrg, orgData);
+            renderTable();
+            showNotification('类型「' + t.name + '」已停用', 'success');
+        } else {
+            // 启用：保留自定义覆盖，仅将 enabled 改回 true
+            if (orgData[key]) {
+                orgData[key].enabled = true;
+                setOrgData(currentOrg, orgData);
+            }
+            renderTable();
+            showNotification('类型「' + t.name + '」已启用', 'success');
+        }
     };
 
     // ===== 删除 =====

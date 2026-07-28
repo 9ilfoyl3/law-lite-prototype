@@ -1,4 +1,6 @@
 // ============ Cases Page JavaScript ============
+// v1.23 色系统一：批量栏/批量生成全屏面板/队列当前项改为蓝色系，仅保留行内「生成文书」按钮橙色单点强调（cases.html 内联样式与 CSS 改动，本文件无逻辑变更）
+// v1.22 列配置面板改为锚定按钮下方的下拉面板（去 fixed）；案件名称追加常驻外链图标 + hover 下划线，增强可点击性
 // v1.21 新增「我的模板」「我的提示词」入口（openMyTemplates/openMyPrompts），从 case-files.html 迁移至案件列表页头部
 // v1.20 提示词标签优先读管理后台 adminPromptTemplates；文书模板渲染兼容对象结构；修复 applyReqTemplate 同步状态 bug
 // v1.19 批量生成超限案件改为自动跳过并记录失败原因，不再弹窗选择；完成页失败项增加「去处理」跳转入口
@@ -211,7 +213,9 @@ function renderStatsCards() {
 function renderCaseList(cases = getCurrentCases()) {
     const listBody = document.getElementById('caseListBody');
     const current = getCurrentBusiness();
-    
+
+    // 用户侧过滤掉软删除案件（管理后台可见，用户侧不可见）
+    cases = cases.filter(c => !c.isDeleted);
     // 按更新时间倒序排列
     cases = [...cases].sort((a, b) => new Date(b.updatedAt || b.date) - new Date(a.updatedAt || a.date));
     
@@ -257,7 +261,10 @@ function renderCaseList(cases = getCurrentCases()) {
             <div class="case-checkbox-col">
                 <input type="checkbox" class="case-checkbox" value="${c.id}" onchange="toggleCaseSelect('${c.id}', this)">
             </div>
-            <div class="case-name" onclick="openCaseFiles('${c.id}')" title="点击查看案件文件">${c.caseName || c.caseNumber}</div>
+            <div class="case-name" onclick="openCaseFiles('${c.id}')" title="点击新标签页打开案件文件">
+                <span class="case-name-text">${c.caseName || c.caseNumber}</span>
+                <i class="fas fa-external-link-alt case-name-icon"></i>
+            </div>
             <div class="case-col" style="text-align:center;">${c.updatedAt || c.date || '-'}</div>
             <div class="case-col case-files-col ${hasOcrError(c) ? 'ocr-error' : ''}" onclick="openOcrPanel('${c.id}')" title="${hasOcrError(c) ? `存在${getOcrErrorCount(c)}个材料解析异常，点击查看` : '点击查看文件解析状态'}">
                 <span class="case-file-count">
@@ -343,8 +350,10 @@ function renderCaseHeader() {
 
 function toggleColConfig() {
     const panel = document.getElementById('colConfigPanel');
+    const btn = document.querySelector('.col-config-toolbar-btn');
     panel.classList.toggle('show');
-    
+    if (btn) btn.classList.toggle('active', panel.classList.contains('show'));
+
     document.querySelectorAll('.col-config-item input[type="checkbox"]').forEach(cb => {
         cb.checked = visibleColumns.has(cb.dataset.column);
     });
@@ -633,18 +642,16 @@ function doExecuteCaseDelete() {
         });
         showNotification('已清空选中案件的原始材料，已生成文书已保留', 'success');
     } else if (scope === 'caseOnly') {
+        // 软删除：仅标记 isDeleted，不从数组移除，保留 files/documents 全部字段
+        // 用户侧 renderCaseList 过滤 isDeleted=true；管理后台可见且可恢复
         cases.forEach(c => {
             if (idsSet.has(c.id)) {
-                // 仅删除案件记录字段，保留 files / documents
                 c.isDeleted = true;
                 c.deletedAt = now;
             }
         });
-        // 案件列表中过滤掉已删除记录
-        const remaining = cases.filter(c => !idsSet.has(c.id));
-        getCurrentBusiness().cases = remaining;
         selectedCaseIds = new Set(Array.from(selectedCaseIds).filter(id => !idsSet.has(id)));
-        showNotification(`已删除 ${caseDeleteTargetIds.length} 个案件记录，原始材料及文书已保留`, 'success');
+        showNotification(`已软删除 ${caseDeleteTargetIds.length} 个案件记录，原始材料及文书已保留，管理员可在后台恢复`, 'success');
     } else {
         const remaining = cases.filter(c => !idsSet.has(c.id));
         getCurrentBusiness().cases = remaining;
@@ -778,10 +785,8 @@ function buildGenElementHintHtml(caseItem) {
 
 function buildGenConfigHtml() {
     const docTypes = getCurrentDocTypes();
-    // 按当前案件 cause 过滤模板（causes 为空 = 通用模板）
-    const c = getCurrentCases().find(x => x.id === quickState.caseId);
-    const cause = c ? c.cause : '';
-    const templates = getFilteredDocTypeTemplates(quickState.docType, cause);
+    // v1.22: 模板不再按 cause 过滤，直接按所属文书类型展示
+    const templates = getFilteredDocTypeTemplates(quickState.docType);
     const docTypeOptions = Object.entries(docTypes)
         .map(([k, v]) => `<option value="${k}" ${k === quickState.docType ? 'selected' : ''}>${v.name}</option>`)
         .join('');
@@ -1208,6 +1213,8 @@ async function runBatch() {
 
     for (let i = 0; i < batchState.results.length; i++) {
         const r = batchState.results[i];
+        // 跳过已完成的项（重试失败案件时不重复生成已成功的）
+        if (r.status === 'done') continue;
         r.status = 'current';
         updateBatchRunningUI();
 
@@ -2602,6 +2609,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const configBtn = document.querySelector('.col-config-toolbar-btn');
         if (panel && panel.classList.contains('show') && !panel.contains(e.target) && (!configBtn || !configBtn.contains(e.target))) {
             panel.classList.remove('show');
+            if (configBtn) configBtn.classList.remove('active');
         }
     });
     

@@ -2,6 +2,7 @@
 // v1.0 个人提示词维护，按文书类型分组
 // 数据持久化：localStorage.myPromptTemplates（按业务系统×文书类型分组）
 // 用户侧联动：case-data.js getReqTemplates 在返回时追加 my 数据（标记 source='mine'）
+// v1.2: 新增历史版本记录（与 admin-prompt-templates.js 同步，最多 10 条，支持一键恢复）
 
 (function() {
     'use strict';
@@ -107,6 +108,11 @@
         const toggleBtn = isEnabled
             ? '<button class="action-btn toggle-off" onclick="toggleEnabled(\'' + docType + '\',' + index + ')">停用</button>'
             : '<button class="action-btn toggle-on" onclick="toggleEnabled(\'' + docType + '\',' + index + ')">启用</button>';
+        // v1.2 历史按钮
+        const histCount = (item && Array.isArray(item.history) && item.history.length) || 0;
+        const histBtn = histCount > 0
+            ? '<button class="action-btn history" title="历史版本（' + histCount + '）" onclick="openHistoryModal(\'' + docType + '\',' + index + ')">历史<span class="hist-count">' + histCount + '</span></button>'
+            : '<button class="action-btn history" disabled title="暂无历史版本">历史</button>';
         return '<div class="item-card">'
             + '<div class="item-row">'
             + '<div>'
@@ -118,6 +124,7 @@
             + '</div>'
             + '<div class="item-actions">'
             + '<button class="action-btn edit" onclick="editItem(\'' + docType + '\',' + index + ')">编辑</button>'
+            + histBtn
             + toggleBtn
             + '<button class="action-btn delete" onclick="deleteItem(\'' + docType + '\',' + index + ')">删除</button>'
             + '</div>'
@@ -272,30 +279,134 @@
 
         // 编辑时保留原 enabled 字段；新增时默认启用
         let prevEnabled = true;
+        let prevHistory = [];
+        let prevName = '';
+        let prevText = '';
         if (oldIndex !== -1 && Array.isArray(orgData[oldDocType]) && orgData[oldDocType][oldIndex]) {
-            prevEnabled = orgData[oldDocType][oldIndex].enabled !== false;
+            const origItem = orgData[oldDocType][oldIndex];
+            prevEnabled = origItem.enabled !== false;
+            prevHistory = Array.isArray(origItem.history) ? origItem.history : [];
+            prevName = origItem.name || '';
+            prevText = origItem.text || '';
+        }
+
+        // v1.2 历史版本管理
+        const HISTORY_MAX = 10;
+        function pushHistory(prev, snapshot) {
+            const arr = Array.isArray(prev) ? prev.slice() : [];
+            arr.unshift(snapshot);
+            if (arr.length > HISTORY_MAX) arr.length = HISTORY_MAX;
+            return arr;
         }
 
         if (oldIndex === -1) {
-            // 新增
-            orgData[newDocType].push({ name: newName, text: newText, enabled: true });
+            // 新增（无 history）
+            orgData[newDocType].push({ name: newName, text: newText, enabled: true, history: [] });
         } else {
             // 编辑：先从原数组移除
             if (Array.isArray(orgData[oldDocType])) {
                 orgData[oldDocType].splice(oldIndex, 1);
-                // 若原数组空了，保留空数组也无妨；不主动删除 key 以保持结构稳定
             }
-            // 加入目标数组（若 docType 未变，等于在原位置之后追加；这里接受位置变化）
-            orgData[newDocType].push({ name: newName, text: newText, enabled: prevEnabled });
+            // v1.2 编辑前内容入栈 history
+            const newHistory = pushHistory(prevHistory, {
+                savedAt: Date.now(),
+                name: prevName,
+                text: prevText
+            });
+            orgData[newDocType].push({ name: newName, text: newText, enabled: prevEnabled, history: newHistory });
         }
 
         setOrgData(currentOrg, orgData);
 
         editingState = null;
-        // 若编辑时切换了文书类型且当前筛选的是原 docType，保持筛选不变即可（列表会反映变化）
         renderLeft();
         renderList();
         showToast(oldIndex === -1 ? '提示词已新增' : '提示词已更新', 'success');
+    };
+
+    // ===== v1.2 历史版本管理 =====
+    let historyContext = null;
+
+    function formatTime(ts) {
+        const d = new Date(ts);
+        const pad = n => (n < 10 ? '0' + n : '' + n);
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+            + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    window.openHistoryModal = function(docType, index) {
+        const orgData = getOrgData(currentOrg);
+        if (!Array.isArray(orgData[docType])) return;
+        const item = orgData[docType][index];
+        if (!item) return;
+        const history = Array.isArray(item.history) ? item.history : [];
+        if (history.length === 0) {
+            showToast('该提示词暂无历史版本', 'error');
+            return;
+        }
+        historyContext = { docType: docType, index: index };
+        const titleEl = document.getElementById('historyModalTitle');
+        if (titleEl) titleEl.textContent = '历史版本 · ' + (item.name || '');
+        const listEl = document.getElementById('historyList');
+        listEl.innerHTML = history.map((h, i) => {
+            const preview = (h.text || '').length > 80 ? (h.text || '').slice(0, 80) + '…' : (h.text || '');
+            return '<div class="history-item">'
+                + '<div class="history-item-head">'
+                + '<span class="history-time">#' + (i + 1) + ' · ' + formatTime(h.savedAt) + '</span>'
+                + '<button class="action-btn restore" onclick="restoreHistory(' + i + ')">恢复此版本</button>'
+                + '</div>'
+                + '<div class="history-name">标签：' + escapeHtml(h.name || '') + '</div>'
+                + '<div class="history-text">' + (escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空）</span>') + '</div>'
+                + '</div>';
+        }).join('');
+        document.getElementById('historyModal').classList.add('show');
+    };
+
+    window.closeHistoryModal = function() {
+        document.getElementById('historyModal').classList.remove('show');
+        historyContext = null;
+    };
+
+    window.restoreHistory = function(histIdx) {
+        if (!historyContext) return;
+        const { docType, index } = historyContext;
+        const orgData = getOrgData(currentOrg);
+        if (!Array.isArray(orgData[docType])) {
+            closeHistoryModal();
+            return;
+        }
+        const cur = orgData[docType][index];
+        if (!cur) {
+            closeHistoryModal();
+            return;
+        }
+        const history = Array.isArray(cur.history) ? cur.history : [];
+        const target = history[histIdx];
+        if (!target) {
+            showToast('历史版本不存在', 'error');
+            return;
+        }
+        if (!confirm('确定将当前内容回滚至「' + formatTime(target.savedAt) + '」的版本吗？当前内容会自动入栈为新历史。')) return;
+        // v1.2 当前内容入栈 history，再用历史版本覆盖当前
+        const HISTORY_MAX = 10;
+        const newHistory = history.slice();
+        newHistory.unshift({
+            savedAt: Date.now(),
+            name: cur.name || '',
+            text: cur.text || ''
+        });
+        if (newHistory.length > HISTORY_MAX) newHistory.length = HISTORY_MAX;
+        orgData[docType][index] = {
+            name: target.name || '',
+            text: target.text || '',
+            enabled: cur.enabled !== false,
+            history: newHistory
+        };
+        setOrgData(currentOrg, orgData);
+        closeHistoryModal();
+        renderLeft();
+        renderList();
+        showToast('已恢复至历史版本', 'success');
     };
 
     // ===== 删除 =====

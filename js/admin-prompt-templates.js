@@ -2,6 +2,7 @@
 // v1.0 提示词管理：维护各文书类型的「提示词」提示词
 // 数据持久化：localStorage.adminPromptTemplates（按业务系统×文书类型分组）
 // 用户侧联动：case-data.js getReqTemplates 优先读此 key，为空回退到 defaultRequirementTemplates
+// v1.2: 移除全局「恢复默认」按钮；新增单条历史版本记录（最多 10 条快照，支持一键恢复）
 
 (function() {
     'use strict';
@@ -48,7 +49,7 @@
     }
 
     // 获取当前业务系统+文书类型下的提示词列表（内置 + 自定义）
-    // 返回统一结构：[{name, text, isBuiltin, index, enabled}]
+    // 返回统一结构：[{name, text, isBuiltin, index, enabled, history}]
     function getAllPrompts(org, docTypeKey) {
         const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
         const customs = (getOrgData(org)[docTypeKey]) || [];
@@ -60,7 +61,8 @@
                 text: p.text || '',
                 isBuiltin: false,
                 index: i,
-                enabled: p.enabled !== false
+                enabled: p.enabled !== false,
+                history: Array.isArray(p.history) ? p.history : []
             }));
         }
         const disabledArr = getBuiltinDisabledMap(org)[docTypeKey] || [];
@@ -69,7 +71,8 @@
             text: p.text || '',
             isBuiltin: true,
             index: i,
-            enabled: !disabledArr.includes(i)
+            enabled: !disabledArr.includes(i),
+            history: []  // 内置未编辑过时无历史
         }));
     }
 
@@ -175,9 +178,15 @@
                 const toggleBtn = isEnabled
                     ? '<button class="action-btn toggle-off" onclick="togglePromptEnabled(\'' + g.docTypeKey + '\',' + item.index + ')">停用</button>'
                     : '<button class="action-btn toggle-on" onclick="togglePromptEnabled(\'' + g.docTypeKey + '\',' + item.index + ')">启用</button>';
+                // v1.2 历史按钮：history 长度为 0 时置灰
+                const histCount = (item.history && item.history.length) || 0;
+                const histBtn = histCount > 0
+                    ? '<button class="action-btn history" title="历史版本（' + histCount + '）" onclick="openHistoryModal(\'' + g.docTypeKey + '\',' + item.index + ')">历史<span class="hist-count">' + histCount + '</span></button>'
+                    : '<button class="action-btn history" disabled title="暂无历史版本">历史</button>';
                 const actions = item.isBuiltin
-                    ? '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>' + toggleBtn
+                    ? '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>' + histBtn + toggleBtn
                     : '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>'
+                      + histBtn
                       + toggleBtn
                       + '<button class="action-btn delete" onclick="deletePrompt(\'' + g.docTypeKey + '\',' + item.index + ')">删除</button>';
                 html += '<div class="pt-item">'
@@ -263,38 +272,72 @@
             orgData[docType] = [];
         }
 
+        // v1.2 历史版本管理工具
+        const HISTORY_MAX = 10;
+        function pushHistory(prevHistory, snapshot) {
+            const arr = Array.isArray(prevHistory) ? prevHistory.slice() : [];
+            arr.unshift(snapshot);  // 头部追加（最新在前）
+            if (arr.length > HISTORY_MAX) arr.length = HISTORY_MAX;  // 截断
+            return arr;
+        }
+
         // 编辑内置提示词：把内置数据全部拷贝为自定义，再修改对应项
         if (editingIsBuiltin && editingDocType === docType) {
             const defaults = (defaultRequirementTemplates[currentOrg] && defaultRequirementTemplates[currentOrg][docType]) || [];
             const disabledArr = getBuiltinDisabledMap(currentOrg)[docType] || [];
-            // 拷贝内置数组，保留原停用状态
+            // v1.2 拷贝内置数组，保留原停用状态与已有 history（首次编辑时 history 为空）
             orgData[docType] = defaults.map((p, i) => ({
                 name: p.name,
                 text: p.text,
-                enabled: !disabledArr.includes(i)
+                enabled: !disabledArr.includes(i),
+                history: []
             }));
-            // 被编辑的项继承原停用状态（编辑不改变启用状态）
-            orgData[docType][editingIndex] = { name: name, text: text, enabled: !disabledArr.includes(editingIndex) };
+            // v1.2 被编辑的项：原内置内容入栈 history，再覆盖为新内容
+            const origBuiltin = defaults[editingIndex] || { name: '', text: '' };
+            const newHistory = pushHistory([], {
+                savedAt: Date.now(),
+                name: origBuiltin.name || '',
+                text: origBuiltin.text || ''
+            });
+            orgData[docType][editingIndex] = {
+                name: name,
+                text: text,
+                enabled: !disabledArr.includes(editingIndex),
+                history: newHistory
+            };
             // 清理 __builtinDisabled__ 中该 docTypeKey（已全部转为自定义）
             if (orgData.__builtinDisabled__ && orgData.__builtinDisabled__[docType]) {
                 delete orgData.__builtinDisabled__[docType];
             }
         } else if (editingDocType !== null && !editingIsBuiltin && editingDocType === docType) {
-            // 编辑自定义提示词（同文书类型）：保留原 enabled
+            // 编辑自定义提示词（同文书类型）：保留原 enabled；v1.2 编辑前内容入栈 history
             const origItem = orgData[docType][editingIndex];
             const origEnabled = (origItem && origItem.enabled !== false);
-            orgData[docType][editingIndex] = { name: name, text: text, enabled: origEnabled };
+            const origHistory = (origItem && Array.isArray(origItem.history)) ? origItem.history : [];
+            const newHistory = pushHistory(origHistory, {
+                savedAt: Date.now(),
+                name: (origItem && origItem.name) || '',
+                text: (origItem && origItem.text) || ''
+            });
+            orgData[docType][editingIndex] = { name: name, text: text, enabled: origEnabled, history: newHistory };
         } else if (editingDocType !== null && !editingIsBuiltin && editingDocType !== docType) {
             // 编辑自定义提示词但改了文书类型：先从原数组移除，再追加到新数组（保留 enabled）
             const oldArr = orgData[editingDocType] || [];
             const origItem = oldArr[editingIndex];
             const origEnabled = (origItem && origItem.enabled !== false);
+            const origHistory = (origItem && Array.isArray(origItem.history)) ? origItem.history : [];
+            // v1.2 跨文书类型编辑也入栈 history
+            const newHistory = pushHistory(origHistory, {
+                savedAt: Date.now(),
+                name: (origItem && origItem.name) || '',
+                text: (origItem && origItem.text) || ''
+            });
             oldArr.splice(editingIndex, 1);
             orgData[editingDocType] = oldArr;
-            orgData[docType].push({ name: name, text: text, enabled: origEnabled });
+            orgData[docType].push({ name: name, text: text, enabled: origEnabled, history: newHistory });
         } else {
-            // 新增
-            orgData[docType].push({ name: name, text: text, enabled: true });
+            // 新增（无 history）
+            orgData[docType].push({ name: name, text: text, enabled: true, history: [] });
         }
 
         setOrgData(currentOrg, orgData);
@@ -363,18 +406,89 @@
         });
     };
 
-    // ===== 恢复默认 =====
-    window.restoreDefault = function() {
-        const orgName = { court: '法院', procuratorate: '检察院', justice: '司法局' }[currentOrg];
-        showConfirm('恢复默认', '确定恢复「' + orgName + '」所有提示词为系统默认值吗？自定义内容将丢失。', () => {
-            const all = getStorage();
-            if (all[currentOrg]) {
-                delete all[currentOrg];
-                saveStorage(all);
-            }
+    // ===== v1.2 历史版本管理 =====
+    let historyContext = null;  // { docTypeKey, index }
+
+    function formatTime(ts) {
+        const d = new Date(ts);
+        const pad = n => (n < 10 ? '0' + n : '' + n);
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+            + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    window.openHistoryModal = function(docTypeKey, index) {
+        const items = getAllPrompts(currentOrg, docTypeKey);
+        const item = items[index];
+        if (!item) return;
+        const history = Array.isArray(item.history) ? item.history : [];
+        if (history.length === 0) {
+            showNotification('该提示词暂无历史版本', 'warning');
+            return;
+        }
+        historyContext = { docTypeKey: docTypeKey, index: index };
+        document.getElementById('historyModalTitle').textContent = '历史版本 · ' + item.name;
+        const listEl = document.getElementById('historyList');
+        listEl.innerHTML = history.map((h, i) => {
+            const preview = (h.text || '').length > 80 ? (h.text || '').slice(0, 80) + '…' : (h.text || '');
+            return '<div class="history-item">'
+                + '<div class="history-item-head">'
+                + '<span class="history-time">#' + (i + 1) + ' · ' + formatTime(h.savedAt) + '</span>'
+                + '<button class="action-btn restore" onclick="restoreHistory(' + i + ')">恢复此版本</button>'
+                + '</div>'
+                + '<div class="history-name">标签：' + escapeHtml(h.name || '') + '</div>'
+                + '<div class="history-text">' + (escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空）</span>') + '</div>'
+                + '</div>';
+        }).join('');
+        document.getElementById('historyModal').classList.add('show');
+    };
+
+    window.closeHistoryModal = function() {
+        document.getElementById('historyModal').classList.remove('show');
+        historyContext = null;
+    };
+
+    window.restoreHistory = function(histIdx) {
+        if (!historyContext) return;
+        const { docTypeKey, index } = historyContext;
+        const orgData = getOrgData(currentOrg);
+        if (!Array.isArray(orgData[docTypeKey])) {
+            closeHistoryModal();
+            return;
+        }
+        const cur = orgData[docTypeKey][index];
+        if (!cur) {
+            closeHistoryModal();
+            return;
+        }
+        const history = Array.isArray(cur.history) ? cur.history : [];
+        const target = history[histIdx];
+        if (!target) {
+            showNotification('历史版本不存在', 'error');
+            return;
+        }
+        showConfirm('恢复历史版本', '确定将当前内容回滚至「' + formatTime(target.savedAt) + '」的版本吗？当前内容会自动入栈为新历史。', () => {
+            // v1.2 当前内容入栈 history，再用历史版本覆盖当前
+            const HISTORY_MAX = 10;
+            const newHistory = history.slice();
+            newHistory.unshift({
+                savedAt: Date.now(),
+                name: cur.name || '',
+                text: cur.text || ''
+            });
+            if (newHistory.length > HISTORY_MAX) newHistory.length = HISTORY_MAX;
+            // 同时移除被恢复的那个历史项（避免重复）
+            // 注意：不删，保留更直观——下次想再回到当前内容可从最新一条恢复
+            orgData[docTypeKey][index] = {
+                name: target.name || '',
+                text: target.text || '',
+                enabled: cur.enabled !== false,
+                history: newHistory
+            };
+            setOrgData(currentOrg, orgData);
+            closeHistoryModal();
             renderLeft();
             renderRight();
-            showNotification('已恢复为默认提示词', 'success');
+            showNotification('已恢复至历史版本', 'success');
         });
     };
 
@@ -401,6 +515,7 @@
         if (e.key === 'Escape') {
             if (document.getElementById('ptModal').classList.contains('show')) closeModal();
             if (document.getElementById('confirmModal').classList.contains('show')) closeConfirm();
+            if (document.getElementById('historyModal').classList.contains('show')) closeHistoryModal();
         }
     });
     document.getElementById('ptModal').addEventListener('click', function(e) {
@@ -409,6 +524,12 @@
     document.getElementById('confirmModal').addEventListener('click', function(e) {
         if (e.target === this) closeConfirm();
     });
+    const historyModalEl = document.getElementById('historyModal');
+    if (historyModalEl) {
+        historyModalEl.addEventListener('click', function(e) {
+            if (e.target === this) closeHistoryModal();
+        });
+    }
 
     // ===== 初始化 =====
     function init() {

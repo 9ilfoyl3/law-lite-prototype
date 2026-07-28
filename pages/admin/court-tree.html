@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法院维护 - AI辅助办案系统管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-logo { width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 12px; margin-bottom: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 16px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+        .sidebar-footer { padding: 16px; border-top: 1px solid var(--border-color); }
+        .logout-btn { width: 100%; padding: 10px; border: none; background: transparent; color: var(--text-secondary); font-size: 14px; cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; font-family: inherit; }
+        .logout-btn:hover { background: var(--bg-primary); color: var(--text-primary); }
+
+        /* 主内容 */
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+        .header { height: var(--header-height); background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 50; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { color: var(--text-muted); font-size: 10px; }
+        .user-menu { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+        .user-name { font-size: 14px; font-weight: 500; }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        .content { padding: 24px 32px; flex: 1; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .page-title-wrap h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .page-title-wrap p { font-size: 14px; color: var(--text-secondary); margin: 4px 0 0; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: #f3f4f6; }
+
+        /* 树形结构 */
+        .tree-container { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; min-height: 480px; }
+        .tree-node { margin-bottom: 4px; }
+        .tree-node-row { display: flex; align-items: center; padding: 10px 12px; border-radius: 6px; transition: background 0.15s; gap: 8px; }
+        .tree-node-row:hover { background: var(--bg-primary); }
+        .tree-toggle { width: 20px; cursor: pointer; color: var(--text-muted); font-size: 12px; text-align: center; }
+        .tree-icon { width: 20px; color: var(--accent-primary); font-size: 14px; }
+        .tree-name { flex: 1; font-size: 14px; color: var(--text-primary); }
+        .tree-level-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 8px; }
+        .tree-level-badge.high { background: #fef3c7; color: #92400e; }
+        .tree-level-badge.middle { background: #dbeafe; color: #1e40af; }
+        .tree-level-badge.base { background: #d1fae5; color: #065f46; }
+        .tree-admin { font-size: 12px; color: var(--text-muted); margin-right: 8px; }
+        .tree-actions { display: flex; gap: 4px; }
+        .tree-action-btn { padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; font-family: inherit; }
+        .tree-action-btn:hover { background: var(--bg-primary); }
+        .tree-action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
+        .tree-action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
+        .tree-action-btn.add { color: var(--accent-success); border-color: #bbf7d0; }
+        .tree-children { margin-left: 28px; display: none; }
+        .tree-children.expanded { display: block; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
+        .empty-state p { font-size: 14px; margin: 0; }
+
+        /* 弹窗 */
+        .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-mask.show { display: flex; }
+        .modal-box { background: var(--bg-secondary); border-radius: 10px; padding: 24px; width: 480px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--text-primary); }
+        .form-row { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-label .required { color: var(--accent-danger); }
+        .form-input, .form-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent-primary); }
+        .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { background: #f3f4f6; color: #374151; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-confirm { background: var(--accent-primary); color: white; }
+        .btn-confirm:hover { background: #1d4ed8; }
+        .btn-confirm.danger { background: var(--accent-danger); }
+        .btn-confirm.danger:hover { background: #b91c1c; }
+
+        /* 通知 */
+        .notification { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; background: var(--bg-secondary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 2000; font-size: 14px; display: flex; align-items: center; gap: 8px; animation: slideIn 0.2s ease; }
+        .notification.success { border-left: 4px solid var(--accent-success); color: #065f46; }
+        .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .role-banner { background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #92400e; display: flex; align-items: center; gap: 8px; }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-balance-scale"></i></div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
+                    <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item active"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>法院维护</span>
+                </div>
+                <div class="user-menu">
+                    <div class="user-avatar">管</div>
+                    <div>
+                        <div class="user-name" id="currentUserName">超级管理员</div>
+                        <div class="user-role" id="currentUserRole">超级管理员</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1>法院维护</h1>
+                        <p>维护法院上下级组织树（基层/中级/高级），为每个法院分配法院管理员账号</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal(null)">
+                        <i class="fas fa-plus"></i> 新增法院
+                    </button>
+                </div>
+
+                <div class="role-banner">
+                    <i class="fas fa-info-circle"></i>
+                    <span>法院有上下级层级结构，但权限平级独立——上级法院不能管理下级法院的用户与数据。</span>
+                </div>
+
+                <div class="tree-container" id="treeContainer">
+                    <!-- 由 JS 渲染 -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div class="modal-mask" id="courtModal">
+        <div class="modal-box">
+            <h3 id="modalTitle">新增法院</h3>
+            <div class="form-row">
+                <label class="form-label">上级法院 <span class="required">*</span></label>
+                <select class="form-select" id="courtParent">
+                    <option value="">无（顶级法院）</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label class="form-label">法院名称 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="courtName" placeholder="如：某省高级人民法院">
+            </div>
+            <div class="form-row">
+                <label class="form-label">法院层级 <span class="required">*</span></label>
+                <select class="form-select" id="courtLevel">
+                    <option value="高级">高级</option>
+                    <option value="中级">中级</option>
+                    <option value="基层">基层</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label class="form-label">分配法院管理员</label>
+                <select class="form-select" id="courtAdmin">
+                    <option value="">未分配</option>
+                </select>
+                <div class="form-hint">从用户管理中角色为「法院管理员」的用户中选择</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-confirm" onclick="saveCourt()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-mask" id="confirmModal">
+        <div class="modal-box" style="width:400px;">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmText" style="font-size:14px; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;"></p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-confirm danger" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script>
+    (function(){
+        // 角色菜单过滤
+        var pages=JSON.parse(localStorage.getItem('adminRolePages')||'[]');
+        if(pages.length===0)return;
+        document.querySelectorAll('.sidebar-nav .nav-item,.sidebar-nav .nav-sub-item').forEach(function(item){
+            var href=item.getAttribute('href');
+            if(!href||href==='#')return;
+            var pageName=href.replace('.html','');
+            if(pages.indexOf(pageName)===-1){item.style.display='none';}
+        });
+        // 显示当前用户角色
+        var role=localStorage.getItem('adminRole')||'super_admin';
+        var roleMap={super_admin:'超级管理员',court_admin:'法院管理员'};
+        document.getElementById('currentUserRole').textContent=roleMap[role]||'管理员';
+        document.getElementById('currentUserName').textContent=roleMap[role]||'管理员';
+    })();
+
+    // ===== 法院树数据 =====
+    // localStorage: adminCourtTree
+    const DEFAULT_COURTS = [
+        { id: 'court_h', name: '某省高级人民法院', level: '高级', parentId: null, adminUserName: '高院管理员', status: 'active' },
+        { id: 'court_m1', name: '某市中级人民法院', level: '中级', parentId: 'court_h', adminUserName: '中院管理员', status: 'active' },
+        { id: 'court_b1', name: '某区基层人民法院', level: '基层', parentId: 'court_m1', adminUserName: '张三', status: 'active' },
+        { id: 'court_b2', name: '某县基层人民法院', level: '基层', parentId: 'court_m1', adminUserName: '', status: 'active' }
+    ];
+
+    let courts = JSON.parse(localStorage.getItem('adminCourtTree')) || DEFAULT_COURTS;
+    let expandedNodes = new Set(['court_h', 'court_m1']); // 默认展开前两层
+    let editingCourtId = null;
+
+    function saveToStorage() {
+        localStorage.setItem('adminCourtTree', JSON.stringify(courts));
+    }
+
+    // 构建树
+    function buildTree(parentId) {
+        return courts.filter(c => c.parentId === parentId);
+    }
+
+    function getNodeById(id) {
+        return courts.find(c => c.id === id);
+    }
+
+    // 渲染树
+    function renderTree() {
+        const container = document.getElementById('treeContainer');
+        const rootNodes = buildTree(null);
+        if (rootNodes.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-sitemap"></i><p>暂无法院数据，点击「新增法院」创建</p></div>';
+            return;
+        }
+        container.innerHTML = rootNodes.map(node => renderNode(node, 0)).join('');
+    }
+
+    function renderNode(node, depth) {
+        const children = buildTree(node.id);
+        const hasChildren = children.length > 0;
+        const isExpanded = expandedNodes.has(node.id);
+        const levelClass = node.level === '高级' ? 'high' : (node.level === '中级' ? 'middle' : 'base');
+        const toggleIcon = hasChildren ? (isExpanded ? 'fa-chevron-down' : 'fa-chevron-right') : 'fa-circle';
+        const adminText = node.adminUserName ? `管理员：${escapeHtml(node.adminUserName)}` : '未分配管理员';
+
+        let html = `<div class="tree-node">
+            <div class="tree-node-row" style="padding-left:${12 + depth * 20}px;">
+                <span class="tree-toggle" onclick="toggleExpand('${node.id}')">
+                    <i class="fas ${toggleIcon}"></i>
+                </span>
+                <i class="fas fa-building tree-icon"></i>
+                <span class="tree-name">${escapeHtml(node.name)}</span>
+                <span class="tree-level-badge ${levelClass}">${node.level}</span>
+                <span class="tree-admin">${adminText}</span>
+                <div class="tree-actions">
+                    <button class="tree-action-btn add" onclick="openAddModal('${node.id}')"><i class="fas fa-plus"></i> 新增下级</button>
+                    <button class="tree-action-btn edit" onclick="openEditModal('${node.id}')"><i class="fas fa-edit"></i> 编辑</button>
+                    <button class="tree-action-btn delete" onclick="confirmDelete('${node.id}')"><i class="fas fa-trash"></i> 删除</button>
+                </div>
+            </div>`;
+        if (hasChildren && isExpanded) {
+            html += `<div class="tree-children expanded">${children.map(child => renderNode(child, depth + 1)).join('')}</div>`;
+        } else if (hasChildren) {
+            html += `<div class="tree-children">${children.map(child => renderNode(child, depth + 1)).join('')}</div>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function toggleExpand(id) {
+        if (expandedNodes.has(id)) {
+            expandedNodes.delete(id);
+        } else {
+            expandedNodes.add(id);
+        }
+        renderTree();
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+
+    function showNotification(message, type = 'success') {
+        const n = document.createElement('div');
+        n.className = `notification ${type}`;
+        n.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i><span>${message}</span>`;
+        document.getElementById('notificationContainer').appendChild(n);
+        setTimeout(() => n.remove(), 2500);
+    }
+
+    // ===== 弹窗 =====
+    function openAddModal(parentId) {
+        editingCourtId = null;
+        document.getElementById('modalTitle').textContent = '新增法院';
+        // 填充上级法院下拉
+        const parentSelect = document.getElementById('courtParent');
+        parentSelect.innerHTML = '<option value="">无（顶级法院）</option>' + courts.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        parentSelect.value = parentId || '';
+        document.getElementById('courtName').value = '';
+        document.getElementById('courtLevel').value = parentId ? (getParentLevel(parentId) === '高级' ? '中级' : '基层') : '高级';
+        // 填充管理员下拉（从 adminUsers 中筛选 court_admin 角色）
+        fillAdminSelect('');
+        document.getElementById('courtModal').classList.add('show');
+    }
+
+    function getParentLevel(parentId) {
+        const parent = getNodeById(parentId);
+        return parent ? parent.level : '';
+    }
+
+    function fillAdminSelect(selectedValue) {
+        const users = JSON.parse(localStorage.getItem('adminUsers')) || [];
+        const courtAdmins = users.filter(u => u.role === 'court_admin');
+        const select = document.getElementById('courtAdmin');
+        select.innerHTML = '<option value="">未分配</option>' + courtAdmins.map(u => `<option value="${u.name}">${escapeHtml(u.name)}</option>`).join('');
+        select.value = selectedValue || '';
+    }
+
+    function openEditModal(id) {
+        const court = getNodeById(id);
+        if (!court) return;
+        editingCourtId = id;
+        document.getElementById('modalTitle').textContent = '编辑法院';
+        const parentSelect = document.getElementById('courtParent');
+        // 上级法院不可选自身或子孙
+        const invalidIds = new Set([id, ...getDescendantIds(id)]);
+        parentSelect.innerHTML = '<option value="">无（顶级法院）</option>' + courts.filter(c => !invalidIds.has(c.id)).map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        parentSelect.value = court.parentId || '';
+        document.getElementById('courtName').value = court.name;
+        document.getElementById('courtLevel').value = court.level;
+        fillAdminSelect(court.adminUserName || '');
+        document.getElementById('courtModal').classList.add('show');
+    }
+
+    function getDescendantIds(id) {
+        const children = buildTree(id);
+        let ids = [];
+        children.forEach(c => {
+            ids.push(c.id);
+            ids = ids.concat(getDescendantIds(c.id));
+        });
+        return ids;
+    }
+
+    function closeModal() {
+        document.getElementById('courtModal').classList.remove('show');
+        editingCourtId = null;
+    }
+
+    function saveCourt() {
+        const parentId = document.getElementById('courtParent').value || null;
+        const name = document.getElementById('courtName').value.trim();
+        const level = document.getElementById('courtLevel').value;
+        const adminUserName = document.getElementById('courtAdmin').value;
+
+        if (!name) { showNotification('请输入法院名称', 'error'); return; }
+
+        if (editingCourtId) {
+            const court = getNodeById(editingCourtId);
+            if (court) {
+                court.parentId = parentId;
+                court.name = name;
+                court.level = level;
+                court.adminUserName = adminUserName;
+            }
+            showNotification('法院已更新');
+        } else {
+            const newId = 'court_' + Date.now();
+            courts.push({ id: newId, name, level, parentId, adminUserName, status: 'active' });
+            if (parentId) expandedNodes.add(parentId);
+            showNotification('法院已创建');
+        }
+        saveToStorage();
+        renderTree();
+        closeModal();
+    }
+
+    function confirmDelete(id) {
+        const court = getNodeById(id);
+        if (!court) return;
+        const children = buildTree(id);
+        if (children.length > 0) {
+            showNotification('该法院下有下级法院，不可删除', 'error');
+            return;
+        }
+        // 校验是否有用户归属此法院（mock：adminUsers 中 courtId === id）
+        const users = JSON.parse(localStorage.getItem('adminUsers')) || [];
+        const courtUsers = users.filter(u => u.courtId === id);
+        if (courtUsers.length > 0) {
+            showNotification(`该法院下有 ${courtUsers.length} 个用户，不可删除`, 'error');
+            return;
+        }
+        document.getElementById('confirmText').textContent = `确认删除「${court.name}」？此操作不可恢复。`;
+        document.getElementById('confirmBtn').onclick = function() {
+            courts = courts.filter(c => c.id !== id);
+            saveToStorage();
+            renderTree();
+            closeConfirm();
+            showNotification('法院已删除');
+        };
+        document.getElementById('confirmModal').classList.add('show');
+    }
+
+    function closeConfirm() {
+        document.getElementById('confirmModal').classList.remove('show');
+    }
+
+    function logout() {
+        if (confirm('确定要退出登录吗？')) window.location.href = '../../index.html';
+    }
+
+    // 初始化
+    renderTree();
+    </script>
+</body>
+</html>

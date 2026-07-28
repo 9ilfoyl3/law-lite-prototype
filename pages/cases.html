@@ -425,9 +425,27 @@
             overflow: hidden;
             text-overflow: ellipsis;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-
-        .case-name:hover {
+        .case-name-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* 常驻淡色外链图标，hover 时变主题色 */
+        .case-name-icon {
+            font-size: 11px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+        .case-name:hover .case-name-text {
+            color: var(--accent-primary);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+        .case-name:hover .case-name-icon {
             color: var(--accent-primary);
         }
 
@@ -903,14 +921,14 @@
             margin: 0;
         }
 
-        /* === 行内快速生成按钮 === */
+        /* === 行内快速生成按钮（保留橙色单点强调） === */
         .quick-gen-btn {
-            color: #f59e0b;
+            color: #ea580c;
         }
         .quick-gen-btn:hover {
-            background: #fffbeb !important;
-            border-color: #fde68a !important;
-            color: #d97706 !important;
+            background: #ffedd5 !important;
+            border-color: #f97316 !important;
+            color: #ea580c !important;
         }
 
         /* === 行内删除按钮 === */
@@ -929,7 +947,7 @@
             align-items: center;
             gap: 8px;
             padding: 10px 20px;
-            background: linear-gradient(135deg, #ea580c, #f97316);
+            background: linear-gradient(135deg, var(--accent-primary), #60a5fa);
             color: white;
             border: none;
             border-radius: 8px;
@@ -940,10 +958,10 @@
         }
         .action-btn-batch:hover:not(:disabled) {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
         }
         .action-btn-batch:disabled {
-            background: #fdba74;
+            background: #93c5fd;
             cursor: not-allowed;
             opacity: 0.6;
         }
@@ -955,10 +973,10 @@
             justify-content: space-between;
             padding: 14px 20px;
             margin-bottom: 20px;
-            background: linear-gradient(135deg, #fff7ed, #fed7aa);
-            border: 1px solid #fbd38d;
+            background: linear-gradient(135deg, var(--accent-light), #dbeafe);
+            border: 1px solid #bfdbfe;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(234, 88, 12, 0.1);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
         }
         .batch-action-bar.show {
             display: flex;
@@ -973,11 +991,11 @@
             align-items: center;
             gap: 10px;
             font-size: 14px;
-            color: #9a3412;
+            color: #1e40af;
             font-weight: 500;
         }
         .batch-bar-left .count {
-            color: #ea580c;
+            color: var(--accent-primary);
             font-weight: 700;
             font-size: 16px;
         }
@@ -999,19 +1017,19 @@
             gap: 6px;
         }
         .batch-bar-btn.primary {
-            background: linear-gradient(135deg, #ea580c, #f97316);
+            background: linear-gradient(135deg, var(--accent-primary), #60a5fa);
             color: white;
         }
         .batch-bar-btn.primary:hover {
-            box-shadow: 0 3px 10px rgba(234, 88, 12, 0.3);
+            box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
         }
         .batch-bar-btn.ghost {
             background: white;
-            color: #9a3412;
-            border: 1px solid #fbd38d;
+            color: var(--accent-primary);
+            border: 1px solid #bfdbfe;
         }
         .batch-bar-btn.ghost:hover {
-            background: #fff7ed;
+            background: var(--accent-light);
         }
         .batch-bar-btn.danger {
             background: #fef2f2;
@@ -1302,8 +1320,8 @@
         }
         .batch-fs-badge {
             padding: 4px 12px;
-            background: linear-gradient(135deg, #fff7ed, #fed7aa);
-            color: #c2410c;
+            background: linear-gradient(135deg, var(--accent-light), #dbeafe);
+            color: #1e40af;
             border-radius: 12px;
             font-size: 12px;
             font-weight: 600;
@@ -1344,8 +1362,8 @@
             align-items: center;
             justify-content: space-between;
             padding: 12px 14px;
-            background: #fff7ed;
-            border: 1px solid #fed7aa;
+            background: var(--accent-light);
+            border: 1px solid #bfdbfe;
             border-radius: 8px;
         }
         .batch-selected-item .info {
@@ -1404,7 +1422,7 @@
         .batch-fs-start-btn {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #ea580c, #f97316);
+            background: linear-gradient(135deg, var(--accent-primary), #60a5fa);
             color: white;
             border: none;
             border-radius: 12px;
@@ -1420,18 +1438,18 @@
         }
         .batch-fs-start-btn:hover:not(:disabled) {
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(234, 88, 12, 0.25);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
         }
         .batch-fs-start-btn:disabled {
-            background: #fdba74;
+            background: #93c5fd;
             cursor: not-allowed;
         }
         .batch-running-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: linear-gradient(135deg, #fff7ed, #fed7aa);
-            border: 1px solid #fbd38d;
+            background: linear-gradient(135deg, var(--accent-light), #dbeafe);
+            border: 1px solid #bfdbfe;
             border-radius: 14px;
             padding: 20px 24px;
             margin-bottom: 20px;
@@ -1447,24 +1465,24 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #ea580c, #f97316);
+            background: linear-gradient(135deg, var(--accent-primary), #60a5fa);
             color: white;
             border-radius: 14px;
             font-size: 24px;
-            animation: pulse-orange 2s ease-in-out infinite;
+            animation: pulse-blue 2s ease-in-out infinite;
         }
-        @keyframes pulse-orange {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.35); }
-            50% { box-shadow: 0 0 0 14px rgba(234, 88, 12, 0); }
+        @keyframes pulse-blue {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.35); }
+            50% { box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); }
         }
         .batch-running-info h3 {
             font-size: 17px;
             font-weight: 600;
-            color: #c2410c;
+            color: #1e40af;
         }
         .batch-running-info p {
             font-size: 12px;
-            color: #9a3412;
+            color: #1e40af;
             margin-top: 2px;
         }
         .batch-running-right {
@@ -1473,11 +1491,11 @@
         .batch-running-time {
             font-size: 26px;
             font-weight: 700;
-            color: #ea580c;
+            color: var(--accent-primary);
         }
         .batch-running-label {
             font-size: 11px;
-            color: #9a3412;
+            color: #1e40af;
         }
         .batch-queue {
             display: flex;
@@ -1499,8 +1517,8 @@
             background: #f0fdf4;
         }
         .batch-queue-item.current {
-            border-left: 4px solid #f97316;
-            box-shadow: 0 2px 10px rgba(249, 115, 22, 0.1);
+            border-left: 4px solid var(--accent-primary);
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.1);
         }
         .batch-queue-item.pending {
             opacity: 0.55;
@@ -1520,7 +1538,7 @@
             color: #059669;
         }
         .batch-queue-item.current .batch-queue-icon {
-            background: #f97316;
+            background: var(--accent-primary);
             color: white;
             animation: spin-slow 1.5s linear infinite;
         }
@@ -1563,8 +1581,8 @@
             color: #059669;
         }
         .batch-queue-action.current {
-            background: #fed7aa;
-            color: #c2410c;
+            background: #dbeafe;
+            color: #1e40af;
         }
         .batch-queue-item.failed {
             border-left: 4px solid #dc2626;
@@ -1730,7 +1748,7 @@
         .batch-empty-tip i {
             font-size: 48px;
             margin-bottom: 16px;
-            color: #fed7aa;
+            color: #bfdbfe;
         }
 
         /* === 弹窗样式 === */
@@ -2470,10 +2488,25 @@
         .col-actions-header {
             text-align: center;
         }
+        /* 包裹按钮与面板，提供定位上下文 */
+        .col-config-wrap {
+            position: relative;
+            display: inline-block;
+        }
+        /* caret 指示器 */
+        .col-config-caret {
+            margin-left: 6px;
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        .col-config-toolbar-btn.active .col-config-caret {
+            transform: rotate(180deg);
+        }
+        /* 下拉面板：锚定按钮下方 */
         .col-config-panel {
-            position: fixed;
-            top: 120px;
-            right: 30px;
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -2531,6 +2564,13 @@
             height: 16px;
             cursor: pointer;
             accent-color: var(--accent-primary);
+        }
+        .col-config-footer {
+            padding: 10px 16px;
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
         }
 
         /* === 文件数量样式 === */
@@ -3221,17 +3261,54 @@
                         <i class="fas fa-plus"></i>
                         新建案件
                     </button>
-                    <button class="action-btn-secondary col-config-toolbar-btn" onclick="toggleColConfig()" title="列配置">
-                        <i class="fas fa-cog"></i>
-                        列配置
-                    </button>
+                    <div class="col-config-wrap">
+                        <button class="action-btn-secondary col-config-toolbar-btn" onclick="toggleColConfig()" title="列配置">
+                            <i class="fas fa-cog"></i>
+                            列配置
+                            <i class="fas fa-caret-down col-config-caret"></i>
+                        </button>
+                        <!-- 列配置下拉面板（锚定按钮下方） -->
+                        <div class="col-config-panel" id="colConfigPanel">
+                            <div class="col-config-header">
+                                <span>列配置</span>
+                                <button class="col-config-close" onclick="toggleColConfig()"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="col-config-body">
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="caseNumber" onchange="toggleColumn(this.dataset.column)">
+                                    <span>案号</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="cause" onchange="toggleColumn(this.dataset.column)">
+                                    <span>案由</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="parties" onchange="toggleColumn(this.dataset.column)">
+                                    <span>当事人</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="handler" onchange="toggleColumn(this.dataset.column)">
+                                    <span>承办人</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="uploadDate" onchange="toggleColumn(this.dataset.column)">
+                                    <span>上传日期</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="caseWord" onchange="toggleColumn(this.dataset.column)">
+                                    <span>案字</span>
+                                </label>
+                            </div>
+                            <div class="col-config-footer">勾选即时生效，无需确认</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- 浮动批量操作栏（勾选案件后显示） -->
             <div class="batch-action-bar" id="batchActionBar">
                 <div class="batch-bar-left">
-                    <i class="fas fa-check-square" style="color:#ea580c;"></i>
+                    <i class="fas fa-check-square" style="color:var(--accent-primary);"></i>
                     <span>已选 <span class="count" id="selectedCount">0</span> 件案件</span>
                 </div>
                 <div class="batch-bar-right">
@@ -3303,40 +3380,6 @@
                 </div>
                 <div id="caseListBody">
                     <!-- Case items will be rendered here -->
-                </div>
-            </div>
-            
-            <!-- 列配置面板 -->
-            <div class="col-config-panel" id="colConfigPanel">
-                <div class="col-config-header">
-                    <span>列配置</span>
-                    <button class="col-config-close" onclick="toggleColConfig()"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="col-config-body">
-                    <label class="col-config-item">
-                        <input type="checkbox" data-column="caseNumber" onchange="toggleColumn(this.dataset.column)">
-                        <span>案号</span>
-                    </label>
-                    <label class="col-config-item">
-                        <input type="checkbox" data-column="cause" onchange="toggleColumn(this.dataset.column)">
-                        <span>案由</span>
-                    </label>
-                    <label class="col-config-item">
-                        <input type="checkbox" data-column="parties" onchange="toggleColumn(this.dataset.column)">
-                        <span>当事人</span>
-                    </label>
-                    <label class="col-config-item">
-                        <input type="checkbox" data-column="handler" onchange="toggleColumn(this.dataset.column)">
-                        <span>承办人</span>
-                    </label>
-                    <label class="col-config-item">
-                        <input type="checkbox" data-column="uploadDate" onchange="toggleColumn(this.dataset.column)">
-                        <span>上传日期</span>
-                    </label>
-                    <label class="col-config-item">
-                        <input type="checkbox" data-column="caseWord" onchange="toggleColumn(this.dataset.column)">
-                        <span>案字</span>
-                    </label>
                 </div>
             </div>
 
@@ -3813,8 +3856,8 @@
     </div>
 
     <script src="../js/common.js?v=30"></script>
-    <script src="../js/case-data.js?v=42"></script>
-    <script src="../js/cases.js?v=58"></script>
+    <script src="../js/case-data.js?v=47"></script>
+    <script src="../js/cases.js?v=60"></script>
     <script>
         // 切换用户下拉菜单
         function toggleUserDropdown() {
