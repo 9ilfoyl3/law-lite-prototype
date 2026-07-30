@@ -207,6 +207,32 @@
             color: var(--text-secondary);
         }
 
+        /* v1.39: 仅本人案件 复选框样式 */
+        .only-mine-group {
+            padding: 0 4px;
+        }
+        .only-mine-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            transition: all 0.2s;
+        }
+        .only-mine-label:hover {
+            border-color: var(--accent-primary);
+        }
+        .only-mine-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent-primary);
+        }
+
         .filter-select {
             padding: 10px 16px;
             border: 1px solid var(--border-color);
@@ -482,6 +508,49 @@
             color: #d97706;
         }
 
+        /* v1.36: 解析中状态样式 */
+        .case-files-col.parsing .case-file-count {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .case-files-col.parsing .fa-spinner {
+            color: #2563eb;
+        }
+
+        /* v2.23: 无材料视觉状态（任务 1.1） */
+        .case-files-col.empty .case-file-count {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+        .case-files-col.empty .fa-inbox {
+            color: var(--text-muted);
+        }
+
+        /* v2.23: 案件名称后的文书数量徽章（任务 1.1，修订：从材料列迁出） */
+        .case-doc-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 7px;
+            margin-left: 8px;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+            vertical-align: middle;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .case-doc-badge:hover {
+            background: #dbeafe;
+            border-color: #2563eb;
+        }
+        .case-doc-badge i {
+            font-size: 10px;
+        }
+
         .ocr-error-badge {
             margin-left: 4px;
             padding: 1px 6px;
@@ -619,6 +688,24 @@
             color: #d97706;
         }
 
+        /* v2.23: 异常状态用红色区分（任务 3.3） */
+        .ocr-status.error {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .ocr-actions .btn-danger {
+            background: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+        .ocr-actions .btn-danger:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+        .ocr-actions .btn-secondary {
+            color: var(--text-secondary);
+        }
+
         .ocr-status.processing {
             background: #dbeafe;
             color: #2563eb;
@@ -743,6 +830,22 @@
         .case-action-btn.quick-gen-btn:hover {
             background: #ffedd5;
             border-color: #f97316;
+        }
+
+        /* v2.22: 置灰态（无可用材料/全部异常） */
+        .case-action-btn:disabled,
+        .case-action-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            color: var(--text-muted);
+            border-color: var(--border-color);
+            background: var(--bg-secondary);
+        }
+        .case-action-btn:disabled:hover,
+        .case-action-btn.disabled:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-muted);
         }
 
         .case-action-btn.delete-case-btn {
@@ -878,6 +981,29 @@
         .page-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        /* v1.25: 案件列表真实分页容器 */
+        .case-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .case-pagination .page-btn:hover:not(.active):not(:disabled) {
+            background: var(--border-color);
+        }
+
+        .page-ellipsis {
+            min-width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 14px;
         }
 
         /* === v1.1 新增：复选框列 === */
@@ -2573,7 +2699,7 @@
             text-align: center;
         }
 
-        /* === 文件数量样式 === */
+        /* === 材料数量样式 === */
         .case-file-count {
             display: inline-flex;
             align-items: center;
@@ -2667,6 +2793,96 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             border-color: var(--text-muted);
+        }
+
+        /* 批量任务徽章 (任务 9.2) */
+        .batch-task-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background: var(--accent-danger, #dc2626);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 9px;
+            align-items: center;
+            justify-content: center;
+            line-height: 18px;
+        }
+
+        /* 批量任务进度面板 (任务 9.2) */
+        .batch-task-panel {
+            display: none;
+            position: fixed;
+            top: 64px;
+            right: 16px;
+            width: 360px;
+            max-height: 480px;
+            overflow-y: auto;
+            background: var(--bg-secondary, #fff);
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 90;
+            padding: 8px 0;
+        }
+        .batch-task-panel.show { display: block; }
+        .batch-task-panel .batch-task-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color, #e5e7eb);
+        }
+        .batch-task-panel .batch-task-item:last-child { border-bottom: none; }
+        .batch-task-panel .batch-task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .batch-task-panel .batch-task-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary, #1a1a2e);
+        }
+        .batch-task-panel .batch-task-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .batch-task-panel .batch-task-status.running {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .batch-task-panel .batch-task-status.done {
+            background: #f0fdf4;
+            color: #10b981;
+        }
+        .batch-task-panel .batch-task-progress {
+            font-size: 12px;
+            color: var(--text-secondary, #6b7280);
+            margin-bottom: 2px;
+        }
+        .batch-task-panel .batch-task-time {
+            font-size: 11px;
+            color: var(--text-muted, #9ca3af);
+        }
+        .batch-task-panel .batch-task-failed-hint {
+            font-size: 12px;
+            color: var(--accent-danger, #dc2626);
+            margin-top: 4px;
+        }
+        .batch-task-panel .batch-task-failed-btn {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 10px;
+            background: var(--accent-danger, #dc2626);
+            color: #fff;
+            font-size: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
         }
 
         /* 全部文书全屏面板 */
@@ -2895,6 +3111,30 @@
             font-weight: 500;
             border-radius: 4px;
             margin-left: 8px;
+        }
+
+        /* v1.37: 生成方式/类型标签（任务 4.3） */
+        .doc-gen-method-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 6px;
+            background: #f3f4f6;
+            color: #6b7280;
+            font-size: 11px;
+            border-radius: 4px;
+            margin-left: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .doc-type-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 6px;
+            background: #fef3c7;
+            color: #d97706;
+            font-size: 11px;
+            border-radius: 4px;
+            margin-left: 6px;
+            border: 1px solid #fde68a;
         }
 
         /* 文书精修弹窗 */
@@ -3224,6 +3464,11 @@
                     <i class="fas fa-file-alt"></i>
                     <span>全部文书</span>
                 </button>
+                <button class="history-tasks-btn" onclick="toggleBatchTaskPanel()" title="任务通知" style="position: relative;">
+                    <i class="fas fa-bell"></i>
+                    <span>任务通知</span>
+                    <span id="batchTaskBadge" class="batch-task-badge" style="display:none;">0</span>
+                </button>
                 <div class="user-menu" id="userMenu" style="position: relative;">
                     <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
                         <i class="fas fa-user"></i>
@@ -3237,6 +3482,9 @@
                 </div>
             </div>
         </header>
+
+        <!-- 批量任务进度面板 (任务 9.2) -->
+        <div id="batchTaskPanel" class="batch-task-panel"></div>
 
         <!-- Cases Page Content -->
         <div class="cases-page">
@@ -3355,6 +3603,12 @@
                             <option value="">全部</option>
                         </select>
                     </div>
+                    <div class="filter-group only-mine-group">
+                        <label class="filter-label only-mine-label" title="开启后仅显示当前登录用户为承办人之一的案件">
+                            <input type="checkbox" id="onlyMineFilter" onchange="filterCases()">
+                            <span>仅本人案件</span>
+                        </label>
+                    </div>
                     <div class="filter-group date-filter-group">
                         <span class="filter-label">上传日期：</span>
                         <select class="filter-select" id="dateRangeQuick" onchange="onDateRangeQuickChange(this.value)">
@@ -3383,20 +3637,8 @@
                 </div>
             </div>
 
-            <!-- Pagination -->
-            <div class="pagination">
-                <button class="page-btn" disabled>
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <button class="page-btn active">1</button>
-                <button class="page-btn">2</button>
-                <button class="page-btn">3</button>
-                <span style="color: var(--text-muted);">...</span>
-                <button class="page-btn">10</button>
-                <button class="page-btn">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
+            <!-- Pagination (v1.25: 动态渲染，由 renderPagination 控制) -->
+            <div id="casePagination" class="case-pagination"></div>
         </div>
     </div>
 
@@ -3640,7 +3882,7 @@
                 <div class="sync-info-icon" style="background:#3b82f6;"><i class="fas fa-folder-open"></i></div>
                 <div class="sync-info-text">
                     <div class="sync-info-title" id="ocrCaseName">案件名称</div>
-                    <div class="sync-info-desc">已完成 <span id="ocrDoneCount" style="color:#10b981;font-weight:600;">0</span> 个 · 未完成 <span id="ocrPendingCount" style="color:#f59e0b;font-weight:600;">0</span> 个</div>
+                    <div class="sync-info-desc">已解析成功 <span id="ocrDoneCount" style="color:#10b981;font-weight:600;">0</span> 个 · 未完成/异常 <span id="ocrPendingCount" style="color:#f59e0b;font-weight:600;">0</span> 个</div>
                 </div>
             </div>
             <div class="ocr-tabs">
@@ -3856,8 +4098,8 @@
     </div>
 
     <script src="../js/common.js?v=30"></script>
-    <script src="../js/case-data.js?v=47"></script>
-    <script src="../js/cases.js?v=61"></script>
+    <script src="../js/case-data.js?v=54"></script>
+    <script src="../js/cases.js?v=84"></script>
     <script>
         // 切换用户下拉菜单
         function toggleUserDropdown() {

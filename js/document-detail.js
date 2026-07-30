@@ -285,3 +285,23 @@ function downloadDocument() {
     a.click();
     URL.revokeObjectURL(url);
 }
+
+// v1.38: 精修跳转（任务 5.2）
+function refineDocument() {
+    if (!pageCaseId || !pageDoc) {
+        showNotification('文书数据缺失，无法精修', 'warning');
+        return;
+    }
+    // 取最新版本作为精修目标
+    const versions = pageDoc.versions || [];
+    const latestVersion = versions[0];
+    if (!latestVersion || !latestVersion.versionId) {
+        showNotification('未找到可精修的文书版本', 'warning');
+        return;
+    }
+    const url = `document-polish.html?caseId=${encodeURIComponent(pageCaseId)}&versionId=${encodeURIComponent(latestVersion.versionId)}`;
+    const win = window.open(url, '_blank');
+    if (!win) {
+        showNotification('浏览器弹窗被拦截，请允许弹窗后重试', 'error');
+    }
+}

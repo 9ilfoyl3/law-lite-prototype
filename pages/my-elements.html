@@ -290,6 +290,9 @@
         .cw-chip.checked { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 500; }
         .cw-chip .cw-check { display: none; font-size: 9px; }
         .cw-chip.checked .cw-check { display: inline; }
+        /* 优化2: 不在白名单的案字（已有数据保留显示，禁止勾选） */
+        .cw-chip.disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; }
+        .cw-chip.disabled:hover { border-color: var(--border-color); }
         .case-word-bar .cw-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; }
 
         /* 要件卡片上的案字标签 */
@@ -368,7 +371,7 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="../js/case-data.js?v=47"></script>
+    <script src="../js/case-data.js?v=54"></script>
     <script>
         const causeListEl = document.getElementById('causeList');
         const currentCauseTitleEl = document.getElementById('currentCauseTitle');
@@ -413,16 +416,24 @@
             const cwBar = document.getElementById('caseWordBar');
             const cwChips = document.getElementById('caseWordChips');
             if (!cwBar || !cwChips) return;
-            const wordList = getCaseWordList(currentBusiness);
-            if (!wordList.length) {
+            const allWords = getCaseWordList(currentBusiness);
+            if (!allWords.length) {
                 cwBar.style.display = 'none';
                 return;
             }
             cwBar.style.display = 'flex';
+            // 优化2: 按案由大类白名单过滤，不在白名单的案字（已有数据）保留显示但禁用
+            const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+                ? getAllowedCaseWordsForCause(currentBusiness, currentCause)
+                : allWords.slice();
             const selected = getMyCauseCaseWords(currentBusiness, currentCause);
-            cwChips.innerHTML = wordList.map(w => {
+            const merged = allowed.slice();
+            selected.forEach(w => { if (merged.indexOf(w) < 0) merged.push(w); });
+            cwChips.innerHTML = merged.map(w => {
                 const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
-                return '<span class="cw-chip' + checked + '" onclick="toggleCauseCaseWord(\'' + escQuote(w) + '\')">'
+                const disabled = allowed.indexOf(w) < 0 ? ' disabled' : '';
+                const onclick = disabled ? '' : ' onclick="toggleCauseCaseWord(\'' + escQuote(w) + '\')"';
+                return '<span class="cw-chip' + checked + disabled + '"' + onclick + ' title="' + (disabled ? '该案字不在当前案由允许范围' : '') + '">'
                     + '<i class="fas fa-check cw-check"></i>'
                     + escapeHtml(w)
                     + '</span>';
@@ -430,6 +441,14 @@
         }
 
         function toggleCauseCaseWord(word) {
+            // 优化2: 白名单守卫
+            const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+                ? getAllowedCaseWordsForCause(currentBusiness, currentCause)
+                : getCaseWordList(currentBusiness);
+            if (allowed.indexOf(word) < 0) {
+                showToast('该案字不在当前案由允许范围', 'error');
+                return;
+            }
             const list = getMyCauseCaseWords(currentBusiness, currentCause);
             const idx = list.indexOf(word);
             if (idx >= 0) list.splice(idx, 1);
@@ -439,18 +458,24 @@
         }
 
         // 渲染表单中的适用案字多选
+        // 优化2: 表单内只展示白名单案字，已选但不在白名单的保留显示但禁用
         function renderFormCaseWords(idx, selected) {
             const container = document.getElementById('formCaseWords_' + idx);
             if (!container) return;
-            const causeWords = getMyCauseCaseWords(currentBusiness, currentCause);
-            const wordList = causeWords.length ? causeWords : getCaseWordList(currentBusiness);
-            if (!wordList.length) {
+            const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+                ? getAllowedCaseWordsForCause(currentBusiness, currentCause)
+                : getCaseWordList(currentBusiness);
+            const sel = selected || [];
+            const merged = allowed.slice();
+            sel.forEach(w => { if (merged.indexOf(w) < 0) merged.push(w); });
+            if (!merged.length) {
                 container.innerHTML = '<span class="form-cw-empty">当前业务系统无案字配置</span>';
                 return;
             }
-            container.innerHTML = wordList.map(w => {
-                const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
-                return '<span class="cw-chip' + checked + '" data-cw="' + escapeHtml(w) + '" onclick="toggleFormCaseWord(this)">'
+            container.innerHTML = merged.map(w => {
+                const checked = sel.indexOf(w) >= 0 ? ' checked' : '';
+                const disabled = allowed.indexOf(w) < 0 ? ' disabled' : '';
+                return '<span class="cw-chip' + checked + disabled + '" data-cw="' + escapeHtml(w) + '" onclick="toggleFormCaseWord(this)" title="' + (disabled ? '该案字不在当前案由允许范围' : '') + '">'
                     + '<i class="fas fa-check cw-check"></i>'
                     + escapeHtml(w)
                     + '</span>';
@@ -458,6 +483,8 @@
         }
 
         function toggleFormCaseWord(el) {
+            // 优化2: 禁用态不响应点击
+            if (el.classList.contains('disabled')) return;
             el.classList.toggle('checked');
         }
 

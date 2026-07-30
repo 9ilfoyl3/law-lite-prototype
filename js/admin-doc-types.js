@@ -6,6 +6,8 @@
 //        新增「匹配案由」字段；移除步骤序列编辑器（节点序列由 agentflow 平台内部决定）
 // v1.33: 类型命名调整——「直接生成型」改为「一步生成型」（内部仍用 'material'），与用户侧 tab 命名「一步生成」对齐
 // v1.34: 启用/停用状态——表格新增「状态」列与「停用/启用」按钮；移除冗余「来源」列（保留类型名称列的内置/自定义徽章）
+// E1 (8.3): Workflow 配置简化——管理后台仅支持一步生成型（type 固定 'material'），移除分步型配置入口与
+//           "每类型至少保留1个分步+1个一步"约束；case-data.js 内置 workflow 仍保留分步型供用户侧使用
 // 数据持久化：localStorage.adminDocTypes（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTypes 在加载时合并到 system.docTypes
 
@@ -201,9 +203,7 @@
         const orgData = getWfOrgData(currentOrg);
         const isCustomized = orgData[docTypeKey] && Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey].length > 0;
 
-        // v1.32: 按类型分组统计，用于删除按钮禁用判断
-        const stepWfs = workflows.filter(w => (w.type || 'step') === 'step');
-        const materialWfs = workflows.filter(w => (w.type || 'step') === 'material');
+        // E1: 移除分步/一步分组统计与"至少保留1个"约束，删除按钮始终可用
 
         let rowsHtml = '';
         if (workflows.length === 0) {
@@ -230,15 +230,8 @@
                 const causesHtml = (!wf.causes || wf.causes.length === 0)
                     ? '<span class="case-word-fallback">兜底</span>'
                     : wf.causes.map(c => '<span class="case-word-tag">' + escapeHtml(c) + '</span>').join('');
-                // v1.32: 删除按钮禁用规则——同类型仅剩 1 个时禁用
-                const sameTypeCount = wfType === 'material' ? materialWfs.length : stepWfs.length;
-                const isOnlyOneOfSameType = sameTypeCount <= 1;
-                const deleteTitle = isOnlyOneOfSameType
-                    ? ('每个类型至少需保留 1 个' + (wfType === 'material' ? '一步生成型' : '分步生成型') + ' workflow')
-                    : '';
-                const deleteBtn = isOnlyOneOfSameType
-                    ? '<button class="action-btn delete" disabled title="' + deleteTitle + '">删除</button>'
-                    : '<button class="action-btn delete" onclick="deleteWorkflow(\'' + docTypeKey + '\',\'' + wf.id + '\')">删除</button>';
+                // E1: 移除"同类型仅剩1个禁用"规则，删除按钮始终可用
+                const deleteBtn = '<button class="action-btn delete" onclick="deleteWorkflow(\'' + docTypeKey + '\',\'' + wf.id + '\')">删除</button>';
                 const editBtn = '<button class="action-btn edit" onclick="editWorkflow(\'' + docTypeKey + '\',\'' + wf.id + '\')">编辑</button>';
                 return '<tr>'
                     + '<td class="wf-name-cell">' + escapeHtml(wf.name) + wfBadge + '</td>'
@@ -301,7 +294,7 @@
     let wfEditingId = null;         // 当前编辑的 workflow id（null=新增）
     let wfSelectedCaseWords = new Set();
     let wfSelectedCauses = new Set();   // v1.32: 选中的匹配案由
-    let wfEditingType = 'step';     // v1.32: 当前编辑的 workflow 类型（'step' | 'material'）
+    let wfEditingType = 'material';     // E1: 固定一步生成型（'step' 分步型已移除配置入口）
     let wfEditingBuiltin = false;   // 是否编辑内置 workflow（控制 id 下拉只读）
 
     // v1.32: 渲染 workflow id 下拉框（数据来自 agentflow 平台 mock 列表）
@@ -348,17 +341,17 @@
         wfEditingId = null;
         wfSelectedCaseWords = new Set();
         wfSelectedCauses = new Set();
-        wfEditingType = 'step';  // v1.32: 默认分步生成型
+        wfEditingType = 'material';  // E1: 固定一步生成型，不再支持分步型
         wfEditingBuiltin = false;
         document.getElementById('wfModalTitle').textContent = '新增 workflow';
         document.getElementById('wfName').value = '';
         // v1.32: 渲染 workflow id 下拉框（新增模式）
         renderWfIdSelect(docTypeKey, '', false);
-        // v1.32: 重置类型 radio
+        // E1: 类型固定为一步生成型（radio 已在 HTML 中隐藏，此处仅同步状态）
         const stepRadio = document.getElementById('wfTypeStep');
         const materialRadio = document.getElementById('wfTypeMaterial');
-        if (stepRadio) stepRadio.checked = true;
-        if (materialRadio) materialRadio.checked = false;
+        if (stepRadio) stepRadio.checked = false;
+        if (materialRadio) materialRadio.checked = true;
         // v1.35: 重置使用模型下拉（默认千问3.6）
         renderWfModelSelect(DEFAULT_MODEL_ID);
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
@@ -373,7 +366,7 @@
         if (!wf) return;
         wfEditingDocType = docTypeKey;
         wfEditingId = wfId;
-        wfEditingType = wf.type || 'step';
+        wfEditingType = 'material';  // E1: 固定一步生成型，编辑时强制转为一步生成型
         wfSelectedCaseWords = new Set(wf.caseWords || []);
         wfSelectedCauses = new Set(wf.causes || []);  // v1.32: 回填匹配案由
         const isBuiltin = !!wf.isBuiltin;
@@ -382,11 +375,11 @@
         document.getElementById('wfName').value = wf.name || '';
         // v1.32: 渲染 workflow id 下拉框（编辑模式，内置只读）
         renderWfIdSelect(docTypeKey, wf.id || '', isBuiltin);
-        // v1.32: 设置类型 radio
+        // E1: 类型固定为一步生成型（radio 已在 HTML 中隐藏，此处仅同步状态）
         const stepRadio = document.getElementById('wfTypeStep');
         const materialRadio = document.getElementById('wfTypeMaterial');
-        if (stepRadio) stepRadio.checked = (wfEditingType === 'step');
-        if (materialRadio) materialRadio.checked = (wfEditingType === 'material');
+        if (stepRadio) stepRadio.checked = false;
+        if (materialRadio) materialRadio.checked = true;
         // v1.35: 回填使用模型
         renderWfModelSelect(wf.modelId || DEFAULT_MODEL_ID);
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
@@ -400,7 +393,7 @@
         wfEditingId = null;
         wfSelectedCaseWords = new Set();
         wfSelectedCauses = new Set();
-        wfEditingType = 'step';
+        wfEditingType = 'material';  // E1: 固定一步生成型
         wfEditingBuiltin = false;
         const wfIdSelect = document.getElementById('wfId');
         if (wfIdSelect) {
@@ -643,13 +636,7 @@
         const wf = workflows.find(w => w.id === wfId);
         if (!wf) return;
         const wfType = wf.type || 'step';
-        // v1.32: 同类型至少保留 1 个
-        const sameTypeWfs = workflows.filter(w => (w.type || 'step') === wfType);
-        if (sameTypeWfs.length <= 1) {
-            const typeLabel = wfType === 'material' ? '一步生成型' : '分步生成型';
-            showNotification('每个类型至少需保留 1 个' + typeLabel + ' workflow', 'warning');
-            return;
-        }
+        // E1: 移除"同类型至少保留1个"约束，允许删除任意 workflow（含最后一个分步型/一步型）
         const isBuiltinWf = !!wf.isBuiltin;
         const isCustomized = getWfOrgData(currentOrg)[docTypeKey] && getWfOrgData(currentOrg)[docTypeKey].length > 0;
         const confirmText = (isBuiltinWf && isCustomized)

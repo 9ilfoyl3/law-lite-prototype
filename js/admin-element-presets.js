@@ -440,16 +440,25 @@
     function renderCaseWordBar() {
         const cwBar = document.getElementById('caseWordBar');
         const cwChips = document.getElementById('caseWordChips');
-        const wordList = getCaseWordList(currentOrg);
-        if (!wordList.length) {
+        const allWords = getCaseWordList(currentOrg);
+        // 优化2: 按案由大类白名单过滤
+        const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+            ? getAllowedCaseWordsForCause(currentOrg, currentCause)
+            : allWords.slice();
+        if (!allWords.length) {
             cwBar.style.display = 'none';
             return;
         }
         cwBar.style.display = 'flex';
         const selected = getCauseCaseWords(currentOrg, currentCause);
-        cwChips.innerHTML = wordList.map(w => {
+        // 合并白名单 + 已选但不在白名单的（保留显示但禁用）
+        const merged = allowed.slice();
+        selected.forEach(w => { if (merged.indexOf(w) < 0) merged.push(w); });
+        cwChips.innerHTML = merged.map(w => {
             const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
-            return '<span class="cw-chip' + checked + '" onclick="toggleCauseCaseWord(\'' + escQuote(w) + '\')">'
+            const disabled = allowed.indexOf(w) < 0 ? ' disabled' : '';
+            const onclick = disabled ? '' : ' onclick="toggleCauseCaseWord(\'' + escQuote(w) + '\')"';
+            return '<span class="cw-chip' + checked + disabled + '"' + onclick + ' title="' + (disabled ? '该案字不在当前案由允许范围' : '') + '">'
                 + '<i class="fas fa-check cw-check"></i>'
                 + escapeHtml(w)
                 + '</span>';
@@ -457,6 +466,14 @@
     }
 
     window.toggleCauseCaseWord = function(word) {
+        // 优化2: 白名单守卫
+        const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+            ? getAllowedCaseWordsForCause(currentOrg, currentCause)
+            : getCaseWordList(currentOrg);
+        if (allowed.indexOf(word) < 0) {
+            showNotification('该案字不在当前案由允许范围', 'error');
+            return;
+        }
         const list = getCauseCaseWords(currentOrg, currentCause);
         const idx = list.indexOf(word);
         if (idx >= 0) {
@@ -506,15 +523,21 @@
     // 优先用该案由已勾选的适配案字；若该案由未勾选任何案字，则用业务系统全部案字
     function renderModalCaseWords(selected) {
         const container = document.getElementById('modalCaseWords');
-        const causeWords = getCauseCaseWords(currentOrg, currentCause);
-        const wordList = causeWords.length ? causeWords : getCaseWordList(currentOrg);
-        if (!wordList.length) {
+        // 优化2: 弹窗内只展示白名单案字，已选但不在白名单的保留显示但禁用
+        const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+            ? getAllowedCaseWordsForCause(currentOrg, currentCause)
+            : getCaseWordList(currentOrg);
+        const sel = selected || [];
+        const merged = allowed.slice();
+        sel.forEach(w => { if (merged.indexOf(w) < 0) merged.push(w); });
+        if (!merged.length) {
             container.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">当前业务系统无案字配置</span>';
             return;
         }
-        container.innerHTML = wordList.map(w => {
-            const checked = selected.indexOf(w) >= 0 ? ' checked' : '';
-            return '<span class="cw-chip' + checked + '" data-cw="' + escapeHtml(w) + '" onclick="toggleModalCaseWord(this)">'
+        container.innerHTML = merged.map(w => {
+            const checked = sel.indexOf(w) >= 0 ? ' checked' : '';
+            const disabled = allowed.indexOf(w) < 0 ? ' disabled' : '';
+            return '<span class="cw-chip' + checked + disabled + '" data-cw="' + escapeHtml(w) + '" onclick="toggleModalCaseWord(this)" title="' + (disabled ? '该案字不在当前案由允许范围' : '') + '">'
                 + '<i class="fas fa-check cw-check"></i>'
                 + escapeHtml(w)
                 + '</span>';
@@ -522,6 +545,8 @@
     }
 
     window.toggleModalCaseWord = function(el) {
+        // 优化2: 禁用态不响应点击
+        if (el.classList.contains('disabled')) return;
         el.classList.toggle('checked');
     };
 

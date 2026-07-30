@@ -218,7 +218,7 @@
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
-                    <a href="model-management.html" class="nav-item"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                    <a href="model-management.html" class="nav-item" style="display:none;"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">组织架构</div>
@@ -335,20 +335,20 @@
                 <input type="text" class="wf-name-readonly" id="wfName" readonly placeholder="选择 workflow id 后自动带出">
                 <div class="form-hint">仅管理后台可见，用户侧不显示此名称</div>
             </div>
-            <!-- v1.33: workflow 类型 radio（命名改为分步生成型/一步生成型） -->
+            <!-- E1: workflow 类型固定为一步生成型，分步生成型配置入口已移除（分步型由内置提供，用户侧仍可使用） -->
             <div class="form-row">
                 <label class="form-label">workflow 类型 <span class="required">*</span></label>
                 <div class="wf-type-radio-group">
-                    <label class="wf-type-radio" id="wfTypeStepLabel">
-                        <input type="radio" name="wfType" id="wfTypeStep" value="step" checked onchange="onWfTypeChange('step')">
-                        <span>分步生成型（含人工交互节点）</span>
-                    </label>
-                    <label class="wf-type-radio" id="wfTypeMaterialLabel">
-                        <input type="radio" name="wfType" id="wfTypeMaterial" value="material" onchange="onWfTypeChange('material')">
+                    <label class="wf-type-radio selected" id="wfTypeMaterialLabel">
+                        <input type="radio" name="wfType" id="wfTypeMaterial" value="material" checked onchange="onWfTypeChange('material')">
                         <span>一步生成型（无人工交互节点）</span>
                     </label>
+                    <label class="wf-type-radio" id="wfTypeStepLabel" style="display:none;">
+                        <input type="radio" name="wfType" id="wfTypeStep" value="step" onchange="onWfTypeChange('step')">
+                        <span>分步生成型（含人工交互节点）</span>
+                    </label>
                 </div>
-                <div class="form-hint">分步生成型 = 用户在分步生成 tab 按节点逐个确认；一步生成型 = 输入参数直接出文书结果，用于一步生成 tab</div>
+                <div class="form-hint">管理后台仅支持配置一步生成型 workflow（输入参数直接出文书结果，用于用户侧"一步生成" tab）；分步生成型由内置默认提供，无需在后台配置</div>
             </div>
             <!-- v1.35: 使用模型（agentflow 平台 workflow 内部大模型节点的镜像映射，供前端 token 估算） -->
             <div class="form-row">
@@ -367,11 +367,11 @@
                 <div id="wfCausesPicker" class="cause-picker-wrap"></div>
                 <div class="form-hint">从当前业务系统案由树中选择（3 级）；不选任何案由 = 兜底；同一案由在多个<strong>同类型</strong> workflow 间不可重复</div>
             </div>
-            <!-- v1.32: workflow 类型说明 -->
+            <!-- E1: workflow 类型说明（仅一步生成型） -->
             <div class="form-row" id="wfMaterialRow">
                 <div class="wf-material-hint">
                     <i class="fas fa-info-circle"></i>
-                    节点序列由 agentflow 平台 workflow 内部决定，管理后台不再配置步骤序列。分步生成型 workflow 在用户分步生成 tab 中按节点逐个确认；一步生成型 workflow 在一步生成 tab 中输入参数后直接输出文书。
+                    节点序列由 agentflow 平台 workflow 内部决定。一步生成型 workflow 在用户"一步生成" tab 中输入参数后直接输出文书；分步生成型 workflow 由内置默认提供，用户在"分步生成" tab 中按节点逐个确认，无需在管理后台配置。
                 </div>
             </div>
             <div class="modal-actions">
@@ -383,7 +383,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=47"></script>
+    <script src="../../js/case-data.js?v=54"></script>
     <script src="../../js/admin-doc-types.js?v=7"></script>
 </body>
 </html>

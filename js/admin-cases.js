@@ -90,8 +90,8 @@
             }
             // 部门
             if (dept && getDeptOf(c) !== dept) return false;
-            // 承办人
-            if (handler && c.handler !== handler) return false;
+            // 承办人（v1.39: 多承办人——命中任一承办人即保留）
+            if (handler && getCaseHandlers(c).indexOf(handler) < 0) return false;
             // 年份
             if (year === 'custom') {
                 const from = document.getElementById('dateFrom').value;
@@ -158,17 +158,22 @@
             const rowCls = [ocrError ? 'has-ocr-error' : '', isDeleted ? 'is-deleted-row' : ''].join(' ').trim();
             const deletedBadge = isDeleted ? `<span class="deleted-badge" title="软删除于 ${c.deletedAt || '-'}">已删除</span>` : '';
 
-            // 已删除行操作列只显示「查看 / 恢复」，不显示「改承办人 / 删除」
+            // E3: 已删除行操作列显示「查看(只读) / 恢复」；未删除行显示「编辑 / 改承办人 / 删除」
             const actionCell = isDeleted
                 ? `<div class="action-cell">
                         <button class="action-btn view" onclick="window.AdminCases.viewCase('${c.id}')">查看</button>
                         <button class="action-btn restore" onclick="window.AdminCases.restoreCase('${c.id}')">恢复</button>
                    </div>`
                 : `<div class="action-cell">
-                        <button class="action-btn view" onclick="window.AdminCases.viewCase('${c.id}')">查看</button>
+                        <button class="action-btn view" onclick="window.AdminCases.editCase('${c.id}')">编辑</button>
                         <button class="action-btn handler" onclick="window.AdminCases.changeHandler('${c.id}')">改承办人</button>
                         <button class="action-btn delete" onclick="window.AdminCases.deleteCase('${c.id}')">删除</button>
                    </div>`;
+
+            // E3: 未删除案件名称链接跳转可编辑模式（无 readonly），已删除案件保持只读
+            const caseNameHref = isDeleted
+                ? `../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}&readonly=1`
+                : `../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}`;
 
             return `
                 <div class="grid-row ${rowCls}" data-case-id="${c.id}">
@@ -176,11 +181,11 @@
                         <input type="checkbox" class="row-check" data-case-id="${c.id}" ${checked} onchange="window.AdminCases.toggleRow('${c.id}', this.checked)">
                     </div>
                     <div>
-                        <a class="case-name-link" href="../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}&readonly=1" target="_blank" title="${escapeHtml(c.caseName || '')}">${escapeHtml(c.caseName || '-')}</a>${deletedBadge}
+                        <a class="case-name-link" href="${caseNameHref}" target="_blank" title="${escapeHtml(c.caseName || '')}">${escapeHtml(c.caseName || '-')}</a>${deletedBadge}
                     </div>
                     <div title="${escapeHtml(c.caseNumber || '')}">${escapeHtml(c.caseNumber || '-')}</div>
                     <div title="${escapeHtml(c.cause || '')}">${escapeHtml(c.cause || '-')}</div>
-                    <div>${escapeHtml(c.handler || '-')}</div>
+                    <div title="${escapeHtml(getCaseHandlers(c).join('、'))}">${escapeHtml(getCaseHandlers(c).join('、') || '-')}</div>
                     <div>${escapeHtml(dept)}</div>
                     <div class="col-center">${fileCountCell}</div>
                     <div class="col-center">${docCount}</div>
@@ -267,8 +272,14 @@
     }
 
     // ===== 行内操作 =====
+    // E3: 已删除案件只读查看
     function viewCase(caseId) {
         window.open(`../../pages/case-files.html?caseId=${encodeURIComponent(caseId)}&readonly=1`, '_blank');
+    }
+
+    // E3: 未删除案件可编辑（跳转 case-files.html 非 readonly 模式，支持修改案件基本信息）
+    function editCase(caseId) {
+        window.open(`../../pages/case-files.html?caseId=${encodeURIComponent(caseId)}`, '_blank');
     }
 
     function deleteCase(caseId) {
@@ -308,7 +319,7 @@
         );
     }
 
-    // ===== 改承办人 =====
+    // ===== 改承办人（v1.39: 多选）=====
     let handlerAction = null; // { type: 'single'|'batch', caseId? }
 
     function buildHandlerOptions() {
@@ -317,17 +328,43 @@
         return names;
     }
 
+    // v1.39: 渲染承办人多选 checkbox 列表（替代原 select 单选）
+    // selectedNames: 预选中的姓名数组
+    function renderHandlerCheckboxes(selectedNames) {
+        const container = document.getElementById('handlerNew');
+        if (!container) return;
+        const names = buildHandlerOptions();
+        const selectedSet = new Set((selectedNames || []).filter(Boolean));
+        if (names.length === 0) {
+            container.innerHTML = '<div style="padding:12px; color:var(--text-muted); font-size:13px;">暂无活跃用户，请先在用户管理中创建</div>';
+            return;
+        }
+        container.innerHTML = names.map(n => `
+            <label style="display:flex; align-items:center; padding:7px 10px; cursor:pointer; border-radius:4px; transition:background 0.15s;"
+                   onmouseover="this.style.background='var(--bg-secondary)'"
+                   onmouseout="this.style.background='transparent'">
+                <input type="checkbox" value="${escapeHtml(n)}" ${selectedSet.has(n) ? 'checked' : ''} style="margin-right:10px; cursor:pointer;">
+                <span style="font-size:14px; color:var(--text-primary);">${escapeHtml(n)}</span>
+            </label>
+        `).join('');
+    }
+
+    // 收集弹窗中勾选的承办人姓名数组
+    function getSelectedHandlerNames() {
+        const checkboxes = document.querySelectorAll('#handlerNew input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb => cb.value).filter(Boolean);
+    }
+
     function changeHandler(caseId) {
         const c = allCases.find(x => x.id === caseId);
         if (!c) return;
         handlerAction = { type: 'single', caseId };
-        document.getElementById('handlerModalTitle').textContent = '改承办人';
+        document.getElementById('handlerModalTitle').textContent = '修改承办人（可多选）';
         document.getElementById('handlerCaseLabel').textContent = '案件';
         document.getElementById('handlerCaseName').textContent = c.caseName || c.caseNumber || '-';
-        document.getElementById('handlerCurrent').textContent = c.handler || '-';
-        const sel = document.getElementById('handlerNew');
-        sel.innerHTML = '<option value="">请选择...</option>' +
-            buildHandlerOptions().map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+        document.getElementById('handlerCurrent').textContent = getCaseHandlers(c).join('、') || '-';
+        // 预选中当前承办人
+        renderHandlerCheckboxes(getCaseHandlers(c));
         document.getElementById('handlerConfirmBtn').textContent = '确认修改';
         document.getElementById('handlerModal').classList.add('show');
     }
@@ -335,13 +372,11 @@
     function batchChangeHandler() {
         if (selectedIds.size === 0) return;
         handlerAction = { type: 'batch' };
-        document.getElementById('handlerModalTitle').textContent = '批量改承办人';
+        document.getElementById('handlerModalTitle').textContent = '修改承办人（可多选）';
         document.getElementById('handlerCaseLabel').textContent = '已选案件';
         document.getElementById('handlerCaseName').textContent = `共 ${selectedIds.size} 件`;
-        document.getElementById('handlerCurrent').textContent = '（将统一替换为新承办人）';
-        const sel = document.getElementById('handlerNew');
-        sel.innerHTML = '<option value="">请选择...</option>' +
-            buildHandlerOptions().map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+        document.getElementById('handlerCurrent').textContent = '（将统一替换为新承办人列表）';
+        renderHandlerCheckboxes([]);
         document.getElementById('handlerConfirmBtn').textContent = '确认批量修改';
         document.getElementById('handlerModal').classList.add('show');
     }
@@ -353,51 +388,54 @@
 
     function execChangeHandler() {
         if (!handlerAction) return;
-        const newName = document.getElementById('handlerNew').value;
-        if (!newName) {
-            showNotification('请选择新承办人', 'info');
+        const newNames = getSelectedHandlerNames();
+        if (newNames.length === 0) {
+            showNotification('请至少选择一名承办人', 'info');
             return;
         }
+        const newLabel = newNames.join('、');
         if (handlerAction.type === 'single') {
             const c = allCases.find(x => x.id === handlerAction.caseId);
             if (!c) { closeHandlerModal(); return; }
-            const oldName = c.handler || '-';
-            c.handler = newName;
+            const oldLabel = getCaseHandlers(c).join('、') || '-';
+            // v1.39: 写入 handlers 数组，同步 handler 为第一个（向后兼容）
+            c.handlers = newNames.slice();
+            c.handler = newNames[0];
             c.updatedAt = nowStr();
             saveBusinessSystems();
-            console.log(`[admin-cases] 改承办人: ${c.id} (${c.caseName}) ${oldName} → ${newName}`);
-            showNotification(`已将「${c.caseName}」承办人改为 ${newName}`, 'success');
+            console.log(`[admin-cases] 改承办人: ${c.id} (${c.caseName}) ${oldLabel} → ${newLabel}`);
+            showNotification(`已将「${c.caseName}」承办人改为 ${newLabel}`, 'success');
+            // 单个直接执行（无需二次确认）
+            loadData();
+            applyFilters();
+            closeHandlerModal();
         } else {
             // 批量
             showConfirm(
                 '批量改承办人确认',
-                `确定将选中的 ${selectedIds.size} 件案件的承办人改为 ${newName} 吗？`,
+                `确定将选中的 ${selectedIds.size} 件案件的承办人改为 ${newLabel} 吗？`,
                 () => {
                     let count = 0;
                     selectedIds.forEach(id => {
                         const c = allCases.find(x => x.id === id);
                         if (c) {
-                            const oldName = c.handler || '-';
-                            c.handler = newName;
+                            const oldLabel = getCaseHandlers(c).join('、') || '-';
+                            c.handlers = newNames.slice();
+                            c.handler = newNames[0];
                             c.updatedAt = nowStr();
-                            console.log(`[admin-cases] 批量改承办人: ${c.id} (${c.caseName}) ${oldName} → ${newName}`);
+                            console.log(`[admin-cases] 批量改承办人: ${c.id} (${c.caseName}) ${oldLabel} → ${newLabel}`);
                             count++;
                         }
                     });
                     saveBusinessSystems();
-                    showNotification(`已将 ${count} 件案件承办人改为 ${newName}`, 'success');
+                    showNotification(`已将 ${count} 件案件承办人改为 ${newLabel}`, 'success');
                     selectedIds.clear();
                     loadData();
                     applyFilters();
                 }
             );
+            closeHandlerModal();
         }
-        if (handlerAction.type === 'single') {
-            // 单个直接执行（无需二次确认）
-            loadData();
-            applyFilters();
-        }
-        closeHandlerModal();
     }
 
     // ===== 批量操作 =====
@@ -449,10 +487,10 @@
             if (u.dept) depts.add(u.dept);
         });
 
-        // 收集承办人（仅当前业务系统下）
+        // 收集承办人（仅当前业务系统下；v1.39: 多承办人聚合）
         const handlers = new Set();
         allCases.forEach(c => {
-            if (c.handler) handlers.add(c.handler);
+            getCaseHandlers(c).forEach(h => { if (h) handlers.add(h); });
         });
 
         // 渲染部门下拉
@@ -602,6 +640,7 @@
         toggleSelectAll,
         clearSelection,
         viewCase,
+        editCase,
         changeHandler,
         batchChangeHandler,
         closeHandlerModal,

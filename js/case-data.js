@@ -1,4 +1,9 @@
 // ============ Shared Case Data ============
+// v1.41 修复批量队列状态计数：updateBatchQueueTask 中 completed/failed 统计改为基于任务状态 'done' 与内部 failed 数量，避免状态不匹配
+// v1.40 案件列表分页验证：新增 ensureExtraCases 函数，在 initCaseData 中幂等追加 28 个法院 mock 案件（case_extra_1~case_extra_28，覆盖民间借贷/交通事故/劳动争议/婚姻家事/房屋租赁/买卖合同/侵权责任/物业服务/信用卡纠纷/拆迁安置等案由），用于验证案件列表真实分页；不修改现有 case1~case10 数据
+// v1.39 多承办人支持：① 案件对象新增 handlers 数组字段（字符串数组，存承办人姓名）；保留 handler 字段向后兼容（始终等于 handlers[0]）；② migrateDataIfNeeded 迁移旧数据 handler→handlers；③ 新增 getCaseHandlers/isCaseHandler 工具函数；④ initCaseData 幂等补全 handlers；用户侧「仅本人案件」筛选基于 isCaseHandler
+// v1.38 修复文书版本迁移：旧文书若仅有 doc 级 content（无 versions 数组），迁移时自动封装为一个版本，避免 getAllDocumentVersions 返回空导致历史文书列表/重新配置回填失效
+// v1.36 V1.1 数据结构升级：① 文件对象新增 parseStatus/errorType/parsedAt 字段（迁移时按 ocrStatus 推断 parseStatus，errorType 随机 mock）；② 案件 documents 数组新增 versionId/genMethod/source/createdBy/config 字段；DATA_VERSION 升至 1.17；新增 getParseStatus/getParseErrorLabel/getCaseParseStats/startMockParsing 工具函数；startMockParsing 上传后延时 2-3 秒随机转 success/error，通过 case-file-parse-updated 事件通知页面刷新
 // v1.35 token 估算简化：AI_MODELS 新增千问3.6/DeepSeek v4 + deployed 字段；CONTEXT_SAFETY_RATIO 默认0.85且可配置；新增 estimateTextTokens 与 getDeployedModels
 // v1.34 文书类型与要件新增启用/停用状态：mergeAdminDocTypes 跳过 enabled===false 的类型；filterElementsByCaseWord 过滤停用要件
 // v1.33 文书模板移除 causes 字段：normalizeDocTemplates / mergeAdminDocTemplates / mergeMyDocTemplates 不再写入 causes；getFilteredDocTypeTemplates 不再按 cause 过滤
@@ -40,6 +45,22 @@ function getCurrentUserName() {
     return localStorage.getItem('currentUserName') || '当前用户';
 }
 
+// v1.39: 获取案件的承办人列表（优先 handlers 数组，回退兼容旧 handler 字段）
+// 返回字符串数组；旧数据仅有 handler 时返回 [handler]，无承办人时返回 []
+function getCaseHandlers(caseItem) {
+    if (!caseItem) return [];
+    if (Array.isArray(caseItem.handlers) && caseItem.handlers.length > 0) {
+        return caseItem.handlers.filter(Boolean);
+    }
+    return caseItem.handler ? [caseItem.handler] : [];
+}
+
+// v1.39: 判断 userName 是否为该案件的承办人（用于用户侧「仅本人案件」筛选）
+function isCaseHandler(caseItem, userName) {
+    if (!caseItem || !userName) return false;
+    return getCaseHandlers(caseItem).indexOf(userName) >= 0;
+}
+
 function getModelContextLimit(modelId) {
     const id = modelId || getCurrentModelId();
     const model = AI_MODELS.find(m => m.id === id);
@@ -75,6 +96,96 @@ function getChatModelByOrg(org) {
         return all[org] || DEFAULT_MODEL_ID;
     } catch (e) {
         return DEFAULT_MODEL_ID;
+    }
+}
+
+// v2.23 (任务 6.3/6.4): 获取批量文书队列允许个数（管理后台 settings 配置）
+function getBatchQueueLimit() {
+    try {
+        const stored = localStorage.getItem('adminSystemConfig');
+        if (stored) {
+            const data = JSON.parse(stored);
+            const limit = data.config && data.config.batchQueueLimit;
+            if (limit && limit >= 1) return limit;
+        }
+    } catch (e) {}
+    return 10; // 默认 10
+}
+
+// v2.23 (任务 6.3): 批量文书队列状态管理（localStorage 持久化）
+function getBatchQueueState() {
+    try {
+        return JSON.parse(localStorage.getItem('batchQueueState') || '{"running":0,"completed":0,"failed":0,"tasks":[]}');
+    } catch (e) {
+        return { running: 0, completed: 0, failed: 0, tasks: [] };
+    }
+}
+
+function saveBatchQueueState(state) {
+    try {
+        localStorage.setItem('batchQueueState', JSON.stringify(state));
+    } catch (e) {
+        console.error('[saveBatchQueueState] 失败:', e);
+    }
+}
+
+// v1.41: 页面加载时清理异常挂起的批量任务（页面刷新/关闭会导致 running 任务无法自动完成，避免阻塞后续提交）
+function cleanupBatchQueueState() {
+    const state = getBatchQueueState();
+    let changed = false;
+    state.tasks = state.tasks.map(t => {
+        if (t.status === 'running' || t.status === 'pending') {
+            changed = true;
+            const results = (t.results || []).map(r => ({
+                ...r,
+                status: r.status === 'done' ? 'done' : 'failed',
+                failReason: r.status === 'done' ? (r.failReason || '') : (r.failReason || '任务中断，请重新提交')
+            }));
+            const completedCount = results.filter(r => r.status === 'done').length;
+            const failedCount = results.filter(r => r.status === 'failed').length;
+            return {
+                ...t,
+                status: 'done',
+                results,
+                completedCount,
+                failedCount,
+                finishedAt: t.finishedAt || new Date().toISOString()
+            };
+        }
+        return t;
+    });
+    if (changed) {
+        state.running = state.tasks.filter(t => t.status === 'running' || t.status === 'pending').length;
+        state.completed = state.tasks.filter(t => t.status === 'done' && (t.failed || 0) === 0).length;
+        state.failed = state.tasks.filter(t => t.status === 'done' && (t.failed || 0) > 0).length;
+        saveBatchQueueState(state);
+    }
+}
+
+function getBatchQueueRunningCount() {
+    const state = getBatchQueueState();
+    // 基于任务实际状态计算运行中数量，避免 state.running 脏数据导致队列误判
+    return state.tasks.filter(t => t.status === 'running' || t.status === 'pending').length;
+}
+
+function addBatchQueueTask(task) {
+    const state = getBatchQueueState();
+    state.tasks.unshift(task);
+    if (state.tasks.length > 50) state.tasks = state.tasks.slice(0, 50); // 最多保留 50 条记录
+    state.running = (state.running || 0) + 1;
+    saveBatchQueueState(state);
+}
+
+function updateBatchQueueTask(taskId, updates) {
+    const state = getBatchQueueState();
+    const task = state.tasks.find(t => t.id === taskId);
+    if (task) {
+        Object.assign(task, updates);
+        // 重新计算计数（批量任务完成状态统一为 'done'，内部结果状态区分 success/failed）
+        state.running = state.tasks.filter(t => t.status === 'running' || t.status === 'pending').length;
+        state.completed = state.tasks.filter(t => t.status === 'done' && (t.failed || 0) === 0).length;
+        state.failed = state.tasks.filter(t => t.status === 'done' && (t.failed || 0) > 0).length;
+        saveBatchQueueState(state);
     }
 }
 
@@ -754,8 +865,65 @@ const caseWordListByOrg = {
     justice: ['行复', '行复决', '行复终']
 };
 
+// v1.41 优化2: 案由大类→案字白名单映射（用于 my-elements / admin-element-presets 案字栏过滤）
+// 案由大类取自 causeTreeDataByOrg 的顶层节点 name；未配置的案由大类默认适配全部案字
+const caseWordWhitelistByCauseCategory = {
+    court: {
+        '民事案由': ['民初', '民终', '民再'],
+        '刑事案由': ['刑初', '刑终', '刑再'],
+        '行政案由': ['行初', '行终'],
+        '国家赔偿案由': ['赔', '监'],
+        '执行案由': ['执']
+    },
+    procuratorate: {
+        // 检察院案由大类：审查逮捕/审查起诉/不起诉/刑事抗诉/刑事赔偿 均属刑事范畴，适配全部检察案字
+        '审查逮捕': ['检捕', '检不立'],
+        '审查起诉': ['检诉', '检刑诉', '检不诉', '检复议'],
+        '不起诉': ['检不诉', '检复议'],
+        '刑事抗诉': ['检刑抗'],
+        '刑事赔偿': ['检赔']
+    },
+    justice: {
+        // 司法局只有行政复议一类，适配全部司法案字
+        '行政复议': ['行复', '行复决', '行复终']
+    }
+};
+
+// v1.41 优化2: 查询某案由所属大类（在 causeTreeDataByOrg 中反查顶层节点名）
+// 返回字符串（大类名）；找不到返回空字符串
+function getCauseCategory(org, cause) {
+    const tree = causeTreeDataByOrg[org] || [];
+    for (const l1 of tree) {
+        if (!l1 || !Array.isArray(l1.children)) continue;
+        for (const l2 of l1.children) {
+            if (typeof l2 === 'string') {
+                if (l2 === cause) return l1.name;
+            } else if (Array.isArray(l2.children)) {
+                if (l2.children.indexOf(cause) >= 0) return l1.name;
+            }
+        }
+    }
+    return '';
+}
+
+// v1.41 优化2: 查询某案由允许适配的案字白名单
+// 返回数组；案由未找到大类或大类未配置白名单时返回该业务系统全部案字（兜底）
+function getAllowedCaseWordsForCause(org, cause) {
+    const category = getCauseCategory(org, cause);
+    if (!category) {
+        // 案由不在树中（如自定义案由），兜底返回全部案字
+        return (caseWordListByOrg[org] || []).slice();
+    }
+    const whitelist = (caseWordWhitelistByCauseCategory[org] || {})[category];
+    if (!whitelist || whitelist.length === 0) {
+        // 大类未配置白名单，兜底返回全部案字
+        return (caseWordListByOrg[org] || []).slice();
+    }
+    return whitelist.slice();
+}
+
 // ===== 数据版本与迁移 =====
-const DATA_VERSION = '1.16';
+const DATA_VERSION = '1.18'; // v1.39: 案件新增 handlers 数组字段（多承办人），迁移时由 handler 派生
 
 // 保留默认的 docTypes 与 docTemplates 配置，用于 localStorage 加载后补全
 // v1.9: 移除文书类型 icon 字段
@@ -1093,6 +1261,12 @@ function generateCaseFiles(c, org) {
         const size = Math.floor(Math.random() * 5000 + 100) * 1024;
         const statusRoll = Math.random();
         const ocrStatus = statusRoll > 0.85 ? 'error' : (statusRoll > 0.75 ? 'pending' : 'done');
+        // v1.36: 新增 parseStatus 字段（uploading/parsing/success/error），与 ocrStatus 映射保持兼容
+        // ocrStatus: done→success, pending→parsing, error→error
+        const parseStatus = ocrStatus === 'done' ? 'success' : (ocrStatus === 'pending' ? 'parsing' : 'error');
+        // v1.36: 解析异常类型（format_unsupported/file_corrupted/ocr_failed/empty_content/other）
+        const errorTypes = ['format_unsupported', 'file_corrupted', 'ocr_failed', 'empty_content', 'other'];
+        const errorType = parseStatus === 'error' ? errorTypes[Math.floor(Math.random() * errorTypes.length)] : null;
         // 示例材料给一个较合理的预估 token 数（500~3000），避免按随机 size 估算失真
         const estimatedTokens = Math.floor(Math.random() * 2500 + 500);
         c.files.push({
@@ -1101,7 +1275,10 @@ function generateCaseFiles(c, org) {
             size,
             estimatedTokens,
             updatedAt: c.updatedAt,
-            ocrStatus
+            ocrStatus,
+            parseStatus,
+            errorType,
+            parsedAt: parseStatus === 'success' ? c.updatedAt : null
         });
     }
 }
@@ -1124,7 +1301,10 @@ function ensureConstructionCaseDemoFiles(c) {
         size: Math.floor(Math.random() * 4000 + 2000) * 1024,
         estimatedTokens: 6000,
         updatedAt: c.updatedAt,
-        ocrStatus: 'done'
+        ocrStatus: 'done',
+        parseStatus: 'success',
+        errorType: null,
+        parsedAt: c.updatedAt
     }));
     c.fileCount = c.files.length;
 }
@@ -1213,6 +1393,13 @@ function migrateDataIfNeeded() {
                 // v1.16: 补全 createdBy 字段，旧数据默认取 handler
                 if (!c.createdBy) {
                     c.createdBy = c.handler || '系统';
+                }
+                // v1.39: 多承办人迁移——有 handler 但无 handlers 时，由 handler 派生 handlers 数组
+                if (!Array.isArray(c.handlers)) {
+                    c.handlers = c.handler ? [c.handler] : [];
+                } else if (c.handlers.length > 0 && !c.handler) {
+                    // handlers 存在但 handler 缺失：补全 handler 为第一个
+                    c.handler = c.handlers[0];
                 }
             });
         });
@@ -1402,6 +1589,58 @@ function getCurrentBusiness() { return businessSystems[currentBusiness]; }
 function getCurrentCases() { return getCurrentBusiness().cases; }
 function getCurrentTemplates() { return getCurrentBusiness().docTemplates; }
 
+// v1.40: 幂等追加法院 mock 案件（case_extra_1~case_extra_28），用于验证案件列表真实分页
+// 仅追加，不修改现有 case1~case10；不设置 documents（保持简洁），filesInitialized 留空由 generateCaseFiles 生成 3-15 个材料
+function ensureExtraCases() {
+    const court = businessSystems.court;
+    if (!court || !Array.isArray(court.cases)) return;
+    // 幂等：已标记追加过则跳过，避免覆盖用户删除（含硬删除后重载不再重新追加）
+    if (localStorage.getItem('extraCasesAdded_v1_40') === '1') return;
+    // 兜底：旧数据已存在 case_extra_ 但未设标记，补标记并跳过
+    if (court.cases.some(c => c.id && String(c.id).indexOf('case_extra_') === 0)) {
+        localStorage.setItem('extraCasesAdded_v1_40', '1');
+        return;
+    }
+    const extra = [
+        { id: 'case_extra_1', caseName: '张三诉李四民间借贷纠纷案', caseNumber: '(2025)粤01民初2001号', cause: '民间借贷纠纷', type: 'contract', partyA: '张三', partyB: '李四', handler: '张法官', status: 'ongoing', date: '2026-07-28', updatedAt: '2026-07-28', caseWord: '民初', fileCount: 3 },
+        { id: 'case_extra_2', caseName: '王五诉赵六机动车交通事故责任纠纷案', caseNumber: '(2025)粤01民初2002号', cause: '机动车交通事故责任纠纷', type: 'tort', partyA: '王五', partyB: '赵六', handler: '李法官', status: 'ongoing', date: '2026-07-25', updatedAt: '2026-07-25', caseWord: '民初', fileCount: 5 },
+        { id: 'case_extra_3', caseName: '陈七与某科技有限公司劳动争议案', caseNumber: '(2025)粤01民初2003号', cause: '劳动争议', type: 'labor', partyA: '陈七', partyB: '某科技有限公司', handler: '王法官', status: 'pending', date: '2026-07-22', updatedAt: '2026-07-22', caseWord: '民初', fileCount: 8 },
+        { id: 'case_extra_4', caseName: '周八诉吴九离婚纠纷案', caseNumber: '(2025)粤01民初2004号', cause: '离婚纠纷', type: 'family', partyA: '周八', partyB: '吴九', handler: '刘法官', status: 'ongoing', date: '2026-07-18', updatedAt: '2026-07-18', caseWord: '民初', fileCount: 4 },
+        { id: 'case_extra_5', caseName: '郑十诉孙十一房屋租赁合同纠纷案', caseNumber: '(2025)粤01民初2005号', cause: '房屋租赁合同纠纷', type: 'contract', partyA: '郑十', partyB: '孙十一', handler: '陈法官', status: 'pending', date: '2026-07-15', updatedAt: '2026-07-15', caseWord: '民初', fileCount: 6 },
+        { id: 'case_extra_6', caseName: '钱十二诉冯十三买卖合同纠纷案', caseNumber: '(2025)粤01民初2006号', cause: '买卖合同纠纷', type: 'contract', partyA: '钱十二', partyB: '冯十三', handler: '杨法官', status: 'ongoing', date: '2026-07-12', updatedAt: '2026-07-12', caseWord: '民初', fileCount: 10 },
+        { id: 'case_extra_7', caseName: '褚十四诉卫十五侵权责任纠纷案', caseNumber: '(2025)粤01民初2007号', cause: '侵权责任纠纷', type: 'tort', partyA: '褚十四', partyB: '卫十五', handler: '黄法官', status: 'closed', date: '2026-07-08', updatedAt: '2026-07-08', caseWord: '民初', fileCount: 7 },
+        { id: 'case_extra_8', caseName: '蒋十六诉某物业公司物业服务合同纠纷案', caseNumber: '(2025)粤01民初2008号', cause: '物业服务合同纠纷', type: 'contract', partyA: '蒋十六', partyB: '某物业公司', handler: '林法官', status: 'ongoing', date: '2026-07-05', updatedAt: '2026-07-05', caseWord: '民初', fileCount: 12 },
+        { id: 'case_extra_9', caseName: '沈十七诉某银行信用卡纠纷案', caseNumber: '(2025)粤01民初2009号', cause: '信用卡纠纷', type: 'contract', partyA: '沈十七', partyB: '某银行', handler: '周法官', status: 'pending', date: '2026-07-02', updatedAt: '2026-07-02', caseWord: '民初', fileCount: 5 },
+        { id: 'case_extra_10', caseName: '韩十八诉某区政府拆迁安置补偿纠纷案', caseNumber: '(2025)粤01民初2010号', cause: '拆迁安置补偿纠纷', type: 'civil', partyA: '韩十八', partyB: '某区政府', handler: '吴法官', status: 'ongoing', date: '2026-06-28', updatedAt: '2026-06-28', caseWord: '民初', fileCount: 9 },
+        { id: 'case_extra_11', caseName: '杨十九诉朱二十民间借贷纠纷案', caseNumber: '(2025)粤01民终2011号', cause: '民间借贷纠纷', type: 'contract', partyA: '杨十九', partyB: '朱二十', handler: '张法官', status: 'ongoing', date: '2026-06-25', updatedAt: '2026-06-25', caseWord: '民终', fileCount: 6 },
+        { id: 'case_extra_12', caseName: '秦廿诉某运输公司机动车交通事故责任纠纷案', caseNumber: '(2025)粤01民终2012号', cause: '机动车交通事故责任纠纷', type: 'tort', partyA: '秦廿', partyB: '某运输公司', handler: '李法官', status: 'closed', date: '2026-06-22', updatedAt: '2026-06-22', caseWord: '民终', fileCount: 14 },
+        { id: 'case_extra_13', caseName: '尤廿一与某制造公司劳动争议案', caseNumber: '(2025)粤01民终2013号', cause: '劳动争议', type: 'labor', partyA: '尤廿一', partyB: '某制造公司', handler: '王法官', status: 'ongoing', date: '2026-06-18', updatedAt: '2026-06-18', caseWord: '民终', fileCount: 4 },
+        { id: 'case_extra_14', caseName: '张三诉李四继承纠纷案', caseNumber: '(2025)粤01民初2014号', cause: '继承纠纷', type: 'family', partyA: '张三', partyB: '李四', handler: '刘法官', status: 'pending', date: '2026-06-15', updatedAt: '2026-06-15', caseWord: '民初', fileCount: 8 },
+        { id: 'case_extra_15', caseName: '王五诉赵六房屋租赁合同纠纷案', caseNumber: '(2025)粤01民终2015号', cause: '房屋租赁合同纠纷', type: 'contract', partyA: '王五', partyB: '赵六', handler: '陈法官', status: 'closed', date: '2026-06-12', updatedAt: '2026-06-12', caseWord: '民终', fileCount: 11 },
+        { id: 'case_extra_16', caseName: '某商贸公司诉某物流公司买卖合同纠纷案', caseNumber: '(2025)粤01民初2016号', cause: '买卖合同纠纷', type: 'contract', partyA: '某商贸公司', partyB: '某物流公司', handler: '杨法官', status: 'ongoing', date: '2026-06-08', updatedAt: '2026-06-08', caseWord: '民初', fileCount: 7 },
+        { id: 'case_extra_17', caseName: '陈七诉周八名誉权纠纷案', caseNumber: '(2025)粤01民初2017号', cause: '名誉权纠纷', type: 'tort', partyA: '陈七', partyB: '周八', handler: '黄法官', status: 'pending', date: '2026-06-05', updatedAt: '2026-06-05', caseWord: '民初', fileCount: 5 },
+        { id: 'case_extra_18', caseName: '吴九诉某开发商商品房买卖合同纠纷案', caseNumber: '(2025)粤01民初2018号', cause: '商品房买卖合同纠纷', type: 'contract', partyA: '吴九', partyB: '某开发商', handler: '林法官', status: 'ongoing', date: '2026-06-02', updatedAt: '2026-06-02', caseWord: '民初', fileCount: 13 },
+        { id: 'case_extra_19', caseName: '郑十诉某保险股份有限公司财产保险合同纠纷案', caseNumber: '(2025)粤01民初2019号', cause: '财产保险合同纠纷', type: 'contract', partyA: '郑十', partyB: '某保险股份有限公司', handler: '周法官', status: 'closed', date: '2026-05-28', updatedAt: '2026-05-28', caseWord: '民初', fileCount: 6 },
+        { id: 'case_extra_20', caseName: '孙十一诉钱十二借款合同纠纷案', caseNumber: '(2025)粤01民初2020号', cause: '借款合同纠纷', type: 'contract', partyA: '孙十一', partyB: '钱十二', handler: '吴法官', status: 'ongoing', date: '2026-05-25', updatedAt: '2026-05-25', caseWord: '民初', fileCount: 9 },
+        { id: 'case_extra_21', caseName: '冯十三诉某餐饮公司提供劳务者受害责任纠纷案', caseNumber: '(2025)粤01民初2021号', cause: '提供劳务者受害责任纠纷', type: 'tort', partyA: '冯十三', partyB: '某餐饮公司', handler: '张法官', status: 'pending', date: '2026-05-22', updatedAt: '2026-05-22', caseWord: '民初', fileCount: 4 },
+        { id: 'case_extra_22', caseName: '褚十四诉卫十五相邻关系纠纷案', caseNumber: '(2025)粤01民初2022号', cause: '相邻关系纠纷', type: 'civil', partyA: '褚十四', partyB: '卫十五', handler: '李法官', status: 'ongoing', date: '2026-05-18', updatedAt: '2026-05-18', caseWord: '民初', fileCount: 7 },
+        { id: 'case_extra_23', caseName: '蒋十六诉某医院医疗损害责任纠纷案', caseNumber: '(2025)粤01民初2023号', cause: '医疗损害责任纠纷', type: 'tort', partyA: '蒋十六', partyB: '某医院', handler: '陈法官', status: 'ongoing', date: '2026-05-15', updatedAt: '2026-05-15', caseWord: '民初', fileCount: 10 },
+        { id: 'case_extra_24', caseName: '沈十七诉韩十八赡养费纠纷案', caseNumber: '(2025)粤01民初2024号', cause: '赡养费纠纷', type: 'family', partyA: '沈十七', partyB: '韩十八', handler: '黄法官', status: 'closed', date: '2026-05-12', updatedAt: '2026-05-12', caseWord: '民初', fileCount: 3 },
+        { id: 'case_extra_25', caseName: '杨十九诉某装修公司装饰装修合同纠纷案', caseNumber: '(2025)粤01民初2025号', cause: '装饰装修合同纠纷', type: 'contract', partyA: '杨十九', partyB: '某装修公司', handler: '林法官', status: 'ongoing', date: '2026-05-08', updatedAt: '2026-05-08', caseWord: '民初', fileCount: 8 },
+        { id: 'case_extra_26', caseName: '朱二十诉秦廿房屋买卖合同纠纷案', caseNumber: '(2025)粤01民终2026号', cause: '房屋买卖合同纠纷', type: 'contract', partyA: '朱二十', partyB: '秦廿', handler: '周法官', status: 'pending', date: '2026-05-05', updatedAt: '2026-05-05', caseWord: '民终', fileCount: 12 },
+        { id: 'case_extra_27', caseName: '尤廿一诉某电商公司网络购物合同纠纷案', caseNumber: '(2025)粤01民初2027号', cause: '网络购物合同纠纷', type: 'contract', partyA: '尤廿一', partyB: '某电商公司', handler: '吴法官', status: 'ongoing', date: '2026-05-02', updatedAt: '2026-05-02', caseWord: '民初', fileCount: 6 },
+        { id: 'case_extra_28', caseName: '张三诉某人力资源公司劳务合同纠纷案', caseNumber: '(2025)粤01民初2028号', cause: '劳务合同纠纷', type: 'labor', partyA: '张三', partyB: '某人力资源公司', handler: '张法官', status: 'pending', date: '2026-05-01', updatedAt: '2026-05-01', caseWord: '民初', fileCount: 15 }
+    ];
+    // 补全 handlers 数组与 documents 空数组（不生成文书，保持简洁）
+    extra.forEach(c => {
+        c.handlers = [c.handler];
+        c.documents = [];
+        // filesInitialized 留空，由 initCaseData 的 generateCaseFiles 生成 3-15 个材料
+    });
+    court.cases.push(...extra);
+    localStorage.setItem('extraCasesAdded_v1_40', '1');
+}
+
 // 初始化案件文件与文书数据
 function initCaseData() {
     Object.entries(businessSystems).forEach(([org, system]) => {
@@ -1416,6 +1655,13 @@ function initCaseData() {
         mergeMyDocTemplates(org, system);
         const caseWords = caseWordListByOrg[org];
         system.cases.forEach(c => {
+            // v1.39: 幂等补全 handlers 数组（多承办人），每次加载都执行
+            // 覆盖首次加载的默认数据（无 handlers）与版本未升级场景
+            if (!Array.isArray(c.handlers)) {
+                c.handlers = c.handler ? [c.handler] : [];
+            } else if (c.handlers.length > 0 && !c.handler) {
+                c.handler = c.handlers[0];
+            }
             if (!c.caseWord && caseWords && caseWords.length) {
                 c.caseWord = caseWords[Math.floor(Math.random() * caseWords.length)];
             }
@@ -1428,14 +1674,76 @@ function initCaseData() {
                     c.documents.push({
                         id: `${c.id}_doc_${i + 1}`,
                         title,
+                        docType: 'judgment',
                         createdAt: c.updatedAt,
+                        // v1.36: 版本数据结构升级，新增 genMethod/source/操作人/配置快照字段
                         versions: [{
-                            type: 'original',
+                            versionId: `v1_${Date.now()}_${i}`,
+                            type: 'original',           // original=首次生成 / polish=精修 / regenerate=重新生成
+                            genMethod: 'material',       // material=一步生成 / step=分步生成
+                            source: 'ai',                // ai=AI生成 / manual=手动导入
                             content: `<div style="font-family:'SimSun',serif;line-height:2;text-align:justify;"><h2 style="text-align:center;font-size:20pt;font-weight:bold;margin-bottom:24px;">${title}</h2><p style="text-indent:2em;margin-bottom:10px;">本文书为系统示例初稿内容，用于演示文书管理、精修与版本对比功能。</p><p style="text-indent:2em;margin-bottom:10px;">案件名称：${c.caseName}。</p><p style="text-indent:2em;margin-bottom:10px;">案由：${c.cause || '-'}。</p><p style="text-align:right;margin-bottom:20px;">生成时间：${c.updatedAt}</p></div>`,
-                            createdAt: c.updatedAt
+                            createdAt: c.updatedAt,
+                            createdBy: c.handler || getCurrentUserName(),
+                            // 配置快照（用于重新配置回填）
+                            config: {
+                                docType: 'judgment',
+                                template: '',
+                                prompt: '',
+                                modelId: DEFAULT_MODEL_ID,
+                                materialIds: []
+                            }
                         }]
                     });
                 }
+            }
+            // v1.36/v1.37/v1.38: 旧数据迁移——给已存在的 documents.versions 补全新字段（幂等）
+            // v1.37: 增强迁移——把旧 doc 上的 template/requirement/model/genMethod/selectedMaterialIds 迁移到 version.config
+            // v1.38: 修复——旧文书若仅有 doc 级 content（无 versions），转为一个版本，避免 getAllDocumentVersions 返回空
+            if (Array.isArray(c.documents)) {
+                c.documents.forEach(doc => {
+                    if (!doc) return;
+                    if (!doc.docType) doc.docType = 'judgment';
+                    if (!Array.isArray(doc.versions)) doc.versions = [];
+                    // v1.38: 旧结构兼容——versions 为空但 doc 上有 content 时，将 doc 级字段封装为一个版本
+                    if (doc.versions.length === 0 && doc.content) {
+                        doc.versions.push({
+                            versionId: `v1_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                            type: 'original',
+                            genMethod: doc.genMethod || 'material',
+                            source: 'ai',
+                            content: doc.content,
+                            createdAt: doc.createdAt || new Date().toISOString(),
+                            createdBy: c.handler || getCurrentUserName(),
+                            config: {
+                                docType: doc.docType || 'judgment',
+                                template: doc.template || '',
+                                prompt: doc.requirement || '',
+                                modelId: doc.model || DEFAULT_MODEL_ID,
+                                materialIds: doc.selectedMaterialIds || [],
+                                materialTokens: 0,
+                                stepsSnapshot: null
+                            }
+                        });
+                    }
+                    doc.versions.forEach((v, idx) => {
+                        if (!v.versionId) v.versionId = `v${idx + 1}_${Date.now()}_${idx}`;
+                        if (!v.genMethod) v.genMethod = doc.genMethod || (v.type === 'polish' ? 'material' : 'material');
+                        if (!v.source) v.source = 'ai';
+                        if (!v.createdBy) v.createdBy = c.handler || getCurrentUserName();
+                        if (!v.config || !v.config.docType) {
+                            v.config = {
+                                docType: doc.docType || 'judgment',
+                                template: doc.template || v.config?.template || '',
+                                prompt: doc.requirement || v.config?.prompt || '',
+                                modelId: doc.model || v.config?.modelId || DEFAULT_MODEL_ID,
+                                materialIds: doc.selectedMaterialIds || v.config?.materialIds || [],
+                                materialTokens: v.config?.materialTokens || 0,
+                                stepsSnapshot: v.config?.stepsSnapshot || null
+                            };
+                        }
+                    });
+                });
             }
             // 仅对未初始化过的案件生成示例材料，避免覆盖用户手动删除后的空状态
             if (!c.filesInitialized) {
@@ -1444,6 +1752,24 @@ function initCaseData() {
             }
             // 为 case7 补充大量演示材料，用于展示分步生成效果
             ensureConstructionCaseDemoFiles(c);
+            // v1.36: 旧数据迁移——给已存在的 files 补 parseStatus/errorType/parsedAt 字段（幂等）
+            if (Array.isArray(c.files)) {
+                c.files.forEach(f => {
+                    if (!f) return;
+                    if (!f.parseStatus) {
+                        // ocrStatus → parseStatus 映射
+                        f.parseStatus = f.ocrStatus === 'done' ? 'success'
+                            : (f.ocrStatus === 'pending' ? 'parsing'
+                            : (f.ocrStatus === 'error' ? 'error' : 'success'));
+                    }
+                    if (!f.errorType) {
+                        f.errorType = f.parseStatus === 'error' ? 'other' : null;
+                    }
+                    if (!f.parsedAt && f.parseStatus === 'success') {
+                        f.parsedAt = f.updatedAt || c.updatedAt;
+                    }
+                });
+            }
             // 同步 fileCount 与 files 长度
             c.fileCount = (c.files || []).length;
         });
@@ -1501,8 +1827,141 @@ function cleanupIconFields() {
 const CASE_DATA_KEY = 'caseAssistant_businessSystems';
 const HISTORY_TASKS_KEY = 'caseAssistant_historyTasks';
 
+// v1.36: 解析状态工具函数（兼容老数据）
+// 返回 'uploading' | 'parsing' | 'success' | 'error'
+function getParseStatus(file) {
+    if (!file) return 'success';
+    if (file.parseStatus) return file.parseStatus;
+    // 老数据无 parseStatus 时按 ocrStatus 推断
+    if (file.ocrStatus === 'done') return 'success';
+    if (file.ocrStatus === 'pending') return 'parsing';
+    if (file.ocrStatus === 'error') return 'error';
+    return 'success';
+}
+
+// v1.36: 解析异常类型文案映射
+const PARSE_ERROR_TYPE_LABELS = {
+    format_unsupported: '格式不支持',
+    file_corrupted: '文件损坏',
+    ocr_failed: 'OCR 解析失败',
+    empty_content: '内容为空',
+    other: '解析异常'
+};
+function getParseErrorLabel(errorType) {
+    return PARSE_ERROR_TYPE_LABELS[errorType] || '解析异常';
+}
+
+// v1.36: 统计案件文件的解析状态
+// 返回 { total, success, parsing, error, errorFiles }
+function getCaseParseStats(caseItem) {
+    const files = (caseItem && caseItem.files) || [];
+    const stats = { total: files.length, success: 0, parsing: 0, error: 0, errorFiles: [] };
+    files.forEach(f => {
+        const s = getParseStatus(f);
+        if (s === 'success') stats.success++;
+        else if (s === 'parsing') stats.parsing++;
+        else if (s === 'error') {
+            stats.error++;
+            stats.errorFiles.push(f);
+        }
+    });
+    return stats;
+}
+
+// v1.36: 启动 mock 解析流程（上传后调用）
+// 文件设为 parsing 状态，延时 2-3 秒后随机转为 success 或 error
+function startMockParsing(caseId, fileId) {
+    const result = findCaseById(caseId);
+    if (!result) return;
+    const f = (result.caseItem.files || []).find(x => x.id === fileId);
+    if (!f) return;
+    f.parseStatus = 'parsing';
+    f.ocrStatus = 'pending';
+    saveBusinessSystems();
+
+    const delay = 2000 + Math.random() * 1000; // 2-3 秒
+    setTimeout(() => {
+        const refreshed = findCaseById(caseId);
+        if (!refreshed) return;
+        const file = (refreshed.caseItem.files || []).find(x => x.id === fileId);
+        if (!file) return;
+        // 85% 概率成功，15% 失败
+        const isSuccess = Math.random() > 0.15;
+        if (isSuccess) {
+            file.parseStatus = 'success';
+            file.ocrStatus = 'done';
+            file.parsedAt = new Date().toISOString().split('T')[0];
+            file.errorType = null;
+        } else {
+            file.parseStatus = 'error';
+            file.ocrStatus = 'error';
+            const errorTypes = ['format_unsupported', 'file_corrupted', 'ocr_failed', 'empty_content', 'other'];
+            file.errorType = errorTypes[Math.floor(Math.random() * errorTypes.length)];
+        }
+        saveBusinessSystems();
+        // 通知页面刷新（如果有监听）
+        window.dispatchEvent(new CustomEvent('case-file-parse-updated', {
+            detail: { caseId, fileId, parseStatus: file.parseStatus }
+        }));
+    }, delay);
+}
+
+// v2.23 (任务 8.9): 数据持久化失败处理
+// localStorage 写入增加 try-catch 保护，失败时展示提示并提供重试
+let _saveRetryQueue = [];
+
 function saveBusinessSystems() {
-    localStorage.setItem(CASE_DATA_KEY, JSON.stringify(businessSystems));
+    try {
+        localStorage.setItem(CASE_DATA_KEY, JSON.stringify(businessSystems));
+    } catch (e) {
+        console.error('[saveBusinessSystems] 持久化失败:', e);
+        handlePersistFailure('saveBusinessSystems');
+    }
+}
+
+// 持久化失败统一处理
+function handlePersistFailure(fnName) {
+    // 避免重复弹框
+    if (document.getElementById('persistFailModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'persistFailModal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-container" style="max-width:420px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle" style="color:#dc2626;"></i> 数据保存失败</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>数据保存失败，可能是浏览器存储空间已满。</p>
+                <p style="font-size:13px;color:#6b7280;margin-top:8px;">数据仍保留在当前页面内存中，刷新页面将丢失。建议点击"重试"重新保存。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="dismissPersistFail()">稍后处理</button>
+                <button class="btn btn-primary" onclick="retryPersist()"><i class="fas fa-redo"></i> 重试</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function retryPersist() {
+    const modal = document.getElementById('persistFailModal');
+    if (modal) modal.remove();
+    try {
+        localStorage.setItem(CASE_DATA_KEY, JSON.stringify(businessSystems));
+        showNotification('数据保存成功', 'success');
+    } catch (e) {
+        console.error('[retryPersist] 仍失败:', e);
+        showNotification('重试失败，请清理浏览器存储空间后重试', 'error');
+        handlePersistFailure('retryPersist');
+    }
+}
+
+function dismissPersistFail() {
+    const modal = document.getElementById('persistFailModal');
+    if (modal) modal.remove();
+    showNotification('数据仅保留在内存中，刷新后将丢失', 'warning');
 }
 
 function loadHistoryTasks() {
@@ -1568,6 +2027,147 @@ function getOrgByCaseId(caseId) {
     return result ? result.org : null;
 }
 
+// ===== v1.37: 文书版本管理工具函数（任务 4.2） =====
+// 数据结构：caseItem.documents = [{ id, title, docType, versions: [version, ...] }]
+// version = { versionId, type, genMethod, source, content, createdAt, createdBy, config }
+
+/**
+ * 获取案件的指定文书类型下的最新版本
+ * @param {string} caseId
+ * @param {string} docType
+ * @returns {object|null} version 对象或 null
+ */
+function getLatestVersion(caseId, docType) {
+    const result = findCaseById(caseId);
+    if (!result) return null;
+    const doc = (result.caseItem.documents || []).find(d => d.docType === docType);
+    if (!doc || !Array.isArray(doc.versions) || doc.versions.length === 0) return null;
+    return doc.versions[0]; // versions 按时间倒序，第一条为最新
+}
+
+/**
+ * 获取案件下所有文书版本（扁平化，用于历史文书列表展示）
+ * 每条返回 { ...version, docId, docType, title, versionIndex }
+ * @param {string} caseId
+ * @returns {Array} 按生成时间倒序
+ */
+function getAllDocumentVersions(caseId) {
+    const result = findCaseById(caseId);
+    if (!result || !result.caseItem) return [];
+    const docs = result.caseItem.documents || [];
+    const list = [];
+    docs.forEach(doc => {
+        if (!doc || !Array.isArray(doc.versions)) return;
+        doc.versions.forEach((v, idx) => {
+            list.push({
+                ...v,
+                docId: doc.id,
+                docType: doc.docType,
+                title: doc.title,
+                versionIndex: idx + 1,
+                versionTotal: doc.versions.length
+            });
+        });
+    });
+    // 按生成时间倒序
+    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return list;
+}
+
+/**
+ * 追加文书新版本（按 docType 合并，不覆盖已有版本）
+ * @param {string} caseId
+ * @param {object} versionData - { type, genMethod, source, content, createdBy, config }
+ * @returns {object} 保存后的 version 对象（含 versionId/createdAt）
+ */
+function addDocumentVersion(caseId, versionData) {
+    const result = findCaseById(caseId);
+    if (!result) {
+        console.warn('[addDocumentVersion] case not found:', caseId);
+        return null;
+    }
+    const caseItem = result.caseItem;
+    if (!Array.isArray(caseItem.documents)) caseItem.documents = [];
+
+    const config = versionData.config || {};
+    const docType = config.docType || 'judgment';
+    const docTypes = getCurrentDocTypes ? getCurrentDocTypes() : {};
+    const docTypeName = docTypes[docType]?.name || '法律文书';
+    // config.template 是 templateId（字符串 key），需先查模板对象再取 name
+    const templates = (typeof getDocTypeTemplates === 'function') ? getDocTypeTemplates(docType) : {};
+    const tplObj = templates[config.template];
+    const templateName = getTemplateName ? getTemplateName(tplObj) : '';
+    const title = templateName ? `${docTypeName} · ${templateName}` : docTypeName;
+
+    // 按现有 id 查找（兼容旧数据：id 形如 doc_<docType>_<caseId> 或 doc_<timestamp>）
+    // 统一按 docType 查找合并
+    let doc = caseItem.documents.find(d => d.docType === docType);
+    if (!doc) {
+        doc = {
+            id: `doc_${docType}_${caseId}`,
+            title,
+            docType,
+            versions: []
+        };
+        caseItem.documents.push(doc);
+    } else if (!doc.title || doc.title === title) {
+        doc.title = title; // 同步最新标题
+    }
+
+    const version = {
+        versionId: `v${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: versionData.type || 'original',          // original/polish/regenerate
+        genMethod: versionData.genMethod || 'material', // material/step
+        source: versionData.source || 'ai',
+        content: versionData.content || '',
+        createdAt: new Date().toISOString(),
+        createdBy: versionData.createdBy || getCurrentUserName(),
+        config: {
+            docType,
+            template: config.template || '',
+            prompt: config.prompt || '',
+            modelId: config.modelId || '',
+            materialIds: Array.isArray(config.materialIds) ? [...config.materialIds] : [],
+            materialTokens: config.materialTokens || 0,
+            stepsSnapshot: Array.isArray(config.stepsSnapshot) ? config.stepsSnapshot : null
+        }
+    };
+    // 新版本插入头部（倒序）
+    doc.versions.unshift(version);
+    caseItem.updatedAt = new Date().toISOString().split('T')[0];
+    saveBusinessSystems();
+    return version;
+}
+
+/**
+ * 删除指定版本的文书（任务 4.3 用）
+ * @param {string} caseId
+ * @param {string} versionId
+ * @returns {boolean} 是否删除成功
+ */
+function deleteDocumentVersion(caseId, versionId) {
+    const result = findCaseById(caseId);
+    if (!result) return false;
+    const caseItem = result.caseItem;
+    if (!Array.isArray(caseItem.documents)) return false;
+    for (let i = caseItem.documents.length - 1; i >= 0; i--) {
+        const doc = caseItem.documents[i];
+        if (!Array.isArray(doc.versions)) continue;
+        const before = doc.versions.length;
+        doc.versions = doc.versions.filter(v => v.versionId !== versionId);
+        if (doc.versions.length < before) {
+            // 若版本清空，移除整个 document
+            if (doc.versions.length === 0) {
+                caseItem.documents.splice(i, 1);
+            }
+            caseItem.updatedAt = new Date().toISOString().split('T')[0];
+            saveBusinessSystems();
+            return true;
+        }
+    }
+    return false;
+}
+
 // 初始化数据：先填充默认值，再尝试从 localStorage 加载
 // 加载后执行 migrateDataIfNeeded 与 initCaseData，确保版本升级后默认案件材料可自动补齐
 initCaseData();
@@ -1577,4 +2177,8 @@ if (loadBusinessSystems()) {
 } else {
     businessSystems._dataVersion = DATA_VERSION;
 }
+// v1.40: 在加载/迁移完成后追加法院 mock 案件（用于验证分页），再跑一次 initCaseData 为新案件生成材料
+// 必须在 loadBusinessSystems 之后调用：否则会在默认数据上先设置标记，导致老用户加载旧数据后跳过追加
+ensureExtraCases();
+initCaseData();
 saveBusinessSystems();

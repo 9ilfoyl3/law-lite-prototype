@@ -26,6 +26,9 @@
 | AI聊天（核心工作区） | [pages/chat.html](pages/chat.html) | 自然语言交互入口，支持七大智能体任务发起与处理 |
 | 历史任务 | [pages/tasks.html](pages/tasks.html) | 按任务类型展示历史任务记录，与普通AI聊天会话分离 |
 | 案件管理 | [pages/cases.html](pages/cases.html) | 案件列表、状态追踪、关联操作（含文书生成与文书详情，不再单设文书管理页） |
+| 案件材料管理 | [pages/case-files.html](pages/case-files.html) | 案件材料上传、解析、文书生成与历史文书版本管理 |
+| 文书精修 | [pages/document-polish.html](pages/document-polish.html) | 文书精修独立页面，左侧文书内容 + 右侧对话式精修，保存为新版本 |
+| 文书详情 | [pages/document-detail.html](pages/document-detail.html) | 文书详情查看、打印、下载、精修入口 |
 | 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理 |
 | 个人设置 | [pages/settings.html](pages/settings.html) | 账户信息、全员公开库管理（管理员权限） |
 
@@ -66,6 +69,10 @@
 
 ## 文档目录
 
+- [V1.1版本PRD](docs/V1.1版本PRD.md) - V1.1版本产品需求文档（给人看，覆盖登录页/案件模块/Workflow编排/管理后台）
+- [V1.1配图索引](docs/V1.1版本PRD.md#十三配图索引v11-评审材料) - V1.1 评审用 15 张分场景流程图索引（位于 `docs/clarify-diagrams/`，纯静态 HTML+SVG，双击即可打开）
+- [V1.1修改清单](docs/修改清单_V1.1_20260728.md) - V1.1原型代码修改任务清单（案件状态/分步生成/材料解析/文书版本）
+- [案件模块设计审视记录](docs/案件模块设计审视记录_20260728.md) - 开发视角审视结果，含已解决/待确认问题追踪
 - [法院Lite版PRD文档](docs/PRD_new.md) - 用户侧系统与七大智能体详细需求
 - [管理后台PRD文档](docs/管理后台PRD_new.md) - 管理后台功能与权限设计
 - [页面清单](docs/页面清单.md) - 所有页面名称、文件路径、功能简述

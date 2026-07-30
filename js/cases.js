@@ -1,4 +1,6 @@
 // ============ Cases Page JavaScript ============
+// v1.26 批量生成过程页与结果页渲染：点击"开始批量生成"后进入全屏进度页实时展示每个案件状态，完成后自动渲染结果总览页（含统计卡片、操作按钮、生成结果明细）；从顶部"任务通知"查看结果时复用 renderBatchDone，确保明细有数据；提交前不再排除无可用材料案件，交由 runBatchAsync 生成失败项，保证结果明细始终可展示
+// v1.25 案件列表真实分页：renderCaseList 按 PAGE_SIZE=10 切片只渲染当前页；新增 goToPage/renderPagination；筛选/业务系统切换重置 currentPage=1；全选仅影响当前页，跨页勾选保留 selectedCaseIds；updateSelectionUI 全选态改为「当前页全部勾选」
 // v1.24 模型改为只读：quick gen 弹框与批量生成均按 workflow 的 modelId 推导模型（agentflow 平台镜像），新增 resolveWorkflowModelForCase 工具方法；onGenModelChange 置为 no-op；startQuickGen 不再向 URL 传 model 参数
 // v1.23 色系统一：批量栏/批量生成全屏面板/队列当前项改为蓝色系，仅保留行内「生成文书」按钮橙色单点强调（cases.html 内联样式与 CSS 改动，本文件无逻辑变更）
 // v1.22 列配置面板改为锚定按钮下方的下拉面板（去 fixed）；案件名称追加常驻外链图标 + hover 下划线，增强可点击性
@@ -14,6 +16,11 @@ let quickState = { caseId: '', model: '', docType: '', template: '', requirement
 let batchState = { docType: '', template: '', results: [], totalElapsed: 0, timerInterval: null, completedCount: 0, failedCount: 0, ocrStrategy: 'skip' };
 let refineState = { caseId: '', docId: '', messages: [], originalContent: '', revisedContent: '', activeTab: 'original' };
 let documentsCaseId = '';
+
+// v1.25: 案件列表真实分页
+const PAGE_SIZE = 10;
+let currentPage = 1;
+let lastRenderedCases = []; // 当前过滤后的全量案件（供 goToPage 重新切片）
 
 // 文书类型与模板辅助函数（getCurrentDocTypes / getDocTypeTemplates 已迁移至 case-data.js）
 function getFirstDocType() {
@@ -90,6 +97,8 @@ function switchBusinessSystem(type) {
     currentBusiness = type;
     localStorage.setItem('currentBusiness', type);
     selectedCaseIds.clear();
+    // v1.25: 切换业务系统后回到第 1 页
+    currentPage = 1;
     
     document.querySelectorAll('.business-switch-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.type === type);
@@ -164,7 +173,10 @@ function updateHandlerFilter() {
     const select = document.getElementById('handlerFilter');
     if (!select) return;
     const currentValue = select.value;
-    const handlers = [...new Set(getCurrentCases().map(c => c.handler).filter(Boolean))].sort();
+    // v1.39: 聚合所有案件的承办人（含多承办人）
+    const handlers = [...new Set(
+        getCurrentCases().flatMap(c => getCaseHandlers(c))
+    )].sort();
     select.innerHTML = '<option value="">全部</option>' + handlers.map(h =>
         `<option value="${h}">${h}</option>`
     ).join('');
@@ -219,7 +231,9 @@ function renderCaseList(cases = getCurrentCases()) {
     cases = cases.filter(c => !c.isDeleted);
     // 按更新时间倒序排列
     cases = [...cases].sort((a, b) => new Date(b.updatedAt || b.date) - new Date(a.updatedAt || a.date));
-    
+    // v1.25: 记录当前过滤后的全量案件，供 goToPage 重新切片
+    lastRenderedCases = cases;
+
     if (cases.length === 0) {
         listBody.innerHTML = `
             <div class="empty-state">
@@ -228,9 +242,18 @@ function renderCaseList(cases = getCurrentCases()) {
                 <div class="empty-desc">点击上方"新建案件"按钮创建您的第一个案件</div>
             </div>
         `;
+        // v1.25: 无案件时隐藏分页器
+        renderPagination(0, 1);
         return;
     }
-    
+
+    // v1.25: 真实分页——按 PAGE_SIZE 切片，只渲染当前页
+    const totalPages = Math.ceil(cases.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
+    const pageCases = cases.slice(startIdx, startIdx + PAGE_SIZE);
+
     const labels = current.partiesLabels;
     
     const buildColumn = (key, c) => {
@@ -242,7 +265,7 @@ function renderCaseList(cases = getCurrentCases()) {
             case 'parties':
                 return `<div class="case-col">${c.partyA || '-'} ${currentBusiness === 'court' ? '诉' : '与'} ${c.partyB || '-'}</div>`;
             case 'handler':
-                return `<div class="case-col">${c.handler || '-'}</div>`;
+                return `<div class="case-col">${getCaseHandlers(c).join('、') || '-'}</div>`;
             case 'uploadDate':
                 return `<div class="case-col">${c.date || '-'}</div>`;
             case 'caseWord':
@@ -252,11 +275,53 @@ function renderCaseList(cases = getCurrentCases()) {
         }
     };
     
-    const getOcrErrorCount = (c) => c.files ? c.files.filter(f => f.ocrStatus !== 'done').length : 0;
-    const hasOcrError = (c) => getOcrErrorCount(c) > 0;
-    
-    listBody.innerHTML = cases.map(c => {
+    // v1.36: 用 parseStatus 重构解析状态判断（兼容老数据）
+    const getParseStats = (c) => getCaseParseStats(c);
+    const hasParsing = (c) => getParseStats(c).parsing > 0;
+    const hasError = (c) => getParseStats(c).error > 0;
+
+    listBody.innerHTML = pageCases.map(c => {
         const extraCols = [...visibleColumns].map(col => buildColumn(col, c)).join('');
+        const stats = getParseStats(c);
+        const parsing = stats.parsing > 0;
+        const error = stats.error > 0;
+        // v2.24: 文书数量直接调用 getAllDocumentVersions，与详情页历史文书面板完全一致
+        const docCount = getAllDocumentVersions(c.id).length;
+        // v2.23: 材料数量列只表达材料状态（任务 1.1，修订：不再混入文书数）
+        // 状态优先级：无材料 → 解析中 → 有异常 → 正常
+        let fileCellTitle, fileCellText, fileCellIcon, fileCellClass = '';
+        if (stats.total === 0) {
+            fileCellTitle = '该案件暂无材料，点击上传';
+            fileCellText = '-';
+            fileCellIcon = '<i class="fas fa-inbox"></i>';
+            fileCellClass = 'empty';
+        } else if (parsing) {
+            fileCellTitle = `正在解析 ${stats.parsing} 个材料，已完成 ${stats.success}/${stats.total}`;
+            fileCellText = `${stats.success}/${stats.total}`;
+            fileCellIcon = '<i class="fas fa-spinner fa-spin"></i>';
+            fileCellClass = 'parsing';
+        } else if (error) {
+            fileCellTitle = `存在 ${stats.error} 个解析异常材料，点击查看`;
+            fileCellText = `${stats.success}/${stats.total}`;
+            fileCellIcon = '<i class="fas fa-file"></i>';
+            fileCellClass = 'ocr-error';
+        } else {
+            fileCellTitle = '点击查看材料解析状态';
+            fileCellText = `${stats.total}`;
+            fileCellIcon = '<i class="fas fa-file"></i>';
+        }
+        const showErrBadge = error && !parsing;
+        // v2.23: 已生成文书徽章挂在案件名称后（不污染材料数量列），点击打开历史文书弹窗
+        const docBadge = docCount > 0
+            ? `<span class="case-doc-badge" onclick="event.stopPropagation();openCaseDocuments('${c.id}')" title="已生成 ${docCount} 份文书，点击查看"><i class="fas fa-file-alt"></i> ${docCount}</span>`
+            : '';
+        // v2.22 + v2.23: 生成文书按钮置灰条件（任务 3.4 + 1.2 解析中拦截）
+        const noMaterials = stats.total === 0;
+        const allError = stats.total > 0 && stats.success === 0;
+        const genDisabled = noMaterials || allError || parsing;
+        const genTitle = parsing ? '材料解析中，请稍候'
+            : (noMaterials ? '请先上传材料'
+            : (allError ? '无可用材料，请先上传并解析文件' : '生成文书'));
         return `
         <div class="case-item" data-case-id="${c.id}">
             <div class="case-checkbox-col">
@@ -264,13 +329,14 @@ function renderCaseList(cases = getCurrentCases()) {
             </div>
             <div class="case-name" onclick="openCaseFiles('${c.id}')" title="点击新标签页打开案件文件">
                 <span class="case-name-text">${c.caseName || c.caseNumber}</span>
+                ${docBadge}
                 <i class="fas fa-external-link-alt case-name-icon"></i>
             </div>
             <div class="case-col" style="text-align:center;">${c.updatedAt || c.date || '-'}</div>
-            <div class="case-col case-files-col ${hasOcrError(c) ? 'ocr-error' : ''}" onclick="openOcrPanel('${c.id}')" title="${hasOcrError(c) ? `存在${getOcrErrorCount(c)}个材料解析异常，点击查看` : '点击查看文件解析状态'}">
+            <div class="case-col case-files-col ${fileCellClass}" onclick="openOcrPanel('${c.id}')" title="${fileCellTitle}">
                 <span class="case-file-count">
-                    <i class="fas fa-file"></i> ${hasOcrError(c) ? `${(c.fileCount || 0) - getOcrErrorCount(c)}/${c.fileCount || 0}` : (c.fileCount || 0)}
-                    ${hasOcrError(c) ? `<span class="ocr-error-badge">解析异常</span>` : ''}
+                    ${fileCellIcon} ${fileCellText}
+                    ${showErrBadge ? `<span class="ocr-error-badge">异常 ${stats.error}</span>` : ''}
                 </span>
             </div>
             ${extraCols}
@@ -278,7 +344,7 @@ function renderCaseList(cases = getCurrentCases()) {
                 <button class="case-action-btn" title="文件上传" onclick="openSupplementUpload('${c.id}')">
                     <i class="fas fa-upload"></i> 文件上传
                 </button>
-                <button class="case-action-btn quick-gen-btn" title="生成文书" onclick="openGenModal('${c.id}')">
+                <button class="case-action-btn quick-gen-btn${genDisabled ? ' disabled' : ''}" title="${genTitle}"${genDisabled ? ' disabled' : ''} onclick="openGenModal('${c.id}')">
                     <i class="fas fa-bolt"></i> 生成文书
                 </button>
                 <div class="case-action-more-wrap">
@@ -286,9 +352,6 @@ function renderCaseList(cases = getCurrentCases()) {
                         <i class="fas fa-ellipsis-v"></i>
                     </button>
                     <div class="case-action-menu">
-                        <div class="case-action-menu-item" onclick="openCaseDocuments('${c.id}')">
-                            <i class="fas fa-file-alt"></i> 历史文书
-                        </div>
                         <div class="case-action-menu-item" onclick="editCase('${c.id}')">
                             <i class="fas fa-edit"></i> 编辑
                         </div>
@@ -300,8 +363,57 @@ function renderCaseList(cases = getCurrentCases()) {
             </div>
         </div>
     `}).join('');
-    
+
     updateGridColumns();
+    // v1.25: 分页后同步当前页勾选状态（跨页勾选保留在 selectedCaseIds）并渲染分页器
+    syncCheckboxState();
+    renderPagination(totalPages, currentPage);
+}
+
+// v1.25: 跳转到指定页码
+function goToPage(n) {
+    const totalPages = Math.ceil(lastRenderedCases.length / PAGE_SIZE);
+    if (n < 1 || (totalPages > 0 && n > totalPages)) return;
+    currentPage = n;
+    renderCaseList(lastRenderedCases);
+}
+
+// v1.25: 渲染分页器；totalPages<=1 或无案件时隐藏
+function renderPagination(totalPages, page) {
+    const container = document.getElementById('casePagination');
+    if (!container) return;
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'flex';
+    let html = '';
+    // 上一页
+    html += `<button class="page-btn"${page === 1 ? ' disabled' : ''} onclick="goToPage(${page - 1})" title="上一页"><i class="fas fa-chevron-left"></i></button>`;
+    // 页码：≤7 全显示；否则 1 ... (page-1) page (page+1) ... N
+    const pages = [];
+    if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+        pages.push(1);
+        if (page > 3) pages.push('...');
+        const start = Math.max(2, page - 1);
+        const end = Math.min(totalPages - 1, page + 1);
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (page < totalPages - 2) pages.push('...');
+        pages.push(totalPages);
+    }
+    pages.forEach(p => {
+        if (p === '...') {
+            html += `<span class="page-ellipsis">...</span>`;
+        } else {
+            html += `<button class="page-btn${p === page ? ' active' : ''}" onclick="goToPage(${p})">${p}</button>`;
+        }
+    });
+    // 下一页
+    html += `<button class="page-btn"${page === totalPages ? ' disabled' : ''} onclick="goToPage(${page + 1})" title="下一页"><i class="fas fa-chevron-right"></i></button>`;
+    container.innerHTML = html;
 }
 
 function updateGridColumns() {
@@ -341,7 +453,7 @@ function renderCaseHeader() {
         <div class="case-checkbox-col"><input type="checkbox" class="case-checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" title="全选"></div>
         <div class="col-name">案件名称</div>
         <div class="col-updated" style="text-align:center;">更新时间</div>
-        <div class="col-files" style="text-align:center;">文件数量</div>
+        <div class="col-files" style="text-align:center;">材料数量</div>
         ${extraHeaderCols}
         <div class="col-actions-header">操作</div>
     `;
@@ -388,12 +500,17 @@ document.addEventListener('click', function(e) {
 });
 
 function filterCases() {
+    // v1.25: 筛选条件变化时回到第 1 页
+    currentPage = 1;
     const searchQuery = document.getElementById('caseSearchInput').value.toLowerCase().trim();
     const causeFilter = document.getElementById('causeFilter').value;
     const caseWordFilter = document.getElementById('caseWordFilter').value;
     const handlerFilter = document.getElementById('handlerFilter').value;
     const dateStart = document.getElementById('uploadDateStart').value;
     const dateEnd = document.getElementById('uploadDateEnd').value;
+    // v1.39: 「仅本人案件」开关（默认关闭）
+    const onlyMineEl = document.getElementById('onlyMineFilter');
+    const onlyMine = onlyMineEl ? onlyMineEl.checked : false;
 
     let filtered = getCurrentCases();
 
@@ -419,8 +536,15 @@ function filterCases() {
         filtered = filtered.filter(c => c.caseWord === caseWordFilter);
     }
 
+    // v1.39: 承办人筛选——命中任一承办人即保留（支持多承办人）
     if (handlerFilter) {
-        filtered = filtered.filter(c => c.handler === handlerFilter);
+        filtered = filtered.filter(c => getCaseHandlers(c).indexOf(handlerFilter) >= 0);
+    }
+
+    // v1.39: 仅本人案件——当前用户为承办人之一的案件
+    if (onlyMine) {
+        const me = getCurrentUserName();
+        filtered = filtered.filter(c => isCaseHandler(c, me));
     }
 
     if (dateStart || dateEnd) {
@@ -474,6 +598,9 @@ function resetAdvancedFilters() {
     document.getElementById('caseWordFilter').value = '';
     document.getElementById('handlerFilter').value = '';
     document.getElementById('dateRangeQuick').value = '';
+    // v1.39: 重置「仅本人案件」开关
+    const onlyMineEl = document.getElementById('onlyMineFilter');
+    if (onlyMineEl) onlyMineEl.checked = false;
     onDateRangeQuickChange('');
     filterCases();
 }
@@ -537,7 +664,9 @@ function updateSelectionUI() {
 
     const visibleCheckboxes = document.querySelectorAll('#caseListBody .case-checkbox');
     if (selectAllCb) {
-        selectAllCb.checked = visibleCheckboxes.length > 0 && count === visibleCheckboxes.length;
+        // v1.25: 分页后全选态仅反映「当前页是否全部勾选」，跨页勾选不影响该状态
+        const allVisibleChecked = visibleCheckboxes.length > 0 && [...visibleCheckboxes].every(cb => cb.checked);
+        selectAllCb.checked = allVisibleChecked;
     }
 }
 
@@ -682,6 +811,21 @@ function resolveWorkflowModelForCase(caseItem, docTypeKey) {
 function openGenModal(caseId) {
     const c = getCurrentCases().find(x => x.id === caseId);
     if (!c) return;
+    // v2.22: 无可用材料时拦截（任务 3.4）
+    const stats = getCaseParseStats(c);
+    if (stats.total === 0) {
+        showNotification('请先上传材料', 'warning');
+        return;
+    }
+    // v2.23: 解析中拦截（任务 1.2）
+    if (stats.parsing > 0) {
+        showNotification(`材料解析中，请稍候（剩余 ${stats.parsing} 个）`, 'warning');
+        return;
+    }
+    if (stats.success === 0) {
+        showNotification('无可用材料，请先上传并解析文件', 'warning');
+        return;
+    }
     const firstDocType = getFirstDocType();
     quickState.caseId = caseId;
     // v1.24: 模型由 workflow 决定，按案件 + 文书类型 匹配
@@ -717,22 +861,23 @@ function onGenModelChange(modelId) {
     // no-op: 模型由 workflow 决定，用户不可修改
 }
 
+// v2.22: Token 估算仅计算 parseStatus==='success' 的文件（部分异常不阻塞生成）
+// v2.23 (任务 8.2): 前端不再做 Token 超限前置判断，保留函数避免报错
 function getAllMaterialsTokens(caseItem) {
-    return (caseItem.files || []).reduce((sum, f) => sum + estimateFileTokens(f), 0);
+    return 0;
 }
 
 function updateGenContextHint() {
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     const hint = document.getElementById('genContextHint');
     if (!hint || !c) return;
-    const totalTokens = getAllMaterialsTokens(c);
-    const safeLimit = getSafeContextLimit(quickState.model);
-    const model = AI_MODELS.find(m => m.id === quickState.model) || AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID);
-    const exceeded = totalTokens > safeLimit;
-    hint.className = 'gen-context-hint ' + (exceeded ? 'warn' : 'ok');
-    hint.innerHTML = exceeded
-        ? `当前案件全部材料预估约 <strong>${formatNumber(totalTokens)}</strong> tokens，超过 <strong>${model.name}</strong> 的安全上限 <strong>${formatNumber(safeLimit)}</strong> tokens，请进入案件详情页选择核心材料生成文书；如勾选的核心材料仍超限，再使用分步生成。`
-        : `当前案件全部材料预估约 <strong>${formatNumber(totalTokens)}</strong> tokens，未超过 <strong>${model.name}</strong> 的安全上限 <strong>${formatNumber(safeLimit)}</strong> tokens，将默认使用全部材料生成。`;
+    const stats = getCaseParseStats(c);
+    // v2.23 (任务 8.2): 不再展示 Token 估算，仅展示材料解析状态
+    const excludeNote = stats.error > 0
+        ? `<br><span style="color:#d97706;font-size:12px;"><i class="fas fa-exclamation-triangle"></i> 已排除 ${stats.error} 个解析失败的材料，仅使用 ${stats.success} 个已解析成功的材料</span>`
+        : '';
+    hint.className = 'gen-context-hint ok';
+    hint.innerHTML = `当前案件可用材料 ${stats.success} 份${stats.parsing > 0 ? `，${stats.parsing} 份解析中` : ''}。将默认使用全部可用材料生成，如材料量过大将在生成时提示。${excludeNote}`;
 }
 
 function renderGenModalBody() {
@@ -741,14 +886,11 @@ function renderGenModalBody() {
     // v1.24: 模型下拉改为只读，仅展示当前 workflow 匹配的模型
     const currentModel = AI_MODELS.find(m => m.id === quickState.model) || AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID);
 
-    const totalTokens = c ? getAllMaterialsTokens(c) : 0;
-    const safeLimit = getSafeContextLimit(quickState.model);
-    const exceeded = totalTokens > safeLimit;
-
+    // v2.23 (任务 8.2): 移除 Token 超限前置判断，始终显示配置区
     let configHtml = '';
     let elementHintHtml = '';
     try {
-        configHtml = exceeded ? '' : buildGenConfigHtml();
+        configHtml = buildGenConfigHtml();
     } catch (e) { configHtml = ''; }
     try {
         elementHintHtml = (typeof buildGenElementHintHtml === 'function') ? buildGenElementHintHtml(c) : '';
@@ -770,12 +912,10 @@ function renderGenModalBody() {
         ${configHtml}
     `;
 
-    updateGenModalFooter(exceeded);
+    updateGenModalFooter(false);
     updateGenContextHint();
 
-    if (!exceeded) {
-        try { renderReqTemplates('genReqTemplates', quickState.docType, 'genRequirement'); } catch (e) {}
-    }
+    try { renderReqTemplates('genReqTemplates', quickState.docType, 'genRequirement'); } catch (e) {}
 }
 
 function buildGenElementHintHtml(caseItem) {
@@ -871,29 +1011,21 @@ function startQuickGen() {
     }
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     if (!c) return;
-    const totalTokens = getAllMaterialsTokens(c);
-    const safeLimit = getSafeContextLimit(quickState.model);
-    if (totalTokens > safeLimit) {
-        goToCaseFilesForGen();
-        return;
-    }
+    // v2.23 (任务 8.2): 移除 Token 超限前置判断，直接跳转详情页生成
 
-    // 未超限时跳转案件详情页，默认使用全部材料并自动触发生成，与详情页配置生成文书的体验统一
+    // 跳转案件详情页，默认使用全部材料并自动触发生成，与详情页配置生成文书的体验统一
     closeGenModal();
-    // v1.24: 不再传 model 参数，详情页会按 workflow 自动匹配模型
-    const params = new URLSearchParams({
+    // v2.23 (任务 9.1): 配置写入 sessionStorage，详情页读取后预填并清除
+    const genConfig = {
         caseId: quickState.caseId,
         docType: quickState.docType,
         template: quickState.template,
         requirement: quickState.requirement || '',
-        source: 'list',
-        autoGen: '1'
-    });
-    // v1.27: 仅「裁判文书」(judgment) 才自动引入要件，其他文书类型不触发要件流程
-    if (quickState.docType === 'judgment') {
-        params.set('autoIntroduceElements', '1');
-    }
-    window.location.href = `case-files.html?${params.toString()}`;
+        autoGen: true,
+        autoIntroduceElements: quickState.docType === 'judgment'
+    };
+    sessionStorage.setItem('listGenConfig', JSON.stringify(genConfig));
+    window.location.href = `case-files.html?caseId=${encodeURIComponent(quickState.caseId)}`;
 }
 
 function goToCaseFilesForGen() {
@@ -961,21 +1093,59 @@ function saveQuickDocument() {
     const cases = getCurrentCases();
     const caseItem = cases.find(c => c.id === quickState.caseId);
     if (!caseItem) return null;
-    if (!caseItem.documents) caseItem.documents = [];
-    caseItem.documents.push({ ...quickState.document });
-    caseItem.updatedAt = new Date().toISOString().split('T')[0];
-    saveBusinessSystems();
+    // v1.37: 调用统一版本管理工具（任务 4.2）
+    const content = quickState.document.versions?.[0]?.content || '';
+    const successMaterialIds = (caseItem.files || [])
+        .filter(f => getParseStatus(f) === 'success').map(f => f.id);
+    const savedVersion = addDocumentVersion(caseItem.id, {
+        type: 'original',
+        genMethod: 'material',
+        source: 'ai',
+        content,
+        createdBy: getCurrentUserName(),
+        config: {
+            docType: quickState.docType,
+            template: quickState.template,
+            prompt: quickState.requirement || '',
+            modelId: quickState.model,
+            materialIds: successMaterialIds,
+            materialTokens: getAllMaterialsTokens(caseItem)
+        }
+    });
     addHistoryTask({
         type: 'generate',
         caseId: caseItem.id,
         caseName: caseItem.caseName || caseItem.caseNumber,
-        docId: quickState.document.id,
+        docId: savedVersion ? `doc_${quickState.docType}_${caseItem.id}` : '',
         docTitle: quickState.document.title
     });
-    return quickState.document;
+    return savedVersion;
 }
 
 // ===== 批量生成（全屏面板） =====
+// v1.37: 批量生成 mock 文书内容（任务 4.2）
+function buildBatchMockContent(c, docType, template, requirement) {
+    const labels = getCurrentBusiness().partiesLabels;
+    const docTypes = getCurrentDocTypes();
+    const docTypeName = docTypes[docType]?.name || '法律文书';
+    const templates = getDocTypeTemplates(docType);
+    const templateName = getTemplateName(templates[template]) || docTypeName;
+    const reqHint = requirement ? `<p style="text-indent:2em;margin-bottom:10px;">生成需求：${requirement}</p>` : '';
+    return `<div style="font-family:'SimSun',serif;line-height:2;text-align:justify;">
+<h2 style="text-align:center;font-size:20pt;font-weight:bold;margin-bottom:24px;">${templateName}</h2>
+<p style="text-align:center;margin-bottom:18px;">${c.caseNumber || ''}</p>
+<p style="text-indent:2em;margin-bottom:10px;"><strong>${labels[0]}：</strong>${c.partyA || '-'}。</p>
+<p style="text-indent:2em;margin-bottom:10px;"><strong>${labels[1]}：</strong>${c.partyB || '-'}。</p>
+<h3 style="font-size:13pt;margin:20px 0 12px;font-weight:bold;">一、案件事实</h3>
+<p style="text-indent:2em;margin-bottom:10px;">经审理查明：${c.caseName || ''}（${c.cause || '-'}）一案，事实清楚，证据确实充分。</p>
+${reqHint}
+<h3 style="font-size:13pt;margin:20px 0 12px;font-weight:bold;">二、处理意见</h3>
+<p style="text-indent:2em;margin-bottom:10px;">根据相关法律规定，结合本案查明的事实，依法作出如下处理。</p>
+<p style="text-align:right;margin-bottom:8px;">${c.handler || ''}</p>
+<p style="text-align:right;margin-bottom:20px;">${new Date().toLocaleDateString('zh-CN')}</p>
+</div>`;
+}
+
 function openBatchFullscreen() {
     if (selectedCaseIds.size === 0) {
         showNotification('请先勾选要批量处理的案件', 'warning');
@@ -1028,16 +1198,23 @@ function renderBatchConfig() {
     }
     const labels = current.partiesLabels;
 
-    // 解析预检：扫描选中案件的 解析异常
-    const ocrWarningCases = selectedCases.filter(c => c.files && c.files.some(f => f.ocrStatus === 'error'));
-    const hasOcrWarning = ocrWarningCases.length > 0;
+    // v2.22: 解析预检改用 parseStatus，区分"部分异常"（可生成）与"全部异常"（无法生成）
+    const partialErrorCases = selectedCases.filter(c => {
+        const s = getCaseParseStats(c);
+        return s.error > 0 && s.success > 0;
+    });
+    const noAvailableCases = selectedCases.filter(c => {
+        const s = getCaseParseStats(c);
+        return s.total > 0 && s.success === 0;
+    });
+    const hasOcrWarning = partialErrorCases.length > 0;
     const ocrWarningHtml = hasOcrWarning ? `
         <div class="batch-ocr-warning" style="margin:0 0 16px;padding:14px 16px;background:#fefce8;border:1px solid #fde68a;border-radius:10px;">
             <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
                 <i class="fas fa-exclamation-triangle" style="color:#d97706;margin-top:2px;"></i>
                 <div style="flex:1;">
-                    <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:4px;">${ocrWarningCases.length} 个案件存在 解析失败的材料</div>
-                    <div style="font-size:12px;color:#a16207;line-height:1.5;">${ocrWarningCases.map(c => c.caseName || c.caseNumber).join('、')}</div>
+                    <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:4px;">${partialErrorCases.length} 个案件存在部分解析失败的材料</div>
+                    <div style="font-size:12px;color:#a16207;line-height:1.5;">${partialErrorCases.map(c => c.caseName || c.caseNumber).join('、')}</div>
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1050,17 +1227,33 @@ function renderBatchConfig() {
             </div>
         </div>
     ` : '';
+    const noAvailableHtml = noAvailableCases.length > 0 ? `
+        <div style="margin:0 0 16px;padding:14px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;">
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+                <i class="fas fa-ban" style="color:#dc2626;margin-top:2px;"></i>
+                <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:600;color:#991b1b;margin-bottom:4px;">${noAvailableCases.length} 个案件无可用材料（全部解析失败），将被自动跳过</div>
+                    <div style="font-size:12px;color:#b91c1c;line-height:1.5;">${noAvailableCases.map(c => c.caseName || c.caseNumber).join('、')}</div>
+                </div>
+            </div>
+        </div>
+    ` : '';
     
     container.innerHTML = `
         <div class="batch-fs-section">
             <div class="batch-fs-section-title"><i class="fas fa-tasks"></i> 已选案件清单（${selectedCases.length}）</div>
             <div class="batch-selected-list" id="batchSelectedList">
                 ${selectedCases.map(c => {
-                    const hasOcrError = c.files && c.files.some(f => f.ocrStatus === 'error');
+                    const s = getCaseParseStats(c);
+                    const partialErr = s.error > 0 && s.success > 0;
+                    const noAvail = s.total > 0 && s.success === 0;
+                    const badge = noAvail
+                        ? ' <span style="display:inline-block;padding:1px 6px;background:#fee2e2;color:#991b1b;border-radius:4px;font-size:11px;font-weight:500;margin-left:6px;">无可用材料</span>'
+                        : (partialErr ? ' <span style="display:inline-block;padding:1px 6px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:500;margin-left:6px;">解析异常</span>' : '');
                     return `
                     <div class="batch-selected-item" data-case-id="${c.id}">
                         <div class="info">
-                            <div class="case-no">${c.caseName || c.caseNumber}${hasOcrError ? ' <span style="display:inline-block;padding:1px 6px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:500;margin-left:6px;">解析异常</span>' : ''}</div>
+                            <div class="case-no">${c.caseName || c.caseNumber}${badge}</div>
                             <div class="case-meta">${c.caseNumber} · ${c.cause}</div>
                         </div>
                         <button class="batch-remove-btn" onclick="removeBatchCase('${c.id}')" title="移除">
@@ -1073,6 +1266,8 @@ function renderBatchConfig() {
         </div>
 
         ${ocrWarningHtml}
+
+        ${noAvailableHtml}
 
         <div class="batch-fs-section">
             <div class="batch-fs-section-title"><i class="fas fa-cog"></i> 批量生成配置</div>
@@ -1089,9 +1284,18 @@ function renderBatchConfig() {
                         ${batchTemplateSelectHtml}
                     </select>
                 </div>
+                <div>
+                    <label class="drawer-form-label">模型</label>
+                    <input class="drawer-form-select" type="text" value="${(() => {
+                        const firstCase = selectedCases[0];
+                        const mid = firstCase ? resolveWorkflowModelForCase(firstCase, batchState.docType) : DEFAULT_MODEL_ID;
+                        const m = typeof getModelById === 'function' ? getModelById(mid) : null;
+                        return m ? m.name : mid;
+                    })()}" disabled style="opacity:0.7;cursor:not-allowed;" title="模型由所选文书类型的一步生成 Workflow 决定，不可修改">
+                </div>
                 <div class="batch-mode-info">
                     <i class="fas fa-info-circle"></i>
-                    <span>系统将根据单个案件全部材料的预估 Token 数自动选择生成方式：未超过当前模型上下文限制时使用材料生成；超过限制时将自动跳过该案并记录失败原因，您可在批量任务结束后进入案件详情页单独处理。</span>
+                    <span>批量生成使用一步生成方式，模型由文书类型对应的 Workflow 决定。若某案件材料量过大导致 Workflow 超限，该案件将标记为失败，可在批量任务面板点击"进入详情页处理"改用分步生成。</span>
                 </div>
                 <div class="full">
                     <label class="drawer-form-label">提示词</label>
@@ -1149,26 +1353,61 @@ function startBatchExec() {
         return;
     }
     if (selectedCaseIds.size === 0) return;
+
+    // v2.25 (任务 8.2): 批量生成不再做前端 Token/字数超限预检，统一交给 workflow 执行后返回结果；
+    // 无可用材料等失败场景由 runBatchAsync 处理，确保生成结果明细始终有数据可展示。
+
+    // v2.23 (任务 6.3): 批量文书队列限制检查
+    const limit = getBatchQueueLimit();
+    const running = getBatchQueueRunningCount();
+    const submitCount = selectedCaseIds.size;
+    if (submitCount + running > limit) {
+        const remain = Math.max(0, limit - running);
+        showNotification(`批量文书队列已满，当前剩余 ${remain} 个位置，请减少提交数量或稍后再试`, 'warning');
+        return;
+    }
+
     const selectedArr = Array.from(selectedCaseIds);
     batchState.results = selectedArr.map(caseId => ({ caseId, status: 'pending', duration: 0, wordCount: 0 }));
     batchState.completedCount = 0;
     batchState.failedCount = 0;
     batchState.totalElapsed = 0;
-    
+
+    // v2.23 (任务 9.2): 异步队列模式——进入全屏进度页实时展示生成过程
+    const taskId = `batch_${Date.now()}`;
+    addBatchQueueTask({
+        id: taskId,
+        caseIds: selectedArr,
+        docType: batchState.docType,
+        template: batchState.template,
+        requirement: batchState.requirement || '',
+        status: 'running',
+        progress: 0,
+        total: selectedArr.length,
+        success: 0,
+        failed: 0,
+        createdAt: new Date().toISOString()
+    });
+
     renderBatchRunning();
     startBatchTimer();
-    runBatch();
+    updateBatchTaskBadge();
+
+    // 异步执行批量生成
+    runBatchAsync(taskId).catch(err => console.error('[batch] runBatchAsync error', err));
 }
 
 function renderBatchRunning() {
     const container = document.getElementById('batchFsContainer');
+    if (!container) return;
+    const results = Array.isArray(batchState.results) ? batchState.results : [];
     container.innerHTML = `
         <div class="batch-running-header">
             <div class="batch-running-left">
                 <div class="batch-running-icon"><i class="fas fa-cogs"></i></div>
                 <div class="batch-running-info">
                     <h3>批量生成进行中...</h3>
-                    <p id="batchProgressText">正在处理 0/${batchState.results.length} 个案件</p>
+                    <p id="batchProgressText">正在处理 0/${results.length} 个案件</p>
                 </div>
             </div>
             <div class="batch-running-right">
@@ -1177,7 +1416,7 @@ function renderBatchRunning() {
             </div>
         </div>
         <div class="batch-queue" id="batchQueueList">
-            ${batchState.results.map((r, i) => renderBatchItem(r, i)).join('')}
+            ${results.map((r, i) => renderBatchItem(r, i)).join('')}
         </div>
     `;
 }
@@ -1210,15 +1449,26 @@ function setOcrStrategy(strategy) {
 }
 
 function getBatchFailReason(caseItem) {
-    if (!caseItem.files || caseItem.files.length === 0) {
+    const stats = getCaseParseStats(caseItem);
+    if (stats.total === 0) {
         return '案件无材料，无法生成文书';
     }
-    const hasOcrError = caseItem.files.some(f => f.ocrStatus === 'error');
-    if (hasOcrError) {
-        if (batchState.ocrStrategy === 'skip') {
-            return '跳过：存在解析失败的材料';
-        }
-        // partial 模式：不阻断，仅用已识别材料生成
+    // v2.22: 全部异常→无可用材料（任务 3.4，无论何种策略都跳过）
+    if (stats.success === 0) {
+        return '无可用材料：全部文件解析失败，请进入案件详情页重新上传或解析';
+    }
+    // 部分异常：按策略处理（skip 跳过；partial 仅用已识别材料生成，不阻断）
+    if (stats.error > 0 && batchState.ocrStrategy === 'skip') {
+        return '跳过：存在解析失败的材料';
+    }
+    // v2.25 (任务 8.2/6.2): workflow 超限异常改用 estimatedTokens 估算，避免按文件 size 字节误算导致 mock 大文件被误判为超限
+    const successFiles = (caseItem.files || []).filter(f => getParseStatus(f) === 'success');
+    const charCount = successFiles.reduce((sum, f) => sum + (typeof estimateFileTokens === 'function' ? estimateFileTokens(f) : 500), 0);
+    if (charCount > 80000) {
+        const isJudgment = batchState.docType === 'judgment';
+        return isJudgment
+            ? '材料量过大（Workflow 超限），请进入案件详情页使用分步生成'
+            : '材料量过大（Workflow 超限），请进入案件详情页精简材料后生成';
     }
     if (Math.random() < 0.1) {
         return '生成服务响应超时，请稍后重试';
@@ -1226,14 +1476,12 @@ function getBatchFailReason(caseItem) {
     return '';
 }
 
-async function runBatch() {
-    // v1.24: 批量生成每个案件按其自身 caseWord+cause 匹配 workflow 模型（可能不同）
+// v2.23 (任务 9.2): 异步批量生成——不阻塞列表页操作，进度通过顶部栏查看
+async function runBatchAsync(taskId) {
     for (let i = 0; i < batchState.results.length; i++) {
         const r = batchState.results[i];
-        // 跳过已完成的项（重试失败案件时不重复生成已成功的）
         if (r.status === 'done') continue;
         r.status = 'current';
-        updateBatchRunningUI();
 
         const c = getCurrentCases().find(x => x.id === r.caseId);
         const failReason = c ? getBatchFailReason(c) : '案件不存在';
@@ -1244,28 +1492,15 @@ async function runBatch() {
             r.duration = 0;
             r.wordCount = 0;
             batchState.failedCount++;
+            updateBatchTaskProgress(taskId, i + 1, batchState.completedCount, batchState.failedCount);
+            updateBatchTaskBadge();
             updateBatchRunningUI();
             await new Promise(res => setTimeout(res, 200));
             continue;
         }
 
-        // v1.24: 按案件 + 文书类型匹配 workflow 模型
+        // v2.23 (任务 8.2/6.2): 移除前端 Token 超限判断，依赖 workflow 返回
         const modelId = resolveWorkflowModelForCase(c, batchState.docType);
-        const safeLimit = getSafeContextLimit(modelId);
-        const totalTokens = getAllMaterialsTokens(c);
-        if (totalTokens > safeLimit) {
-            // C 方案：超限自动跳过并记录失败原因，不再弹窗选择
-            r.status = 'failed';
-            r.failReason = `案件材料超过当前模型上下文限制（预估 ${formatNumber(totalTokens)} / 上限 ${formatNumber(safeLimit)} tokens），请进入案件详情页使用分步生成`;
-            r.duration = 0;
-            r.wordCount = 0;
-            batchState.failedCount++;
-            updateBatchRunningUI();
-            await new Promise(res => setTimeout(res, 200));
-            continue;
-        }
-
-        const mode = 'material';
         const baseTime = 800;
         const variance = Math.random() * 600;
         await new Promise(res => setTimeout(res, baseTime + variance));
@@ -1273,13 +1508,173 @@ async function runBatch() {
         r.status = 'done';
         r.duration = Math.round((baseTime + variance) / 100 * 10) / 10;
         r.wordCount = Math.round(2000 + Math.random() * 3000);
-        r.genMode = mode;
+        r.genMode = 'material';
         batchState.completedCount++;
 
+        // 保存为新版本
+        const batchContent = buildBatchMockContent(c, batchState.docType, batchState.template, batchState.requirement || '');
+        const successMaterialIds = (c.files || [])
+            .filter(f => getParseStatus(f) === 'success').map(f => f.id);
+        const savedVersion = addDocumentVersion(c.id, {
+            type: 'original',
+            genMethod: 'material',
+            source: 'ai',
+            content: batchContent,
+            createdBy: getCurrentUserName(),
+            config: {
+                docType: batchState.docType,
+                template: batchState.template,
+                prompt: batchState.requirement || '',
+                modelId: modelId,
+                materialIds: successMaterialIds,
+                materialTokens: 0
+            }
+        });
+        r.versionId = savedVersion?.versionId || '';
+        r.docId = savedVersion ? `doc_${batchState.docType}_${c.id}` : '';
+
+        updateBatchTaskProgress(taskId, i + 1, batchState.completedCount, batchState.failedCount);
+        updateBatchTaskBadge();
         updateBatchRunningUI();
         await new Promise(res => setTimeout(res, 200));
     }
+
+    // 标记任务完成，保存结果快照供任务通知面板查看
+    updateBatchQueueTask(taskId, {
+        status: 'done',
+        finishedAt: new Date().toISOString(),
+        results: batchState.results.map(r => ({
+            caseId: r.caseId,
+            status: r.status,
+            failReason: r.failReason || '',
+            duration: r.duration || 0,
+            wordCount: r.wordCount || 0,
+            versionId: r.versionId || '',
+            docId: r.docId || ''
+        })),
+        completedCount: batchState.completedCount,
+        failedCount: batchState.failedCount,
+        totalElapsed: batchState.totalElapsed
+    });
+    updateBatchTaskBadge();
+
+    // 显示完成汇总通知
+    const total = batchState.results.length;
+    const success = batchState.completedCount;
+    const failed = batchState.failedCount;
+    showNotification(`批量生成完成：成功 ${success} 个${failed > 0 ? `，失败 ${failed} 个` : ''}`, failed > 0 ? 'warning' : 'success');
+
+    // 记录批量生成历史任务（只在实际完成时记录一次，避免从通知面板重复添加）
+    const totalWordsForHistory = batchState.results.reduce((sum, r) => sum + (r.wordCount || 0), 0);
+    const templates = getCurrentTemplates();
+    const typeName = (getCurrentDocTypes()[batchState.docType] || {}).name || '';
+    const templateName = getTemplateName(templates[batchState.template]);
+    const baseTitle = templateName ? `${typeName} · ${templateName}` : typeName;
+    addHistoryTask({
+        type: 'batch',
+        caseId: '',
+        caseName: `批量生成 ${batchState.results.length} 个案件`,
+        docId: '',
+        docTitle: `${baseTitle} · 成功 ${batchState.completedCount} 个 · 共 ${totalWordsForHistory.toLocaleString()} 字`
+    });
+
+    // 渲染结果总览页，确保"生成结果明细"有数据
+    renderBatchDone();
     stopBatchTimer();
+}
+
+function updateBatchTaskProgress(taskId, progress, success, failed) {
+    updateBatchQueueTask(taskId, { progress, success, failed });
+}
+
+// v2.23 (任务 9.2): 顶部栏"批量任务"按钮徽章
+function updateBatchTaskBadge() {
+    const state = getBatchQueueState();
+    const running = state.tasks.filter(t => t.status === 'running').length;
+    const badge = document.getElementById('batchTaskBadge');
+    if (badge) {
+        badge.textContent = running;
+        badge.style.display = running > 0 ? 'flex' : 'none';
+    }
+    // 如果进度面板打开，刷新内容
+    const panel = document.getElementById('batchTaskPanel');
+    if (panel && panel.classList.contains('show')) {
+        renderBatchTaskPanel();
+    }
+}
+
+// v2.23 (任务 9.2): 切换批量任务进度面板
+function toggleBatchTaskPanel() {
+    const panel = document.getElementById('batchTaskPanel');
+    if (!panel) return;
+    panel.classList.toggle('show');
+    if (panel.classList.contains('show')) {
+        renderBatchTaskPanel();
+    }
+}
+
+function renderBatchTaskPanel() {
+    const panel = document.getElementById('batchTaskPanel');
+    if (!panel) return;
+    const state = getBatchQueueState();
+    const tasks = state.tasks.slice(0, 10); // 最近 10 条
+
+    if (tasks.length === 0) {
+        panel.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">暂无任务通知</div>';
+        return;
+    }
+
+    panel.innerHTML = tasks.map(t => {
+        const isRunning = t.status === 'running';
+        const progressText = isRunning ? `处理中 ${t.progress || 0}/${t.total}` : `完成（成功 ${t.success || 0}，失败 ${t.failed || 0}）`;
+        const statusCls = isRunning ? 'running' : 'done';
+        const time = new Date(t.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        // v2.24: 已完成任务展示"查看结果"按钮，跳转结果总览页
+        const resultBtn = !isRunning
+            ? `<button class="batch-task-failed-btn" style="background:var(--accent-primary,#2563eb);" onclick="showBatchTaskResult('${t.id}')">查看结果</button>`
+            : '';
+        const failedHint = !isRunning && (t.failed || 0) > 0
+            ? `<div class="batch-task-failed-hint">有 ${t.failed} 个失败案件，请在结果详情中处理</div>`
+            : '';
+        return `
+            <div class="batch-task-item ${statusCls}">
+                <div class="batch-task-header">
+                    <span class="batch-task-name">${t.total} 个案件 · ${getCurrentDocTypes()[t.docType]?.name || '法律文书'}</span>
+                    <span class="batch-task-status ${statusCls}">${isRunning ? '处理中' : '已完成'}</span>
+                </div>
+                <div class="batch-task-progress">${progressText}</div>
+                <div class="batch-task-time">${time}</div>
+                ${failedHint}
+                ${resultBtn}
+            </div>
+        `;
+    }).join('');
+}
+
+// v2.24: 从任务通知面板打开结果总览页
+function showBatchTaskResult(taskId) {
+    const state = getBatchQueueState();
+    const task = state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // 关闭任务通知面板
+    const panel = document.getElementById('batchTaskPanel');
+    if (panel) panel.classList.remove('show');
+
+    // 打开批量全屏面板
+    const fullscreen = document.getElementById('batchFullscreen');
+    if (!fullscreen) return;
+    fullscreen.classList.add('show');
+
+    // 从任务快照恢复 batchState，复用 renderBatchDone 渲染结果明细
+    batchState.docType = task.docType || '';
+    batchState.template = task.template || '';
+    batchState.requirement = task.requirement || '';
+    batchState.results = (task.results || []).map(r => ({ ...r }));
+    batchState.completedCount = task.completedCount || 0;
+    batchState.failedCount = task.failedCount || 0;
+    batchState.totalElapsed = task.totalElapsed || 0;
+
     renderBatchDone();
 }
 
@@ -1289,6 +1684,23 @@ function retryBatchFailed() {
         showNotification('没有失败的案件可重试', 'info');
         return;
     }
+    // v2.23: 重试也走异步队列
+    const failedCaseIds = failedResults.map(r => r.caseId);
+    const taskId = `batch_retry_${Date.now()}`;
+    addBatchQueueTask({
+        id: taskId,
+        caseIds: failedCaseIds,
+        docType: batchState.docType,
+        template: batchState.template,
+        requirement: batchState.requirement || '',
+        status: 'running',
+        progress: 0,
+        total: failedCaseIds.length,
+        success: 0,
+        failed: 0,
+        createdAt: new Date().toISOString()
+    });
+
     // 重置失败项状态
     failedResults.forEach(r => {
         r.status = 'pending';
@@ -1297,11 +1709,10 @@ function retryBatchFailed() {
     });
     batchState.completedCount = batchState.results.filter(r => r.status === 'done').length;
     batchState.failedCount = 0;
-    batchState.totalElapsed = 0;
 
-    renderBatchRunning();
-    startBatchTimer();
-    runBatch();
+    showNotification(`已重新加入队列，${failedCaseIds.length} 个案件重试中`, 'success');
+    updateBatchTaskBadge();
+    runBatchAsync(taskId);
 }
 
 function showBatchFailReason(idx) {
@@ -1345,52 +1756,46 @@ function formatBatchTime(s) {
 }
 
 function renderBatchDone() {
-    const totalTime = formatBatchTime(batchState.totalElapsed);
-    const totalWords = batchState.results.reduce((sum, r) => sum + r.wordCount, 0);
     const container = document.getElementById('batchFsContainer');
+    if (!container) return;
 
-    // 记录批量生成历史任务
-    const templates = getCurrentTemplates();
-    const typeName = (getCurrentDocTypes()[batchState.docType] || {}).name || '';
-    const templateName = getTemplateName(templates[batchState.template]);
-    const baseTitle = templateName ? `${typeName} · ${templateName}` : typeName;
-    addHistoryTask({
-        type: 'batch',
-        caseId: '',
-        caseName: `批量生成 ${batchState.results.length} 个案件`,
-        docId: '',
-        docTitle: `${baseTitle} · 成功 ${batchState.completedCount} 个 · 共 ${totalWords.toLocaleString()} 字`
-    });
-    
-    const resultsHtml = batchState.results.map((r, i) => {
-        const c = getCurrentCases().find(x => x.id === r.caseId);
-        const isFailed = r.status === 'failed';
-        const reasonBtn = isFailed
-            ? ' <button class="batch-reason-btn" onclick="showBatchFailReason(' + i + ')" title="查看原因"><i class="fas fa-eye"></i></button>'
-            : '';
-        // 失败项额外提供「去处理」按钮，跳转案件详情页单独处理
-        const handleBtn = isFailed
-            ? ' <button class="batch-handle-btn" onclick="goHandleCase(\'' + r.caseId + '\')" title="进入案件详情页处理"><i class="fas fa-arrow-right"></i> 去处理</button>'
-            : '';
-        const rightText = isFailed
-            ? '<span style="color:#dc2626;">' + (r.failReason || '生成失败') + '</span>' + reasonBtn + handleBtn
-            : '<span style="color:#059669;">' + r.wordCount.toLocaleString() + '字 · ' + r.duration + 's</span>';
-        return '<div class="batch-result-item ' + (isFailed ? 'failed' : '') + '">\n            <span><strong>' + (i + 1) + '. ' + (c ? (c.caseName || c.caseNumber) : '未知案件') + '</strong> (' + (c ? c.caseNumber : '') + ')</span>\n            ' + rightText + '\n        </div>';
-    }).join('');
+    const results = Array.isArray(batchState.results) ? batchState.results : [];
+    const totalTime = formatBatchTime(batchState.totalElapsed || 0);
+    const totalWords = results.reduce((sum, r) => sum + (r.wordCount || 0), 0);
+    const completedCount = batchState.completedCount || 0;
+    const failedCount = batchState.failedCount || 0;
 
-    const retryBtn = batchState.failedCount > 0
-        ? `<button class="batch-btn-action outline" onclick="retryBatchFailed()"><i class="fas fa-redo"></i> 重试失败的（${batchState.failedCount}）</button>`
+    const resultsHtml = results.length === 0
+        ? '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">暂无生成结果数据</div>'
+        : results.map((r, i) => {
+            const c = getCurrentCases().find(x => x.id === r.caseId);
+            const isFailed = r.status === 'failed';
+            const reasonBtn = isFailed
+                ? ' <button class="batch-reason-btn" onclick="showBatchFailReason(' + i + ')" title="查看原因"><i class="fas fa-eye"></i></button>'
+                : '';
+            // 失败项额外提供「去处理」按钮，跳转案件详情页单独处理
+            const handleBtn = isFailed
+                ? ' <button class="batch-handle-btn" onclick="goHandleCase(\'' + r.caseId + '\')" title="进入案件详情页处理"><i class="fas fa-arrow-right"></i> 去处理</button>'
+                : '';
+            const rightText = isFailed
+                ? '<span style="color:#dc2626;">' + (r.failReason || '生成失败') + '</span>' + reasonBtn + handleBtn
+                : '<span style="color:#059669;">' + (r.wordCount || 0).toLocaleString() + '字 · ' + (r.duration || 0) + 's</span>';
+            return '<div class="batch-result-item ' + (isFailed ? 'failed' : '') + '">\n            <span><strong>' + (i + 1) + '. ' + (c ? (c.caseName || c.caseNumber) : '未知案件') + '</strong> (' + (c ? c.caseNumber : '') + ')</span>\n            ' + rightText + '\n        </div>';
+        }).join('');
+
+    const retryBtn = failedCount > 0
+        ? `<button class="batch-btn-action outline" onclick="retryBatchFailed()"><i class="fas fa-redo"></i> 重试失败的（${failedCount}）</button>`
         : '';
 
     container.innerHTML = `
         <div class="batch-done-section">
             <div class="batch-done-icon"><i class="fas fa-check-double"></i></div>
             <div class="batch-done-title">批量生成全部完成！</div>
-            <div class="batch-done-desc">共处理 <strong>${batchState.results.length}</strong> 个案件，<strong>${batchState.completedCount}</strong> 个成功，<strong>${batchState.failedCount}</strong> 个失败。</div>
+            <div class="batch-done-desc">共处理 <strong>${results.length}</strong> 个案件，<strong>${completedCount}</strong> 个成功，<strong>${failedCount}</strong> 个失败。</div>
 
             <div class="batch-done-stats">
-                <div class="batch-done-stat"><div class="val">${batchState.results.length}</div><div class="lbl">案件总数</div></div>
-                <div class="batch-done-stat"><div class="val">${batchState.completedCount}</div><div class="lbl">成功数量</div></div>
+                <div class="batch-done-stat"><div class="val">${results.length}</div><div class="lbl">案件总数</div></div>
+                <div class="batch-done-stat"><div class="val">${completedCount}</div><div class="lbl">成功数量</div></div>
                 <div class="batch-done-stat"><div class="val">${totalWords.toLocaleString()}</div><div class="lbl">总字数</div></div>
                 <div class="batch-done-stat"><div class="val">${totalTime}</div><div class="lbl">总耗时</div></div>
             </div>
@@ -1577,6 +1982,8 @@ function submitCreateCase() {
         partyA: partyA || '',
         partyB: partyB || '',
         handler: handler || currentUser,
+        // v1.39: handlers 数组与 handler 同步（用户侧新建为单承办人，保持向后兼容）
+        handlers: [handler || currentUser],
         createdBy: currentUser,
         status: 'pending',
         date: date || now,
@@ -1589,7 +1996,10 @@ function submitCreateCase() {
             size: f.size,
             estimatedTokens: estimateFileTokens(f),
             updatedAt: now,
-            ocrStatus: 'done'
+            ocrStatus: 'done',
+            parseStatus: 'success',  // v1.36: 新建案件时材料标记为已解析
+            errorType: null,
+            parsedAt: now
         })),
         documents: []
     };
@@ -1714,7 +2124,10 @@ function submitSupplementUpload() {
                 estimatedTokens: estimateFileTokens(f),
                 category: f.category || '其他材料',
                 updatedAt: new Date().toISOString().split('T')[0],
-                ocrStatus: 'pending'
+                ocrStatus: 'pending',
+                parseStatus: 'parsing',  // v1.36: 上传后进入解析中
+                errorType: null,
+                parsedAt: null
             };
 
             // 插入到同类材料的最后，保持分类聚集
@@ -1737,6 +2150,16 @@ function submitSupplementUpload() {
         if (lastCategory) {
             localStorage.setItem('last_supplement_category', lastCategory);
         }
+
+        // v1.36: 启动 mock 解析流程（每个文件独立延时 2-3 秒）
+        const caseIdForParse = caseItem.id;
+        const newFileIds = caseItem.files.slice(-supplementFiles.length).map(f => f.id);
+        saveBusinessSystems();
+        renderCaseList();
+        closeSupplementUpload();
+        showNotification(`成功上传 ${supplementFiles.length} 个文件，正在解析...`, 'success');
+        newFileIds.forEach(fid => startMockParsing(caseIdForParse, fid));
+        return;
     }
 
     saveBusinessSystems();
@@ -1789,8 +2212,9 @@ function renderOcrList(tab) {
     const c = getCurrentCases().find(x => x.id === ocrPanelCaseId);
     if (!c) return;
     const files = c.files || [];
-    const doneFiles = files.filter(f => f.ocrStatus === 'done');
-    const pendingFiles = files.filter(f => f.ocrStatus !== 'done');
+    // v2.23: 改用 parseStatus 判断（任务 3.3）
+    const doneFiles = files.filter(f => getParseStatus(f) === 'success');
+    const pendingFiles = files.filter(f => getParseStatus(f) !== 'success');
 
     document.getElementById('ocrDoneCount').textContent = doneFiles.length;
     document.getElementById('ocrPendingCount').textContent = pendingFiles.length;
@@ -1799,21 +2223,32 @@ function renderOcrList(tab) {
     const displayFiles = tab === 'done' ? doneFiles : pendingFiles;
 
     if (displayFiles.length === 0) {
-        listEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;"><div class="empty-title">${tab === 'done' ? '暂无已完成解析的文件' : '暂无未完成解析的文件'}</div></div>`;
+        listEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;"><div class="empty-title">${tab === 'done' ? '暂无已解析成功的文件' : '暂无未完成解析的文件'}</div></div>`;
     } else {
         listEl.innerHTML = displayFiles.map(f => {
-            const statusClass = f.ocrStatus === 'done' ? 'done' : (f.ocrStatus === 'error' ? 'error' : 'pending');
-            const statusText = f.ocrStatus === 'done' ? '解析完成' : (f.ocrStatus === 'error' ? '解析失败' : '解析中');
-            const statusIcon = f.ocrStatus === 'done' ? 'fa-check-circle' : (f.ocrStatus === 'error' ? 'fa-exclamation-circle' : 'fa-clock');
+            const ps = getParseStatus(f);
+            let statusClass, statusText, statusIcon, statusLabel;
+            if (ps === 'success') {
+                statusClass = 'done'; statusLabel = '解析完成'; statusText = '解析完成'; statusIcon = 'fa-check-circle';
+            } else if (ps === 'parsing' || ps === 'uploading') {
+                statusClass = 'pending'; statusLabel = '解析中'; statusText = '解析中'; statusIcon = 'fa-spinner fa-spin';
+            } else {
+                statusClass = 'error'; statusLabel = '解析失败'; statusText = getParseErrorLabel(f.errorType); statusIcon = 'fa-exclamation-circle';
+            }
+            const isError = ps === 'error';
             return `
                 <div class="ocr-item">
                     <div class="ocr-item-info">
                         <div class="ocr-item-name" onclick="startEditFileName('${f.id}', this)" title="点击编辑文件名">${f.name}</div>
-                        <div class="ocr-item-meta">${formatFileSize(f.size)} · ${f.updatedAt || '-'}</div>
+                        <div class="ocr-item-meta">${formatFileSize(f.size)} · ${f.updatedAt || '-'}${isError ? ' · <span style="color:#dc2626;">' + statusText + '</span>' : ''}</div>
                     </div>
                     <div class="ocr-actions">
-                        <span class="ocr-status ${statusClass}"><i class="fas ${statusIcon}"></i> ${statusText}</span>
-                        ${f.ocrStatus !== 'done' ? `<button class="btn btn-secondary" onclick="retryOcr('${f.id}')">重新解析</button>` : ''}
+                        <span class="ocr-status ${statusClass}"><i class="fas ${statusIcon}"></i> ${statusLabel}</span>
+                        ${isError ? `
+                            <button class="btn btn-secondary" onclick="retryOcr('${f.id}')" title="重新解析"><i class="fas fa-redo"></i> 重新解析</button>
+                            <button class="btn btn-secondary" onclick="reuploadFile('${f.id}')" title="重新上传"><i class="fas fa-upload"></i> 重新上传</button>
+                            <button class="btn btn-danger" onclick="deleteParseFile('${f.id}')" title="删除"><i class="fas fa-trash"></i></button>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -1864,27 +2299,59 @@ function saveFileName(fileId, input) {
     renderOcrList(ocrCurrentTab);
 }
 
+// v2.23: retryAllOcr 改用 startMockParsing（任务 3.3）
 function retryAllOcr() {
     const c = getCurrentCases().find(x => x.id === ocrPanelCaseId);
     if (!c || !c.files) return;
+    let count = 0;
     c.files.forEach(f => {
-        if (f.ocrStatus !== 'done') f.ocrStatus = 'pending';
+        if (getParseStatus(f) !== 'success') {
+            startMockParsing(ocrPanelCaseId, f.id);
+            count++;
+        }
     });
     renderOcrList('pending');
     renderCaseList();
-    showNotification('已重新提交解析任务', 'success');
+    showNotification(count > 0 ? `已重新提交 ${count} 个文件的解析任务` : '没有需要重新解析的文件', count > 0 ? 'success' : 'info');
 }
 
 function retryOcr(fileId) {
     const c = getCurrentCases().find(x => x.id === ocrPanelCaseId);
     if (!c || !c.files) return;
     const f = c.files.find(x => x.id === fileId);
-    if (f) {
-        f.ocrStatus = 'pending';
-        renderOcrList('pending');
-        renderCaseList();
-        showNotification('已重新提交该文件解析任务', 'success');
-    }
+    if (!f) return;
+    startMockParsing(ocrPanelCaseId, fileId);
+    renderOcrList(ocrCurrentTab);
+    renderCaseList();
+    showNotification('已重新提交该文件解析任务', 'success');
+}
+
+// v2.23: 重新上传（原型简化为重新走 mock 解析流程，任务 3.3）
+function reuploadFile(fileId) {
+    const c = getCurrentCases().find(x => x.id === ocrPanelCaseId);
+    if (!c || !c.files) return;
+    const f = c.files.find(x => x.id === fileId);
+    if (!f) return;
+    if (!confirm(`确认重新上传文件「${f.name}」？原文件将被替换并重新解析。`)) return;
+    startMockParsing(ocrPanelCaseId, fileId);
+    renderOcrList(ocrCurrentTab);
+    renderCaseList();
+    showNotification('已重新上传并开始解析', 'success');
+}
+
+// v2.23: 删除文件（任务 3.3）
+function deleteParseFile(fileId) {
+    const c = getCurrentCases().find(x => x.id === ocrPanelCaseId);
+    if (!c || !c.files) return;
+    const f = c.files.find(x => x.id === fileId);
+    if (!f) return;
+    if (!confirm(`确认删除文件「${f.name}」？删除后不可恢复。`)) return;
+    c.files = c.files.filter(x => x.id !== fileId);
+    c.updatedAt = new Date().toISOString().split('T')[0];
+    saveBusinessSystems();
+    renderOcrList(ocrCurrentTab);
+    renderCaseList();
+    showNotification('文件已删除', 'success');
 }
 
 function formatFileSize(bytes) {
@@ -1903,7 +2370,9 @@ function openCaseDocuments(caseId) {
     const c = getCurrentCases().find(x => x.id === caseId);
     if (!c) return;
     document.getElementById('documentsCaseName').textContent = c.caseName || c.caseNumber || '案件';
-    document.getElementById('documentsCount').textContent = (c.documents || []).length;
+    // v1.37: 文书数按版本统计（任务 4.3）
+    const versions = getAllDocumentVersions(caseId);
+    document.getElementById('documentsCount').textContent = versions.length;
     renderDocumentsList();
     document.getElementById('documentsDialog').classList.add('show');
     document.getElementById('documentsOverlay').classList.add('show');
@@ -1915,32 +2384,105 @@ function closeCaseDocuments() {
     documentsCaseId = '';
 }
 
+// v1.37: 历史文书列表按版本展示（任务 4.3）
 function renderDocumentsList() {
-    const c = getCurrentCases().find(x => x.id === documentsCaseId);
     const list = document.getElementById('documentsList');
-    if (!c || !list) return;
-    const docs = c.documents || [];
-    if (docs.length === 0) {
-        list.innerHTML = '<div class="empty-state" style="padding:40px 20px;"><div class="empty-title">暂无文书</div></div>';
+    if (!list) return;
+    const versions = getAllDocumentVersions(documentsCaseId);
+    if (versions.length === 0) {
+        list.innerHTML = '<div class="empty-state" style="padding:40px 20px;"><div class="empty-title">暂无文书</div><div class="empty-desc">生成文书后将在此展示历史版本</div></div>';
         return;
     }
-    list.innerHTML = docs.map(d => {
-        const hasRevised = (d.versions || []).some(v => v.type === 'revised');
+    const docTypes = getCurrentDocTypes();
+    const genMethodLabel = (m) => m === 'step' ? '分步生成' : '一步生成';
+    const typeLabel = (t) => t === 'polish' ? '精修' : (t === 'regenerate' ? '重新生成' : '首次生成');
+    const formatTime = (iso) => {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? iso : d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+    list.innerHTML = versions.map(v => {
+        const docTypeName = docTypes[v.docType]?.name || '法律文书';
+        const versionNo = `v${v.versionTotal - v.versionIndex + 1}`;
         return `
         <div class="document-item">
             <div class="document-item-info">
-                <div class="document-item-name">${d.title} ${hasRevised ? '<span class="version-badge">有修订稿</span>' : ''}</div>
-                <div class="document-item-meta">${d.createdAt || '-'} ${hasRevised ? '· 已精修' : ''}</div>
+                <div class="document-item-name">
+                    ${v.title || docTypeName}
+                    <span class="version-badge">${versionNo}</span>
+                    <span class="doc-gen-method-tag">${genMethodLabel(v.genMethod)}</span>
+                    ${v.type !== 'original' ? `<span class="doc-type-tag">${typeLabel(v.type)}</span>` : ''}
+                </div>
+                <div class="document-item-meta">
+                    ${docTypeName} · ${formatTime(v.createdAt)} · ${v.createdBy || '-'}
+                </div>
             </div>
             <div class="document-actions">
-                <button class="btn btn-secondary" onclick="previewCaseDocument('${d.id}')">预览</button>
-                <button class="btn btn-secondary" onclick="regenerateCaseDocument('${d.id}')">重新生成</button>
-                <button class="btn btn-secondary" onclick="openRefineModal('${documentsCaseId}', '${d.id}')">文书精修</button>
-                <button class="btn btn-secondary" onclick="downloadDocument('${d.id}')">下载</button>
-                <button class="btn btn-danger" onclick="deleteDocument('${d.id}')">删除</button>
+                <button class="btn btn-secondary" onclick="previewDocumentVersion('${v.versionId}')" title="查看"><i class="fas fa-eye"></i> 查看</button>
+                <button class="btn btn-secondary" onclick="refineDocumentVersion('${v.versionId}')" title="精修"><i class="fas fa-pen-nib"></i> 精修</button>
+                <button class="btn btn-secondary" onclick="downloadDocumentVersion('${v.versionId}')" title="下载"><i class="fas fa-download"></i> 下载</button>
+                <button class="btn btn-danger" onclick="deleteDocumentVersionUI('${v.versionId}')" title="删除"><i class="fas fa-trash"></i> 删除</button>
             </div>
         </div>
     `}).join('');
+}
+
+// v1.37: 按版本号查找文书版本（任务 4.3）
+function findDocumentVersion(caseId, versionId) {
+    const result = findCaseById(caseId);
+    if (!result) return null;
+    for (const doc of (result.caseItem.documents || [])) {
+        if (!doc || !Array.isArray(doc.versions)) continue;
+        const v = doc.versions.find(x => x.versionId === versionId);
+        if (v) return { org: result.org, caseItem: result.caseItem, doc, version: v };
+    }
+    return null;
+}
+
+// v1.37: 查看指定版本（新标签页预览）
+function previewDocumentVersion(versionId) {
+    const res = findDocumentVersion(documentsCaseId, versionId);
+    if (!res) { showNotification('版本不存在', 'error'); return; }
+    const { caseItem, version } = res;
+    openDocumentPreviewWindow({ title: version.title || caseItem.caseName, versions: [version] }, documentsCaseId);
+}
+
+// v2.24: 精修指定版本（跳转文书精修页，与详情页功能一致）
+function refineDocumentVersion(versionId) {
+    const url = 'document-polish.html?caseId=' + encodeURIComponent(documentsCaseId) + '&versionId=' + encodeURIComponent(versionId);
+    const win = window.open(url, '_blank');
+    if (!win) showNotification('浏览器拦截了新窗口，请允许弹出窗口后重试', 'info');
+}
+
+// v1.37: 下载指定版本
+function downloadDocumentVersion(versionId) {
+    const res = findDocumentVersion(documentsCaseId, versionId);
+    if (!res) { showNotification('版本不存在', 'error'); return; }
+    const { caseItem, version } = res;
+    const title = version.title || caseItem.caseName || '文书';
+    const blob = new Blob([title + '\n\n' + stripHtml(version.content || '')], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title}_${(version.createdAt || '').split('T')[0]}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('文书已下载', 'success');
+}
+
+// v1.37: 删除指定版本（二次确认）
+function deleteDocumentVersionUI(versionId) {
+    if (!confirm('确定删除该版本文书？删除后不可恢复。')) return;
+    const ok = deleteDocumentVersion(documentsCaseId, versionId);
+    if (ok) {
+        const versions = getAllDocumentVersions(documentsCaseId);
+        document.getElementById('documentsCount').textContent = versions.length;
+        renderDocumentsList();
+        renderCaseList();
+        showNotification('版本已删除', 'success');
+    } else {
+        showNotification('删除失败', 'error');
+    }
 }
 
 function openSyncDialog() {
@@ -2077,7 +2619,8 @@ function openEditCase(caseId) {
     
     document.getElementById('editPartyA').value = caseItem.partyA || '';
     document.getElementById('editPartyB').value = caseItem.partyB || '';
-    document.getElementById('editHandler').value = caseItem.handler || '';
+    // v1.39: 编辑时展示全部承办人（顿号分隔），保存时按分隔符拆分同步 handlers
+    document.getElementById('editHandler').value = getCaseHandlers(caseItem).join('、');
     document.getElementById('editCaseDate').value = caseItem.date || '';
     
     document.getElementById('editOverlay').classList.add('show');
@@ -2111,7 +2654,12 @@ function submitEditCase() {
     caseItem.type = type;
     caseItem.partyA = document.getElementById('editPartyA').value.trim();
     caseItem.partyB = document.getElementById('editPartyB').value.trim();
-    caseItem.handler = document.getElementById('editHandler').value.trim();
+    // v1.39: 承办人支持多人——按顿号/逗号拆分，同步 handler 与 handlers
+    const handlerText = document.getElementById('editHandler').value.trim();
+    const handlerArr = handlerText ? handlerText.split(/[、,，]/).map(s => s.trim()).filter(Boolean) : [];
+    const primaryHandler = handlerArr[0] || caseItem.handler || getCurrentUserName();
+    caseItem.handler = primaryHandler;
+    caseItem.handlers = handlerArr.length > 0 ? handlerArr : [primaryHandler];
     caseItem.date = document.getElementById('editCaseDate').value || caseItem.date;
     caseItem.updatedAt = new Date().toISOString().split('T')[0];
 
@@ -2513,7 +3061,8 @@ function renderAllDocs() {
 }
 
 function getPanelDocument(caseId, docId) {
-    const c = findCaseById(caseId);
+    // v2.26: 适配 case-data.js 统一的 findCaseById 返回结构 { org, caseItem }
+    const c = findCaseById(caseId)?.caseItem;
     if (!c) return null;
     const doc = (c.documents || []).find(d => d.id === docId);
     if (!doc) return null;
@@ -2582,14 +3131,8 @@ function deleteDocFromPanel(caseId, docId) {
     showNotification('文书已删除', 'success');
 }
 
-function findCaseById(caseId) {
-    for (const [org, system] of Object.entries(businessSystems)) {
-        if (org === '_dataVersion' || !system || !Array.isArray(system.cases)) continue;
-        const c = system.cases.find(x => x.id === caseId);
-        if (c) return c;
-    }
-    return null;
-}
+// v2.26: 删除重复的 findCaseById 定义，统一使用 case-data.js 的版本（返回 { org, caseItem }）
+// 旧版本返回 caseItem 本身，与 getAllDocumentVersions/addDocumentVersion 等函数期望的 result.caseItem 不匹配
 
 function formatDateTime(iso) {
     if (!iso) return '-';
@@ -2600,11 +3143,37 @@ function formatDateTime(iso) {
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', function() {
     loadColumnConfig();
+    // v1.26: 清理页面刷新/关闭导致的异常挂起批量任务，避免阻塞新提交
+    if (typeof cleanupBatchQueueState === 'function') cleanupBatchQueueState();
     updateCauseFilter();
     updateCaseWordFilter();
     updateHandlerFilter();
     renderCaseHeader();
     renderCaseList();
+
+    // v1.36: 监听文件解析状态更新事件，自动刷新列表（mock 解析完成后触发）
+    window.addEventListener('case-file-parse-updated', function(e) {
+        renderCaseList();
+    });
+
+    // v1.37: 支持 ?openDocs=caseId 自动打开历史文书弹窗（任务 4.3，案件详情页入口）
+    const urlParams = new URLSearchParams(window.location.search);
+    const openDocsCaseId = urlParams.get('openDocs');
+    if (openDocsCaseId) {
+        // 延迟执行，确保 DOM 渲染完成
+        setTimeout(() => {
+            const result = findCaseById(openDocsCaseId);
+            if (result) {
+                // 若案件不在当前业务系统，先切换
+                if (result.org !== currentBusiness) {
+                    switchBusinessSystem(result.org);
+                }
+                openCaseDocuments(openDocsCaseId);
+            } else {
+                showNotification('未找到案件', 'warning');
+            }
+        }, 100);
+    }
 
     document.getElementById('caseSearchInput').addEventListener('input', filterCases);
     document.getElementById('causeFilter').addEventListener('change', filterCases);

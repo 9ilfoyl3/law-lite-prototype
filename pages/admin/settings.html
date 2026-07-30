@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -731,7 +731,7 @@
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item active"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
-                    <a href="model-management.html" class="nav-item"><i class="fas fa-microchip"></i><span>模型配置与用量</span></a>
+                    <a href="model-management.html" class="nav-item" style="display:none;"><i class="fas fa-microchip"></i><span>模型配置与用量</span></a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">组织架构</div>
@@ -924,6 +924,23 @@
                     </div>
                 </div>
 
+                <!-- 批量生成配置 (任务 6.4) -->
+                <div class="config-card">
+                    <div class="config-card-header">
+                        <div class="config-card-indicator blue"></div>
+                        <h3 class="config-card-title">批量生成配置</h3>
+                    </div>
+                    <div class="config-card-body">
+                        <div class="config-row">
+                            <div class="config-label">批量文书队列允许个数</div>
+                            <div class="config-value">
+                                <input type="number" class="form-input" id="batchQueueLimit" value="10" min="1">
+                                <span class="form-hint">同时处理的批量文书生成任务上限，默认 10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 底部操作 -->
                 <div class="config-actions" id="configActions"></div>
             </div>
@@ -973,7 +990,8 @@
         requireSpecial: false,
         sessionTimeout: 30,
         maxFileSize: 50,
-        allowedFormats: 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg'
+        allowedFormats: 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg',
+        batchQueueLimit: 10  // 任务 6.4: 批量文书队列允许个数
     };
 
     // 状态: 'unconfigured' | 'locked' | 'unlocking'
@@ -1019,9 +1037,15 @@
         document.getElementById('sessionTimeout').value = currentConfig.sessionTimeout;
         document.getElementById('maxFileSize').value = currentConfig.maxFileSize;
         document.getElementById('allowedFormats').value = currentConfig.allowedFormats;
+        // 任务 6.4: 批量队列允许个数
+        var bqEl = document.getElementById('batchQueueLimit');
+        if (bqEl) bqEl.value = currentConfig.batchQueueLimit || 10;
     }
 
     function readConfigFromForm() {
+        var bqEl = document.getElementById('batchQueueLimit');
+        var batchQueueLimit = bqEl ? (parseInt(bqEl.value) || 10) : 10;
+        if (batchQueueLimit < 1) batchQueueLimit = 1;  // 最小值 1
         return {
             systemName: document.getElementById('systemName').value.trim(),
             loginCaptcha: getSwitch('switchCaptcha'),
@@ -1035,7 +1059,8 @@
             requireSpecial: getSwitch('switchSpecial'),
             sessionTimeout: parseInt(document.getElementById('sessionTimeout').value) || 30,
             maxFileSize: parseInt(document.getElementById('maxFileSize').value) || 50,
-            allowedFormats: document.getElementById('allowedFormats').value.trim()
+            allowedFormats: document.getElementById('allowedFormats').value.trim(),
+            batchQueueLimit: batchQueueLimit  // 任务 6.4
         };
     }
 

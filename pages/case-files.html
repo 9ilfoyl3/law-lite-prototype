@@ -130,9 +130,22 @@
         }
         .material-col.collapsed .material-col-header span,
         .material-col.collapsed .material-search,
+        .material-col.collapsed .material-col-elements-bar,
         .material-col.collapsed .material-col-toolbar,
         .material-col.collapsed .material-tree { display: none; }
         .material-col.collapsed .material-col-header { justify-content: center; }
+
+        /* 优化1.1: 本案要件顶部固定条样式 */
+        .material-col-elements-bar {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            flex-shrink: 0;
+        }
+        .material-col-elements-bar .case-elements-entry-btn {
+            width: 100%;
+            justify-content: space-between;
+        }
 
         .col-resizer {
             width: 6px;
@@ -360,6 +373,29 @@
             font-size: 13px;
         }
         .material-empty i { font-size: 32px; opacity: 0.3; margin-bottom: 8px; }
+
+        /* v1.36: 材料树解析进度概览 */
+        .material-parse-overview {
+            padding: 8px 12px;
+            margin: 8px 8px 0;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+        .material-parse-overview .parse-overview-parsing {
+            color: #2563eb;
+            font-weight: 500;
+        }
+        .material-parse-overview .parse-overview-error {
+            color: #d97706;
+            font-weight: 500;
+        }
+        .material-parse-overview .fa-spinner {
+            font-size: 11px;
+        }
 
         .material-col-toolbar {
             padding: 10px 16px;
@@ -945,6 +981,47 @@
             font-size: 12px;
             flex-shrink: 0;
         }
+        /* v2.21: 步骤依赖提示条（可选依赖未完成=黄色警告 / 已完成或必填依赖未完成=红色阻止 / 无依赖=蓝色信息） */
+        .step-dependency-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .step-dependency-hint.info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+        .step-dependency-hint.warning {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            color: #92400e;
+        }
+        .step-dependency-hint.blocked {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+        .step-dependency-hint i {
+            margin-top: 2px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .step-dependency-hint .dep-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin-right: 8px;
+        }
+        .step-dependency-hint .dep-item .dep-status {
+            font-size: 11px;
+            opacity: 0.85;
+        }
         .step-selected-mats {
             display: flex;
             align-items: flex-start;
@@ -1310,6 +1387,53 @@
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* v2.23 流式输出区 (任务 8.8/9.5) */
+        .streaming-output-area {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .streaming-progress-bar {
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .streaming-progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .streaming-progress-info i { color: var(--accent-primary); margin-right: 4px; }
+        .streaming-stats { font-size: 12px; color: var(--text-muted); }
+        .streaming-progress-track {
+            height: 4px;
+            background: var(--bg-primary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .streaming-progress-fill {
+            height: 100%;
+            background: var(--accent-primary);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        .streaming-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 32px;
+            font-family: "Noto Serif SC", "SimSun", serif;
+            line-height: 1.8;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .streaming-content p { margin: 1em 0; text-indent: 2em; }
+        .streaming-content h2 { text-align: center; font-size: 18px; font-weight: bold; margin: 12px 0; }
+        .streaming-content h3 { font-size: 15px; font-weight: bold; margin: 16px 0 8px; }
 
         .result-doc {
             font-size: 14px;
@@ -1962,6 +2086,491 @@
             from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* ===== v2.24 (任务 8.6 / 9.4): 本案要件抽屉 ===== */
+        /* 材料树底部的"本案要件"入口按钮 */
+        .material-col-footer {
+            flex-shrink: 0;
+            padding: 10px 12px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        .material-col.collapsed .material-col-footer { display: none; }
+        .case-elements-entry-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--accent-primary);
+            border-radius: 8px;
+            background: var(--accent-light);
+            color: var(--accent-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .case-elements-entry-btn:hover {
+            background: var(--accent-primary);
+            color: #fff;
+        }
+        .case-elements-entry-btn .entry-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .case-elements-entry-btn .entry-count {
+            display: inline-flex;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-primary);
+            color: #fff;
+            border-radius: 9px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 2px;
+        }
+        .case-elements-entry-btn:hover .entry-count {
+            background: #fff;
+            color: var(--accent-primary);
+        }
+
+        /* 抽屉遮罩 */
+        .case-elements-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 400;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .case-elements-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* 抽屉主体 */
+        .case-elements-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 380px;
+            max-width: 92vw;
+            background: var(--bg-primary);
+            box-shadow: -6px 0 24px rgba(0, 0, 0, 0.12);
+            z-index: 401;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .case-elements-drawer.show {
+            transform: translateX(0);
+        }
+        .case-elements-drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .case-elements-drawer-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .case-elements-drawer-title i {
+            color: var(--accent-primary);
+            font-size: 14px;
+        }
+        .case-elements-drawer-close {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.15s;
+        }
+        .case-elements-drawer-close:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        /* 来源统计条 */
+        .case-elements-stats {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        .case-elements-stats .stat-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .case-elements-stats .stat-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .case-elements-stats .stat-dot.standard { background: #6366f1; }
+        .case-elements-stats .stat-dot.mine { background: #10b981; }
+        .case-elements-stats .stat-dot.case { background: #f97316; }
+        .case-elements-stats .stat-num {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* 抽屉主体列表区 */
+        .case-elements-drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+        }
+        .case-elements-group {
+            margin-bottom: 16px;
+        }
+        .case-elements-group-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            padding-left: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .case-elements-group-title .group-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .case-elements-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            transition: all 0.15s;
+        }
+        .case-elements-item:hover {
+            border-color: var(--accent-primary);
+        }
+        .case-elements-item input[type="checkbox"] {
+            margin-top: 2px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .case-elements-item-body {
+            flex: 1;
+            min-width: 0;
+        }
+        .case-elements-item-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .case-elements-item-title .answered-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            display: inline-block;
+            flex-shrink: 0;
+            title: '已填写答案';
+        }
+        .case-elements-item-question {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .case-elements-item-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .case-elements-item-qa-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .case-elements-item-qa-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .case-elements-item-qa-btn.answered {
+            color: #059669;
+            border-color: #6ee7b7;
+            background: #ecfdf5;
+        }
+        .case-elements-item-del-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+        }
+        .case-elements-item-del-btn:hover {
+            color: #dc2626;
+            background: #fef2f2;
+        }
+        /* 来源标签（三种颜色） */
+        .source-tag {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+        .source-tag.standard {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        .source-tag.mine {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .source-tag.case {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+        .case-elements-empty {
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .case-elements-empty i {
+            font-size: 32px;
+            opacity: 0.3;
+            margin-bottom: 8px;
+        }
+
+        /* 抽屉底部操作区 */
+        .case-elements-drawer-footer {
+            flex-shrink: 0;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .case-elements-footer-btns {
+            display: flex;
+            gap: 8px;
+        }
+        .case-elements-footer-btn {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .case-elements-footer-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .case-elements-footer-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .case-elements-footer-btn.primary:hover {
+            background: #1d4ed8;
+            color: #fff;
+        }
+        .case-elements-footer-link {
+            text-align: center;
+            font-size: 12px;
+            color: var(--accent-primary);
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            padding: 4px;
+        }
+        .case-elements-footer-link:hover {
+            text-decoration: underline;
+        }
+
+        /* 新增个案要件内联表单 */
+        .case-elements-add-form {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-primary);
+            border: 1px dashed var(--accent-primary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .case-elements-add-form.show {
+            display: flex;
+        }
+        .case-elements-add-form .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .case-elements-add-form label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .case-elements-add-form input,
+        .case-elements-add-form textarea {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: inherit;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            outline: none;
+            box-sizing: border-box;
+        }
+        .case-elements-add-form input:focus,
+        .case-elements-add-form textarea:focus {
+            border-color: var(--accent-primary);
+        }
+        .case-elements-add-form textarea {
+            min-height: 48px;
+            resize: vertical;
+        }
+        .case-elements-add-form .form-actions {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+        .case-elements-add-form .form-btn {
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+        }
+        .case-elements-add-form .form-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .case-elements-add-form .form-btn.primary:hover {
+            background: #1d4ed8;
+        }
+
+        /* 要件问答弹窗 */
+        .element-qa-modal .modal-body {
+            padding: 20px 22px;
+        }
+        .element-qa-source-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .element-qa-question {
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent-primary);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        .element-qa-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            outline: none;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .element-qa-textarea:focus {
+            border-color: var(--accent-primary);
+            background: var(--bg-primary);
+        }
+        .element-qa-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            line-height: 1.5;
+        }
+        .element-qa-hint i {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -2006,8 +2615,8 @@
                     </div>
                 </div>
                 <div class="detail-header-right">
-                    <button class="detail-action-btn" onclick="toggleHistoryTasks()">
-                        <i class="fas fa-history"></i> 历史文书
+                    <button class="detail-action-btn" id="caseHistoryDocsBtn" onclick="toggleHistoryTasks()" title="查看历史文书版本">
+                        <i class="fas fa-file-alt"></i> 历史文书
                     </button>
                 </div>
             </div>
@@ -2019,6 +2628,13 @@
                     <div class="material-col-header">
                         <span><i class="fas fa-th-large"></i> 材料树</span>
                         <button onclick="toggleMaterialCol()" title="折叠/展开"><i class="fas fa-chevron-left"></i></button>
+                    </div>
+                    <!-- 优化1.1: 本案要件入口移到顶部固定条，材料多时无需滚动 -->
+                    <div class="material-col-elements-bar">
+                        <button type="button" class="case-elements-entry-btn" id="caseElementsEntryBtn" onclick="toggleElementsDrawer()" title="查看本案要件">
+                            <span class="entry-left"><i class="fas fa-puzzle-piece"></i> 本案要件 <span class="entry-count" id="caseElementsEntryCount">0</span></span>
+                            <i class="fas fa-chevron-right" style="font-size:11px;"></i>
+                        </button>
                     </div>
                     <div class="material-search">
                         <div class="material-search-box">
@@ -2181,6 +2797,7 @@
                     </div>
                     <div class="result-footer" id="resultFooter" style="display:none;">
                         <button class="result-footer-btn primary" onclick="saveResult()"><i class="fas fa-save"></i> 保存</button>
+                        <button class="result-footer-btn" onclick="refineResult()"><i class="fas fa-pen-nib"></i> 精修</button>
                         <button class="result-footer-btn" onclick="downloadResult()"><i class="fas fa-download"></i> 下载</button>
                     </div>
                 </div>
@@ -2255,9 +2872,6 @@
                     <i class="fas fa-clock"></i>
                     <span>引入要件后，系统将针对每个问题预生成答案并整合到文书中，生成时间可能会稍长。</span>
                 </div>
-                <div class="element-confirm-manage">
-                    <a href="javascript:;" onclick="openMyElementsFromModal()">管理我的要件</a>
-                </div>
                 <div class="element-confirm-selected-count" id="elementSelectedCount">已选 0 项</div>
                 <div id="elementConfirmSelectList"></div>
                 <div class="element-confirm-actions">
@@ -2270,7 +2884,7 @@
                 <div class="element-confirm-desc">系统已根据每个要件问题预生成参考答案，你可直接修改或补充。</div>
                 <div class="element-confirm-answer-list" id="elementConfirmAnswerList"></div>
                 <div class="element-confirm-actions">
-                    <button class="modal-btn-secondary" onclick="showElementConfirmPreviewStep()">返回</button>
+                    <button class="modal-btn-secondary" onclick="showElementConfirmSelectStep()">上一步</button>
                     <button class="modal-btn-primary" onclick="confirmElementContext(true)">确认生成</button>
                 </div>
             </div>
@@ -2315,9 +2929,79 @@
         <div class="history-tasks-list" id="historyTasksList"></div>
     </div>
 
+    <!-- v2.24 (任务 8.6 / 9.4): 本案要件抽屉 -->
+    <div class="case-elements-overlay" id="caseElementsOverlay" onclick="closeElementsDrawer()"></div>
+    <aside class="case-elements-drawer" id="caseElementsDrawer" role="dialog" aria-label="本案要件">
+        <div class="case-elements-drawer-header">
+            <div class="case-elements-drawer-title">
+                <i class="fas fa-puzzle-piece"></i>
+                <span>本案要件</span>
+            </div>
+            <button type="button" class="case-elements-drawer-close" onclick="closeElementsDrawer()" title="关闭"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="case-elements-stats" id="caseElementsStats"></div>
+        <div class="case-elements-drawer-body" id="caseElementsBody">
+            <!-- 要件列表由 JS 动态渲染 -->
+        </div>
+        <div class="case-elements-drawer-footer">
+            <!-- 新增个案要件内联表单 -->
+            <div class="case-elements-add-form" id="caseElementsAddForm">
+                <div class="form-row">
+                    <label>要件名称 <span style="color:#dc2626;">*</span></label>
+                    <input type="text" id="newCaseElementName" placeholder="如：原告具体身份核实" maxlength="40">
+                </div>
+                <div class="form-row">
+                    <label>要件说明</label>
+                    <input type="text" id="newCaseElementDesc" placeholder="简要描述该要件的目的" maxlength="80">
+                </div>
+                <div class="form-row">
+                    <label>要件问题 <span style="color:#dc2626;">*</span></label>
+                    <textarea id="newCaseElementQuestion" placeholder="针对该要件需要回答的问题" maxlength="200"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="form-btn" onclick="toggleCaseElementAddForm(false)">取消</button>
+                    <button type="button" class="form-btn primary" onclick="addCaseElementConfirm()">保存</button>
+                </div>
+            </div>
+            <div class="case-elements-footer-btns">
+                <button type="button" class="case-elements-footer-btn primary" onclick="toggleCaseElementAddForm(true)">
+                    <i class="fas fa-plus"></i> 新增个案要件
+                </button>
+                <button type="button" class="case-elements-footer-btn" onclick="closeElementsDrawer()">
+                    <i class="fas fa-times"></i> 关闭
+                </button>
+            </div>
+            <button type="button" class="case-elements-footer-link" onclick="openMyElements()">
+                <i class="fas fa-external-link-alt"></i> 管理我的要件
+            </button>
+        </div>
+    </aside>
+
+    <!-- v2.24 (任务 8.6 / 9.4): 要件问答弹窗 -->
+    <div class="modal-overlay" id="elementQaOverlay" onclick="closeElementQaModal()"></div>
+    <div class="modal-dialog element-qa-modal" id="elementQaModal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3><i class="fas fa-puzzle-piece"></i> <span id="elementQaTitle">要件问答</span></h3>
+            <button class="modal-close" onclick="closeElementQaModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="element-qa-source-row" id="elementQaSourceRow"></div>
+            <div class="element-qa-question" id="elementQaQuestion"></div>
+            <textarea class="element-qa-textarea" id="elementQaAnswer" placeholder="请输入对该要件问题的回答，作为文书生成的辅助上下文..."></textarea>
+            <div class="element-qa-hint">
+                <i class="fas fa-info-circle"></i>
+                <span>保存后答案将持久化到本案件，下次进入本页面会自动恢复。已填写答案的要件在抽屉中显示绿点标识。</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn-secondary" onclick="closeElementQaModal()">取消</button>
+            <button class="modal-btn-primary" onclick="saveElementAnswerFromModal()">保存答案</button>
+        </div>
+    </div>
+
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=47"></script>
-    <script src="../js/case-files.js?v=66"></script>
+    <script src="../js/case-data.js?v=54"></script>
+    <script src="../js/case-files.js?v=81"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

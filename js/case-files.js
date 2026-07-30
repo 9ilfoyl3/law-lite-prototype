@@ -1,4 +1,6 @@
 // ============ Case Files Page JavaScript ============
+// v2.22 材料解析状态展示（PRD 10章）：renderMaterialTree 仅展示 parseStatus==='success' 的文件；存在解析中/异常文件时顶部显示解析进度概览"共N个，已解析M个，异常K个"；监听 case-file-parse-updated 事件自动刷新材料树
+// v2.21 V1.1 分步生成步骤序列硬编码：stepConfigsByOrg.court.judgment 改为 6 步固定清单（案件信息/原告诉请/被告答辩/争议焦点/事实认定/裁判结果），新增 inputs 依赖定义（source=material/prev_step/case_context，步骤4 争议焦点依赖前3步为选填）；同步将 step.title 字段引用改为 step.name；新增 updateStepsTabVisibility 仅裁判文书类型展示分步生成 Tab；renderStepGenConfig 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型；新增 buildStepDependencyHintHtml 在步骤 body 顶部展示依赖状态提示条（无依赖/必填未完成红色阻止/可选未完成黄色警告/全部已完成蓝色信息）；必填依赖未完成时生成本步按钮置灰并在 generateSingleStepManually 入口加双保险校验
 // v2.20 模型改为只读展示：模型由 workflow 的 modelId 决定（agentflow 平台镜像），新增 refreshModelFromWorkflow 在文书类型/生成方式/初始化/重新配置等时机刷新；onModelChange 置为 no-op；applyListGenParams/applyRegenerateConfig/reconfigWithLatestSnapshot 不再从 URL 或历史文书恢复模型
 // v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/提示词/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
 // v2.18 workflow 匹配维度升级为案字+案由：getWorkflowByCaseWord/getMaterialWorkflowByCaseWord/getStepsConfigForDocType 调用补 cause 参数
@@ -23,6 +25,7 @@ let isGenerating = false;                   // 是否正在生成中
 let stepGenerationStarted = false;          // 分步生成是否已开始（控制提示/步骤列表显示）
 let resultContent = '';                     // 右栏结果内容HTML
 let resultEditContent = '';                 // 右栏编辑模式内容
+let lastSavedVersionId = '';                // 最近保存的文书版本ID（用于精修跳转）
 let pendingUploadFiles = [];
 let pendingElementAll = { standard: [], mine: [] }; // 待确认的案由要件
 let pendingElementSelections = new Set();
@@ -56,65 +59,70 @@ const stepMaterialHints = {
     decision: '建议选择行政复议申请书、答复书、证据材料、法律依据等'
 };
 
-// ===== 六步生成配置（按业务系统 × 文书类型） =====
+// ===== 分步生成步骤序列（V1.1 硬编码） =====
+// v2.21 按会议调整：步骤序列硬编码前端，不依赖 agentflow SSE 动态返回
+// 数据结构: {id, name, apiId, inputs: [{field, required, source}]}
+//   - source: 'material'=该步已选材料 / 'prev_step'=前序步骤输出 / 'case_context'=案件上下文
+//   - V1.1 分步生成仅裁判文书（judgment），其他文书类型不展示分步生成 Tab
+//   - V1.1 步骤依赖关系（后续可能变化）：
+//     步骤4 争议焦点：可选依赖步骤1+2+3 返回内容（选填，为空允许执行）
+//     步骤5 事实认定：必填依赖步骤4 返回内容
+//     步骤6 裁判结果：必填依赖步骤5 返回内容
 const stepConfigsByOrg = {
     court: {
+        // 裁判文书分步生成（6 步固定清单，V1.1 硬编码）
         judgment: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'plaintiff', title: '原告诉请', icon: 'fa-user-tie' },
-            { id: 'defendant', title: '被告抗辩', icon: 'fa-shield-alt' },
-            { id: 'dispute', title: '争议焦点', icon: 'fa-bullseye' },
-            { id: 'facts', title: '事实认定', icon: 'fa-search' },
-            { id: 'verdict', title: '裁判结果', icon: 'fa-gavel' }
-        ],
-        trial: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'trialFocus', title: '庭审重点', icon: 'fa-bullseye' },
-            { id: 'dispute', title: '争议焦点', icon: 'fa-crosshairs' },
-            { id: 'questions', title: '询问提纲', icon: 'fa-question-circle' },
-            { id: 'notes', title: '注意事项', icon: 'fa-exclamation-circle' }
-        ],
-        execution: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'execItems', title: '执行事项', icon: 'fa-list' },
-            { id: 'assets', title: '财产查控', icon: 'fa-search-dollar' },
-            { id: 'measures', title: '执行措施', icon: 'fa-tools' },
-            { id: 'execResult', title: '执行结果', icon: 'fa-check-circle' }
+            {
+                id: 'caseInfo', name: '案件信息', apiId: 'wf-step-case-info',
+                inputs: [
+                    { field: 'materials', required: true, source: 'material' },
+                    { field: 'caseContext', required: true, source: 'case_context' }
+                ]
+            },
+            {
+                id: 'plaintiff', name: '原告诉请', apiId: 'wf-step-plaintiff',
+                inputs: [
+                    { field: 'materials', required: true, source: 'material' },
+                    { field: 'caseContext', required: true, source: 'case_context' }
+                ]
+            },
+            {
+                id: 'defendant', name: '被告答辩', apiId: 'wf-step-defendant',
+                inputs: [
+                    { field: 'materials', required: true, source: 'material' },
+                    { field: 'caseContext', required: true, source: 'case_context' }
+                ]
+            },
+            {
+                id: 'dispute', name: '争议焦点', apiId: 'wf-step-dispute',
+                inputs: [
+                    { field: 'materials', required: true, source: 'material' },
+                    // 可选依赖前 3 步返回内容（步骤1+2+3），为空时允许执行
+                    { field: 'prevStep_caseInfo', required: false, source: 'prev_step', fromStep: 'caseInfo' },
+                    { field: 'prevStep_plaintiff', required: false, source: 'prev_step', fromStep: 'plaintiff' },
+                    { field: 'prevStep_defendant', required: false, source: 'prev_step', fromStep: 'defendant' }
+                ]
+            },
+            {
+                id: 'facts', name: '事实认定', apiId: 'wf-step-facts',
+                inputs: [
+                    { field: 'materials', required: true, source: 'material' },
+                    // 必填依赖步骤4 返回内容
+                    { field: 'prevStep_dispute', required: true, source: 'prev_step', fromStep: 'dispute' }
+                ]
+            },
+            {
+                id: 'verdict', name: '裁判结果', apiId: 'wf-step-verdict',
+                inputs: [
+                    { field: 'materials', required: true, source: 'material' },
+                    // 必填依赖步骤5 返回内容
+                    { field: 'prevStep_facts', required: true, source: 'prev_step', fromStep: 'facts' }
+                ]
+            }
         ]
-    },
-    procuratorate: {
-        indictment: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'crimeFacts', title: '犯罪事实', icon: 'fa-search' },
-            { id: 'evidence', title: '证据分析', icon: 'fa-file-alt' },
-            { id: 'lawApply', title: '法律适用', icon: 'fa-balance-scale' },
-            { id: 'conclusion', title: '审查结论', icon: 'fa-gavel' }
-        ],
-        prosecution: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'crimeFacts', title: '犯罪事实', icon: 'fa-search' },
-            { id: 'evidence', title: '证据分析', icon: 'fa-file-alt' },
-            { id: 'lawApply', title: '法律适用', icon: 'fa-balance-scale' },
-            { id: 'conclusion', title: '审查结论', icon: 'fa-gavel' }
-        ],
-        nonProsecution: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'crimeFacts', title: '犯罪事实', icon: 'fa-search' },
-            { id: 'evidence', title: '证据分析', icon: 'fa-file-alt' },
-            { id: 'lawApply', title: '法律适用', icon: 'fa-balance-scale' },
-            { id: 'conclusion', title: '不起诉决定', icon: 'fa-gavel' }
-        ]
-    },
-    justice: {
-        review: [
-            { id: 'caseInfo', title: '案件信息', icon: 'fa-folder-open' },
-            { id: 'applicant', title: '申请人请求', icon: 'fa-user' },
-            { id: 'respondent', title: '被申请人答复', icon: 'fa-building' },
-            { id: 'dispute', title: '争议焦点', icon: 'fa-bullseye' },
-            { id: 'facts', title: '事实认定', icon: 'fa-search' },
-            { id: 'decision', title: '复议决定', icon: 'fa-gavel' }
-        ]
+        // 其他文书类型（trial/execution 等）V1.1 不配置分步序列（不展示分步生成 Tab）
     }
+    // 检察院/司法局 V1.1 分步生成暂不配置（后续场景扩展时复制模块改代码）
 };
 
 // ===== 工具函数 =====
@@ -226,6 +234,9 @@ function initPage() {
     // 应用只读模式
     if (isReadOnly) applyReadOnlyMode();
 
+    // v2.21: 控制分步生成 Tab 可见性（仅当前业务系统在 stepConfigsByOrg 中有配置时才显示）
+    updateStepsTabVisibility();
+
     // 初始化生成方式
     initMaterialGen();
     initStepsGen();
@@ -236,6 +247,14 @@ function initPage() {
     // 渲染材料树
     renderMaterialTree();
 
+    // v1.36: 监听文件解析状态更新事件，自动刷新材料树（mock 解析完成后触发）
+    window.addEventListener('case-file-parse-updated', function(e) {
+        if (e.detail && e.detail.caseId === caseId) {
+            renderMaterialTree();
+            updateAllSelectedCounts();
+        }
+    });
+
     // 初始化列宽拖拽调节
     initColResizer();
 
@@ -244,6 +263,13 @@ function initPage() {
 
     // 若从「重新生成」跳转回来，恢复历史文书配置
     applyRegenerateConfig();
+
+    // v1.37: 历史文书按钮置灰逻辑（任务 4.3）
+    updateHistoryDocsBtnState();
+
+    // v2.24 (任务 8.6 / 9.4): 加载本案要件缓存与持久化数据，刷新入口按钮数字
+    loadCaseElementsAll();
+    refreshCaseElementsEntryCount();
 
     // 监听 ESC 关闭弹窗
     document.addEventListener('keydown', function(e) {
@@ -259,6 +285,12 @@ function initPage() {
             }
             if (document.getElementById('materialSelectorDialog').classList.contains('show')) {
                 closeMaterialSelector();
+            }
+            // v2.24: 抽屉与问答弹窗的 ESC 关闭
+            if (document.getElementById('elementQaModal').classList.contains('show')) {
+                closeElementQaModal();
+            } else if (caseElementsDrawerOpen) {
+                closeElementsDrawer();
             }
         }
     });
@@ -292,16 +324,44 @@ function initPage() {
     }
 
     // 处理从案件列表页点击「生成文书」进入的自动触发生成流程
+    // v2.23 (任务 9.1): 优先读 sessionStorage，兼容旧 URL 参数
+    let listGenConfig = null;
+    try {
+        const cfgStr = sessionStorage.getItem('listGenConfig');
+        if (cfgStr) {
+            listGenConfig = JSON.parse(cfgStr);
+            // 校验 caseId 匹配
+            if (listGenConfig.caseId !== caseItem.id) listGenConfig = null;
+        }
+    } catch (e) { listGenConfig = null; }
+
     const urlSource = getUrlParam('source');
     const autoGen = getUrlParam('autoGen');
     const autoIntroduceElements = getUrlParam('autoIntroduceElements');
-    if (urlSource === 'list' && autoGen === '1') {
-        applyListGenParams();
+
+    if (listGenConfig && listGenConfig.autoGen) {
+        // sessionStorage 方式（v2.23）
+        applyListGenConfig(listGenConfig);
         // 默认使用全部材料
         selectedMaterialIds = new Set((caseItem.files || []).map(f => f.id));
         renderMaterialTree();
         updateAllSelectedCounts();
+        // 预填完成后清除 sessionStorage（避免重复预填）
+        sessionStorage.removeItem('listGenConfig');
         // 延迟触发以确保 DOM 就绪
+        setTimeout(() => {
+            if (listGenConfig.autoIntroduceElements) {
+                autoGenerateWithAllElements();
+            } else {
+                generateByMaterial();
+            }
+        }, 100);
+    } else if (urlSource === 'list' && autoGen === '1') {
+        // 兼容旧 URL 参数方式
+        applyListGenParams();
+        selectedMaterialIds = new Set((caseItem.files || []).map(f => f.id));
+        renderMaterialTree();
+        updateAllSelectedCounts();
         setTimeout(() => {
             if (autoIntroduceElements === '1') {
                 autoGenerateWithAllElements();
@@ -310,6 +370,36 @@ function initPage() {
             }
         }, 100);
     }
+}
+
+// v2.23 (任务 9.1): 应用 sessionStorage 中的生成配置
+function applyListGenConfig(cfg) {
+    const docTypeSelect = document.getElementById('matDocType');
+    if (docTypeSelect && cfg.docType) {
+        const docTypes = getCurrentDocTypes();
+        if (docTypes[cfg.docType]) {
+            docTypeSelect.value = cfg.docType;
+            onMatDocTypeChange(false);
+        }
+    }
+    const templateSelect = document.getElementById('matTemplate');
+    const effectiveDocType = docTypeSelect ? docTypeSelect.value : cfg.docType;
+    if (templateSelect && cfg.template) {
+        const templates = getDocTypeTemplates(effectiveDocType);
+        if (templates[cfg.template]) {
+            templateSelect.value = cfg.template;
+        }
+    }
+    const requirementTextarea = document.getElementById('matRequirement');
+    if (requirementTextarea && cfg.requirement) {
+        requirementTextarea.value = cfg.requirement;
+    }
+    syncStepConfigFromMaterial();
+    // 自动定位到一步生成 Tab（默认已在一步生成，确保激活）
+    document.querySelectorAll('.gen-tab').forEach(t => t.classList.toggle('active', t.dataset.method === 'material'));
+    document.getElementById('panel-main').classList.add('active');
+    document.getElementById('panel-steps').classList.remove('active');
+    currentGenMethod = 'material';
 }
 
 // 应用从案件列表页传入的生成参数
@@ -355,16 +445,36 @@ function renderMaterialTree() {
     const searchInput = document.getElementById('materialSearchInput');
     const keyword = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
+    // v1.36: 材料树仅展示 parseStatus === 'success' 的文件
+    const successFiles = files.filter(f => getParseStatus(f) === 'success');
+    const stats = getCaseParseStats(caseItem);
+
     if (!files.length) {
         tree.innerHTML = '<div class="material-empty"><i class="fas fa-folder-open"></i><div>暂无材料</div></div>';
         updateMaterialCount();
         return;
     }
 
-    // 按类别分组：根据文件名关键词简单分类
-    const categories = classifyMaterials(files);
+    // v1.36: 存在未解析完成或异常文件时，顶部显示解析进度概览
+    let overviewHtml = '';
+    if (stats.parsing > 0 || stats.error > 0) {
+        const parts = [`共 ${stats.total} 个`];
+        if (stats.success > 0) parts.push(`已解析 ${stats.success} 个`);
+        if (stats.parsing > 0) parts.push(`<span class="parse-overview-parsing"><i class="fas fa-spinner fa-spin"></i> 解析中 ${stats.parsing} 个</span>`);
+        if (stats.error > 0) parts.push(`<span class="parse-overview-error"><i class="fas fa-exclamation-triangle"></i> 异常 ${stats.error} 个</span>`);
+        overviewHtml = `<div class="material-parse-overview">${parts.join('，')}</div>`;
+    }
 
-    tree.innerHTML = Object.entries(categories).map(([categoryName, categoryFiles]) => {
+    if (!successFiles.length) {
+        tree.innerHTML = overviewHtml + '<div class="material-empty"><i class="fas fa-clock"></i><div>材料解析中，请稍候...</div></div>';
+        updateMaterialCount();
+        return;
+    }
+
+    // 按类别分组：根据文件名关键词简单分类
+    const categories = classifyMaterials(successFiles);
+
+    tree.innerHTML = overviewHtml + Object.entries(categories).map(([categoryName, categoryFiles]) => {
         const visibleFiles = keyword ? categoryFiles.filter(f => f.name.toLowerCase().includes(keyword)) : categoryFiles;
         if (keyword && !visibleFiles.length) return '';
 
@@ -564,8 +674,18 @@ function updateMatGenerateButtonState() {
     if (controls && controls.classList.contains('disabled')) return;
 
     const docType = document.getElementById('matDocType')?.value || '';
-    const canGenerate = selectedMaterialIds.size > 0 && docType !== '';
+    // v2.22: 可用材料=已选且 parseStatus==='success'；全部异常时置灰
+    const availableCount = getSelectedFiles().length;
+    const stats = getCaseParseStats(caseItem);
+    if (stats.total > 0 && stats.success === 0) {
+        // 全部文件异常，按钮置灰
+        btn.disabled = true;
+        btn.title = '无可用材料，请先上传并解析文件';
+        return;
+    }
+    const canGenerate = availableCount > 0 && docType !== '';
     btn.disabled = !canGenerate;
+    btn.title = canGenerate ? '' : (availableCount === 0 ? '请先在左侧勾选材料' : '请选择文书类型');
 }
 
 function renderCoreMaterialsAlert() {
@@ -605,18 +725,20 @@ function scrollToMaterialTree() {
 }
 
 // ===== 上下文占用计算 =====
+// v2.22: getSelectedFiles 仅返回 parseStatus==='success' 的已选文件（部分异常不阻塞生成）
 function getSelectedFiles() {
     const files = caseItem.files || [];
-    return files.filter(f => selectedMaterialIds.has(f.id));
+    return files.filter(f => selectedMaterialIds.has(f.id) && getParseStatus(f) === 'success');
 }
 
 function getSelectedEstimatedTokens() {
-    return getSelectedFiles().reduce((sum, f) => sum + estimateFileTokens(f), 0);
+    // v2.23 (任务 8.2): Token 估算逻辑已移除，保留函数避免报错，始终返回 0
+    return 0;
 }
 
 function canUseMaterialGeneration() {
-    if (selectedMaterialIds.size === 0) return true;
-    return getSelectedEstimatedTokens() <= getSafeContextLimit();
+    // v2.23 (任务 8.2): 不再做前端 Token 超限前置判断，直接交给 workflow 处理
+    return true;
 }
 
 function getCurrentModel() {
@@ -668,52 +790,29 @@ function updateContextUsageHint() {
         hint.className = 'context-usage-hint';
         return;
     }
-    const used = getSelectedEstimatedTokens();
-    const safe = getSafeContextLimit();
-    const ratio = Math.min(100, Math.round(used / safe * 100));
-    hint.innerHTML = `已选 ${selectedMaterialIds.size} 件 · 预计 ${formatNumber(used)} / ${formatNumber(safe)} tokens（${ratio}%）`;
-    hint.className = 'context-usage-hint' + (ratio >= 100 ? ' danger' : (ratio >= 70 ? ' warning' : ''));
+    // v2.23 (任务 8.2): 不再展示 Token 估算，仅显示已选数量
+    hint.innerHTML = `已选 ${selectedMaterialIds.size} 件材料`;
+    hint.className = 'context-usage-hint';
 }
 
 // ===== 智能推荐卡片 / 视图切换 =====
 function checkMaterialLimit() {
-    const model = getCurrentModel();
-    const safeLimit = getSafeContextLimit();
-    const selectedTokens = getSelectedEstimatedTokens();
-    const count = selectedMaterialIds.size;
-    const selectedExceeded = count > 0 && selectedTokens > safeLimit;
-
-    // 更新智能推荐卡片（用户在材料生成视图时可见）
+    // v2.23 (任务 8.2): 移除前端 Token 超限前置判断，不再置灰表单
+    // 保留函数避免调用报错，仅更新数量提示
     const recommendCard = document.getElementById('stepRecommendCard');
-    if (recommendCard) {
-        const titleEl = document.getElementById('recommendCardTitle');
-        const descEl = document.getElementById('recommendCardDesc');
-        const actionEl = document.getElementById('recommendCardAction');
-
-        if (selectedExceeded) {
-            if (titleEl) titleEl.textContent = '已选材料预估超出当前模型上下文限制';
-            if (descEl) descEl.innerHTML = `当前已选 ${count} 份材料预估约 <strong id="recommendTokenCount">${formatNumber(selectedTokens)}</strong> tokens，已超过 <span id="modelName">${model.name}</span> 的安全上限 <span id="materialLimit">${formatNumber(safeLimit)}</span> tokens，请点击使用分步生成。`;
-            if (actionEl) actionEl.textContent = '使用分步生成';
-            recommendCard.style.display = 'flex';
-        } else {
-            recommendCard.style.display = 'none';
-        }
-    }
-
-    // 控制材料生成表单可用性
-    const controls = document.getElementById('matGenControls');
-    if (controls) {
-        controls.classList.toggle('disabled', selectedExceeded);
-        controls.querySelectorAll('select, textarea, button').forEach(el => {
-            el.disabled = selectedExceeded;
-        });
-    }
-
-    // 上下文占用提示
+    if (recommendCard) recommendCard.style.display = 'none';
     updateContextUsageHint();
 }
 
 function switchToStepView(options = {}) {
+    // v2.23 (任务 9.3): Tab 切换前检查已选材料，弹确认框
+    if (!options.skipConfirm && !options.auto && selectedMaterialIds.size > 0) {
+        if (!confirm('切换至分步生成将清空当前已选材料，是否继续？')) return;
+        // v2.24 (任务 9.3): 确认后实际清空一步生成已选材料
+        selectedMaterialIds.clear();
+        renderMaterialTree();
+        updateAllSelectedCounts();
+    }
     syncStepConfigFromMaterial();
     refreshStepsConfig();
     // 进入分步视图时，每步材料默认清空，由用户逐一手动选择
@@ -727,8 +826,9 @@ function switchToStepView(options = {}) {
     // 更新顶部 Tab 激活状态
     document.querySelectorAll('.gen-tab').forEach(t => t.classList.toggle('active', t.dataset.method === 'steps'));
 
+    // v2.24 (任务 8.2): 移除前端 Token 限制展示，不再展示安全上限数字
     const hintLimit = document.getElementById('stepHintLimit');
-    if (hintLimit) hintLimit.textContent = formatNumber(getSafeContextLimit());
+    if (hintLimit) hintLimit.textContent = '--';
 
     const autoAlert = document.getElementById('autoSwitchAlert');
     if (autoAlert) {
@@ -764,6 +864,20 @@ function buildStepSelectedMaterialsSummary(effectiveMats) {
 }
 
 function backToMainView() {
+    // v2.23 (任务 9.3): Tab 切换前检查分步视图已选材料，弹确认框
+    if (typeof stepsConfig !== 'undefined' && typeof stepData !== 'undefined') {
+        const hasStepMaterials = stepsConfig.some(s => {
+            const d = stepData[s.id];
+            return d && d.materials && d.materials.size > 0;
+        });
+        if (hasStepMaterials) {
+            if (!confirm('切换至一步生成将清空各步骤已选材料，是否继续？')) return;
+            // v2.24 (任务 9.3): 确认后实际清空分步生成各步骤已选材料
+            stepsConfig.forEach(s => {
+                stepData[s.id] = { items: [], materials: new Set() };
+            });
+        }
+    }
     syncMaterialConfigFromStep();
     document.getElementById('panel-steps').classList.remove('active');
     document.getElementById('panel-main').classList.add('active');
@@ -794,64 +908,60 @@ function setLayoutState(state) {
     }
 }
 
-// v2.19: 重新配置——默认回填最近一次历史文书的快照数据
-// 取 caseItem.documents 中 createdAt 最新的一条作为快照源
-// 回填内容：模型 / 文书类型 / 模板 / 提示词 / 已选材料集合 / 生成方式（含分步生成的 stepDocType/stepTemplate/stepRequirement）
+// v2.19/v1.37: 重新配置——默认回填最近一次历史文书的快照数据
+// v1.37: 改用 getAllDocumentVersions 取最新版本，从 version.config 回填（任务 4.4）
+// 回填内容：文书类型 / 模板 / 提示词 / 已选材料集合 / 生成方式
+// 模型由 workflow 决定（v2.20 不恢复），回填 docType 后由 refreshModelFromWorkflow 自动刷新
 function reconfigWithLatestSnapshot() {
     if (guardReadOnly('reconfigWithLatestSnapshot')) return;
 
     // 先切回配置态
     setLayoutState('generating');
 
-    // 取最近一次历史文书
-    const docs = (caseItem && Array.isArray(caseItem.documents)) ? caseItem.documents : [];
-    if (docs.length === 0) {
+    // v1.37: 取最近一次历史文书版本（扁平化，按时间倒序）
+    const versions = getAllDocumentVersions(caseItem.id);
+    if (versions.length === 0) {
         // 无历史文书：保持默认配置态（空表单 + 全部材料未勾选）
         showNotification('已切换到配置态', 'info');
         return;
     }
-
-    // 按 createdAt 倒序取最新一条
-    const latestDoc = docs.slice().sort((a, b) => {
-        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return tb - ta;
-    })[0];
+    const latest = versions[0]; // 最新版本
+    const cfg = latest.config || {};
 
     // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 refreshModelFromWorkflow 自动刷新）
 
     // 2. 文书类型 / 模板 / 提示词（材料生成视图）
-    if (latestDoc.docType) {
+    if (cfg.docType) {
         const matDocTypeEl = document.getElementById('matDocType');
         if (matDocTypeEl) {
             const docTypes = getCurrentDocTypes();
-            matDocTypeEl.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
-                `<option value="${key}" ${key === latestDoc.docType ? 'selected' : ''}>${cfg.name}</option>`
+            matDocTypeEl.innerHTML = Object.entries(docTypes).map(([key, docCfg]) =>
+                `<option value="${key}" ${key === cfg.docType ? 'selected' : ''}>${docCfg.name}</option>`
             ).join('');
         }
         onMatDocTypeChange(false);
         const matTemplateEl = document.getElementById('matTemplate');
-        if (matTemplateEl && latestDoc.template) matTemplateEl.value = latestDoc.template;
-        renderMatReqTemplates(latestDoc.docType);
+        if (matTemplateEl && cfg.template) matTemplateEl.value = cfg.template;
+        renderMatReqTemplates(cfg.docType);
     }
-    if (latestDoc.requirement !== undefined) {
+    if (cfg.prompt !== undefined) {
         const matRequirementEl = document.getElementById('matRequirement');
-        if (matRequirementEl) matRequirementEl.value = latestDoc.requirement;
+        if (matRequirementEl) matRequirementEl.value = cfg.prompt;
     }
 
     // 同步到分步生成视图配置
     syncStepConfigFromMaterial();
 
-    // 3. 已选材料集合
+    // 3. 已选材料集合（v1.37: 从 version.config.materialIds 回填）
     selectedMaterialIds.clear();
-    if (Array.isArray(latestDoc.selectedMaterialIds) && latestDoc.selectedMaterialIds.length) {
-        latestDoc.selectedMaterialIds.forEach(id => selectedMaterialIds.add(id));
+    if (Array.isArray(cfg.materialIds) && cfg.materialIds.length) {
+        cfg.materialIds.forEach(id => selectedMaterialIds.add(id));
     }
     renderMaterialTree();
     updateAllSelectedCounts();
 
     // 4. 生成方式：若原为分步生成，切换到分步生成视图
-    if (latestDoc.genMethod === 'steps') {
+    if (latest.genMethod === 'step') {
         switchToStepView({ auto: false });
         // 重置分步生成流程状态，让用户重新走【开始生成】
         stepGenerationStarted = false;
@@ -936,6 +1046,25 @@ function formatFileSize(bytes) {
 }
 
 // ===== 中栏 - Tab 切换 =====
+// v2.21: 控制分步生成 Tab 可见性
+// 仅当前业务系统在 stepConfigsByOrg 中有配置时才显示分步生成 Tab
+// V1.1 仅法院裁判文书（judgment）支持分步生成，其他类型/业务系统隐藏 Tab
+function updateStepsTabVisibility() {
+    const orgKey = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const stepConfigOrg = (typeof stepConfigsByOrg !== 'undefined' && stepConfigsByOrg[orgKey]) || {};
+    const hasStepConfig = Object.keys(stepConfigOrg).some(key =>
+        Array.isArray(stepConfigOrg[key]) && stepConfigOrg[key].length > 0
+    );
+    const stepsTab = document.querySelector('.gen-tab[data-method="steps"]');
+    if (stepsTab) {
+        stepsTab.style.display = hasStepConfig ? '' : 'none';
+    }
+    // 若当前正在分步生成视图但已无配置，切回一步生成
+    if (!hasStepConfig && currentGenMethod === 'steps') {
+        currentGenMethod = 'material';
+    }
+}
+
 function switchGenMethod(method) {
     if (method === currentGenMethod) return;
     if (method === 'steps') {
@@ -1083,12 +1212,10 @@ function renderStepGenConfig() {
 
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
     const docTypes = getCurrentDocTypes();
-    // v1.29: 分步生成 tab 文书类型下拉仅展示有展示型 workflow（type='step'）的类型
+    // v2.21: 分步生成 tab 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型（V1.1 仅裁判文书 judgment）
+    const stepConfigOrg = (typeof stepConfigsByOrg !== 'undefined' && stepConfigsByOrg[org]) || {};
     const filteredEntries = Object.entries(docTypes).filter(([key]) => {
-        const workflows = (typeof getWorkflowsForDocType !== 'undefined')
-            ? getWorkflowsForDocType(org, key, 'step')
-            : [];
-        return Array.isArray(workflows) && workflows.length > 0;
+        return Array.isArray(stepConfigOrg[key]) && stepConfigOrg[key].length > 0;
     });
     const filteredKeys = filteredEntries.map(([key]) => key);
 
@@ -1179,14 +1306,22 @@ function onStepRequirementChange(value) {
 
 function generateByMaterial() {
     if (guardReadOnly('generateByMaterial')) return;
+    // v2.22: 全部文件异常时阻止生成
+    const stats = getCaseParseStats(caseItem);
+    if (stats.total > 0 && stats.success === 0) {
+        showNotification('无可用材料，请先上传并解析文件', 'warning');
+        return;
+    }
     if (selectedMaterialIds.size === 0) {
         showNotification('请先在左侧选择材料', 'warning');
         return;
     }
-    if (!canUseMaterialGeneration()) {
-        showNotification('已选材料预估超出当前模型上下文限制，请点击「使用分步生成」切换视图', 'warning');
+    // v2.22: 已选材料中无 success 文件时提示（部分异常情况）
+    if (getSelectedFiles().length === 0) {
+        showNotification('已选材料均解析异常，请重新选择或等待解析完成', 'warning');
         return;
     }
+    // v2.23 (任务 8.2): 移除前端 Token 超限前置判断，直接调用 workflow
 
     const _org = localStorage.getItem('currentBusiness') || 'court';
     const _cw = parseCaseWord(caseItem.caseNumber, _org);
@@ -1206,14 +1341,21 @@ function generateByMaterial() {
 }
 
 function autoGenerateWithAllElements() {
+    // v2.22: 全部文件异常时阻止生成
+    const stats = getCaseParseStats(caseItem);
+    if (stats.total > 0 && stats.success === 0) {
+        showNotification('无可用材料，请先上传并解析文件', 'warning');
+        return;
+    }
     if (selectedMaterialIds.size === 0) {
         showNotification('请先在左侧选择材料', 'warning');
         return;
     }
-    if (!canUseMaterialGeneration()) {
-        showNotification('已选材料预估超出当前模型上下文限制，请点击「使用分步生成」切换视图', 'warning');
+    if (getSelectedFiles().length === 0) {
+        showNotification('已选材料均解析异常，请重新选择或等待解析完成', 'warning');
         return;
     }
+    // v2.23 (任务 8.2): 移除前端 Token 超限前置判断，直接调用 workflow
 
     const _org2 = localStorage.getItem('currentBusiness') || 'court';
     const _cw2 = parseCaseWord(caseItem.caseNumber, _org2);
@@ -1247,20 +1389,105 @@ function autoGenerateWithAllElements() {
     }
 }
 
+// v2.23 (任务 8.2): 估算已选材料总字数（仅用于超限提示参考，不再做前置拦截）
+// v2.25 修复：改用 estimatedTokens 估算（1 token≈1 中文字），避免按文件 size 字节误算导致动辄百万字误触发超限
+function getSelectedMaterialCharCount() {
+    const files = getSelectedFiles();
+    let total = 0;
+    files.forEach(f => {
+        if (f && typeof f.estimatedTokens === 'number' && f.estimatedTokens > 0) {
+            total += f.estimatedTokens;
+        } else if (typeof estimateFileTokens === 'function') {
+            total += estimateFileTokens(f);
+        } else {
+            total += 500; // 无 estimatedTokens 时兜底
+        }
+    });
+    return total;
+}
+
+// v2.23 (任务 8.6/9.6): workflow 超限异常决策辅助弹框
+function showWorkflowOverflowModal(docType) {
+    const charCount = getSelectedMaterialCharCount();
+    const charWan = (charCount / 10000).toFixed(1);
+    const suggestWan = 8; // 硬编码建议上限
+    const isJudgment = docType === 'judgment';
+
+    // 移除已有弹框
+    const old = document.getElementById('workflowOverflowModal');
+    if (old) old.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'workflowOverflowModal';
+    modal.className = 'modal-overlay show';
+    modal.innerHTML = `
+        <div class="modal-dialog show" style="max-width:480px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle" style="color:#d97706;"></i> 材料量过大</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>当前已选材料约 <strong>${charWan}</strong> 万字，建议控制在 <strong>${suggestWan}</strong> 万字以内以保证生成质量。</p>
+                <div style="background:#f9fafb;padding:12px;border-radius:6px;margin-top:12px;font-size:13px;color:#4b5563;">
+                    <div style="margin-bottom:6px;font-weight:500;">建议操作：</div>
+                    <div>1. 点击"按材料类型筛选"精简材料</div>
+                    <div>2. 减少非必要材料的选择</div>
+                    ${isJudgment ? '<div>3. 切换至分步生成，逐步处理</div>' : ''}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
+                <button class="btn btn-secondary" onclick="filterMaterialByCategory()"><i class="fas fa-filter"></i> 按材料类型筛选</button>
+                ${isJudgment ? '<button class="btn btn-primary" onclick="closeOverflowAndSwitchStep()"><i class="fas fa-list-ol"></i> 切换至分步生成</button>' : ''}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// 按材料类型筛选（打开材料分类筛选）
+function filterMaterialByCategory() {
+    const modal = document.getElementById('workflowOverflowModal');
+    if (modal) modal.remove();
+    // 滚动到材料树顶部并高亮分类
+    const tree = document.getElementById('materialTree');
+    if (tree) {
+        tree.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const categories = tree.querySelectorAll('.material-category-header');
+        categories.forEach(c => c.style.boxShadow = '0 0 0 2px #2563eb');
+        setTimeout(() => categories.forEach(c => c.style.boxShadow = ''), 2000);
+    }
+    showNotification('请按材料类型勾选所需材料，取消非必要材料', 'info');
+}
+
+function closeOverflowAndSwitchStep() {
+    const modal = document.getElementById('workflowOverflowModal');
+    if (modal) modal.remove();
+    switchToStepView({ auto: false });
+    showNotification('已切换至分步生成', 'success');
+}
+
 function doGenerateByMaterial(elementAnswers) {
     const docType = document.getElementById('matDocType').value;
     if (!docType) {
         showNotification('请选择文书类型', 'warning');
         return;
     }
-    showResultLoading();
-    setTimeout(() => {
-        const template = document.getElementById('matTemplate').value;
-        const docTypeName = getCurrentDocTypes()[docType]?.name || '';
-        const templateName = getCurrentTemplates()[template] || '';
-        const content = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers);
-        showResult(content, templateName);
-    }, 2000);
+
+    // v2.23 (任务 8.2/9.6): mock workflow 超限异常（材料字数 > 8万 时触发）
+    const charCount = getSelectedMaterialCharCount();
+    if (charCount > 80000) {
+        showWorkflowOverflowModal(docType);
+        return;
+    }
+
+    // v2.23 (任务 8.8/9.5): 流式输出展示
+    const template = document.getElementById('matTemplate').value;
+    const docTypeName = getCurrentDocTypes()[docType]?.name || '';
+    const templateName = getCurrentTemplates()[template] || '';
+    const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers);
+
+    startStreamingOutput(fullContent, templateName);
 }
 
 // 生成 Mock 文书内容
@@ -1495,6 +1722,66 @@ function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepP
     return Object.values(orgConfigs)[0] || [];
 }
 
+// v2.21: 构建步骤依赖提示 HTML
+// 规则：
+//   - 无 prev_step 依赖：显示蓝色信息条"本步无前置依赖"
+//   - 必填依赖未完成：显示红色阻止条"需先完成：XX（未完成）"，调用方应据此禁用生成本步按钮
+//   - 可选依赖未完成：显示黄色警告条"建议先完成：XX（未完成）；可空值执行"
+//   - 所有依赖已完成：显示蓝色信息条"前置依赖已完成：XX（已完成）"
+function buildStepDependencyHintHtml(stepIdx) {
+    const step = stepsConfig[stepIdx];
+    if (!step || !Array.isArray(step.inputs)) return '';
+
+    const prevDeps = step.inputs.filter(inp => inp.source === 'prev_step' && inp.fromStep);
+    if (prevDeps.length === 0) {
+        return `<div class="step-dependency-hint info"><i class="fas fa-info-circle"></i><span>本步无前置依赖</span></div>`;
+    }
+
+    // 解析依赖项的完成状态
+    const depStatuses = prevDeps.map(dep => {
+        const fromIdx = stepsConfig.findIndex(s => s.id === dep.fromStep);
+        const fromName = fromIdx >= 0 ? stepsConfig[fromIdx].name : dep.fromStep;
+        const done = fromIdx >= 0 && stepStates[fromIdx] === 'done';
+        return { ...dep, fromName, fromIdx, done };
+    });
+
+    const allDone = depStatuses.every(d => d.done);
+    const hasRequired = depStatuses.some(d => d.required);
+    const requiredUndone = depStatuses.filter(d => d.required && !d.done);
+    const optionalUndone = depStatuses.filter(d => !d.required && !d.done);
+
+    if (allDone) {
+        const doneNames = depStatuses.map(d => d.fromName).join('、');
+        return `<div class="step-dependency-hint info"><i class="fas fa-check-circle"></i><span>前置依赖已完成：${doneNames}</span></div>`;
+    }
+
+    // 必填依赖未完成 → 阻止
+    if (requiredUndone.length > 0) {
+        const items = depStatuses.map(d => {
+            const icon = d.done ? 'fa-check-circle' : 'fa-times-circle';
+            const status = d.done ? '已完成' : '未完成';
+            const reqTag = d.required ? '必填' : '选填';
+            return `<span class="dep-item"><i class="fas ${icon}"></i>${d.fromName}<span class="dep-status">（${reqTag}·${status}）</span></span>`;
+        }).join('');
+        const undoneNames = requiredUndone.map(d => d.fromName).join('、');
+        return `<div class="step-dependency-hint blocked"><i class="fas fa-ban"></i><span>需先完成：${undoneNames}（未完成）<br>${items}</span></div>`;
+    }
+
+    // 仅可选依赖未完成 → 警告
+    if (optionalUndone.length > 0) {
+        const items = depStatuses.map(d => {
+            const icon = d.done ? 'fa-check-circle' : 'fa-exclamation-circle';
+            const status = d.done ? '已完成' : '未完成';
+            const reqTag = d.required ? '必填' : '选填';
+            return `<span class="dep-item"><i class="fas ${icon}"></i>${d.fromName}<span class="dep-status">（${reqTag}·${status}）</span></span>`;
+        }).join('');
+        const undoneNames = optionalUndone.map(d => d.fromName).join('、');
+        return `<div class="step-dependency-hint warning"><i class="fas fa-exclamation-triangle"></i><span>建议先完成：${undoneNames}（未完成）；当前配置为选填，可空值执行<br>${items}</span></div>`;
+    }
+
+    return '';
+}
+
 function renderSteps() {
     const list = document.getElementById('stepsList');
     if (!stepsConfig.length) {
@@ -1543,7 +1830,7 @@ function renderSteps() {
                 <div class="step-acc-header" onclick="toggleStep(${i})">
                     <div class="step-acc-title">
                         <div class="step-acc-num ${state}">${state === 'done' ? '<i class="fas fa-check"></i>' : (i + 1)}</div>
-                        <span>${s.title}</span>
+                        <span>${s.name}</span>
                         <span class="step-acc-mat-count">已选 ${matCount} 件</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
@@ -1552,6 +1839,7 @@ function renderSteps() {
                     </div>
                 </div>
                 <div class="step-acc-body">
+                    ${buildStepDependencyHintHtml(i)}
                     ${materialsHtml}
                     ${selectedMatsSummaryHtml}
                     <div class="step-content-area" id="stepContent_${i}">${contentHtml}</div>
@@ -1562,7 +1850,19 @@ function renderSteps() {
                         </div>
                     ` : (state === 'waiting' && stepGenerationStarted && !isGenerating ? `
                         <div class="step-actions">
-                            <button class="step-action-btn primary" onclick="generateSingleStepManually(${i})"><i class="fas fa-play"></i> 生成本步</button>
+                            ${(() => {
+                                // v2.21: 必填依赖未完成时置灰生成本步按钮
+                                const step = stepsConfig[i];
+                                const prevDeps = (step.inputs || []).filter(inp => inp.source === 'prev_step' && inp.fromStep);
+                                const requiredUndone = prevDeps.some(dep => {
+                                    const fromIdx = stepsConfig.findIndex(s => s.id === dep.fromStep);
+                                    return dep.required && (fromIdx < 0 || stepStates[fromIdx] !== 'done');
+                                });
+                                if (requiredUndone) {
+                                    return `<button class="step-action-btn primary" disabled title="需先完成必填前置步骤"><i class="fas fa-play"></i> 生成本步</button>`;
+                                }
+                                return `<button class="step-action-btn primary" onclick="generateSingleStepManually(${i})"><i class="fas fa-play"></i> 生成本步</button>`;
+                            })()}
                         </div>
                     ` : '')}
                 </div>
@@ -1580,9 +1880,26 @@ async function generateSingleStepManually(index) {
     if (index < 0 || index >= stepsConfig.length) return;
     if (stepStates[index] === 'done') return;
 
+    // v2.21: 校验必填前置依赖是否已完成
+    const step = stepsConfig[index];
+    const requiredUndoneDeps = (step.inputs || [])
+        .filter(inp => inp.source === 'prev_step' && inp.fromStep && inp.required)
+        .filter(dep => {
+            const fromIdx = stepsConfig.findIndex(s => s.id === dep.fromStep);
+            return fromIdx < 0 || stepStates[fromIdx] !== 'done';
+        });
+    if (requiredUndoneDeps.length > 0) {
+        const fromNames = requiredUndoneDeps.map(d => {
+            const fromIdx = stepsConfig.findIndex(s => s.id === d.fromStep);
+            return fromIdx >= 0 ? stepsConfig[fromIdx].name : d.fromStep;
+        }).join('、');
+        showNotification(`「${step.name}」需先完成：${fromNames}`, 'warning');
+        return;
+    }
+
     // 校验该步是否已选择材料
-    const stepId = stepsConfig[index].id;
-    const stepTitle = stepsConfig[index].title;
+    const stepId = step.id;
+    const stepTitle = step.name;  // v2.21: 字段从 title 改为 name
     const mats = getEffectiveStepMaterials(stepId);
     if (mats.size === 0) {
         showNotification(`请为「${stepTitle}」至少选择 1 件材料`, 'warning');
@@ -1592,15 +1909,7 @@ async function generateSingleStepManually(index) {
         renderSteps();
         return;
     }
-    const safeLimit = getSafeContextLimit();
-    const stepTokens = [...mats].reduce((sum, id) => {
-        const f = caseItem.files.find(x => x.id === id);
-        return sum + (f ? estimateFileTokens(f) : 0);
-    }, 0);
-    if (stepTokens > safeLimit) {
-        showNotification(`「${stepTitle}」预估 ${formatNumber(stepTokens)} tokens，超出当前模型安全上限 ${formatNumber(safeLimit)} tokens，请减少材料`, 'warning');
-        return;
-    }
+    // v2.23 (任务 8.2): 移除分步生成的 Token 超限前置判断
 
     expandedStepIndex = index;
     await generateSingleStep(index, { silent: true });
@@ -1772,29 +2081,9 @@ function updateMaterialSelectorCount() {
         countEl.innerHTML = `已选 <strong>${selected}</strong> / 共 ${total} 件` +
             (visibleTotal < total ? `（当前可见 ${visibleTotal} 件）` : '');
     }
-
-    // 实时校验已选材料 Token 是否超出限制
-    const safeLimit = getSafeContextLimit();
-    let selectedTokens = 0;
-    checkedInputs.forEach(input => {
-        const item = input.closest('.material-selector-item');
-        if (!item) return;
-        const fileId = item.dataset.id;
-        const f = (caseItem.files || []).find(x => x.id === fileId);
-        if (f) selectedTokens += estimateFileTokens(f);
-    });
-
-    const hintEl = document.getElementById('materialSelectorTokenHint');
+    // v2.24 (任务 8.2): 移除前端 Token 超限前置判断，确认按钮始终可用
     const confirmBtn = document.getElementById('materialSelectorConfirmBtn');
-    if (hintEl && confirmBtn) {
-        if (selectedTokens > safeLimit) {
-            hintEl.textContent = `已选材料预估 ${formatNumber(selectedTokens)} / ${formatNumber(safeLimit)} tokens，超出限制，请精简材料`;
-            confirmBtn.disabled = true;
-        } else {
-            hintEl.textContent = '';
-            confirmBtn.disabled = false;
-        }
-    }
+    if (confirmBtn) confirmBtn.disabled = false;
 }
 
 function toggleStep(index) {
@@ -1811,22 +2100,14 @@ async function generateSingleStep(stepIndex, options = {}) {
     const step = stepsConfig[stepIndex];
     if (!step) return false;
 
-    const safeLimit = getSafeContextLimit();
     const stepId = step.id;
-    const stepTitle = step.title;
+    const stepTitle = step.name;  // v2.21: 字段从 title 改为 name
     const mats = getEffectiveStepMaterials(stepId);
     if (mats.size === 0) {
         if (!options.silent) showNotification(`请为「${stepTitle}」至少选择 1 件材料`, 'warning');
         return false;
     }
-    const stepTokens = [...mats].reduce((sum, id) => {
-        const f = caseItem.files.find(x => x.id === id);
-        return sum + (f ? estimateFileTokens(f) : 0);
-    }, 0);
-    if (stepTokens > safeLimit) {
-        if (!options.silent) showNotification(`「${stepTitle}」预估 ${formatNumber(stepTokens)} tokens，超出当前模型安全上限 ${formatNumber(safeLimit)} tokens，请减少材料`, 'warning');
-        return false;
-    }
+    // v2.24 (任务 8.2): 移除前端 Token 超限前置判断，超限由 workflow 返回异常处理
 
     isGenerating = true;
     updateStepGenerationButtons();
@@ -1919,12 +2200,12 @@ async function startStepGeneration() {
 
 // 校验所有未生成步骤的材料
 function validateStepMaterials() {
-    const safeLimit = getSafeContextLimit();
+    // v2.24 (任务 8.2): 移除前端 Token 超限前置判断，超限由 workflow 返回异常处理
     for (let i = 0; i < stepsConfig.length; i++) {
         if (stepStates[i] === 'done') continue;
 
         const stepId = stepsConfig[i].id;
-        const stepTitle = stepsConfig[i].title;
+        const stepTitle = stepsConfig[i].name;  // v2.21: 字段从 title 改为 name
         const mats = getEffectiveStepMaterials(stepId);
         if (mats.size === 0) {
             showNotification(`请为「${stepTitle}」至少选择 1 件材料`, 'warning');
@@ -1942,19 +2223,6 @@ function validateStepMaterials() {
                 if (el) el.classList.add('expanded');
             }
             updateStepGenerationButtons();
-            return false;
-        }
-        const stepTokens = [...mats].reduce((sum, id) => {
-            const f = caseItem.files.find(x => x.id === id);
-            return sum + (f ? estimateFileTokens(f) : 0);
-        }, 0);
-        if (stepTokens > safeLimit) {
-            showNotification(`「${stepTitle}」预估 ${formatNumber(stepTokens)} tokens，超出当前模型安全上限 ${formatNumber(safeLimit)} tokens，请减少材料`, 'warning');
-            const flowArea = document.getElementById('stepFlowArea');
-            if (flowArea && flowArea.style.display !== 'none') {
-                const el = document.getElementById(`step_${i}`);
-                if (el) el.classList.add('expanded');
-            }
             return false;
         }
     }
@@ -2211,8 +2479,8 @@ function doCompileSteps(elementAnswers) {
         <p style="text-align:right;">${new Date().toLocaleDateString('zh-CN')}</p>
     </div>`;
 
-    showResult(content, title);
-    showNotification('文书已编译完成', 'success');
+    // v2.24 (任务 8.8): 分步生成最终编译也接入流式输出
+    startStreamingOutput(content, title);
 }
 
 // ===== 引入案由要件弹窗 =====
@@ -2468,6 +2736,97 @@ function showResultLoading() {
     `;
 }
 
+// v2.23 (任务 8.8/9.5): 流式输出展示 + 进度指示
+// 不可取消，完成后自动渲染为格式化文书
+let streamingTimer = null;
+let streamingStartTime = 0;
+
+function startStreamingOutput(fullContent, title) {
+    document.getElementById('resultTabs').style.display = 'none';
+    document.getElementById('resultFooter').style.display = 'none';
+    const body = document.getElementById('resultBody');
+
+    // 构建流式输出区
+    body.innerHTML = `
+        <div class="streaming-output-area">
+            <div class="streaming-progress-bar">
+                <div class="streaming-progress-info">
+                    <span><i class="fas fa-circle-notch fa-spin"></i> 正在生成：${escapeHtmlForStreaming(title || '法律文书')}</span>
+                    <span class="streaming-stats" id="streamingStats">已输出 0 字 · 预计剩余 --</span>
+                </div>
+                <div class="streaming-progress-track"><div class="streaming-progress-fill" id="streamingProgressFill" style="width:0%"></div></div>
+            </div>
+            <div class="streaming-content" id="streamingContent"></div>
+        </div>
+    `;
+
+    // 分段流式输出（按段落切分）
+    const segments = splitContentToSegments(fullContent);
+    let segIndex = 0;
+    let outputChars = 0;
+    streamingStartTime = Date.now();
+
+    const renderNext = () => {
+        if (segIndex >= segments.length) {
+            // 输出完成，自动渲染为格式化文书
+            finishStreaming(fullContent, title);
+            return;
+        }
+        const seg = segments[segIndex];
+        const contentEl = document.getElementById('streamingContent');
+        contentEl.innerHTML += seg;
+        outputChars += seg.replace(/<[^>]+>/g, '').length;
+
+        // 更新进度
+        const progress = Math.round((segIndex + 1) / segments.length * 100);
+        const fill = document.getElementById('streamingProgressFill');
+        if (fill) fill.style.width = progress + '%';
+        const stats = document.getElementById('streamingStats');
+        if (stats) {
+            const elapsed = (Date.now() - streamingStartTime) / 1000;
+            const speed = outputChars / (elapsed || 1);
+            const remainSegs = segments.length - segIndex - 1;
+            const remainChars = remainSegs * (outputChars / (segIndex + 1));
+            const remainSec = speed > 0 ? Math.ceil(remainChars / speed) : 0;
+            stats.textContent = `已输出 ${outputChars} 字 · 预计剩余 ${remainSec}s · 第 ${segIndex + 1}/${segments.length} 段`;
+        }
+
+        segIndex++;
+        streamingTimer = setTimeout(renderNext, 150 + Math.random() * 200);
+    };
+    renderNext();
+}
+
+// 将文书内容按段落切分为多个片段
+function splitContentToSegments(html) {
+    // 按 </p> 或 </h2> 或 </h3> 或 <br> 切分
+    const parts = html.split(/(?<=<\/(?:p|h2|h3)>)/);
+    // 合并过短片段
+    const segments = [];
+    let buffer = '';
+    parts.forEach(p => {
+        buffer += p;
+        if (buffer.replace(/<[^>]+>/g, '').length > 40) {
+            segments.push(buffer);
+            buffer = '';
+        }
+    });
+    if (buffer) segments.push(buffer);
+    return segments.length > 0 ? segments : [html];
+}
+
+function finishStreaming(fullContent, title) {
+    if (streamingTimer) { clearTimeout(streamingTimer); streamingTimer = null; }
+    showResult(fullContent, title);
+    // v2.24 (任务 8.8): 流式输出完成后统一提示
+    showNotification('文书已生成完成', 'success');
+}
+
+function escapeHtmlForStreaming(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function showResult(html, title) {
     resultContent = html;
     resultEditContent = html.replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -2500,9 +2859,6 @@ function saveResult() {
         resultEditContent = editArea.value;
     }
 
-    // 保存到案件 documents
-    if (!caseItem.documents) caseItem.documents = [];
-
     // 记录当前生成配置
     const isStep = currentGenMethod === 'steps';
     const docTypeEl = document.getElementById(isStep ? 'stepDocType' : 'matDocType');
@@ -2511,29 +2867,65 @@ function saveResult() {
     const docType = docTypeEl ? docTypeEl.value : '';
     const template = templateEl ? templateEl.value : '';
     const requirement = requirementEl ? requirementEl.value : '';
-    const docTypes = getCurrentDocTypes();
-    const templates = getDocTypeTemplates(docType);
-    const templateName = getTemplateName(templates[template]);
-    const docTypeName = docTypes[docType]?.name || '法律文书';
-    const title = templateName ? `${docTypeName} · ${templateName}` : docTypeName;
 
-    const doc = {
-        id: `doc_${Date.now()}`,
-        title: title,
-        docType: docType,
-        template: template,
-        requirement: requirement,
-        model: getCurrentModelId(),
+    // v1.37: 构建分步生成的步骤快照（任务 4.2）
+    let stepsSnapshot = null;
+    if (isStep && typeof stepsConfig !== 'undefined' && typeof stepData !== 'undefined') {
+        stepsSnapshot = stepsConfig.map(s => {
+            const data = stepData[s.id] || { items: [], materials: new Set() };
+            return {
+                stepId: s.id,
+                stepName: s.name,
+                items: (data.items || []).slice(),
+                materialIds: [...(data.materials || [])]
+            };
+        });
+    }
+
+    // v1.37: 调用统一版本管理工具，按 docType 合并追加新版本（任务 4.2）
+    const savedVersion = addDocumentVersion(caseItem.id, {
+        type: 'original',
         genMethod: currentGenMethod,
-        selectedMaterialIds: [...selectedMaterialIds],
-        wordCount: resultEditContent.length,
-        createdAt: new Date().toISOString(),
-        versions: [{ type: 'original', content: resultContent, createdAt: new Date().toISOString() }]
-    };
-    caseItem.documents.push(doc);
-    caseItem.updatedAt = new Date().toISOString().split('T')[0];
-    saveBusinessSystems();
-    showNotification('文书已保存到历史文书', 'success');
+        source: 'ai',
+        content: resultContent,
+        createdBy: getCurrentUserName(),
+        config: {
+            docType,
+            template,
+            prompt: requirement,
+            modelId: getCurrentModelId(),
+            materialIds: [...selectedMaterialIds],
+            materialTokens: (typeof getSelectedMaterialTokens === 'function') ? getSelectedMaterialTokens() : 0,
+            stepsSnapshot
+        }
+    });
+
+    if (savedVersion) {
+        lastSavedVersionId = savedVersion.versionId || '';
+        showNotification('文书已保存到历史文书（新版本）', 'success');
+        // v1.37: 刷新历史文书按钮状态（任务 4.3）
+        updateHistoryDocsBtnState();
+    } else {
+        showNotification('保存失败，请重试', 'error');
+    }
+}
+
+// v1.37/v1.38: 历史文书按钮置灰状态（任务 4.3）
+function updateHistoryDocsBtnState() {
+    const btn = document.getElementById('caseHistoryDocsBtn');
+    if (!btn) return;
+    const versions = getAllDocumentVersions(caseItem.id);
+    if (versions.length === 0) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+        btn.title = '该案件暂无历史文书';
+    } else {
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        btn.title = `查看历史文书（${versions.length} 份）`;
+    }
 }
 
 function downloadResult() {
@@ -2556,6 +2948,15 @@ function refineResult() {
         showNotification('请先生成文书', 'warning');
         return;
     }
+    // v1.38: 精修跳转 document-polish.html（任务 5.2）
+    // 已保存的文书优先用 versionId 跳转；未保存的通过 localStorage 传递内容
+    if (lastSavedVersionId) {
+        const url = `document-polish.html?caseId=${encodeURIComponent(caseItem.id)}&versionId=${encodeURIComponent(lastSavedVersionId)}`;
+        const win = window.open(url, '_blank');
+        if (!win) showNotification('浏览器弹窗被拦截，请允许弹窗后重试', 'error');
+        return;
+    }
+    // 未保存：通过 localStorage 传递临时内容
     const matDocType = document.getElementById('matDocType');
     const matTemplate = document.getElementById('matTemplate');
     const docTypeName = matDocType ? (getCurrentDocTypes()[matDocType.value]?.name || '') : '';
@@ -2570,7 +2971,8 @@ function refineResult() {
         source: 'case-files'
     };
     localStorage.setItem('refineContext', JSON.stringify(ctx));
-    window.open('chat.html?refine=1', '_blank');
+    const win = window.open('document-polish.html', '_blank');
+    if (!win) showNotification('浏览器弹窗被拦截，请允许弹窗后重试', 'error');
 }
 
 // ===== 历史文书面板 =====
@@ -2584,30 +2986,59 @@ function toggleHistoryTasks() {
 
 function renderHistoryTasks() {
     const list = document.getElementById('historyTasksList');
-    if (!caseItem || !caseItem.documents || !caseItem.documents.length) {
+    if (!list || !caseItem) return;
+    // v1.38: 按版本展示历史文书（与案件列表页一致）
+    const versions = getAllDocumentVersions(caseItem.id);
+    if (versions.length === 0) {
         list.innerHTML = '<div class="history-task-empty"><i class="fas fa-folder-open"></i><div>暂无历史文书</div></div>';
         return;
     }
-    list.innerHTML = caseItem.documents.map(d => {
-        const created = (d.createdAt || '').split('T')[0];
-        const words = d.wordCount ? `${d.wordCount}字` : '';
+    const docTypes = getCurrentDocTypes();
+    const genMethodLabel = (m) => m === 'step' ? '分步生成' : '一步生成';
+    const typeLabel = (t) => t === 'polish' ? '精修' : (t === 'regenerate' ? '重新生成' : '首次生成');
+    const formatTime = (iso) => {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? iso : d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+    list.innerHTML = versions.map(v => {
+        const docTypeName = docTypes[v.docType]?.name || '法律文书';
+        const versionNo = `v${v.versionTotal - v.versionIndex + 1}`;
         return `
             <div class="history-task-item">
-                <div class="history-task-item-title">${d.title || '未命名文书'}</div>
+                <div class="history-task-item-title">
+                    ${v.title || docTypeName}
+                    <span class="version-badge">${versionNo}</span>
+                    <span class="doc-gen-method-tag">${genMethodLabel(v.genMethod)}</span>
+                    ${v.type !== 'original' ? `<span class="doc-type-tag">${typeLabel(v.type)}</span>` : ''}
+                </div>
                 <div class="history-task-item-meta">
-                    <span>${created}</span>
-                    ${words ? `<span>·</span><span>${words}</span>` : ''}
+                    <span>${docTypeName}</span>
+                    <span>·</span>
+                    <span>${formatTime(v.createdAt)}</span>
+                    <span>·</span>
+                    <span>${v.createdBy || '-'}</span>
                 </div>
                 <div class="history-task-item-actions">
-                    <button class="history-task-item-btn" onclick="event.stopPropagation();viewHistoryDoc('${d.id}')"><i class="fas fa-eye"></i> 查看</button>
-                    <button class="history-task-item-btn" onclick="event.stopPropagation();refineHistoryDoc('${d.id}')"><i class="fas fa-pen-nib"></i> 精修</button>
-                    <button class="history-task-item-btn" onclick="event.stopPropagation();regenerateHistoryDoc('${d.id}')"><i class="fas fa-redo"></i> 重新生成</button>
-                    <button class="history-task-item-btn" onclick="event.stopPropagation();downloadHistoryDoc('${d.id}')"><i class="fas fa-download"></i> 下载</button>
-                    <button class="history-task-item-btn danger" onclick="event.stopPropagation();deleteHistoryDoc('${d.id}')"><i class="fas fa-trash-alt"></i> 删除</button>
+                    <button class="history-task-item-btn" onclick="event.stopPropagation();viewHistoryDocVersion('${v.versionId}')"><i class="fas fa-eye"></i> 查看</button>
+                    <button class="history-task-item-btn" onclick="event.stopPropagation();refineHistoryDocVersion('${v.versionId}')"><i class="fas fa-pen-nib"></i> 精修</button>
+                    <button class="history-task-item-btn" onclick="event.stopPropagation();downloadHistoryDocVersion('${v.versionId}')"><i class="fas fa-download"></i> 下载</button>
+                    <button class="history-task-item-btn danger" onclick="event.stopPropagation();deleteHistoryDocVersion('${v.versionId}')"><i class="fas fa-trash-alt"></i> 删除</button>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// v1.38: 按 versionId 查找版本
+function findHistoryDocVersion(versionId) {
+    if (!caseItem || !Array.isArray(caseItem.documents)) return null;
+    for (const doc of caseItem.documents) {
+        if (!doc || !Array.isArray(doc.versions)) continue;
+        const v = doc.versions.find(x => x.versionId === versionId);
+        if (v) return { doc, version: v };
+    }
+    return null;
 }
 
 function getHistoryDoc(docId) {
@@ -2723,6 +3154,74 @@ function deleteHistoryDoc(docId) {
     saveBusinessSystems();
     renderHistoryTasks();
     showNotification('文书已删除', 'success');
+}
+
+// v1.38: 按 versionId 操作历史文书版本
+function viewHistoryDocVersion(versionId) {
+    const res = findHistoryDocVersion(versionId);
+    if (!res) { showNotification('版本不存在', 'error'); return; }
+    const { doc, version } = res;
+    const title = version.title || doc.title || caseItem.caseName || '法律文书';
+    const content = version.content || '';
+    const caseNo = caseItem.caseNumber || '';
+    const causeName = caseItem.cause || '';
+    const previewWin = window.open('', '_blank', 'width=900,height=800,menubar=no,toolbar=no');
+    if (!previewWin) {
+        showNotification('浏览器弹窗被拦截，请允许弹窗后重试', 'error');
+        return;
+    }
+    previewWin.document.write('<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>' + title + ' - 文书预览</title>\n    <style>\n        body { font-family: "Noto Serif SC", "SimSun", serif; margin: 0; padding: 40px; background: #f5f5f5; }\n        .preview-container { max-width: 800px; margin: 0 auto; background: white; padding: 50px 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }\n        .preview-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #333; }\n        .preview-title { font-size: 22px; font-weight: 700; margin: 0 0 10px; color: #1a1a1a; }\n        .preview-meta { font-size: 14px; color: #666; }\n        .preview-content { font-size: 16px; line-height: 1.8; color: #333; }\n        .preview-content p { margin: 1em 0; text-indent: 2em; }\n        .preview-content h2 { font-size: 18px; font-weight: 600; margin: 2em 0 1em; color: #1a1a1a; }\n        .preview-content h3 { font-size: 16px; font-weight: 600; margin: 1.5em 0 0.8em; color: #1a1a1a; }\n        .preview-footer { margin-top: 60px; text-align: right; font-size: 14px; color: #666; }\n        @media print {\n            body { background: white; padding: 0; }\n            .preview-container { box-shadow: none; padding: 20px; }\n        }\n    </style>\n</head>\n<body>\n    <div class="preview-container">\n        <div class="preview-header">\n            <div class="preview-title">' + title + '</div>\n            <div class="preview-meta">' + caseNo + ' · ' + causeName + '</div>\n        </div>\n        <div class="preview-content">' + content + '</div>\n        <div class="preview-footer">文书生成时间：' + new Date().toLocaleString() + '</div>\n    </div>\n</body>\n</html>');
+    previewWin.document.close();
+}
+
+function refineHistoryDocVersion(versionId) {
+    const res = findHistoryDocVersion(versionId);
+    if (!res) { showNotification('版本不存在', 'error'); return; }
+    // v1.38: 跳转精修页面（任务 5.2）
+    const url = `document-polish.html?caseId=${encodeURIComponent(caseItem.id)}&versionId=${encodeURIComponent(versionId)}`;
+    const win = window.open(url, '_blank');
+    if (!win) {
+        showNotification('浏览器弹窗被拦截，请允许弹窗后重试', 'warning');
+    }
+}
+
+function downloadHistoryDocVersion(versionId) {
+    const res = findHistoryDocVersion(versionId);
+    if (!res) { showNotification('版本不存在', 'error'); return; }
+    const { doc, version } = res;
+    const content = version.content || '';
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>${doc.title || '法律文书'}</title>
+    <style>body{font-family:'Noto Serif SC','SimSun',serif;line-height:2;padding:40px;max-width:800px;margin:0 auto;}h2{text-align:center;font-size:22pt;}p{text-indent:2em;font-size:14pt;}</style>
+</head>
+<body>${content}</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${caseItem.caseName || doc.title || '法律文书'}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('文书已下载', 'success');
+}
+
+function deleteHistoryDocVersion(versionId) {
+    const res = findHistoryDocVersion(versionId);
+    if (!res) { showNotification('版本不存在', 'error'); return; }
+    const { doc, version } = res;
+    if (!confirm(`确定要删除版本「${doc.title || '未命名文书'}」吗？删除后不可恢复。`)) return;
+    const ok = deleteDocumentVersion(caseItem.id, versionId);
+    if (ok) {
+        renderHistoryTasks();
+        updateHistoryDocsBtnState();
+        showNotification('版本已删除', 'success');
+    } else {
+        showNotification('删除失败', 'error');
+    }
 }
 
 // ===== 文件上传 =====
@@ -2900,4 +3399,331 @@ function deleteSelectedMaterials() {
     selectedMaterialIds.clear();
     renderMaterialTree();
     showNotification(`已删除 ${idsToDelete.length} 个材料`, 'success');
+}
+
+// ===== v2.24 (任务 8.6 / 9.4): 本案要件抽屉 =====
+// 抽屉状态与缓存
+let caseElementsDrawerOpen = false;
+let caseElementsCache = { standard: [], mine: [], case: [] }; // 当前案件三类要件缓存
+let caseElementsAnswers = {};      // { [要件名]: 答案 }，与 localStorage.caseElements_${caseId} 同步
+let caseElementsSelection = new Set(); // 选中的要件名集合
+let currentQaElement = null;       // 当前正在问答的要件对象
+
+// ---- 个案要件存取（案件维度）----
+function getCaseCustomElements(cid) {
+    if (!cid) return [];
+    try {
+        const arr = JSON.parse(localStorage.getItem(`caseCustomElements_${cid}`) || '[]');
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+}
+function setCaseCustomElements(cid, arr) {
+    if (!cid) return;
+    localStorage.setItem(`caseCustomElements_${cid}`, JSON.stringify(arr || []));
+}
+
+// ---- 要件答案存取（案件维度）----
+function loadElementAnswers(cid) {
+    if (!cid) return {};
+    try {
+        const obj = JSON.parse(localStorage.getItem(`caseElements_${cid}`) || '{}');
+        return (obj && typeof obj === 'object') ? obj : {};
+    } catch (e) { return {}; }
+}
+function saveElementAnswers(cid, obj) {
+    if (!cid) return;
+    localStorage.setItem(`caseElements_${cid}`, JSON.stringify(obj || {}));
+}
+
+// ---- 要件勾选状态存取（案件维度）----
+function loadElementSelection(cid) {
+    if (!cid) return new Set();
+    try {
+        const arr = JSON.parse(localStorage.getItem(`caseElementsSelection_${cid}`) || '[]');
+        return new Set(Array.isArray(arr) ? arr : []);
+    } catch (e) { return new Set(); }
+}
+function saveElementSelection(cid, set) {
+    if (!cid) return;
+    localStorage.setItem(`caseElementsSelection_${cid}`, JSON.stringify(Array.from(set || [])));
+}
+
+// 加载当前案件的全部要件（标准 + 我的 + 个案），同步刷新缓存与答案
+function loadCaseElementsAll() {
+    if (!caseItem) {
+        caseElementsCache = { standard: [], mine: [], case: [] };
+        caseElementsAnswers = {};
+        caseElementsSelection = new Set();
+        return caseElementsCache;
+    }
+    const _org = localStorage.getItem('currentBusiness') || org || 'court';
+    const _cw = parseCaseWord(caseItem.caseNumber, _org);
+    const presets = getAllElementPresets(caseItem.cause, _org, _cw);
+    const standard = (presets.standard || []).map(p => ({ ...p, source: 'standard' }));
+    const mine = (presets.mine || []).map(p => ({ ...p, source: 'mine' }));
+    const caseCustom = getCaseCustomElements(caseItem.id)
+        .filter(p => p && p.enabled !== false)
+        .map(p => ({ ...p, source: 'case' }));
+    caseElementsCache = { standard, mine, case: caseCustom };
+    caseElementsAnswers = loadElementAnswers(caseItem.id);
+    caseElementsSelection = loadElementSelection(caseItem.id);
+    return caseElementsCache;
+}
+
+// 更新材料树底部入口按钮的数字
+function refreshCaseElementsEntryCount() {
+    const data = caseElementsCache && (caseElementsCache.standard || caseElementsCache.mine || caseElementsCache.case)
+        ? caseElementsCache
+        : loadCaseElementsAll();
+    const n = (data.standard?.length || 0) + (data.mine?.length || 0) + (data.case?.length || 0);
+    const el = document.getElementById('caseElementsEntryCount');
+    if (el) el.textContent = String(n);
+}
+
+// ---- 抽屉开关 ----
+function toggleElementsDrawer() {
+    if (caseElementsDrawerOpen) {
+        closeElementsDrawer();
+    } else {
+        openElementsDrawer();
+    }
+}
+function openElementsDrawer() {
+    loadCaseElementsAll();
+    renderElementsList();
+    document.getElementById('caseElementsOverlay').classList.add('show');
+    document.getElementById('caseElementsDrawer').classList.add('show');
+    caseElementsDrawerOpen = true;
+}
+function closeElementsDrawer() {
+    document.getElementById('caseElementsOverlay').classList.remove('show');
+    document.getElementById('caseElementsDrawer').classList.remove('show');
+    caseElementsDrawerOpen = false;
+    toggleCaseElementAddForm(false);
+}
+
+// ---- 渲染要件列表 ----
+function renderElementsList() {
+    const body = document.getElementById('caseElementsBody');
+    if (!body) return;
+    const data = caseElementsCache || { standard: [], mine: [], case: [] };
+    const standard = data.standard || [];
+    const mine = data.mine || [];
+    const caseC = data.case || [];
+
+    // 统计条
+    const statsEl = document.getElementById('caseElementsStats');
+    if (statsEl) {
+        statsEl.innerHTML = `
+            <span class="stat-item"><span class="stat-dot standard"></span> 标准 <span class="stat-num">${standard.length}</span></span>
+            <span class="stat-item"><span class="stat-dot mine"></span> 我的 <span class="stat-num">${mine.length}</span></span>
+            <span class="stat-item"><span class="stat-dot case"></span> 个案 <span class="stat-num">${caseC.length}</span></span>
+        `;
+    }
+
+    if (standard.length === 0 && mine.length === 0 && caseC.length === 0) {
+        body.innerHTML = `
+            <div class="case-elements-empty">
+                <i class="fas fa-inbox"></i>
+                <div>本案暂无可用要件</div>
+                <div style="font-size:11px;margin-top:6px;">可在下方新增个案要件，或前往"管理我的要件"维护</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    if (standard.length > 0) html += renderElementsGroup('标准要件', standard, 'standard');
+    if (mine.length > 0) html += renderElementsGroup('我的要件', mine, 'mine');
+    if (caseC.length > 0) html += renderElementsGroup('个案要件', caseC, 'case');
+    body.innerHTML = html;
+}
+
+function renderElementsGroup(title, items, source) {
+    const listHtml = items.map((p, idx) => {
+        const checked = caseElementsSelection.has(p.name) ? 'checked' : '';
+        const answered = (caseElementsAnswers[p.name] || '').trim().length > 0;
+        const answeredDot = answered ? '<span class="answered-dot" title="已填写答案"></span>' : '';
+        const delBtn = source === 'case'
+            ? `<button type="button" class="case-elements-item-del-btn" onclick="deleteCaseElement('${escapeJsString(p.name)}')" title="删除该个案要件"><i class="fas fa-trash-alt"></i></button>`
+            : '';
+        return `
+            <div class="case-elements-item">
+                <input type="checkbox" ${checked} onchange="toggleDrawerElementSelection('${escapeJsString(p.name)}', this.checked)">
+                <div class="case-elements-item-body">
+                    <div class="case-elements-item-title">
+                        ${escapeHtmlForElements(p.name)} ${answeredDot}
+                        <span class="source-tag ${source}">${sourceLabel(source)}</span>
+                    </div>
+                    <div class="case-elements-item-question">${escapeHtmlForElements(p.question || p.desc || '')}</div>
+                    <div class="case-elements-item-actions">
+                        <button type="button" class="case-elements-item-qa-btn ${answered ? 'answered' : ''}" onclick="openElementQaModal('${source}', ${idx})">
+                            <i class="fas fa-${answered ? 'check' : 'question'}"></i> ${answered ? '已答 · 查看' : '问答'}
+                        </button>
+                        ${delBtn}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    return `
+        <div class="case-elements-group">
+            <div class="case-elements-group-title">${title} <span class="group-count">${items.length} 项</span></div>
+            ${listHtml}
+        </div>
+    `;
+}
+
+function sourceLabel(source) {
+    if (source === 'standard') return '标准';
+    if (source === 'mine') return '我的';
+    return '个案';
+}
+
+function toggleDrawerElementSelection(name, checked) {
+    if (checked) caseElementsSelection.add(name);
+    else caseElementsSelection.delete(name);
+    if (caseItem) saveElementSelection(caseItem.id, caseElementsSelection);
+}
+
+// ---- 要件问答弹窗 ----
+function openElementQaModal(source, idx) {
+    const list = caseElementsCache[source] || [];
+    const p = list[idx];
+    if (!p) return;
+    currentQaElement = { ...p, source, idx };
+    document.getElementById('elementQaTitle').textContent = p.name;
+    document.getElementById('elementQaSourceRow').innerHTML = `<span class="source-tag ${source}">${sourceLabel(source)}要件</span>`;
+    document.getElementById('elementQaQuestion').textContent = p.question || p.desc || '（无问题描述）';
+    document.getElementById('elementQaAnswer').value = caseElementsAnswers[p.name] || '';
+    document.getElementById('elementQaOverlay').classList.add('show');
+    document.getElementById('elementQaModal').classList.add('show');
+    setTimeout(() => {
+        const ta = document.getElementById('elementQaAnswer');
+        if (ta) ta.focus();
+    }, 100);
+}
+
+function closeElementQaModal() {
+    document.getElementById('elementQaOverlay').classList.remove('show');
+    document.getElementById('elementQaModal').classList.remove('show');
+    currentQaElement = null;
+}
+
+function saveElementAnswerFromModal() {
+    if (!currentQaElement || !caseItem) {
+        closeElementQaModal();
+        return;
+    }
+    const answer = document.getElementById('elementQaAnswer').value || '';
+    caseElementsAnswers[currentQaElement.name] = answer;
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    // 已填写答案的要件自动勾选
+    if (answer.trim()) {
+        caseElementsSelection.add(currentQaElement.name);
+        saveElementSelection(caseItem.id, caseElementsSelection);
+    }
+    showNotification('要件答案已保存', 'success');
+    closeElementQaModal();
+    renderElementsList();
+}
+
+// ---- 新增个案要件 ----
+function toggleCaseElementAddForm(show) {
+    const form = document.getElementById('caseElementsAddForm');
+    if (!form) return;
+    if (show) {
+        form.classList.add('show');
+        document.getElementById('newCaseElementName').value = '';
+        document.getElementById('newCaseElementDesc').value = '';
+        document.getElementById('newCaseElementQuestion').value = '';
+        setTimeout(() => {
+            const i = document.getElementById('newCaseElementName');
+            if (i) i.focus();
+        }, 100);
+    } else {
+        form.classList.remove('show');
+    }
+}
+
+function addCaseElementConfirm() {
+    if (!caseItem) return;
+    const name = (document.getElementById('newCaseElementName').value || '').trim();
+    const desc = (document.getElementById('newCaseElementDesc').value || '').trim();
+    const question = (document.getElementById('newCaseElementQuestion').value || '').trim();
+    if (!name) { showNotification('请填写要件名称', 'warning'); return; }
+    if (!question) { showNotification('请填写要件问题', 'warning'); return; }
+
+    const arr = getCaseCustomElements(caseItem.id);
+    // 重名检查
+    if (arr.some(p => p.name === name)) {
+        showNotification('已存在同名个案要件，请使用其他名称', 'warning');
+        return;
+    }
+    arr.push({ name, desc, question, enabled: true, createdAt: Date.now() });
+    setCaseCustomElements(caseItem.id, arr);
+    toggleCaseElementAddForm(false);
+    loadCaseElementsAll();
+    renderElementsList();
+    refreshCaseElementsEntryCount();
+    showNotification('个案要件已添加', 'success');
+}
+
+function deleteCaseElement(name) {
+    if (!caseItem) return;
+    if (!confirm(`确定删除个案要件"${name}"吗？相关答案也会一并清除。`)) return;
+    let arr = getCaseCustomElements(caseItem.id);
+    arr = arr.filter(p => p.name !== name);
+    setCaseCustomElements(caseItem.id, arr);
+    // 同步清除答案与勾选
+    delete caseElementsAnswers[name];
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    caseElementsSelection.delete(name);
+    saveElementSelection(caseItem.id, caseElementsSelection);
+    loadCaseElementsAll();
+    renderElementsList();
+    refreshCaseElementsEntryCount();
+    showNotification('个案要件已删除', 'success');
+}
+
+// ---- 字符串转义辅助 ----
+function escapeHtmlForElements(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+function escapeJsString(str) {
+    if (str == null) return '';
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// 收集当前抽屉中已勾选且已填写答案的要件，供 generateByMaterial 作为 elementAnswers 入参
+function collectDrawerElementAnswers() {
+    if (!caseItem) return [];
+    loadCaseElementsAll();
+    const result = [];
+    const all = [
+        ...(caseElementsCache.standard || []).map(p => ({ ...p, source: 'standard' })),
+        ...(caseElementsCache.mine || []).map(p => ({ ...p, source: 'mine' })),
+        ...(caseElementsCache.case || []).map(p => ({ ...p, source: 'case' }))
+    ];
+    all.forEach(p => {
+        if (caseElementsSelection.has(p.name)) {
+            const answer = (caseElementsAnswers[p.name] || '').trim();
+            if (answer) {
+                result.push({
+                    name: p.name,
+                    desc: p.desc || '',
+                    question: p.question || '',
+                    answer: answer,
+                    source: p.source
+                });
+            }
+        }
+    });
+    return result;
 }
