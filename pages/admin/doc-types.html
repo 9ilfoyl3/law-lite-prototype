@@ -152,8 +152,7 @@
         .wf-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
         .wf-type-badge.step { background: #dbeafe; color: #1e40af; }
         .wf-type-badge.material { background: #ede9fe; color: #5b21b6; }
-        /* v1.35: workflow 使用模型标签 */
-        .wf-model-tag { display: inline-block; padding: 2px 8px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        /* v1.36 (V1.1.8): workflow 使用模型标签已移除，模型由 agentflow 平台内部决定 */
         .step-count-dash { color: var(--text-muted); font-size: 14px; }
 
         /* v1.32: workflow 类型 radio 行 */
@@ -181,6 +180,9 @@
         .cause-tree-node { margin-bottom: 4px; }
         .cause-tree-node-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; font-size: 13px; cursor: pointer; }
         .cause-tree-node-row:hover { background: var(--bg-secondary); }
+        /* v1.36 (V1.1.8): 案由节点选中态，支持一/二/三级节点勾选 */
+        .cause-tree-node-row.selected { background: var(--accent-light); border: 1px solid var(--accent-primary); }
+        .cause-tree-node-row.selected .cause-tree-label { color: var(--accent-primary); }
         .cause-tree-toggle { width: 16px; cursor: pointer; color: var(--text-muted); font-size: 10px; }
         .cause-tree-checkbox { margin: 0; }
         .cause-tree-label { color: var(--text-primary); }
@@ -350,12 +352,7 @@
                 </div>
                 <div class="form-hint">管理后台仅支持配置一步生成型 workflow（输入参数直接出文书结果，用于用户侧"一步生成" tab）；分步生成型由内置默认提供，无需在后台配置</div>
             </div>
-            <!-- v1.35: 使用模型（agentflow 平台 workflow 内部大模型节点的镜像映射，供前端 token 估算） -->
-            <div class="form-row">
-                <label class="form-label">使用模型 <span class="required">*</span></label>
-                <select id="wfModel" class="wf-id-select"></select>
-                <div class="form-hint">作为 agentflow 平台 workflow 内部大模型节点的镜像映射，供前端 token 估算使用；选项来自已部署模型列表</div>
-            </div>
+            <!-- v1.36 (V1.1.8): 使用模型字段已移除，模型由 agentflow 平台 workflow 内部决定，前端不再配置 -->
             <div class="form-row">
                 <label class="form-label">匹配案字（不选 = 案字兜底）</label>
                 <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
@@ -383,7 +380,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=54"></script>
-    <script src="../../js/admin-doc-types.js?v=7"></script>
+    <script src="../../js/case-data.js?v=57"></script>
+    <script src="../../js/admin-doc-types.js?v=8"></script>
 </body>
 </html>

@@ -890,16 +890,22 @@ const caseWordWhitelistByCauseCategory = {
 };
 
 // v1.41 优化2: 查询某案由所属大类（在 causeTreeDataByOrg 中反查顶层节点名）
-// 返回字符串（大类名）；找不到返回空字符串
+// 支持一级案由大类、二级案由分组、三级案由叶子节点命中；找不到返回空字符串
 function getCauseCategory(org, cause) {
     const tree = causeTreeDataByOrg[org] || [];
     for (const l1 of tree) {
-        if (!l1 || !Array.isArray(l1.children)) continue;
+        if (!l1 || typeof l1.name !== 'string') continue;
+        // 当前选择的就是一级案由大类（如"民事案由"）
+        if (l1.name === cause) return l1.name;
+        if (!Array.isArray(l1.children)) continue;
         for (const l2 of l1.children) {
             if (typeof l2 === 'string') {
                 if (l2 === cause) return l1.name;
-            } else if (Array.isArray(l2.children)) {
-                if (l2.children.indexOf(cause) >= 0) return l1.name;
+            } else if (l2 && typeof l2 === 'object') {
+                // 当前选择的就是二级案由分组（如"人格权纠纷"）
+                if (l2.name === cause) return l1.name;
+                // 三级案由叶子节点
+                if (Array.isArray(l2.children) && l2.children.indexOf(cause) >= 0) return l1.name;
             }
         }
     }
@@ -923,7 +929,7 @@ function getAllowedCaseWordsForCause(org, cause) {
 }
 
 // ===== 数据版本与迁移 =====
-const DATA_VERSION = '1.18'; // v1.39: 案件新增 handlers 数组字段（多承办人），迁移时由 handler 派生
+const DATA_VERSION = '1.19'; // v1.42: case7 新增 demoOverflow 标记，ensureConstructionCaseDemoFiles 强制刷新 36 个演示材料
 
 // 保留默认的 docTypes 与 docTemplates 配置，用于 localStorage 加载后补全
 // v1.9: 移除文书类型 icon 字段
@@ -1284,8 +1290,10 @@ function generateCaseFiles(c, org) {
 }
 
 // 为演示「分步生成」效果，给建设工程施工合同纠纷案（case7）生成大量材料并超过默认模型上下文限制
+// 演示标记 demoOverflow: true 表示该案件勾选全部材料时 workflow 判断不能一步生成（36×6000=216,000 > 80,000 阈值）
 function ensureConstructionCaseDemoFiles(c) {
     if (c.id !== 'case7') return;
+    c.demoOverflow = true;
     const names = [
         '建设工程施工合同', '补充协议（一）', '补充协议（二）', '工程签证单_001', '工程签证单_002',
         '工程签证单_003', '竣工验收报告', '工程款支付凭证_001', '工程款支付凭证_002', '工程款支付凭证_003',
@@ -1450,7 +1458,7 @@ let businessSystems = {
             { id: 'case4', caseName: '陈某与某科技有限公司劳动争议案', caseNumber: '(2024)粤01民初11234号', cause: '劳动争议', type: 'labor', partyA: '陈某', partyB: '某科技有限公司', handler: '刘法官', status: 'closed', date: '2024-11-20', fileCount: 2, updatedAt: '2024-11-20' },
             { id: 'case5', caseName: '刘某诉保险公司机动车交通事故责任纠纷案', caseNumber: '(2024)粤01民初11235号', cause: '机动车交通事故责任纠纷', type: 'tort', partyA: '刘某', partyB: '保险公司', handler: '陈法官', status: 'ongoing', date: '2024-12-08', fileCount: 4, updatedAt: '2024-12-08' },
             { id: 'case6', caseName: '某银行诉周某民间借贷纠纷案', caseNumber: '(2024)粤01民初10086号', cause: '民间借贷纠纷', type: 'contract', partyA: '某银行', partyB: '周某', handler: '杨法官', status: 'pending', date: '2024-12-20', fileCount: 1, updatedAt: '2024-12-20' },
-            { id: 'case7', caseName: '某建筑公司诉某房地产公司建设工程施工合同纠纷案', caseNumber: '(2023)粤01民终8765号', cause: '建设工程施工合同纠纷', type: 'contract', partyA: '某建筑公司', partyB: '某房地产公司', handler: '黄法官', status: 'closed', date: '2023-10-15', fileCount: 6, updatedAt: '2023-10-15' },
+            { id: 'case7', caseName: '某建筑公司诉某房地产公司建设工程施工合同纠纷案', caseNumber: '(2023)粤01民终8765号', cause: '建设工程施工合同纠纷', type: 'contract', partyA: '某建筑公司', partyB: '某房地产公司', handler: '黄法官', status: 'closed', date: '2023-10-15', fileCount: 6, updatedAt: '2023-10-15', demoOverflow: true },
             { id: 'case8', caseName: '吴某诉郑某股权转让纠纷案', caseNumber: '(2024)粤01民初9876号', cause: '股权转让纠纷', type: 'contract', partyA: '吴某', partyB: '郑某', handler: '林法官', status: 'ongoing', date: '2024-11-28', fileCount: 3, updatedAt: '2024-11-28' },
             { id: 'case9', caseName: '林某与黄某离婚纠纷案', caseNumber: '(2024)粤01民初8765号', cause: '离婚纠纷', type: 'family', partyA: '林某', partyB: '黄某', handler: '周法官', status: 'ongoing', date: '2024-11-15', fileCount: 2, updatedAt: '2024-11-15' },
             { id: 'case10', caseName: '马某诉某媒体公司名誉权纠纷案', caseNumber: '(2024)粤01民初7654号', cause: '名誉权纠纷', type: 'tort', partyA: '马某', partyB: '某媒体公司', handler: '吴法官', status: 'pending', date: '2024-12-05', fileCount: 0, updatedAt: '2024-12-05' }

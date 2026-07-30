@@ -1,4 +1,9 @@
 // ============ Case Files Page JavaScript ============
+// v2.27 本案要件交互重构：1)删除要件项"问答/已答·查看"按钮；2)AI总结改为批量总结全部要件（无需勾选，自动全选并生成答案）；3)已答状态直接在要件项下方展示答案内容（绿色卡片 + AI生成答案标签 + 修改按钮）；4)新增 editElementAnswerInline/saveElementAnswerInline 内联编辑功能（替代原 openElementQaModal 弹窗）；5)清理 .case-elements-item-qa-btn CSS，新增 .case-elements-item-answer/.inline-edit-textarea 样式
+// v2.26 本案要件抽屉优化：1)抽屉宽度 380px → 50vw（min-width 380px 兜底）；2)删除底部"关闭"按钮（头部 × 与遮罩点击仍可关闭）；3)新增"AI总结"按钮（紫色品牌色区分），对已勾选要件批量生成答案，用户可在问答弹窗中修改（复用 generateMockElementAnswer，与生成文书弹框引入要件逻辑一致）
+// v2.25 分步生成 tab 隐藏顶部"核心材料"提示条（分步每步独立选材料，与材料树全局勾选无关）
+// v2.24 分步生成交互优化：1)一步生成"生成文书"按钮移到配置卡片外部（.step-start-actions）；2)选择材料后不再自动生成，由用户手动点击"生成本步"；3)waiting 状态步骤始终展示"直接输入"+"生成本步"按钮（去 stepGenerationStarted 限制）；4)新增 directInputStep/saveDirectInput 直接输入功能（手动输入内容保存为 done）；5)done 状态新增"追问"按钮（followUpStep/submitFollowUp），支持多轮对话式追问，历史持久化到 stepData.followUps；6)startStepGeneration 不再强制校验材料和自动生成第一步
+// v2.23 UI 优化：一步生成配置区改为卡片样式（与分步生成一致，满宽）；移除一步生成"当前模型"展示及 step-view-header 标题；steps-list/steps-bottom-actions/step-start-actions 去 max-width 改 width:100%，与配置区同宽；refreshModelFromWorkflow 不再调用（HTML 已删除 modelSelect 元素，函数保留为 no-op 防报错）
 // v2.22 材料解析状态展示（PRD 10章）：renderMaterialTree 仅展示 parseStatus==='success' 的文件；存在解析中/异常文件时顶部显示解析进度概览"共N个，已解析M个，异常K个"；监听 case-file-parse-updated 事件自动刷新材料树
 // v2.21 V1.1 分步生成步骤序列硬编码：stepConfigsByOrg.court.judgment 改为 6 步固定清单（案件信息/原告诉请/被告答辩/争议焦点/事实认定/裁判结果），新增 inputs 依赖定义（source=material/prev_step/case_context，步骤4 争议焦点依赖前3步为选填）；同步将 step.title 字段引用改为 step.name；新增 updateStepsTabVisibility 仅裁判文书类型展示分步生成 Tab；renderStepGenConfig 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型；新增 buildStepDependencyHintHtml 在步骤 body 顶部展示依赖状态提示条（无依赖/必填未完成红色阻止/可选未完成黄色警告/全部已完成蓝色信息）；必填依赖未完成时生成本步按钮置灰并在 generateSingleStepManually 入口加双保险校验
 // v2.20 模型改为只读展示：模型由 workflow 的 modelId 决定（agentflow 平台镜像），新增 refreshModelFromWorkflow 在文书类型/生成方式/初始化/重新配置等时机刷新；onModelChange 置为 no-op；applyListGenParams/applyRegenerateConfig/reconfigWithLatestSnapshot 不再从 URL 或历史文书恢复模型
@@ -27,7 +32,7 @@ let resultContent = '';                     // 右栏结果内容HTML
 let resultEditContent = '';                 // 右栏编辑模式内容
 let lastSavedVersionId = '';                // 最近保存的文书版本ID（用于精修跳转）
 let pendingUploadFiles = [];
-let pendingElementAll = { standard: [], mine: [] }; // 待确认的案由要件
+let pendingElementAll = { standard: [], mine: [], case: [] }; // 待确认的案由要件
 let pendingElementSelections = new Set();
 let pendingElementConfirmCallback = null;   // 要素确认回调
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
@@ -240,9 +245,6 @@ function initPage() {
     // 初始化生成方式
     initMaterialGen();
     initStepsGen();
-
-    // v2.20: 初始化模型只读展示（由 workflow 的 modelId 决定，须在 initMaterialGen/initStepsGen 之后调用）
-    refreshModelFromWorkflow();
 
     // 渲染材料树
     renderMaterialTree();
@@ -839,8 +841,10 @@ function switchToStepView(options = {}) {
     renderStepGenConfig();
     resetStepFlowUI();
     renderSteps();
-    // v2.20: 切换到分步视图后，刷新模型只读展示（分步型 workflow 可能使用不同模型）
-    refreshModelFromWorkflow();
+
+    // v2.25: 分步生成 tab 隐藏顶部"核心材料"提示条（分步生成每步独立选材料，与材料树全局勾选无关）
+    const coreAlert = document.getElementById('coreMaterialsAlert');
+    if (coreAlert) coreAlert.style.display = 'none';
 }
 
 // 获取某步骤实际生效的关联材料（与核心材料表的交集，过滤已删除文件）
@@ -890,8 +894,10 @@ function backToMainView() {
     if (autoAlert) autoAlert.classList.remove('show');
     // v1.28: 切换回材料生成 tab 时，刷新材料型 workflow 匹配（用户侧不感知）
     refreshMaterialWorkflow();
-    // v2.20: 切换生成方式后刷新模型只读展示（一步/分步型 workflow 可能使用不同模型）
-    refreshModelFromWorkflow();
+
+    // v2.25: 恢复显示顶部"核心材料"提示条
+    const coreAlert = document.getElementById('coreMaterialsAlert');
+    if (coreAlert) coreAlert.style.display = '';
 }
 
 function toggleMaterialCol() {
@@ -1130,8 +1136,6 @@ function onMatDocTypeChange(shouldSync = true) {
     refreshMaterialWorkflow();
     updateMatGenerateButtonState();
     if (shouldSync) syncStepConfigFromMaterial();
-    // v2.20: 文书类型变化后刷新模型只读展示（不同 workflow 可能使用不同模型）
-    refreshModelFromWorkflow();
 }
 
 function renderMatReqTemplates(docTypeKey) {
@@ -1325,10 +1329,10 @@ function generateByMaterial() {
 
     const _org = localStorage.getItem('currentBusiness') || 'court';
     const _cw = parseCaseWord(caseItem.caseNumber, _org);
-    const allPresets = getAllElementPresets(caseItem.cause, _org, _cw);
+    const allPresets = mergeCaseElements(getAllElementPresets(caseItem.cause, _org, _cw), caseItem.id);
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
     const _matDocType = document.getElementById('matDocType')?.value || '';
-    const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
+    const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (_matDocType === 'judgment' && _hasElements) {
         showPreElementConfirmModal(allPresets, () => {
             doGenerateByMaterial(null);
@@ -1359,8 +1363,8 @@ function autoGenerateWithAllElements() {
 
     const _org2 = localStorage.getItem('currentBusiness') || 'court';
     const _cw2 = parseCaseWord(caseItem.caseNumber, _org2);
-    const allPresets = getAllElementPresets(caseItem.cause, _org2, _cw2);
-    const hasPresets = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
+    const allPresets = mergeCaseElements(getAllElementPresets(caseItem.cause, _org2, _cw2), caseItem.id);
+    const hasPresets = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     // v1.27: 要件仅在「裁判文书」(judgment) 时才自动引入
     const _autoDocType = document.getElementById('matDocType')?.value || getUrlParam('docType') || '';
 
@@ -1375,6 +1379,14 @@ function autoGenerateWithAllElements() {
             });
         });
         (allPresets.mine || []).forEach(p => {
+            elementAnswers.push({
+                name: p.name,
+                desc: p.desc,
+                question: p.question,
+                answer: generateMockElementAnswer(p, caseItem)
+            });
+        });
+        (allPresets.case || []).forEach(p => {
             elementAnswers.push({
                 name: p.name,
                 desc: p.desc,
@@ -1414,35 +1426,51 @@ function showWorkflowOverflowModal(docType) {
     const isJudgment = docType === 'judgment';
 
     // 移除已有弹框
-    const old = document.getElementById('workflowOverflowModal');
+    const old = document.getElementById('workflowOverflowOverlay');
     if (old) old.remove();
+    const oldDialog = document.getElementById('workflowOverflowModal');
+    if (oldDialog) oldDialog.remove();
 
-    const modal = document.createElement('div');
-    modal.id = 'workflowOverflowModal';
-    modal.className = 'modal-overlay show';
-    modal.innerHTML = `
-        <div class="modal-dialog show" style="max-width:480px;">
-            <div class="modal-header">
-                <h3><i class="fas fa-exclamation-triangle" style="color:#d97706;"></i> 材料量过大</h3>
-                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <p>当前已选材料约 <strong>${charWan}</strong> 万字，建议控制在 <strong>${suggestWan}</strong> 万字以内以保证生成质量。</p>
-                <div style="background:#f9fafb;padding:12px;border-radius:6px;margin-top:12px;font-size:13px;color:#4b5563;">
-                    <div style="margin-bottom:6px;font-weight:500;">建议操作：</div>
-                    <div>1. 点击"按材料类型筛选"精简材料</div>
-                    <div>2. 减少非必要材料的选择</div>
-                    ${isJudgment ? '<div>3. 切换至分步生成，逐步处理</div>' : ''}
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-                <button class="btn btn-secondary" onclick="filterMaterialByCategory()"><i class="fas fa-filter"></i> 按材料类型筛选</button>
-                ${isJudgment ? '<button class="btn btn-primary" onclick="closeOverflowAndSwitchStep()"><i class="fas fa-list-ol"></i> 切换至分步生成</button>' : ''}
+    const overlay = document.createElement('div');
+    overlay.id = 'workflowOverflowOverlay';
+    overlay.className = 'modal-overlay show';
+    overlay.onclick = function() { closeWorkflowOverflowModal(); };
+
+    const dialog = document.createElement('div');
+    dialog.id = 'workflowOverflowModal';
+    dialog.className = 'modal-dialog show';
+    dialog.style.width = '460px';
+    dialog.onclick = function(e) { e.stopPropagation(); };
+    dialog.innerHTML = `
+        <div class="modal-header">
+            <h3><i class="fas fa-exclamation-triangle" style="color:#d97706;"></i> 材料量过大</h3>
+            <button class="modal-close" onclick="closeWorkflowOverflowModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="margin:0 0 14px 0;line-height:1.6;color:var(--text-primary);">当前已选材料约 <strong style="color:#d97706;">${charWan}</strong> 万字，建议控制在 <strong>${suggestWan}</strong> 万字以内以保证生成质量。</p>
+            <div style="background:var(--bg-secondary);padding:14px 16px;border-radius:8px;font-size:13px;color:var(--text-secondary);line-height:1.8;">
+                <div style="margin-bottom:4px;font-weight:600;color:var(--text-primary);">建议操作：</div>
+                <div>1. 点击"按材料类型筛选"精简材料</div>
+                <div>2. 减少非必要材料的选择</div>
+                ${isJudgment ? '<div>3. 切换至分步生成，逐步处理</div>' : ''}
             </div>
         </div>
+        <div class="modal-footer">
+            <button class="modal-btn-secondary" onclick="closeWorkflowOverflowModal()">取消</button>
+            <button class="modal-btn-secondary" onclick="filterMaterialByCategory()"><i class="fas fa-filter" style="margin-right:4px;"></i>按材料类型筛选</button>
+            ${isJudgment ? '<button class="modal-btn-primary" onclick="closeOverflowAndSwitchStep()"><i class="fas fa-list-ol" style="margin-right:4px;"></i>切换至分步生成</button>' : ''}
+        </div>
     `;
-    document.body.appendChild(modal);
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(dialog);
+}
+
+function closeWorkflowOverflowModal() {
+    const overlay = document.getElementById('workflowOverflowOverlay');
+    const dialog = document.getElementById('workflowOverflowModal');
+    if (overlay) overlay.remove();
+    if (dialog) dialog.remove();
 }
 
 // 按材料类型筛选（打开材料分类筛选）
@@ -1807,6 +1835,15 @@ function renderSteps() {
             contentHtml = (data.items || []).map((item, idx) =>
                 `<div class="step-content-item"><span class="step-content-item-num">${idx + 1}.</span>${item}</div>`
             ).join('');
+            // v2.24: 追问历史渲染
+            if (data.followUps && data.followUps.length > 0) {
+                contentHtml += data.followUps.map(f => `
+                    <div class="step-followup-item">
+                        <div class="step-followup-q"><i class="fas fa-question-circle"></i> ${escapeHtmlForStreaming(f.q)}</div>
+                        <div class="step-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForStreaming(f.a)}</div>
+                    </div>
+                `).join('');
+            }
         }
 
         const materialsHtml = renderStepMaterials(s.id);
@@ -1847,9 +1884,11 @@ function renderSteps() {
                         <div class="step-actions">
                             <button class="step-action-btn" onclick="editStep(${i})"><i class="fas fa-edit"></i> 编辑</button>
                             <button class="step-action-btn" onclick="regenerateStep(${i})"><i class="fas fa-redo"></i> 重新生成</button>
+                            <button class="step-action-btn" onclick="followUpStep(${i})"><i class="fas fa-comments"></i> 追问</button>
                         </div>
-                    ` : (state === 'waiting' && stepGenerationStarted && !isGenerating ? `
+                    ` : (state === 'waiting' && !isGenerating ? `
                         <div class="step-actions">
+                            <button class="step-action-btn" onclick="directInputStep(${i})"><i class="fas fa-keyboard"></i> 直接输入</button>
                             ${(() => {
                                 // v2.21: 必填依赖未完成时置灰生成本步按钮
                                 const step = stepsConfig[i];
@@ -2042,9 +2081,7 @@ async function confirmMaterialSelection() {
     closeMaterialSelector();
     renderSteps();
 
-    if (stepIndex !== -1 && stepMats.size > 0) {
-        await generateSingleStep(stepIndex);
-    }
+    // v2.24: 不再选完材料后自动生成，由用户点击"生成本步"按钮手动触发
 }
 
 // 过滤材料选择器列表
@@ -2186,16 +2223,19 @@ async function startStepGeneration() {
     if (guardReadOnly('startStepGeneration')) return;
     if (isGenerating) return;
 
-    if (!validateStepMaterials()) return;
-
-    // 进入分步生成流程：显示提示与步骤列表
+    // v2.24: 不再强制校验所有步骤材料，用户可在步骤列表中逐步选择材料后手动点击"生成本步"
     stepGenerationStarted = true;
     const flowArea = document.getElementById('stepFlowArea');
     if (flowArea) flowArea.style.display = 'block';
+
+    // 展开第一步引导用户操作
+    if (stepsConfig.length > 0) {
+        expandedStepIndex = 0;
+    }
+    renderSteps();
     updateStepGenerationButtons();
 
-    // 开始生成第一步
-    await continueStepGeneration();
+    // 不再自动生成第一步，由用户手动点击"生成本步"或"直接输入"
 }
 
 // 校验所有未生成步骤的材料
@@ -2367,6 +2407,99 @@ function generateStepContent(stepId, caseData, orgType, selectedMaterials) {
     return gen ? gen() : ['暂无内容'];
 }
 
+// v2.24: 直接输入 —— 用户不通过 AI 生成，手动输入步骤内容
+function directInputStep(index) {
+    if (guardReadOnly('directInputStep')) return;
+    const stepId = stepsConfig[index].id;
+    if (!stepData[stepId]) stepData[stepId] = { items: [], materials: new Set() };
+
+    const contentEl = document.getElementById(`stepContent_${index}`);
+    if (!contentEl) return;
+    contentEl.classList.add('editing');
+    contentEl.innerHTML = `
+        <textarea class="step-edit-textarea" id="stepDirectInput_${index}" placeholder="请直接输入本步骤的内容，支持多段（每行一段）..."></textarea>
+        <div class="step-actions">
+            <button class="step-action-btn save" onclick="saveDirectInput(${index})"><i class="fas fa-save"></i> 保存</button>
+            <button class="step-action-btn" onclick="renderSteps(); document.getElementById('step_${index}').classList.add('expanded');">取消</button>
+        </div>
+    `;
+    const ta = document.getElementById(`stepDirectInput_${index}`);
+    if (ta) ta.focus();
+}
+
+// v2.24: 保存直接输入的内容，将步骤标记为 done
+function saveDirectInput(index) {
+    const stepId = stepsConfig[index].id;
+    const textarea = document.getElementById(`stepDirectInput_${index}`);
+    if (!textarea) return;
+    const lines = textarea.value.split('\n').filter(l => l.trim());
+    if (lines.length === 0) {
+        showNotification('请输入内容后再保存', 'warning');
+        return;
+    }
+    stepData[stepId].items = lines;
+    stepData[stepId].genMethod = 'manual';  // 标记为手动输入
+    stepStates[index] = 'done';
+    renderSteps();
+    const el = document.getElementById(`step_${index}`);
+    if (el) el.classList.add('expanded');
+    showNotification('已保存直接输入的内容', 'success');
+    updateStepGenerationButtons();
+}
+
+// v2.24: 追问 —— 在已完成步骤下方 toggle 追问输入区，支持多轮对话
+function followUpStep(index) {
+    if (guardReadOnly('followUpStep')) return;
+    const existing = document.getElementById(`stepFollowUpArea_${index}`);
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    const contentEl = document.getElementById(`stepContent_${index}`);
+    if (!contentEl) return;
+    contentEl.insertAdjacentHTML('beforeend', `
+        <div class="step-followup-area" id="stepFollowUpArea_${index}">
+            <div class="step-followup-input-row">
+                <input type="text" id="stepFollowUpInput_${index}" placeholder="输入追问问题，按 Enter 发送..." class="step-followup-text">
+                <button class="step-action-btn primary" onclick="submitFollowUp(${index})"><i class="fas fa-paper-plane"></i> 发送</button>
+            </div>
+        </div>
+    `);
+    const input = document.getElementById(`stepFollowUpInput_${index}`);
+    if (input) {
+        input.focus();
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); submitFollowUp(index); }
+        });
+    }
+}
+
+// v2.24: 提交追问，模拟 AI 回答并持久化到 stepData
+function submitFollowUp(index) {
+    const stepId = stepsConfig[index].id;
+    const input = document.getElementById(`stepFollowUpInput_${index}`);
+    if (!input || !input.value.trim()) return;
+
+    const q = input.value.trim();
+    if (!stepData[stepId].followUps) stepData[stepId].followUps = [];
+
+    // 原型 mock：基于步骤类型返回模拟回答
+    const stepName = stepsConfig[index].name || '';
+    const mockAnswers = [
+        `根据所选材料分析，「${stepName}」部分的关键事实已得到充分支撑，建议保留。`,
+        `补充说明：该部分法律适用依据为相关法条的规定，可在文书中引用具体条款。`,
+        `经进一步分析，建议在「${stepName}」中补充相关证据链的说明以增强论证力。`
+    ];
+    const a = mockAnswers[stepData[stepId].followUps.length % mockAnswers.length];
+
+    stepData[stepId].followUps.push({ q, a });
+    renderSteps();
+    const el = document.getElementById(`step_${index}`);
+    if (el) el.classList.add('expanded');
+    // 重新展开追问输入框
+    setTimeout(() => followUpStep(index), 0);
+}
+
 function editStep(index) {
     const stepId = stepsConfig[index].id;
     const data = stepData[stepId];
@@ -2484,20 +2617,23 @@ function doCompileSteps(elementAnswers) {
 }
 
 // ===== 引入案由要件弹窗 =====
-let pendingElementPresets = { standard: [], mine: [] };
+let pendingElementPresets = { standard: [], mine: [], case: [] };
 let pendingElementDirectCallback = null;
 
 function showPreElementConfirmModal(presets, onDirect, onIntroduce) {
-    pendingElementPresets = presets || { standard: [], mine: [] };
+    pendingElementPresets = presets || { standard: [], mine: [], case: [] };
     pendingElementDirectCallback = onDirect;
     pendingElementConfirmCallback = onIntroduce;
 
     const standardCount = (pendingElementPresets.standard || []).length;
     const mineCount = (pendingElementPresets.mine || []).length;
-    const totalCount = standardCount + mineCount;
+    const caseCount = (pendingElementPresets.case || []).length;
+    const totalCount = standardCount + mineCount + caseCount;
     const countEl = document.getElementById('preElementConfirmCount');
     if (countEl) {
-        countEl.textContent = `共 ${totalCount} 个可用要件（标准 ${standardCount} / 我的 ${mineCount}）`;
+        // v2.27 (V1.1.8): 计数纳入个案要件；为 0 时省略"个案 0"段，文案更简洁
+        const caseSeg = caseCount > 0 ? ` / 个案 ${caseCount}` : '';
+        countEl.textContent = `共 ${totalCount} 个可用要件（标准 ${standardCount} / 我的 ${mineCount}${caseSeg}）`;
     }
 
     document.getElementById('preElementConfirmOverlay').classList.add('show');
@@ -2520,7 +2656,7 @@ function chooseIntroduceElements() {
 }
 
 function showElementConfirmModal(presets, callback) {
-    pendingElementAll = presets || { standard: [], mine: [] };
+    pendingElementAll = presets || { standard: [], mine: [], case: [] };
     pendingElementConfirmCallback = callback;
     pendingElementSelections = new Set();
 
@@ -2530,6 +2666,9 @@ function showElementConfirmModal(presets, callback) {
     });
     (pendingElementAll.mine || []).forEach((_, idx) => {
         pendingElementSelections.add(getElementGlobalIndex('mine', idx));
+    });
+    (pendingElementAll.case || []).forEach((_, idx) => {
+        pendingElementSelections.add(getElementGlobalIndex('case', idx));
     });
 
     renderElementConfirmSelectList();
@@ -2544,6 +2683,7 @@ function renderElementConfirmSelectList() {
     const container = document.getElementById('elementConfirmSelectList');
     const standard = pendingElementAll.standard || [];
     const mine = pendingElementAll.mine || [];
+    const caseElements = pendingElementAll.case || [];
 
     let html = '';
     if (standard.length > 0) {
@@ -2552,15 +2692,19 @@ function renderElementConfirmSelectList() {
     if (mine.length > 0) {
         html += renderElementCategory('我的要件', mine, 'mine');
     }
-    if (standard.length === 0 && mine.length === 0) {
+    if (caseElements.length > 0) {
+        html += renderElementCategory('个案要件', caseElements, 'case');
+    }
+    if (standard.length === 0 && mine.length === 0 && caseElements.length === 0) {
         html = `<div class="element-confirm-empty">暂无可用的案由要件</div>`;
     }
     container.innerHTML = html;
 }
 
 function renderElementCategory(title, items, source) {
-    const tagClass = source === 'mine' ? 'select-tag mine' : 'select-tag';
-    const tagText = source === 'mine' ? '我的' : '标准';
+    // v2.27 (V1.1.8): 三色标签 — 标准(蓝)/我的(绿)/个案(橙)，与本案要件抽屉一致
+    const tagClass = source === 'mine' ? 'select-tag mine' : (source === 'case' ? 'select-tag case' : 'select-tag');
+    const tagText = source === 'mine' ? '我的' : (source === 'case' ? '个案' : '标准');
     const listHtml = items.map((p, idx) => {
         const globalIdx = getElementGlobalIndex(source, idx);
         const checked = pendingElementSelections.has(globalIdx) ? 'checked' : '';
@@ -2631,6 +2775,11 @@ function getSelectedElements() {
             result.push({ ...p, source: 'mine', idx });
         }
     });
+    (pendingElementAll.case || []).forEach((p, idx) => {
+        if (pendingElementSelections.has(getElementGlobalIndex('case', idx))) {
+            result.push({ ...p, source: 'case', idx });
+        }
+    });
     return result;
 }
 
@@ -2680,7 +2829,7 @@ function generateMockElementAnswer(preset, caseData) {
 function closeElementConfirmModal() {
     document.getElementById('elementConfirmOverlay').classList.remove('show');
     document.getElementById('elementConfirmModal').classList.remove('show');
-    pendingElementAll = { standard: [], mine: [] };
+    pendingElementAll = { standard: [], mine: [], case: [] };
     pendingElementSelections = new Set();
     pendingElementConfirmCallback = null;
 }
@@ -3422,6 +3571,20 @@ function setCaseCustomElements(cid, arr) {
     localStorage.setItem(`caseCustomElements_${cid}`, JSON.stringify(arr || []));
 }
 
+// v2.27 (V1.1.8): 将个案要件合并进 allPresets，供引入要件弹框统一消费
+// 与 loadCaseElementsAll 保持一致的过滤（enabled !== false）与 source 标记
+function mergeCaseElements(allPresets, cid) {
+    const base = allPresets && typeof allPresets === 'object' ? allPresets : { standard: [], mine: [] };
+    const caseCustom = getCaseCustomElements(cid)
+        .filter(p => p && p.enabled !== false)
+        .map(p => ({ ...p, source: 'case' }));
+    return {
+        standard: base.standard || [],
+        mine: base.mine || [],
+        case: caseCustom
+    };
+}
+
 // ---- 要件答案存取（案件维度）----
 function loadElementAnswers(cid) {
     if (!cid) return {};
@@ -3542,10 +3705,19 @@ function renderElementsList() {
 function renderElementsGroup(title, items, source) {
     const listHtml = items.map((p, idx) => {
         const checked = caseElementsSelection.has(p.name) ? 'checked' : '';
-        const answered = (caseElementsAnswers[p.name] || '').trim().length > 0;
-        const answeredDot = answered ? '<span class="answered-dot" title="已填写答案"></span>' : '';
+        const answer = (caseElementsAnswers[p.name] || '').trim();
+        const answered = answer.length > 0;
+        const answeredDot = answered ? '<span class="answered-dot" title="已生成答案"></span>' : '';
         const delBtn = source === 'case'
             ? `<button type="button" class="case-elements-item-del-btn" onclick="deleteCaseElement('${escapeJsString(p.name)}')" title="删除该个案要件"><i class="fas fa-trash-alt"></i></button>`
+            : '';
+        // v2.27: 已答状态直接在要件项下方展示答案内容，不再用"问答/已答·查看"按钮跳转
+        const answerHtml = answered
+            ? `<div class="case-elements-item-answer">
+                   <div class="answer-label"><i class="fas fa-comment-dots"></i> AI 生成答案</div>
+                   <div class="answer-text">${escapeHtmlForElements(answer)}</div>
+                   <button type="button" class="case-elements-item-edit-btn" onclick="editElementAnswerInline('${escapeJsString(p.name)}')"><i class="fas fa-edit"></i> 修改</button>
+               </div>`
             : '';
         return `
             <div class="case-elements-item">
@@ -3554,14 +3726,10 @@ function renderElementsGroup(title, items, source) {
                     <div class="case-elements-item-title">
                         ${escapeHtmlForElements(p.name)} ${answeredDot}
                         <span class="source-tag ${source}">${sourceLabel(source)}</span>
-                    </div>
-                    <div class="case-elements-item-question">${escapeHtmlForElements(p.question || p.desc || '')}</div>
-                    <div class="case-elements-item-actions">
-                        <button type="button" class="case-elements-item-qa-btn ${answered ? 'answered' : ''}" onclick="openElementQaModal('${source}', ${idx})">
-                            <i class="fas fa-${answered ? 'check' : 'question'}"></i> ${answered ? '已答 · 查看' : '问答'}
-                        </button>
                         ${delBtn}
                     </div>
+                    <div class="case-elements-item-question">${escapeHtmlForElements(p.question || p.desc || '')}</div>
+                    ${answerHtml}
                 </div>
             </div>
         `;
@@ -3572,6 +3740,53 @@ function renderElementsGroup(title, items, source) {
             ${listHtml}
         </div>
     `;
+}
+
+// v2.27: 内联编辑要件答案（替代原 openElementQaModal 弹窗）
+function editElementAnswerInline(name) {
+    if (!caseItem) return;
+    const current = caseElementsAnswers[name] || '';
+    const itemEls = document.querySelectorAll('.case-elements-item');
+    let targetEl = null;
+    itemEls.forEach(el => {
+        const titleEl = el.querySelector('.case-elements-item-title');
+        if (titleEl && titleEl.textContent.includes(name)) {
+            targetEl = el;
+        }
+    });
+    if (!targetEl) return;
+    const body = targetEl.querySelector('.case-elements-item-body');
+    if (!body || body.querySelector('.inline-edit-area')) return;
+    const existingAnswer = body.querySelector('.case-elements-item-answer');
+    if (existingAnswer) existingAnswer.remove();
+    const editHtml = `
+        <div class="case-elements-item-answer inline-edit-area">
+            <div class="answer-label"><i class="fas fa-edit"></i> 修改答案</div>
+            <textarea class="inline-edit-textarea" placeholder="修改 AI 生成的答案...">${escapeHtmlForElements(current)}</textarea>
+            <div class="inline-edit-actions">
+                <button type="button" class="case-elements-item-edit-btn" onclick="saveElementAnswerInline('${escapeJsString(name)}')"><i class="fas fa-save"></i> 保存</button>
+                <button type="button" class="case-elements-item-edit-btn" onclick="renderElementsList();"><i class="fas fa-times"></i> 取消</button>
+            </div>
+        </div>
+    `;
+    body.insertAdjacentHTML('beforeend', editHtml);
+    const ta = body.querySelector('.inline-edit-textarea');
+    if (ta) { ta.focus(); ta.style.height = ta.scrollHeight + 'px'; }
+}
+
+function saveElementAnswerInline(name) {
+    if (!caseItem) return;
+    const ta = document.querySelector('.inline-edit-area .inline-edit-textarea');
+    if (!ta) return;
+    const val = ta.value.trim();
+    caseElementsAnswers[name] = val;
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    if (val) {
+        caseElementsSelection.add(name);
+        saveElementSelection(caseItem.id, caseElementsSelection);
+    }
+    renderElementsList();
+    showNotification('答案已保存', 'success');
 }
 
 function sourceLabel(source) {
@@ -3684,6 +3899,35 @@ function deleteCaseElement(name) {
     renderElementsList();
     refreshCaseElementsEntryCount();
     showNotification('个案要件已删除', 'success');
+}
+
+// v2.27: AI总结 —— 对全部要件批量生成答案，无需勾选，用户可直接在列表中修改
+// 复用 generateMockElementAnswer（与"生成文书弹框中引入要件"保持一致逻辑）
+function aiSummarizeElements() {
+    if (!caseItem) {
+        showNotification('请先选择案件', 'warning');
+        return;
+    }
+    const all = [
+        ...(caseElementsCache.standard || []).map(p => ({ ...p, source: 'standard' })),
+        ...(caseElementsCache.mine || []).map(p => ({ ...p, source: 'mine' })),
+        ...(caseElementsCache.case || []).map(p => ({ ...p, source: 'case' }))
+    ];
+    if (all.length === 0) {
+        showNotification('暂无要件可总结，请先新增或维护要件', 'warning');
+        return;
+    }
+    let count = 0;
+    all.forEach(p => {
+        const answer = generateMockElementAnswer(p, caseItem);
+        caseElementsAnswers[p.name] = answer;
+        caseElementsSelection.add(p.name);  // 自动勾选已生成答案的要件
+        count++;
+    });
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    saveElementSelection(caseItem.id, caseElementsSelection);
+    renderElementsList();
+    showNotification(`已为 ${count} 项要件生成答案，可直接在列表中修改`, 'success');
 }
 
 // ---- 字符串转义辅助 ----

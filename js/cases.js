@@ -1,4 +1,5 @@
 // ============ Cases Page JavaScript ============
+// v1.27 UI 优化：生成文书弹框移除"当前模型"表单项（模型由 workflow 决定，用户侧不再展示）；批量生成配置移除"模型"只读输入框，batch-mode-info 文案同步去掉模型描述；resolveWorkflowModelForCase/quickState.model/onGenModelChange 保留（批量生成内部仍需 modelId 写入版本快照）
 // v1.26 批量生成过程页与结果页渲染：点击"开始批量生成"后进入全屏进度页实时展示每个案件状态，完成后自动渲染结果总览页（含统计卡片、操作按钮、生成结果明细）；从顶部"任务通知"查看结果时复用 renderBatchDone，确保明细有数据；提交前不再排除无可用材料案件，交由 runBatchAsync 生成失败项，保证结果明细始终可展示
 // v1.25 案件列表真实分页：renderCaseList 按 PAGE_SIZE=10 切片只渲染当前页；新增 goToPage/renderPagination；筛选/业务系统切换重置 currentPage=1；全选仅影响当前页，跨页勾选保留 selectedCaseIds；updateSelectionUI 全选态改为「当前页全部勾选」
 // v1.24 模型改为只读：quick gen 弹框与批量生成均按 workflow 的 modelId 推导模型（agentflow 平台镜像），新增 resolveWorkflowModelForCase 工具方法；onGenModelChange 置为 no-op；startQuickGen 不再向 URL 传 model 参数
@@ -883,8 +884,6 @@ function updateGenContextHint() {
 function renderGenModalBody() {
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     const body = document.getElementById('genModalBody');
-    // v1.24: 模型下拉改为只读，仅展示当前 workflow 匹配的模型
-    const currentModel = AI_MODELS.find(m => m.id === quickState.model) || AI_MODELS.find(m => m.id === DEFAULT_MODEL_ID);
 
     // v2.23 (任务 8.2): 移除 Token 超限前置判断，始终显示配置区
     let configHtml = '';
@@ -897,14 +896,6 @@ function renderGenModalBody() {
     } catch (e) { elementHintHtml = ''; }
 
     body.innerHTML = `
-        <div class="gen-form-group">
-            <label class="gen-form-label">当前模型 <i class="fas fa-info-circle model-info-icon" title="模型由 workflow 配置决定（agentflow 平台镜像），用户不可修改"></i></label>
-            <select class="gen-form-select" id="genModelSelect" disabled>
-                <option value="${currentModel.id}" selected>${currentModel.name}（${formatNumber(currentModel.limit)}）</option>
-            </select>
-            <div class="gen-form-hint" style="font-size:12px;color:var(--text-muted, #9ca3af);margin-top:4px;">由当前文书类型对应的 workflow 决定，不可手动切换</div>
-        </div>
-
         <div class="gen-context-hint ok" id="genContextHint"></div>
 
         ${elementHintHtml}
@@ -1284,18 +1275,9 @@ function renderBatchConfig() {
                         ${batchTemplateSelectHtml}
                     </select>
                 </div>
-                <div>
-                    <label class="drawer-form-label">模型</label>
-                    <input class="drawer-form-select" type="text" value="${(() => {
-                        const firstCase = selectedCases[0];
-                        const mid = firstCase ? resolveWorkflowModelForCase(firstCase, batchState.docType) : DEFAULT_MODEL_ID;
-                        const m = typeof getModelById === 'function' ? getModelById(mid) : null;
-                        return m ? m.name : mid;
-                    })()}" disabled style="opacity:0.7;cursor:not-allowed;" title="模型由所选文书类型的一步生成 Workflow 决定，不可修改">
-                </div>
                 <div class="batch-mode-info">
                     <i class="fas fa-info-circle"></i>
-                    <span>批量生成使用一步生成方式，模型由文书类型对应的 Workflow 决定。若某案件材料量过大导致 Workflow 超限，该案件将标记为失败，可在批量任务面板点击"进入详情页处理"改用分步生成。</span>
+                    <span>批量生成使用一步生成方式。若某案件材料量过大导致 Workflow 超限，该案件将标记为失败，可在批量任务面板点击"进入详情页处理"改用分步生成。</span>
                 </div>
                 <div class="full">
                     <label class="drawer-form-label">提示词</label>

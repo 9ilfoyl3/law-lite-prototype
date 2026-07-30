@@ -207,7 +207,7 @@
 
         let rowsHtml = '';
         if (workflows.length === 0) {
-            rowsHtml = '<tr><td colspan="7" class="step-empty">暂无 workflow，点击「新增 workflow」创建</td></tr>';
+            rowsHtml = '<tr><td colspan="6" class="step-empty">暂无 workflow，点击「新增 workflow」创建</td></tr>';
         } else {
             rowsHtml = workflows.map(wf => {
                 const wfType = wf.type || 'step';
@@ -218,11 +218,6 @@
                 const typeBadge = wfType === 'material'
                     ? '<span class="wf-type-badge material">一步生成型</span>'
                     : '<span class="wf-type-badge step">分步生成型</span>';
-                // v1.35: 使用模型列（新增）
-                const modelObj = (typeof getModelById === 'function') ? getModelById(wf.modelId) : null;
-                const modelHtml = modelObj
-                    ? '<span class="wf-model-tag">' + escapeHtml(modelObj.name) + '</span>'
-                    : '<span class="case-word-fallback">未设置</span>';
                 const caseWordsHtml = (!wf.caseWords || wf.caseWords.length === 0)
                     ? '<span class="case-word-fallback">兜底</span>'
                     : wf.caseWords.map(w => '<span class="case-word-tag">' + escapeHtml(w) + '</span>').join('');
@@ -236,7 +231,6 @@
                 return '<tr>'
                     + '<td class="wf-name-cell">' + escapeHtml(wf.name) + wfBadge + '</td>'
                     + '<td>' + typeBadge + '</td>'
-                    + '<td>' + modelHtml + '</td>'
                     + '<td>' + caseWordsHtml + '</td>'
                     + '<td>' + causesHtml + '</td>'
                     + '<td>' + wfBadge + '</td>'
@@ -247,13 +241,13 @@
 
         const title = escapeHtml(typeCfg.name) + ' 的 workflow';
         const hint = isCustomized ? '(已自定义，删除全部 workflow 恢复内置)' : '(使用内置默认)';
-        return '<tr class="wf-sub-row"><td colspan="7"><div class="wf-sub-wrap">'
+        return '<tr class="wf-sub-row"><td colspan="6"><div class="wf-sub-wrap">'
             + '<div class="wf-sub-header">'
             + '  <div class="wf-sub-title">' + title + '<span class="hint">' + hint + '</span></div>'
             + '  <button class="btn btn-primary" onclick="openAddWfModal(\'' + docTypeKey + '\')"><i class="fas fa-plus"></i> 新增 workflow</button>'
             + '</div>'
             + '<table class="wf-sub-table"><thead><tr>'
-            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th style="width:100px;">使用模型</th><th>匹配案字</th><th>匹配案由</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
+            + '<th>workflow 名称</th><th style="width:80px;">类型</th><th>匹配案字</th><th>匹配案由</th><th style="width:90px;">来源</th><th style="width:140px;">操作</th>'
             + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
             + '</div></td></tr>';
     }
@@ -352,8 +346,6 @@
         const materialRadio = document.getElementById('wfTypeMaterial');
         if (stepRadio) stepRadio.checked = false;
         if (materialRadio) materialRadio.checked = true;
-        // v1.35: 重置使用模型下拉（默认千问3.6）
-        renderWfModelSelect(DEFAULT_MODEL_ID);
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderCausesPicker(docTypeKey, wfSelectedCauses);
         document.getElementById('wfModal').classList.add('show');
@@ -380,8 +372,6 @@
         const materialRadio = document.getElementById('wfTypeMaterial');
         if (stepRadio) stepRadio.checked = false;
         if (materialRadio) materialRadio.checked = true;
-        // v1.35: 回填使用模型
-        renderWfModelSelect(wf.modelId || DEFAULT_MODEL_ID);
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderCausesPicker(docTypeKey, wfSelectedCauses);
         document.getElementById('wfModal').classList.add('show');
@@ -409,18 +399,6 @@
         renderCaseWordsPicker(wfEditingDocType, wfSelectedCaseWords);
         renderCausesPicker(wfEditingDocType, wfSelectedCauses);
     };
-
-    // v1.35: 渲染 workflow 使用模型下拉框（仅展示 deployed=true 的已部署模型）
-    function renderWfModelSelect(selectedModelId) {
-        const select = document.getElementById('wfModel');
-        if (!select) return;
-        const models = (typeof getDeployedModels === 'function') ? getDeployedModels() : [];
-        select.innerHTML = models.map(m =>
-            '<option value="' + m.id + '"' + (m.id === selectedModelId ? ' selected' : '') + '>'
-            + escapeHtml(m.name) + '（' + (m.limit >= 1000 ? (m.limit / 1000) + 'K' : m.limit) + '）'
-            + '</option>'
-        ).join('');
-    }
 
     function renderCaseWordsPicker(docTypeKey, selected) {
         const picker = document.getElementById('wfCaseWordsPicker');
@@ -477,29 +455,28 @@
     }
 
     // v1.32: 递归渲染案由树节点
+    // v1.36 (V1.1.8): 一级、二级、三级案由节点均支持勾选，按案由字符串精确匹配
     function renderCauseTreeNode(node, key, selected, usedCauses) {
         // node 可能是字符串（叶子）或对象 {name, children}
         if (typeof node === 'string') {
-            const name = node;
-            const isSel = selected.has(name);
-            const isUsed = usedCauses.has(name);
-            const cls = isSel ? ' selected' : '';
-            const title = isUsed ? '已被同类型其他 workflow 匹配' : '';
-            return '<div class="cause-tree-node">'
-                + '<div class="cause-tree-node-row' + cls + '" title="' + title + '">'
-                + '<span class="cause-tree-toggle"></span>'
-                + '<input type="checkbox" class="cause-tree-checkbox" value="' + escapeHtml(name) + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleCause(\'' + escapeHtml(name) + '\', this.checked)">'
-                + '<span class="cause-tree-label">' + escapeHtml(name) + (isUsed ? ' ⚠' : '') + '</span>'
-                + '</div></div>';
+            return renderCauseTreeLeaf(node, selected, usedCauses);
         }
         const name = node.name || '';
         const children = node.children || [];
         const hasChildren = children.length > 0;
-        const toggleHtml = hasChildren ? '<span class="cause-tree-toggle" onclick="toggleCauseNode(\'' + key + '\')"><i class="fas fa-chevron-right"></i></span>' : '<span class="cause-tree-toggle"></span>';
+        const isSel = selected.has(name);
+        const isUsed = usedCauses.has(name);
+        const rowCls = 'cause-tree-node-row' + (isSel ? ' selected' : '');
+        const title = isUsed ? '已被同类型其他 workflow 匹配' : '';
+        const toggleHtml = hasChildren
+            ? '<span class="cause-tree-toggle" onclick="toggleCauseNode(\'' + key + '\')">' +
+              '<i class="fas fa-chevron-right"></i></span>'
+            : '<span class="cause-tree-toggle"></span>';
         let html = '<div class="cause-tree-node">'
-            + '<div class="cause-tree-node-row">'
+            + '<div class="' + rowCls + '" title="' + title + '">'
             + toggleHtml
-            + '<span class="cause-tree-label" style="font-weight:500;">' + escapeHtml(name) + '</span>'
+            + '<input type="checkbox" class="cause-tree-checkbox" value="' + escapeHtml(name) + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleCause(\'' + escapeHtml(name) + '\', this.checked)">'
+            + '<span class="cause-tree-label" style="font-weight:500;">' + escapeHtml(name) + (isUsed ? ' ⚠' : '') + '</span>'
             + '</div>';
         if (hasChildren) {
             html += '<div class="cause-tree-children" id="cause-children-' + key + '">';
@@ -508,6 +485,19 @@
         }
         html += '</div>';
         return html;
+    }
+
+    function renderCauseTreeLeaf(name, selected, usedCauses) {
+        const isSel = selected.has(name);
+        const isUsed = usedCauses.has(name);
+        const cls = isSel ? ' selected' : '';
+        const title = isUsed ? '已被同类型其他 workflow 匹配' : '';
+        return '<div class="cause-tree-node">'
+            + '<div class="cause-tree-node-row' + cls + '" title="' + title + '">'
+            + '<span class="cause-tree-toggle"></span>'
+            + '<input type="checkbox" class="cause-tree-checkbox" value="' + escapeHtml(name) + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleCause(\'' + escapeHtml(name) + '\', this.checked)">'
+            + '<span class="cause-tree-label">' + escapeHtml(name) + (isUsed ? ' ⚠' : '') + '</span>'
+            + '</div></div>';
     }
 
     window.toggleCause = function(name, checked) {
@@ -599,16 +589,13 @@
         const arr = orgData[wfEditingDocType];
 
         // v1.32: 新 workflow 对象（不再写 steps 字段）
-        // v1.35: 新增 modelId 字段（使用模型）
-        const wfModelSelect = document.getElementById('wfModel');
-        const finalModelId = wfModelSelect ? wfModelSelect.value : DEFAULT_MODEL_ID;
+        // v1.36 (V1.1.8): 移除 modelId 字段，使用模型由 agentflow 平台 workflow 内部决定
         const newWf = {
             id: finalWfId,
             name: name,
             type: wfEditingType,
             caseWords: newCaseWords,
             causes: newCauses,             // v1.32: 匹配案由
-            modelId: finalModelId,         // v1.35: 使用模型（agentflow 平台 workflow 内部大模型节点的镜像映射）
             isBuiltin: false
         };
         if (wfEditingId) {

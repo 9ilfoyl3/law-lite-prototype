@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>07 · 一步生成闭环图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --brand-soft: #ede9fe;
+    --warn: #d4a017;
+    --danger: #e74c3c;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1200px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .svg-wrap { width: 100%; }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">一步生成闭环图（V1.1）</div>
+  <div class="widget-sub">用户只交互一次，中间过程不可控；前端不做 Token 估算，超限由 workflow 返回异常</div>
+  <div class="svg-wrap">
+  <svg viewBox="0 0 1080 1120" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+      </marker>
+      <marker id="arrowBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+      </marker>
+      <marker id="arrowWarn" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+      </marker>
+      <marker id="arrowLoop" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#9ca3af" />
+      </marker>
+    </defs>
+
+    <!-- 顶部双入口 -->
+    <!-- 入口A：列表页 -->
+    <g>
+      <rect x="80" y="20" width="220" height="48" rx="24" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="190" y="49" text-anchor="middle" fill="#ffffff" font-size="14">入口A · 案件列表页</text>
+    </g>
+    <text x="190" y="86" text-anchor="middle" fill="#6b7280" font-size="11">cases.html 行操作「生成文书」</text>
+
+    <!-- 入口B：详情页 -->
+    <g>
+      <rect x="780" y="20" width="220" height="48" rx="24" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="890" y="49" text-anchor="middle" fill="#ffffff" font-size="14">入口B · 案件详情页</text>
+    </g>
+    <text x="890" y="86" text-anchor="middle" fill="#6b7280" font-size="11">case-files.html 「一步生成」Tab</text>
+
+    <!-- 入口A 流程：弹框配置 → sessionStorage → 跳详情页 -->
+    <path d="M 190 92 L 190 120" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="60" y="124" width="260" height="78" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="190" y="148" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">弹框配置生成参数</text>
+      <text x="190" y="166" text-anchor="middle" fill="#6b7280" font-size="11">文书类型 / 模板 / 提示词</text>
+      <text x="190" y="180" text-anchor="middle" fill="#6b7280" font-size="11">模型字段只读（workflow 决定）</text>
+      <text x="190" y="194" text-anchor="middle" fill="#6b7280" font-size="11">不展示 Token 预估</text>
+    </g>
+    <path d="M 190 204 L 190 232" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="60" y="236" width="260" height="78" rx="8" fill="#f9fafb" stroke="#6d5ce7" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="190" y="260" text-anchor="middle" fill="#1f2937" font-size="13">sessionStorage 传递配置</text>
+      <text x="190" y="278" text-anchor="middle" fill="#6b7280" font-size="11">跳转详情页 → 自动预填配置</text>
+      <text x="190" y="292" text-anchor="middle" fill="#6b7280" font-size="11">自动定位「一步生成」Tab</text>
+      <text x="190" y="306" text-anchor="middle" fill="#6b7280" font-size="11">自动勾选全部材料</text>
+    </g>
+
+    <!-- 入口B 流程：选材料 + 配置 -->
+    <path d="M 890 92 L 890 120" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <g>
+      <rect x="760" y="124" width="260" height="78" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="890" y="148" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">选材料 + 配置生成参数</text>
+      <text x="890" y="166" text-anchor="middle" fill="#6b7280" font-size="11">左栏材料树勾选（仅 success）</text>
+      <text x="890" y="180" text-anchor="middle" fill="#6b7280" font-size="11">右栏配置文书类型/模板/提示词</text>
+      <text x="890" y="194" text-anchor="middle" fill="#6b7280" font-size="11">模型字段只读展示</text>
+    </g>
+
+    <!-- Tab 切换材料清空确认（提示框） -->
+    <g>
+      <rect x="760" y="220" width="260" height="60" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+      <text x="890" y="242" text-anchor="middle" fill="#1f2937" font-size="12">Tab 切换材料清空确认</text>
+      <text x="890" y="258" text-anchor="middle" fill="#6b7280" font-size="11">一步 ↔ 分步 Tab 切换时</text>
+      <text x="890" y="272" text-anchor="middle" fill="#6b7280" font-size="11">已选材料 → 弹确认框 → 清空</text>
+    </g>
+
+    <!-- 汇流到主路径 -->
+    <path d="M 190 314 L 190 360 L 460 360" stroke="#6d5ce7" stroke-width="2" fill="none"/>
+    <path d="M 890 280 L 890 360 L 620 360" stroke="#6b7280" stroke-width="1.5" fill="none"/>
+
+    <!-- 汇流点：配置区 -->
+    <g>
+      <rect x="380" y="332" width="320" height="60" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="540" y="358" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="500">配置生成参数（详情页右栏）</text>
+      <text x="540" y="376" text-anchor="middle" fill="#6b7280" font-size="11">材料已选 + 模板/提示词已填</text>
+      <text x="540" y="388" text-anchor="middle" fill="#6b7280" font-size="11">点击「生成」按钮触发</text>
+    </g>
+
+    <!-- 配置项明细（横向卡片） -->
+    <g>
+      <rect x="80" y="420" width="920" height="100" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="100" y="442" fill="#1f2937" font-size="13" font-weight="500">配置项明细</text>
+
+      <!-- 文书类型 -->
+      <rect x="100" y="452" width="160" height="56" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="180" y="472" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">文书类型</text>
+      <text x="180" y="490" text-anchor="middle" fill="#6b7280" font-size="10">下拉选择</text>
+      <text x="180" y="502" text-anchor="middle" fill="#6b7280" font-size="10">决定可用 Workflow</text>
+
+      <!-- 文书模板 -->
+      <rect x="270" y="452" width="170" height="56" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="355" y="472" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">文书模板</text>
+      <text x="355" y="490" text-anchor="middle" fill="#6b7280" font-size="10">optgroup 分组</text>
+      <text x="355" y="502" text-anchor="middle" fill="#6b7280" font-size="10">标准 + 我的</text>
+
+      <!-- 提示词 -->
+      <rect x="450" y="452" width="170" height="56" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="535" y="472" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">提示词</text>
+      <text x="535" y="490" text-anchor="middle" fill="#6b7280" font-size="10">标准 + 我的（颜色区分）</text>
+      <text x="535" y="502" text-anchor="middle" fill="#6b7280" font-size="10">启用/停用 + 历史版本</text>
+
+      <!-- 模型 -->
+      <rect x="630" y="452" width="160" height="56" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="710" y="472" text-anchor="middle" fill="#9ca3af" font-size="12" font-weight="500">模型（只读）</text>
+      <text x="710" y="490" text-anchor="middle" fill="#6b7280" font-size="10">workflow 决定</text>
+      <text x="710" y="502" text-anchor="middle" fill="#6b7280" font-size="10">不可手动切换</text>
+
+      <!-- 要件 -->
+      <rect x="800" y="452" width="180" height="56" rx="6" fill="#fdf6e3" stroke="#d4a017"/>
+      <text x="890" y="472" text-anchor="middle" fill="#d4a017" font-size="12" font-weight="500">要件（可选 Plus）</text>
+      <text x="890" y="490" text-anchor="middle" fill="#6b7280" font-size="10">仅裁判文书 + 案字过滤</text>
+      <text x="890" y="502" text-anchor="middle" fill="#6b7280" font-size="10">0 个或多个</text>
+    </g>
+
+    <path d="M 540 392 L 540 420" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <path d="M 540 520 L 540 552" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+
+    <!-- 调用 workflow（端到端 API，前端不做前置 Token 估算） -->
+    <g>
+      <rect x="320" y="556" width="440" height="76" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="540" y="582" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="500">调用 Workflow（端到端 API）</text>
+      <text x="540" y="602" text-anchor="middle" fill="#6b7280" font-size="11">前端直接调用，不做前置 Token 估算</text>
+      <text x="540" y="616" text-anchor="middle" fill="#6b7280" font-size="11">workflow 第一步判断材料量，超限快速返回</text>
+      <text x="540" y="628" text-anchor="middle" fill="#6b7280" font-size="11">workflow 内部可分拆多次模型调用（用户不感知）</text>
+    </g>
+
+    <!-- workflow 内部判断分支 -->
+    <path d="M 540 632 L 540 664" stroke="#6d5ce7" stroke-width="2" fill="none"/>
+    <g>
+      <path d="M 540 664 L 660 712 L 540 760 L 420 712 Z" fill="#f9fafb" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="540" y="704" text-anchor="middle" fill="#1f2937" font-size="13">workflow</text>
+      <text x="540" y="720" text-anchor="middle" fill="#1f2937" font-size="13">判断材料量</text>
+      <text x="540" y="736" text-anchor="middle" fill="#6b7280" font-size="11">超限？</text>
+    </g>
+
+    <!-- 正常路径：流式输出 -->
+    <path d="M 420 712 L 220 712 L 220 780" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <rect x="240" y="694" width="60" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+    <text x="270" y="708" text-anchor="middle" fill="#6d5ce7" font-size="11">正常</text>
+
+    <g>
+      <rect x="80" y="784" width="280" height="100" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="220" y="808" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">流式输出文书内容</text>
+      <text x="220" y="828" text-anchor="middle" fill="#6b7280" font-size="11">专用渲染区实时展示（非编辑器内）</text>
+      <text x="220" y="842" text-anchor="middle" fill="#6b7280" font-size="11">已输出字数 / 预计剩余时间</text>
+      <text x="220" y="856" text-anchor="middle" fill="#6b7280" font-size="11">分段进度提示「正在生成：XX 段...」</text>
+      <text x="220" y="870" text-anchor="middle" fill="#d4a017" font-size="11">输出过程不可取消，无取消按钮</text>
+    </g>
+
+    <!-- 异常路径：超限异常 -->
+    <path d="M 660 712 L 860 712 L 860 780" stroke="#d4a017" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowWarn)"/>
+    <rect x="820" y="694" width="60" height="20" rx="10" fill="#ffffff" stroke="#d4a017"/>
+    <text x="850" y="708" text-anchor="middle" fill="#d4a017" font-size="11">超限</text>
+
+    <g>
+      <rect x="720" y="784" width="280" height="116" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+      <text x="860" y="806" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">workflow 返回超限异常</text>
+      <text x="860" y="824" text-anchor="middle" fill="#6b7280" font-size="11">非裁判文书：「材料量过大，当前流程不支持」</text>
+      <text x="860" y="838" text-anchor="middle" fill="#6b7280" font-size="11">裁判文书：「可切换至分步生成」</text>
+      <text x="860" y="852" text-anchor="middle" fill="#6b7280" font-size="11">补充：当前材料约 X 万字，建议 Y 万字以内</text>
+      <text x="860" y="866" text-anchor="middle" fill="#6b7280" font-size="11">提供「按材料类型筛选」快捷入口</text>
+      <text x="860" y="884" text-anchor="middle" fill="#d4a017" font-size="10">弹框 UI 统一 · overlay/dialog + modal-btn</text>
+    </g>
+    <!-- case7 演示标注 -->
+    <g>
+      <rect x="420" y="800" width="280" height="92" rx="8" fill="#f0edff" stroke="#6d5ce7" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="560" y="822" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">case7 演示场景</text>
+      <text x="560" y="840" text-anchor="middle" fill="#6b7280" font-size="10">某建筑公司诉某房地产公司</text>
+      <text x="560" y="854" text-anchor="middle" fill="#6b7280" font-size="10">建设工程施工合同纠纷案</text>
+      <text x="560" y="870" text-anchor="middle" fill="#6b7280" font-size="10">36 材料 × 6000 ≈ 21.6 万字</text>
+      <text x="560" y="884" text-anchor="middle" fill="#d4a017" font-size="10">&gt; 8 万阈值 → 弹「切换至分步生成」</text>
+    </g>
+    <path d="M 700 846 L 720 846" stroke="#6d5ce7" stroke-width="1.5" stroke-dasharray="3,3" fill="none" marker-end="url(#arrowBrand)"/>
+
+    <!-- 流式输出完成 → 自动渲染格式化文书 -->
+    <path d="M 220 884 L 220 920" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="80" y="924" width="280" height="64" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="220" y="948" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">自动渲染格式化文书</text>
+      <text x="220" y="966" text-anchor="middle" fill="#6b7280" font-size="11">输出完成 → 配置区折叠</text>
+      <text x="220" y="980" text-anchor="middle" fill="#6b7280" font-size="11">文书展示区显示结果（占 75% 宽）</text>
+    </g>
+
+    <!-- 异常分支回环（修改材料后重新生成） -->
+    <path d="M 860 900 L 860 968 L 540 968" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,3" fill="none"/>
+    <rect x="640" y="952" width="80" height="20" rx="10" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="680" y="966" text-anchor="middle" fill="#6b7280" font-size="10">减少材料重试</text>
+
+    <!-- 保存为文书版本 -->
+    <path d="M 220 988 L 220 1018" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="80" y="1022" width="280" height="64" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="220" y="1046" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">保存为文书版本</text>
+      <text x="220" y="1064" text-anchor="middle" fill="#6b7280" font-size="11">按 docType 合并 + 不覆盖已有版本</text>
+      <text x="220" y="1078" text-anchor="middle" fill="#6b7280" font-size="11">追加到案件文书版本列表</text>
+    </g>
+
+    <!-- 重新展开配置区回环 -->
+    <path d="M 80 956 L 40 956 L 40 360 L 380 360" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#arrowLoop)"/>
+    <rect x="20" y="640" width="120" height="20" rx="10" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="80" y="654" text-anchor="middle" fill="#6b7280" font-size="10">重新展开配置区修改</text>
+
+    <!-- 终点提示 -->
+    <text x="220" y="1110" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">闭环完成 · 用户仅一次交互</text>
+  </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>主路径 / 焦点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px solid #e5e7eb"></span>普通节点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f9fafb;border:1px dashed #6d5ce7"></span>数据传递 / sessionStorage</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fdf6e3;border:1px solid #d4a017"></span>异常 / 警告</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px dashed #9ca3af"></span>回环 / 重新生成</span>
+  </div>
+</div>
+</body>
+</html>

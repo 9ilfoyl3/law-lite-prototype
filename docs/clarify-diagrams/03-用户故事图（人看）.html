@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>03 · 用户故事图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --radius: 8px;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1080px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .role-row {
+    display: flex; align-items: center; gap: var(--spacer-12);
+    padding: var(--spacer-12) var(--spacer-16);
+    background: var(--surface-muted);
+    border-radius: var(--radius);
+    margin-bottom: var(--spacer-16);
+    border-left: 3px solid var(--brand);
+  }
+  .role-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--brand); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; flex-shrink: 0;
+  }
+  .role-text { font-size: 14px; color: var(--text); line-height: 1.4; }
+  .role-text strong { font-weight: 600; }
+  .role-text small { color: var(--text-muted); font-size: 12px; display:block; margin-top: 2px; }
+  .epic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacer-12); }
+  .epic {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: var(--spacer-12) var(--spacer-16);
+    background: var(--surface);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .epic-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 600; color: var(--text);
+  }
+  .epic-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--surface-muted); color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .epic-tag.pri { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .epic-tag.new { background: #fdf6e3; color: #d4a017; border-color: #d4a017; }
+  .epic-body { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  .story-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 4px; }
+  .story-list li {
+    font-size: 12px; color: var(--text);
+    padding-left: 12px; position: relative; line-height: 1.5;
+  }
+  .story-list li::before {
+    content: ''; position: absolute; left: 0; top: 8px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--brand);
+  }
+  @media (max-width: 720px) { .epic-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">用户故事图（V1.1）</div>
+  <div class="widget-sub">基层民事法官在案件模块的核心 Epic 与故事分组（按优先级排序，标注 V1.1 调整点）</div>
+
+  <div class="role-row">
+    <div class="role-avatar">法</div>
+    <div class="role-text">
+      <strong>基层民事法官 · 主要用户</strong>
+      <small>案多人少 · 时间紧张 · 不擅长复杂配置 · 50 岁左右视力一般</small>
+    </div>
+  </div>
+
+  <div class="epic-grid">
+    <div class="epic">
+      <div class="epic-head">
+        <span>E1 · 一键生成裁判文书</span>
+        <span class="epic-tag pri">P0 核心</span>
+      </div>
+      <div class="epic-body">作为法官，我希望上传案件材料后系统自动解析并一步生成裁判文书初稿，流式输出让我感知在生成。</div>
+      <ul class="story-list">
+        <li>前端不做 Token 估算，直接调 workflow</li>
+        <li>默认加载全部要素（标准+自定义）</li>
+        <li>流式输出 + 字数/进度提示</li>
+        <li>workflow 超限返回异常后展示提示</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E2 · 复杂案件分步生成</span>
+        <span class="epic-tag pri">P0 核心</span>
+      </div>
+      <div class="epic-body">作为法官，我希望对裁判文书按 6 步序列逐步生成，让我对中间环节有掌控感。</div>
+      <ul class="story-list">
+        <li>仅裁判文书类型展示分步生成 Tab</li>
+        <li>6 步硬编码：案件信息→原告诉请→被告答辩→争议焦点→事实认定→裁判结果</li>
+        <li>手动逐步触发，选完材料不自动生成</li>
+        <li>步骤依赖：步骤4选填前3步，步骤5/6必填前一步</li>
+        <li>片段拼接产出完整文书</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E3 · 案件状态追踪</span>
+        <span class="epic-tag">P1 重要</span>
+      </div>
+      <div class="epic-body">作为法官，我希望在列表页一眼看清每个案件的解析状态与历史文书，不必进入详情就能判断下一步。</div>
+      <ul class="story-list">
+        <li>材料数量列：解析中 spinner / 异常黄色徽章</li>
+        <li>案件名称后蓝色文书数徽章（可点击打开历史文书）</li>
+        <li>列配置默认最小列集（名称/更新时间/材料数量）</li>
+        <li>不设独立状态字段，靠派生指标表达</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E4 · 模板与提示词个性化</span>
+        <span class="epic-tag">P1 重要</span>
+      </div>
+      <div class="epic-body">作为法官，我希望维护自己的模板和提示词并启用/停用，让文书更符合本庭风格。</div>
+      <ul class="story-list">
+        <li>标准/我的模板下拉分组显示，"我的"徽章</li>
+        <li>提示词按来源颜色区分 + 启用/停用</li>
+        <li>提示词历史版本管理（最多 10 条，一键恢复）</li>
+        <li>已移除全局"恢复默认"按钮</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E5 · 批量生成与异步队列</span>
+        <span class="epic-tag">P2 增强</span>
+      </div>
+      <div class="epic-body">作为法官，我希望一次勾选多个案件批量生成，配置阶段告知异常案件，执行阶段异步不阻塞。</div>
+      <ul class="story-list">
+        <li>统一一种文书类型，模型字段只读</li>
+        <li>配置阶段：解析异常案件黄色徽章 + 策略选项</li>
+        <li>异步队列 + 进度反馈（顶部"批量任务"入口）</li>
+        <li>队列满时阻止提交，提示剩余位置</li>
+        <li>workflow 超限标记 failed + 提示进详情页</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E6 · 文书精修与版本管理</span>
+        <span class="epic-tag">P2 增强</span>
+      </div>
+      <div class="epic-body">作为法官，我希望对已生成文书多轮对话式精修，并保留所有版本可回溯。</div>
+      <ul class="story-list">
+        <li>精修独立页（左文书 + 右对话），新标签页打开</li>
+        <li>每轮修改可撤销，保存为新版本不覆盖原文</li>
+        <li>历史文书列表按时间倒序，查看/下载/删除</li>
+        <li>重新配置回填最近版本配置</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E7 · 引入要件（可选 Plus）</span>
+        <span class="epic-tag">P2 增强</span>
+      </div>
+      <div class="epic-body">作为法官，我希望文书生成时可选引入要件作为上下文，可 0 个可多个。</div>
+      <ul class="story-list">
+        <li>本案要件入口在材料树顶部固定条</li>
+        <li>弹框两步：选择要件 → 确认 AI 预生成答案</li>
+        <li>三种来源：标准(蓝)/我的(绿)/个案(橙)</li>
+        <li>个案要件(橙色标签) 默认勾选 + 答案预生成</li>
+        <li>弹框内已去掉"管理我的要件"链接</li>
+        <li>要件结果持久化到 localStorage（案件维度）</li>
+      </ul>
+    </div>
+
+    <div class="epic">
+      <div class="epic-head">
+        <span>E8 · 案由案字管理关系</span>
+        <span class="epic-tag">P1 重要</span>
+      </div>
+      <div class="epic-body">作为法官/管理员，我希望案字适配时只看到当前案由大类允许的案字，避免管理关系错乱。</div>
+      <ul class="story-list">
+        <li>案由大类→案字白名单映射（民事→民初/民终/民再 等）</li>
+        <li>一级/二级/三级案由均可触发白名单匹配（getCauseCategory）</li>
+        <li>我的要件/管理后台要件管理：案字栏仅展示允许项</li>
+        <li>已有不在白名单的案字标记"已禁用"（灰+删除线）</li>
+        <li>历史数据保留显示，用户手动清理</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

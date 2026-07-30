@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>06 · 材料解析状态机（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --brand-soft: #f0edff;
+    --warn: #d4a017;
+    --warn-soft: #fdf6e3;
+    --info: #2563eb;
+    --info-soft: #dbeafe;
+    --ok: #16a34a;
+    --ok-soft: #ecfdf5;
+    --danger: #e74c3c;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+    --spacer-24: 24px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: #f3f4f6;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+  .widget-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: var(--spacer-24);
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-20); line-height: 1.6; }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: var(--spacer-24) 0 var(--spacer-12);
+    padding-left: var(--spacer-8);
+    border-left: 3px solid var(--brand);
+    line-height: 1.2;
+  }
+  .svg-wrap { width: 100%; }
+  table.kv {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  table.kv th, table.kv td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.kv th {
+    background: var(--surface-muted);
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  table.kv td.center { text-align: center; }
+  table.kv tr.row-warn td { background: var(--warn-soft); }
+  table.kv tr.row-ok td { background: var(--ok-soft); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge-muted { background: #f3f4f6; color: #9ca3af; }
+  .badge-ok { background: var(--ok-soft); color: var(--ok); }
+  .badge-warn { background: var(--warn-soft); color: var(--warn); }
+  .badge-info { background: var(--info-soft); color: var(--info); }
+  .badge-brand { background: var(--brand-soft); color: var(--brand); }
+  .legend {
+    display: flex; gap: var(--spacer-16);
+    margin-top: var(--spacer-12);
+    font-size: 12px; color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .legend-line { width: 18px; height: 2px; display: inline-block; }
+  .note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: var(--spacer-8);
+    background: var(--surface-muted);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid var(--brand);
+  }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacer-12);
+  }
+  .compare-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+  }
+  .compare-card h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brand);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .compare-card ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .compare-card li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">材料解析状态机（V1.1）</div>
+  <div class="widget-sub">文件从上传到解析完成的状态流转与异常处理路径；单文件粒度的状态机，案件级别聚合后影响文书生成按钮可用性</div>
+
+  <!-- ============ 状态机 SVG ============ -->
+  <div class="section-title">一、状态机流转（PRD 10.1 / 10.2）</div>
+  <div class="svg-wrap">
+    <svg viewBox="0 0 920 480" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+        </marker>
+        <marker id="arrowBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+        </marker>
+        <marker id="arrowWarn" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+        </marker>
+        <marker id="arrowOk" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#16a34a" />
+        </marker>
+        <marker id="arrowDanger" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#e74c3c" />
+        </marker>
+      </defs>
+
+      <!-- 顶部主链：上传中 → 解析中 → 解析完成 -->
+      <!-- 节点1：上传中 -->
+      <g>
+        <rect x="30" y="50" width="170" height="76" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+        <text x="115" y="76" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">上传中</text>
+        <text x="115" y="96" text-anchor="middle" fill="#6b7280" font-size="11">原型阶段瞬时完成</text>
+        <text x="115" y="114" text-anchor="middle" fill="#6b7280" font-size="11">文件存至本地存储</text>
+      </g>
+
+      <!-- 箭头1：上传中 → 解析中（上传完成，自动触发解析） -->
+      <path d="M 200 88 L 290 88" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="210" y="68" width="70" height="18" rx="9" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="245" y="81" text-anchor="middle" fill="#6d5ce7" font-size="11">上传完成</text>
+
+      <!-- 节点2：解析中 -->
+      <g>
+        <rect x="300" y="50" width="170" height="76" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+        <text x="385" y="76" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">解析中</text>
+        <text x="385" y="96" text-anchor="middle" fill="#6b7280" font-size="11">spinner 旋转动画</text>
+        <text x="385" y="114" text-anchor="middle" fill="#6b7280" font-size="11">mock 延时 2-3 秒</text>
+      </g>
+
+      <!-- 箭头2：解析中 → 解析完成（成功） -->
+      <path d="M 470 88 L 560 88" stroke="#16a34a" stroke-width="2" fill="none" marker-end="url(#arrowOk)"/>
+      <rect x="480" y="68" width="60" height="18" rx="9" fill="#ffffff" stroke="#16a34a"/>
+      <text x="510" y="81" text-anchor="middle" fill="#16a34a" font-size="11">解析成功</text>
+
+      <!-- 节点3：解析完成 -->
+      <g>
+        <rect x="570" y="50" width="170" height="76" rx="8" fill="#ecfdf5" stroke="#16a34a" stroke-width="1.5"/>
+        <text x="655" y="76" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">解析完成</text>
+        <text x="655" y="96" text-anchor="middle" fill="#6b7280" font-size="11">绿色对勾 ✓</text>
+        <text x="655" y="114" text-anchor="middle" fill="#6b7280" font-size="11">可参与文书生成</text>
+      </g>
+
+      <!-- 箭头3：解析中 → 解析异常（失败，黄色虚线） -->
+      <path d="M 385 126 L 385 200" stroke="#d4a017" stroke-width="1.8" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowWarn)"/>
+      <rect x="395" y="148" width="60" height="18" rx="9" fill="#ffffff" stroke="#d4a017"/>
+      <text x="425" y="161" text-anchor="middle" fill="#d4a017" font-size="11">解析失败</text>
+
+      <!-- 节点4：解析异常 -->
+      <g>
+        <rect x="300" y="204" width="170" height="76" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+        <text x="385" y="230" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">解析异常</text>
+        <text x="385" y="250" text-anchor="middle" fill="#6b7280" font-size="11">黄色标签标黄</text>
+        <text x="385" y="268" text-anchor="middle" fill="#6b7280" font-size="11">tooltip 显示异常份数</text>
+      </g>
+
+      <!-- 三条异常处理路径 -->
+      <!-- 路径1：重新解析（回到解析中） -->
+      <path d="M 340 204 L 340 184 L 340 126" stroke="#6d5ce7" stroke-width="1.8" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="170" y="154" width="80" height="30" rx="15" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="210" y="174" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">重新解析</text>
+      <text x="210" y="196" text-anchor="middle" fill="#6b7280" font-size="10">原文件重试</text>
+
+      <!-- 路径2：重新上传（回到上传中） -->
+      <path d="M 300 254 L 200 254 L 115 254 L 115 126" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+      <rect x="120" y="238" width="90" height="30" rx="15" fill="#ffffff" stroke="#6b7280"/>
+      <text x="165" y="258" text-anchor="middle" fill="#6b7280" font-size="11" font-weight="500">重新上传</text>
+      <text x="165" y="280" text-anchor="middle" fill="#6b7280" font-size="10">替换为新文件</text>
+
+      <!-- 路径3：删除文件（移出案件） -->
+      <path d="M 470 254 L 570 254 L 660 254" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowDanger)"/>
+      <rect x="480" y="244" width="80" height="18" rx="9" fill="#ffffff" stroke="#e74c3c"/>
+      <text x="520" y="257" text-anchor="middle" fill="#e74c3c" font-size="11">删除文件</text>
+      <g>
+        <rect x="660" y="226" width="170" height="56" rx="8" fill="#ffffff" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="745" y="252" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">移出案件</text>
+        <text x="745" y="270" text-anchor="middle" fill="#6b7280" font-size="11">不再参与解析/生成</text>
+      </g>
+
+      <!-- 批量解析提示 -->
+      <g>
+        <rect x="30" y="340" width="200" height="56" rx="8" fill="#f0edff" stroke="#6d5ce7" stroke-width="1.5"/>
+        <text x="130" y="364" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="500">批量解析（并行）</text>
+        <text x="130" y="382" text-anchor="middle" fill="#6b7280" font-size="11">批量上传时并行解析</text>
+        <text x="130" y="396" text-anchor="middle" fill="#6b7280" font-size="11">互不影响</text>
+      </g>
+      <path d="M 130 340 L 130 240 L 300 240" stroke="#6d5ce7" stroke-width="1" stroke-dasharray="3,3" fill="none" opacity="0.5"/>
+
+      <!-- 不阻塞提示 -->
+      <g>
+        <rect x="280" y="340" width="280" height="56" rx="8" fill="#ecfdf5" stroke="#16a34a" stroke-width="1.5"/>
+        <text x="420" y="364" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="500">部分异常不阻塞</text>
+        <text x="420" y="382" text-anchor="middle" fill="#6b7280" font-size="11">只要存在已解析成功的材料即可生成文书</text>
+        <text x="420" y="396" text-anchor="middle" fill="#6b7280" font-size="11">异常材料自动排除</text>
+      </g>
+
+      <!-- 解析中限制提示 -->
+      <g>
+        <rect x="600" y="340" width="280" height="56" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+        <text x="740" y="364" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="500">解析中不可生成文书</text>
+        <text x="740" y="382" text-anchor="middle" fill="#6b7280" font-size="11">列表页"生成文书"按钮置灰</text>
+        <text x="740" y="396" text-anchor="middle" fill="#6b7280" font-size="11">提示"材料解析中，请稍候"</text>
+      </g>
+    </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-line" style="background:#6d5ce7"></span>主路径 / 重新解析</span>
+    <span class="legend-item"><span class="legend-line" style="background:#16a34a"></span>成功路径</span>
+    <span class="legend-item"><span class="legend-line" style="background:#d4a017;border-top:1px dashed #d4a017"></span>异常路径</span>
+    <span class="legend-item"><span class="legend-line" style="background:#6b7280"></span>重新上传 / 回退</span>
+    <span class="legend-item"><span class="legend-line" style="background:#e74c3c;border-top:1px dashed #e74c3c"></span>删除路径</span>
+  </div>
+
+  <!-- ============ 10.3 异常类型表格 ============ -->
+  <div class="section-title">二、5 种异常类型与处理（PRD 10.3）</div>
+  <table class="kv">
+    <thead>
+      <tr>
+        <th style="width:18%">异常类型</th>
+        <th style="width:30%">表现</th>
+        <th>用户处理路径</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-warn">
+        <td><span class="badge badge-warn">格式不支持</span></td>
+        <td>文件名旁黄色标签"格式不支持"</td>
+        <td>重新上传支持的格式（PDF / Word / Excel / TXT / 图片）</td>
+      </tr>
+      <tr class="row-warn">
+        <td><span class="badge badge-warn">文件损坏</span></td>
+        <td>黄色标签"文件损坏"</td>
+        <td>重新上传完整文件</td>
+      </tr>
+      <tr class="row-warn">
+        <td><span class="badge badge-warn">OCR 失败</span></td>
+        <td>黄色标签"OCR失败"（扫描件）</td>
+        <td>重新上传可编辑版（非扫描件）</td>
+      </tr>
+      <tr class="row-warn">
+        <td><span class="badge badge-warn">内容为空</span></td>
+        <td>黄色标签"内容为空"</td>
+        <td>检查文件内容后重新上传</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-muted">文件过大</span></td>
+        <td>上传时拦截，<strong>不进入解析</strong></td>
+        <td>上传符合大小限制的文件（大小限制由系统初始化配置）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ 10.4 进度展示区分 ============ -->
+  <div class="section-title">三、进度展示区分（PRD 10.4）</div>
+  <div class="compare-grid">
+    <div class="compare-card">
+      <h4>📋 案件列表页</h4>
+      <ul>
+        <li>材料数量单元格：解析中显示 spinner + 数字</li>
+        <li>异常材料数单独 <span class="badge badge-warn">标黄</span></li>
+        <li>点击材料数量 → 打开"文件解析状态"弹窗</li>
+        <li>弹窗展示每个文件的解析状态</li>
+        <li>弹窗中对异常文件提供"重新解析"按钮</li>
+      </ul>
+    </div>
+    <div class="compare-card">
+      <h4>📁 案件详情页</h4>
+      <ul>
+        <li>材料树<strong>仅展示</strong> <code>parseStatus === 'success'</code> 的材料</li>
+        <li>解析中和异常材料不在详情页展示</li>
+        <li>顶部进度概览："共 N 个文件，已解析 M 个，异常 K 个"</li>
+        <li>仅在存在未解析完成或异常文件时显示概览</li>
+        <li>查看全部文件状态 → 列表页文件解析状态弹窗</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ 10.5 交互规则 ============ -->
+  <div class="section-title">四、交互规则（PRD 10.5）</div>
+  <table class="kv">
+    <thead>
+      <tr>
+        <th style="width:22%">规则</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>解析触发</td>
+        <td>文件上传完成后<strong>自动触发</strong>解析（原型阶段 mock 延时 2-3 秒模拟异步）</td>
+      </tr>
+      <tr>
+        <td>解析中不可生成文书</td>
+        <td>列表页"生成文书"按钮在材料解析中时置灰，提示"材料解析中，请稍候"</td>
+      </tr>
+      <tr>
+        <td>详情页材料过滤</td>
+        <td>案件详情页材料树仅展示 <code>parseStatus === 'success'</code> 的文件，解析中和异常文件不展示（详见 5.2 功能1）</td>
+      </tr>
+      <tr>
+        <td>部分异常不阻塞</td>
+        <td>只要存在已解析成功的材料，即可生成文书；异常材料自动排除</td>
+      </tr>
+      <tr>
+        <td>批量解析</td>
+        <td>批量上传时<strong>并行解析</strong>，互不影响</td>
+      </tr>
+      <tr>
+        <td>重新解析</td>
+        <td>在文件解析状态弹窗中，对异常文件提供"重新解析"按钮（原文件重试）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

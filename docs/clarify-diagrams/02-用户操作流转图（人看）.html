@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>02 · 用户操作流转图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --warn: #d4a017;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1200px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">用户操作流转图（V1.1）</div>
+  <div class="widget-sub">法官在案件列表页与详情页之间的动作分支：一步生成/分步生成（仅裁判文书）/批量生成，前端不做 Token 判断</div>
+  <svg viewBox="0 0 1120 820" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowNav" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+      </marker>
+      <marker id="arrowNavBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+      </marker>
+    </defs>
+
+    <!-- 入口 -->
+    <g>
+      <rect x="480" y="20" width="160" height="48" rx="24" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="560" y="49" text-anchor="middle" fill="#ffffff" font-size="14">法官登录</text>
+    </g>
+    <path d="M 560 70 L 560 100" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+
+    <!-- 案件列表页 -->
+    <g>
+      <rect x="420" y="106" width="280" height="90" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="560" y="134" text-anchor="middle" fill="#1f2937" font-size="15" font-weight="500">案件列表页 cases.html</text>
+      <text x="560" y="154" text-anchor="middle" fill="#6b7280" font-size="12">材料数量列 + 文书数徽章 + 解析状态</text>
+      <text x="560" y="172" text-anchor="middle" fill="#6b7280" font-size="11">列配置默认最小列集（名称/更新时间/材料数量）</text>
+      <text x="560" y="188" text-anchor="middle" fill="#6b7280" font-size="11">按钮可用性：无材料/解析中置灰</text>
+    </g>
+
+    <!-- 左分支1：列表页生成文书 -->
+    <path d="M 420 151 L 320 151 L 320 230" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowNavBrand)"/>
+    <rect x="360" y="131" width="120" height="22" rx="11" fill="#ffffff" stroke="#6d5ce7"/>
+    <text x="420" y="146" text-anchor="middle" fill="#6d5ce7" font-size="11">点击「生成文书」</text>
+
+    <g>
+      <rect x="220" y="234" width="200" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="320" y="260" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">弹框配置生成参数</text>
+      <text x="320" y="278" text-anchor="middle" fill="#6b7280" font-size="11">文书类型/模板/提示词</text>
+      <text x="320" y="294" text-anchor="middle" fill="#6b7280" font-size="11">模型只读展示（workflow 决定）</text>
+      <text x="320" y="308" text-anchor="middle" fill="#6b7280" font-size="11">不展示 Token 预估</text>
+    </g>
+    <path d="M 320 316 L 320 346" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowNavBrand)"/>
+
+    <g>
+      <rect x="220" y="350" width="200" height="68" rx="8" fill="#f9fafb" stroke="#6d5ce7" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="320" y="374" text-anchor="middle" fill="#1f2937" font-size="12">sessionStorage 传递配置</text>
+      <text x="320" y="392" text-anchor="middle" fill="#6b7280" font-size="11">跳转详情页自动预填</text>
+      <text x="320" y="408" text-anchor="middle" fill="#6b7280" font-size="11">自动定位一步生成 Tab</text>
+      <text x="320" y="416" text-anchor="middle" fill="#6b7280" font-size="10">自动勾选全部材料</text>
+    </g>
+
+    <!-- 左分支2：批量生成 -->
+    <path d="M 420 165 L 60 165 L 60 230" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+    <rect x="20" y="145" width="80" height="22" rx="11" fill="#ffffff" stroke="#e5e7eb"/>
+    <text x="60" y="160" text-anchor="middle" fill="#6b7280" font-size="11">勾选多个</text>
+
+    <g>
+      <rect x="20" y="234" width="160" height="80" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="100" y="260" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">批量生成</text>
+      <text x="100" y="278" text-anchor="middle" fill="#6b7280" font-size="11">统一一种文书类型</text>
+      <text x="100" y="294" text-anchor="middle" fill="#6b7280" font-size="11">异步队列 + 进度反馈</text>
+      <text x="100" y="308" text-anchor="middle" fill="#6b7280" font-size="11">队列满时阻止提交</text>
+    </g>
+    <path d="M 100 316 L 100 350" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+    <g>
+      <rect x="20" y="354" width="160" height="56" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+      <text x="100" y="378" text-anchor="middle" fill="#1f2937" font-size="12">逐案件调 workflow</text>
+      <text x="100" y="396" text-anchor="middle" fill="#6b7280" font-size="11">超限标记 failed + 提示</text>
+    </g>
+
+    <!-- 右分支：点击案件名称 -->
+    <path d="M 700 151 L 900 151 L 900 230" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+    <rect x="780" y="131" width="120" height="22" rx="11" fill="#ffffff" stroke="#e5e7eb"/>
+    <text x="840" y="146" text-anchor="middle" fill="#6b7280" font-size="11">点击案件名称</text>
+
+    <!-- 案件详情页 -->
+    <g>
+      <rect x="780" y="234" width="260" height="100" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="910" y="262" text-anchor="middle" fill="#1f2937" font-size="15" font-weight="500">案件详情页 case-files.html</text>
+      <text x="910" y="282" text-anchor="middle" fill="#6b7280" font-size="12">材料树（25%宽，可拖拽）</text>
+      <text x="910" y="300" text-anchor="middle" fill="#6b7280" font-size="11">顶部固定条：本案要件入口（蓝/绿/橙 三色）</text>
+      <text x="910" y="316" text-anchor="middle" fill="#6b7280" font-size="11">仅展示 parseStatus=success 材料</text>
+      <text x="910" y="330" text-anchor="middle" fill="#6b7280" font-size="11">支持文件问答、历史文书、文书精修</text>
+    </g>
+
+    <path d="M 910 336 L 910 366" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+
+    <!-- 两个 tab -->
+    <g>
+      <rect x="760" y="370" width="180" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="850" y="394" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">一步生成 Tab</text>
+      <text x="850" y="412" text-anchor="middle" fill="#6b7280" font-size="11">全文书类型默认展示</text>
+      <text x="850" y="428" text-anchor="middle" fill="#6b7280" font-size="11">默认加载全部要素</text>
+      <text x="850" y="442" text-anchor="middle" fill="#6b7280" font-size="11">流式输出 + 进度提示</text>
+    </g>
+
+    <g>
+      <rect x="960" y="370" width="160" height="80" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="1040" y="394" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">分步生成 Tab</text>
+      <text x="1040" y="412" text-anchor="middle" fill="#6b7280" font-size="11">仅裁判文书类型展示</text>
+      <text x="1040" y="428" text-anchor="middle" fill="#6b7280" font-size="11">6步硬编码序列</text>
+      <text x="1040" y="442" text-anchor="middle" fill="#6b7280" font-size="11">手动逐步触发</text>
+    </g>
+
+    <!-- Tab 切换确认 -->
+    <path d="M 940 410 L 960 410" stroke="#d4a017" stroke-width="1.5" stroke-dasharray="3,3" fill="none"/>
+    <rect x="936" y="396" width="28" height="14" rx="7" fill="#ffffff" stroke="#d4a017"/>
+    <text x="950" y="406" text-anchor="middle" fill="#d4a017" font-size="9">切换</text>
+
+    <path d="M 850 452 L 850 490" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowNavBrand)"/>
+    <path d="M 1040 452 L 1040 490" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+
+    <!-- 生成结果 -->
+    <g>
+      <rect x="760" y="494" width="180" height="70" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="850" y="520" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">调用 workflow 一步生成</text>
+      <text x="850" y="538" text-anchor="middle" fill="#6b7280" font-size="11">前端不做 Token 估算</text>
+      <text x="850" y="554" text-anchor="middle" fill="#6b7280" font-size="11">workflow 返回超限→提示</text>
+    </g>
+
+    <g>
+      <rect x="960" y="494" width="160" height="70" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="1040" y="520" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">逐步配置生成</text>
+      <text x="1040" y="538" text-anchor="middle" fill="#6b7280" font-size="11">步骤依赖校验</text>
+      <text x="1040" y="554" text-anchor="middle" fill="#6b7280" font-size="11">片段拼接产出</text>
+    </g>
+
+    <path d="M 850 566 L 850 592" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+    <path d="M 1040 566 L 1040 592" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+
+    <!-- 流式输出 -->
+    <g>
+      <rect x="800" y="596" width="280" height="50" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="940" y="618" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">流式输出 + 保存为文书版本</text>
+      <text x="940" y="636" text-anchor="middle" fill="#6b7280" font-size="11">专用渲染区，不可取消</text>
+    </g>
+
+    <!-- 汇流到文书版本管理 -->
+    <path d="M 320 418 L 320 690 L 480 690" stroke="#6d5ce7" stroke-width="1.5" fill="none"/>
+    <path d="M 100 410 L 100 690 L 480 690" stroke="#6b7280" stroke-width="1.5" fill="none"/>
+    <path d="M 940 648 L 940 690 L 640 690" stroke="#6b7280" stroke-width="1.5" fill="none"/>
+    <path d="M 560 690 L 560 720" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
+
+    <!-- 终点：文书版本管理 -->
+    <g>
+      <rect x="440" y="724" width="240" height="80" rx="10" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="560" y="750" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="500">文书版本管理</text>
+      <text x="560" y="770" text-anchor="middle" fill="#6b7280" font-size="11">历史文书列表（按时间倒序）</text>
+      <text x="560" y="786" text-anchor="middle" fill="#6b7280" font-size="11">查看 / 下载 / 删除</text>
+      <text x="560" y="800" text-anchor="middle" fill="#6b7280" font-size="11">精修 / 重新配置回填</text>
+    </g>
+  </svg>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>主路径/默认</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px solid #e5e7eb"></span>可选路径</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f9fafb;border:1px dashed #6d5ce7"></span>数据传递</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fdf6e3;border:1px solid #d4a017"></span>异常/警告</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f9fafb;border:1px solid #e5e7eb"></span>终点</span>
+  </div>
+</div>
+</body>
+</html>

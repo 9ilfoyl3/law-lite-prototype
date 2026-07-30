@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>08 · 分步生成闭环图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --warn: #d4a017;
+    --info: #3b82f6;
+    --info-bg: #eff6ff;
+    --danger: #e74c3c;
+    --danger-bg: #fef2f2;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1200px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .svg-wrap { width: 100%; }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">分步生成闭环图（V1.1）</div>
+  <div class="widget-sub">仅裁判文书类型展示分步 Tab；6 步硬编码序列，手动逐步触发，片段拼接产出</div>
+  <div class="svg-wrap">
+  <svg viewBox="0 0 1180 1480" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+      </marker>
+      <marker id="arrowBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+      </marker>
+      <marker id="arrowWarn" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+      </marker>
+      <marker id="arrowRequired" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#e74c3c" />
+      </marker>
+      <marker id="arrowOptional" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#3b82f6" />
+      </marker>
+    </defs>
+
+    <!-- 前置条件 -->
+    <g>
+      <rect x="320" y="20" width="540" height="76" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="590" y="46" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="500">前置条件：updateStepsTabVisibility 判断</text>
+      <text x="590" y="66" text-anchor="middle" fill="#6b7280" font-size="11">仅「裁判文书」类型展示分步生成 Tab</text>
+      <text x="590" y="80" text-anchor="middle" fill="#6b7280" font-size="11">其他文书类型只有一步生成 Tab</text>
+    </g>
+    <!-- case7 演示路径标注 -->
+    <g>
+      <rect x="900" y="20" width="260" height="92" rx="8" fill="#f0edff" stroke="#6d5ce7" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="1030" y="42" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">case7 演示路径</text>
+      <text x="1030" y="60" text-anchor="middle" fill="#6b7280" font-size="10">一步生成超限（36 材料×6000）</text>
+      <text x="1030" y="74" text-anchor="middle" fill="#6b7280" font-size="10">→ 弹框「切换至分步生成」</text>
+      <text x="1030" y="88" text-anchor="middle" fill="#6b7280" font-size="10">→ 进入分步 Tab</text>
+      <text x="1030" y="102" text-anchor="middle" fill="#d4a017" font-size="10">6 步序列正常执行</text>
+    </g>
+    <path d="M 900 66 L 860 66" stroke="#6d5ce7" stroke-width="1.5" stroke-dasharray="3,3" fill="none" marker-end="url(#arrowBrand)"/>
+    <path d="M 590 96 L 590 124" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+
+    <!-- 步骤通用模板说明（左侧） -->
+    <g>
+      <rect x="20" y="130" width="240" height="180" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="140" y="152" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">每步通用交互（手动触发）</text>
+      <text x="30" y="174" fill="#6b7280" font-size="11">1. 独立选材料（步骤级非全局）</text>
+      <text x="30" y="192" fill="#6b7280" font-size="11">2. 配置模板 / 提示词</text>
+      <text x="30" y="210" fill="#6b7280" font-size="11">3. 模型只读（workflow 决定）</text>
+      <text x="30" y="228" fill="#6b7280" font-size="11">4. 点击「生成」按钮触发</text>
+      <text x="30" y="246" fill="#6b7280" font-size="11">5. 选完材料不自动触发</text>
+      <text x="30" y="264" fill="#6b7280" font-size="11">6. 调用 workflow（端到端 API）</text>
+      <text x="30" y="282" fill="#6b7280" font-size="11">7. 保留输出快照（可查看）</text>
+      <text x="30" y="300" fill="#d4a017" font-size="11">注：每步独立 API 调用</text>
+    </g>
+
+    <!-- 依赖提示条状态说明（右侧） -->
+    <g>
+      <rect x="920" y="130" width="240" height="180" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="1040" y="152" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">依赖提示条（buildStepDependencyHintHtml）</text>
+      <rect x="935" y="164" width="14" height="14" rx="3" fill="#eff6ff" stroke="#3b82f6"/>
+      <text x="955" y="175" fill="#6b7280" font-size="11">蓝色 info · 无依赖 / 前置已完成</text>
+      <rect x="935" y="186" width="14" height="14" rx="3" fill="#fef2f2" stroke="#e74c3c"/>
+      <text x="955" y="197" fill="#6b7280" font-size="11">红色 block · 必填未完成（按钮置灰）</text>
+      <rect x="935" y="208" width="14" height="14" rx="3" fill="#fdf6e3" stroke="#d4a017"/>
+      <text x="955" y="219" fill="#6b7280" font-size="11">黄色 warning · 选填未完成（可执行）</text>
+      <text x="935" y="245" fill="#1f2937" font-size="11" font-weight="500">按钮可用性：</text>
+      <text x="935" y="263" fill="#6b7280" font-size="11">必填依赖未完成 → 置灰 + title 提示</text>
+      <text x="935" y="281" fill="#6b7280" font-size="11">选填依赖未完成 → 允许执行传空值</text>
+      <text x="935" y="299" fill="#6b7280" font-size="11">超限异常 → 不阻止按钮，返回后展示</text>
+    </g>
+
+    <!-- 步骤1：案件信息 -->
+    <g>
+      <rect x="320" y="130" width="540" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="340" y="154" fill="#6d5ce7" font-size="13" font-weight="600">步骤 1 · 案件信息</text>
+      <text x="340" y="174" fill="#6b7280" font-size="11">无前置依赖 → 蓝色 info 提示</text>
+      <text x="340" y="190" fill="#6b7280" font-size="11">手动点击「生成」→ 调用 workflow → 输出片段1（当事人段）</text>
+      <text x="340" y="204" fill="#6b7280" font-size="11">保留输出快照，可查看 / 重新生成</text>
+      <rect x="730" y="142" width="120" height="22" rx="11" fill="#eff6ff" stroke="#3b82f6"/>
+      <text x="790" y="157" text-anchor="middle" fill="#3b82f6" font-size="11">无依赖 · 可执行</text>
+    </g>
+
+    <!-- 步骤2：原告诉请 -->
+    <path d="M 590 210 L 590 240" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <g>
+      <rect x="320" y="244" width="540" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="340" y="268" fill="#6d5ce7" font-size="13" font-weight="600">步骤 2 · 原告诉请</text>
+      <text x="340" y="288" fill="#6b7280" font-size="11">无前置依赖 → 蓝色 info 提示</text>
+      <text x="340" y="304" fill="#6b7280" font-size="11">手动点击「生成」→ 调用 workflow → 输出片段2（诉请段）</text>
+      <text x="340" y="318" fill="#6b7280" font-size="11">保留输出快照，可查看 / 重新生成</text>
+      <rect x="730" y="256" width="120" height="22" rx="11" fill="#eff6ff" stroke="#3b82f6"/>
+      <text x="790" y="271" text-anchor="middle" fill="#3b82f6" font-size="11">无依赖 · 可执行</text>
+    </g>
+
+    <!-- 步骤3：被告答辩 -->
+    <path d="M 590 324 L 590 354" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <g>
+      <rect x="320" y="358" width="540" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="340" y="382" fill="#6d5ce7" font-size="13" font-weight="600">步骤 3 · 被告答辩</text>
+      <text x="340" y="402" fill="#6b7280" font-size="11">无前置依赖 → 蓝色 info 提示</text>
+      <text x="340" y="418" fill="#6b7280" font-size="11">手动点击「生成」→ 调用 workflow → 输出片段3（答辩段）</text>
+      <text x="340" y="432" fill="#6b7280" font-size="11">保留输出快照，可查看 / 重新生成</text>
+      <rect x="730" y="370" width="120" height="22" rx="11" fill="#eff6ff" stroke="#3b82f6"/>
+      <text x="790" y="385" text-anchor="middle" fill="#3b82f6" font-size="11">无依赖 · 可执行</text>
+    </g>
+
+    <!-- 步骤4：争议焦点（可选依赖 1+2+3） -->
+    <path d="M 590 438 L 590 468" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+
+    <!-- 可选依赖箭头：1,2,3 → 4 -->
+    <path d="M 320 170 L 280 170 L 280 500 L 320 500" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowOptional)"/>
+    <path d="M 320 284 L 260 284 L 260 510 L 320 510" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowOptional)"/>
+    <path d="M 320 398 L 240 398 L 240 520 L 320 520" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowOptional)"/>
+    <rect x="220" y="448" width="100" height="20" rx="10" fill="#ffffff" stroke="#3b82f6"/>
+    <text x="270" y="462" text-anchor="middle" fill="#3b82f6" font-size="10">可选依赖 required=false</text>
+
+    <g>
+      <rect x="320" y="472" width="540" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="340" y="496" fill="#6d5ce7" font-size="13" font-weight="600">步骤 4 · 争议焦点</text>
+      <text x="340" y="516" fill="#6b7280" font-size="11">可选依赖步骤 1+2+3 返回内容（required=false）</text>
+      <text x="340" y="532" fill="#6b7280" font-size="11">为空允许执行传空值 → 输出片段4（争议段）</text>
+      <text x="340" y="546" fill="#6b7280" font-size="11">已完成 1/2/3 → 蓝色 info；未完成 → 黄色 warning</text>
+      <rect x="710" y="484" width="140" height="22" rx="11" fill="#fdf6e3" stroke="#d4a017"/>
+      <text x="780" y="499" text-anchor="middle" fill="#d4a017" font-size="11">选填未完成 · 可执行</text>
+    </g>
+
+    <!-- 步骤5：事实认定（必填依赖 4） -->
+    <path d="M 590 552 L 590 582" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <path d="M 860 512 L 880 512 L 880 612 L 860 612" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arrowRequired)"/>
+    <rect x="820" y="552" width="120" height="20" rx="10" fill="#ffffff" stroke="#e74c3c"/>
+    <text x="880" y="566" text-anchor="middle" fill="#e74c3c" font-size="10">必填依赖 required=true</text>
+
+    <g>
+      <rect x="320" y="586" width="540" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="340" y="610" fill="#6d5ce7" font-size="13" font-weight="600">步骤 5 · 事实认定</text>
+      <text x="340" y="630" fill="#6b7280" font-size="11">必填依赖步骤 4 返回内容（required=true）</text>
+      <text x="340" y="646" fill="#6b7280" font-size="11">为空阻止执行 → 输出片段5（事实段）</text>
+      <text x="340" y="660" fill="#6b7280" font-size="11">未完成 → 红色 block + 按钮置灰 + title 提示</text>
+      <rect x="710" y="598" width="140" height="22" rx="11" fill="#fef2f2" stroke="#e74c3c"/>
+      <text x="780" y="613" text-anchor="middle" fill="#e74c3c" font-size="11">必填未完成 · 按钮置灰</text>
+    </g>
+
+    <!-- 步骤6：裁判结果（必填依赖 5） -->
+    <path d="M 590 666 L 590 696" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <path d="M 860 626 L 880 626 L 880 726 L 860 726" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arrowRequired)"/>
+    <rect x="820" y="666" width="120" height="20" rx="10" fill="#ffffff" stroke="#e74c3c"/>
+    <text x="880" y="680" text-anchor="middle" fill="#e74c3c" font-size="10">必填依赖 required=true</text>
+
+    <g>
+      <rect x="320" y="700" width="540" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="340" y="724" fill="#6d5ce7" font-size="13" font-weight="600">步骤 6 · 裁判结果</text>
+      <text x="340" y="744" fill="#6b7280" font-size="11">必填依赖步骤 5 返回内容（required=true）</text>
+      <text x="340" y="760" fill="#6b7280" font-size="11">为空阻止执行 → 输出片段6（主文段）</text>
+      <text x="340" y="774" fill="#6b7280" font-size="11">未完成 → 红色 block + 按钮置灰 + title 提示</text>
+      <rect x="710" y="712" width="140" height="22" rx="11" fill="#fef2f2" stroke="#e74c3c"/>
+      <text x="780" y="727" text-anchor="middle" fill="#e74c3c" font-size="11">必填未完成 · 按钮置灰</text>
+    </g>
+
+    <!-- 全部步骤完成 → 生成文书按钮 -->
+    <path d="M 590 780 L 590 816" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="320" y="820" width="540" height="56" rx="8" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="590" y="846" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="500">全部步骤完成 · 显示「生成文书」按钮</text>
+      <text x="590" y="864" text-anchor="middle" fill="#ffffff" font-size="11">仅当 6 步全部完成才显示</text>
+    </g>
+
+    <!-- 片段拼接 -->
+    <path d="M 590 876 L 590 906" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="120" y="910" width="940" height="100" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="590" y="934" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">片段拼接（片段 1 + 2 + 3 + 4 + 5 + 6）</text>
+      <rect x="140" y="948" width="130" height="48" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="205" y="968" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">片段1</text>
+      <text x="205" y="984" text-anchor="middle" fill="#6b7280" font-size="10">当事人段</text>
+      <rect x="285" y="948" width="130" height="48" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="350" y="968" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">片段2</text>
+      <text x="350" y="984" text-anchor="middle" fill="#6b7280" font-size="10">诉请段</text>
+      <rect x="430" y="948" width="130" height="48" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="495" y="968" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">片段3</text>
+      <text x="495" y="984" text-anchor="middle" fill="#6b7280" font-size="10">答辩段</text>
+      <rect x="575" y="948" width="130" height="48" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="640" y="968" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">片段4</text>
+      <text x="640" y="984" text-anchor="middle" fill="#6b7280" font-size="10">争议段</text>
+      <rect x="720" y="948" width="130" height="48" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="785" y="968" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">片段5</text>
+      <text x="785" y="984" text-anchor="middle" fill="#6b7280" font-size="10">事实段</text>
+      <rect x="865" y="948" width="130" height="48" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="930" y="968" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">片段6</text>
+      <text x="930" y="984" text-anchor="middle" fill="#6b7280" font-size="10">主文段</text>
+    </g>
+
+    <!-- 完整文书 -->
+    <path d="M 590 1010 L 590 1040" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <g>
+      <rect x="320" y="1044" width="540" height="60" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="590" y="1068" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">完整文书</text>
+      <text x="590" y="1086" text-anchor="middle" fill="#6b7280" font-size="11">保存为文书版本（含 stepsSnapshot 步骤快照）</text>
+      <text x="590" y="1100" text-anchor="middle" fill="#6b7280" font-size="11">按 docType 合并 + 不覆盖已有版本</text>
+    </g>
+
+    <!-- 重新生成 + 重新配置 -->
+    <path d="M 590 1104 L 590 1134" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <g>
+      <rect x="120" y="1138" width="940" height="120" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="140" y="1160" fill="#1f2937" font-size="13" font-weight="500">重新生成 & 重新配置</text>
+      <rect x="140" y="1172" width="430" height="76" rx="6" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="355" y="1194" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">重新生成（当前步）</text>
+      <text x="355" y="1212" text-anchor="middle" fill="#6b7280" font-size="11">仅覆盖当前步输出</text>
+      <text x="355" y="1226" text-anchor="middle" fill="#6b7280" font-size="11">不影响后续已完成步骤</text>
+      <text x="355" y="1240" text-anchor="middle" fill="#d4a017" font-size="11">递归重置暂不实现（PRD 登记后续扩展）</text>
+
+      <rect x="610" y="1172" width="430" height="76" rx="6" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="825" y="1194" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">重新配置回填</text>
+      <text x="825" y="1212" text-anchor="middle" fill="#6b7280" font-size="11">默认回填最近一次历史文书快照</text>
+      <text x="825" y="1226" text-anchor="middle" fill="#6b7280" font-size="11">已选材料 + 模型/类型/模板/提示词/方式</text>
+      <text x="825" y="1240" text-anchor="middle" fill="#d4a017" font-size="11">stepsSnapshot 暂不回填到 stepData</text>
+    </g>
+
+    <!-- 异常分支：workflow 超限 -->
+    <path d="M 590 1258 L 590 1288" stroke="#d4a017" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowWarn)"/>
+    <g>
+      <rect x="320" y="1292" width="540" height="76" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+      <text x="590" y="1316" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">workflow 超限异常</text>
+      <text x="590" y="1336" text-anchor="middle" fill="#6b7280" font-size="11">提示：「步骤名」材料量过大，请减少材料</text>
+      <text x="590" y="1350" text-anchor="middle" fill="#6b7280" font-size="11">不阻止该步生成按钮，由 workflow 返回后展示</text>
+      <text x="590" y="1364" text-anchor="middle" fill="#6b7280" font-size="11">用户减少该步材料后重试</text>
+    </g>
+
+    <!-- 终点提示 -->
+    <text x="590" y="1420" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">闭环完成 · 6 步硬编码 · 手动逐步触发 · 片段拼接产出</text>
+    <text x="590" y="1440" text-anchor="middle" fill="#6b7280" font-size="11">V1.1 仅法院民商事场景，后续场景扩展时复制模块改代码（不做配置化）</text>
+  </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>主路径 / 焦点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px solid #e5e7eb"></span>普通节点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#eff6ff;border:1px solid #3b82f6"></span>蓝色 info · 无依赖 / 前置已完成</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fef2f2;border:1px solid #e74c3c"></span>红色 block · 必填未完成</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fdf6e3;border:1px solid #d4a017"></span>黄色 warning · 选填未完成 / 异常</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px dashed #3b82f6"></span>可选依赖箭头</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>05 · 案件状态流转图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --brand-soft: #f0edff;
+    --warn: #d4a017;
+    --warn-soft: #fdf6e3;
+    --info: #2563eb;
+    --info-soft: #dbeafe;
+    --ok: #16a34a;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+    --spacer-24: 24px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: #f3f4f6;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+  .widget-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: var(--spacer-24);
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-20); line-height: 1.6; }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: var(--spacer-24) 0 var(--spacer-12);
+    padding-left: var(--spacer-8);
+    border-left: 3px solid var(--brand);
+    line-height: 1.2;
+  }
+  .svg-wrap { width: 100%; }
+  table.kv {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  table.kv th, table.kv td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.kv th {
+    background: var(--surface-muted);
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  table.kv td.center { text-align: center; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 500;
+  }
+  .badge-muted { background: #f3f4f6; color: #9ca3af; }
+  .badge-ok { background: #ecfdf5; color: #047857; }
+  .badge-warn { background: var(--warn-soft); color: var(--warn); }
+  .badge-info { background: var(--info-soft); color: var(--info); }
+  .badge-brand { background: var(--brand-soft); color: var(--brand); }
+  .legend {
+    display: flex; gap: var(--spacer-16);
+    margin-top: var(--spacer-12);
+    font-size: 12px; color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .legend-line { width: 18px; height: 2px; display: inline-block; }
+  .note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: var(--spacer-8);
+    background: var(--surface-muted);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid var(--brand);
+  }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">案件状态流转图（V1.1）</div>
+  <div class="widget-sub">案件不设独立状态字段，通过"材料数量 + 文书数"两个派生指标体现当前状态；不加状态筛选器，用户通过派生指标自行判断</div>
+
+  <!-- ============ 状态机 SVG ============ -->
+  <div class="section-title">一、状态机流转（PRD 8.1 / 8.2）</div>
+  <div class="svg-wrap">
+    <svg viewBox="0 0 920 460" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+        </marker>
+        <marker id="arrowBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+        </marker>
+        <marker id="arrowWarn" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+        </marker>
+        <marker id="arrowInfo" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#2563eb" />
+        </marker>
+      </defs>
+
+      <!-- 顶部主链：待上传 → 材料解析中 → 可生成文书 → 已生成文书 -->
+      <!-- 节点1：待上传 -->
+      <g>
+        <rect x="30" y="60" width="180" height="80" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+        <text x="120" y="86" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">待上传</text>
+        <text x="120" y="106" text-anchor="middle" fill="#6b7280" font-size="11">材料数量 = 0</text>
+        <text x="120" y="124" text-anchor="middle" fill="#6b7280" font-size="11">文书数 = 0</text>
+      </g>
+
+      <!-- 箭头1：待上传 → 材料解析中（上传材料） -->
+      <path d="M 210 100 L 270 100" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="218" y="80" width="60" height="18" rx="9" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="248" y="93" text-anchor="middle" fill="#6d5ce7" font-size="11">上传材料</text>
+
+      <!-- 节点2：材料解析中 -->
+      <g>
+        <rect x="280" y="60" width="180" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+        <text x="370" y="86" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">材料解析中</text>
+        <text x="370" y="106" text-anchor="middle" fill="#6b7280" font-size="11">spinner + 数字</text>
+        <text x="370" y="124" text-anchor="middle" fill="#6b7280" font-size="11">部分完成不阻塞</text>
+      </g>
+
+      <!-- 箭头2：材料解析中 → 可生成文书（解析完成） -->
+      <path d="M 460 100 L 520 100" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="462" y="80" width="60" height="18" rx="9" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="492" y="93" text-anchor="middle" fill="#6d5ce7" font-size="11">解析完成</text>
+
+      <!-- 节点3：可生成文书 -->
+      <g>
+        <rect x="530" y="60" width="180" height="80" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+        <text x="620" y="86" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">可生成文书</text>
+        <text x="620" y="106" text-anchor="middle" fill="#6b7280" font-size="11">材料数量 &gt; 0</text>
+        <text x="620" y="124" text-anchor="middle" fill="#6b7280" font-size="11">全部解析成功</text>
+      </g>
+
+      <!-- 箭头3：可生成文书 → 已生成文书（生成文书） -->
+      <path d="M 620 140 L 620 200" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arrowInfo)"/>
+      <rect x="630" y="155" width="60" height="18" rx="9" fill="#ffffff" stroke="#2563eb"/>
+      <text x="660" y="168" text-anchor="middle" fill="#2563eb" font-size="11">生成文书</text>
+
+      <!-- 节点4：已生成文书 -->
+      <g>
+        <rect x="530" y="204" width="180" height="80" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+        <text x="620" y="230" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">已生成文书</text>
+        <text x="620" y="250" text-anchor="middle" fill="#6b7280" font-size="11">文书数 ≥ 1</text>
+        <text x="620" y="268" text-anchor="middle" fill="#6b7280" font-size="11">名称后蓝色徽章</text>
+      </g>
+
+      <!-- 箭头4：已生成文书 → 可生成文书（删除全部文书，回退） -->
+      <path d="M 710 244 L 760 244 L 760 100 L 710 100" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowFlow)"/>
+      <rect x="752" y="160" width="80" height="18" rx="9" fill="#ffffff" stroke="#6b7280"/>
+      <text x="792" y="173" text-anchor="middle" fill="#6b7280" font-size="11">删除全部文书</text>
+
+      <!-- 箭头5：材料解析中 → 解析异常（部分失败，黄色虚线） -->
+      <path d="M 370 140 L 370 220" stroke="#d4a017" stroke-width="1.8" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowWarn)"/>
+      <rect x="380" y="160" width="60" height="18" rx="9" fill="#ffffff" stroke="#d4a017"/>
+      <text x="410" y="173" text-anchor="middle" fill="#d4a017" font-size="11">部分失败</text>
+
+      <!-- 节点5：解析异常 -->
+      <g>
+        <rect x="280" y="224" width="180" height="80" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+        <text x="370" y="250" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="600">解析异常</text>
+        <text x="370" y="270" text-anchor="middle" fill="#6b7280" font-size="11">黄色标签标黄</text>
+        <text x="370" y="288" text-anchor="middle" fill="#6b7280" font-size="11">不阻塞已成功部分</text>
+      </g>
+
+      <!-- 箭头6：解析异常 → 可生成文书（重新上传/删除异常材料） -->
+      <path d="M 460 264 L 510 264 L 510 130 L 530 130" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+      <rect x="466" y="186" width="120" height="18" rx="9" fill="#ffffff" stroke="#6b7280"/>
+      <text x="526" y="199" text-anchor="middle" fill="#6b7280" font-size="11">重新上传/删除异常材料</text>
+
+      <!-- 删除案件（任意状态可触发） -->
+      <g>
+        <rect x="40" y="380" width="200" height="56" rx="8" fill="#ffffff" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="140" y="406" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">删除案件（任意状态可触发）</text>
+        <text x="140" y="424" text-anchor="middle" fill="#6b7280" font-size="11">仅删材料 / 同时删除文书</text>
+      </g>
+      <path d="M 120 304 L 120 380" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#arrowWarn)"/>
+      <path d="M 370 304 L 200 380" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,3" fill="none" opacity="0.5"/>
+
+      <!-- 管理后台标记 -->
+      <g>
+        <rect x="760" y="380" width="140" height="56" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+        <text x="830" y="404" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="500">管理后台（8.3）</text>
+        <text x="830" y="422" text-anchor="middle" fill="#6b7280" font-size="11">软删除/恢复/改承办人</text>
+      </g>
+      <path d="M 710 284 L 830 380" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,3" fill="none" opacity="0.5"/>
+    </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-line" style="background:#6d5ce7"></span>主链路流转</span>
+    <span class="legend-item"><span class="legend-line" style="background:#2563eb"></span>生成文书</span>
+    <span class="legend-item"><span class="legend-line" style="background:#d4a017;border-top:1px dashed #d4a017"></span>异常路径</span>
+    <span class="legend-item"><span class="legend-line" style="background:#6b7280;border-top:1px dashed #6b7280"></span>回退/旁路</span>
+    <span class="legend-item"><span class="legend-line" style="background:#e74c3c;border-top:1px dashed #e74c3c"></span>删除操作</span>
+  </div>
+
+  <!-- ============ 8.1 列表页视觉标识 ============ -->
+  <div class="section-title">二、列表页视觉标识（PRD 8.1）</div>
+  <table class="kv">
+    <thead>
+      <tr>
+        <th style="width:14%">材料数量</th>
+        <th style="width:14%">文书数</th>
+        <th style="width:18%">用户感知状态</th>
+        <th>列表页视觉标识</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="center">0</td>
+        <td class="center">0</td>
+        <td>待上传</td>
+        <td>材料数量单元格显示 <span class="badge badge-muted">-</span> <span style="color:#6b7280">灰色</span></td>
+      </tr>
+      <tr>
+        <td class="center">&gt; 0</td>
+        <td class="center">0</td>
+        <td>待生成</td>
+        <td>材料数量显示数字 <span style="color:#1f2937">正常色</span>；解析中显示 spinner + 数字；异常份数单独 <span class="badge badge-warn">标黄</span></td>
+      </tr>
+      <tr>
+        <td class="center">&gt; 0</td>
+        <td class="center">≥ 1</td>
+        <td>已生成</td>
+        <td>材料数量显示数字 + 案件名称后 <span class="badge badge-info">蓝色文书数徽章</span>；点击徽章打开历史文书弹窗</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    材料数量包含：已解析材料 + 解析异常材料（异常单独标黄）；文书数包含该案件下所有文书类型、所有版本的文书总数。<strong>不加状态筛选器</strong>，用户通过材料数量/文书数自行判断。
+  </div>
+
+  <!-- ============ 8.2.1 按钮可用性约束 ============ -->
+  <div class="section-title">三、主链路按钮可用性约束（PRD 8.2.1）</div>
+  <table class="kv">
+    <thead>
+      <tr>
+        <th style="width:20%">按钮</th>
+        <th style="width:30%">可用条件</th>
+        <th style="width:25%">置灰条件</th>
+        <th>置灰提示</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-brand">生成文书</span><br><span style="color:#6b7280;font-size:11px">列表页 / 详情页</span></td>
+        <td>案件有材料 <strong>且</strong> 全部解析成功</td>
+        <td>无材料（材料数量=0）</td>
+        <td>请先上传材料</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td>存在解析中材料</td>
+        <td>材料解析中，请稍候</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td style="color:#9ca3af;text-decoration:line-through">已选材料 Token 超限</td>
+        <td style="color:#9ca3af">已移除前端判断，由 workflow 返回异常</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-info">历史文书</span><br><span style="color:#6b7280;font-size:11px">列表页 / 详情页</span></td>
+        <td>案件文书数 ≥ 1</td>
+        <td>案件从未生成过文书（文书数=0）</td>
+        <td>hover 提示"该案件暂无历史文书"</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-brand">批量生成</span><br><span style="color:#6b7280;font-size:11px">列表页</span></td>
+        <td>勾选的案件全部有材料且解析完成</td>
+        <td>勾选案件存在解析中材料</td>
+        <td>单案件置灰，批量栏提示"部分案件材料解析中"</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    Token 超限不再做前置判断，改为调用 workflow 后根据返回异常展示提示（详见 6.4）；批量生成另受"系统初始化配置"中"批量文书队列允许个数"限制（默认 10）。
+  </div>
+
+  <!-- ============ 8.3 管理后台 ============ -->
+  <div class="section-title">四、管理后台案件管理状态（PRD 8.3）</div>
+  <table class="kv">
+    <thead>
+      <tr>
+        <th style="width:22%">特性</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>状态字段</td>
+        <td>同样不设独立状态字段</td>
+      </tr>
+      <tr>
+        <td>软删除状态</td>
+        <td><code>isDeleted</code> 标记；已删除案件显示"已删除"徽章；操作列变为"查看/恢复"；不进入正常列表</td>
+      </tr>
+      <tr>
+        <td>模式</td>
+        <td>可编辑模式：可编辑案件基本信息、可增加或更改承办人（支持多人协作）、可上传材料/生成文书、可删除/恢复</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
