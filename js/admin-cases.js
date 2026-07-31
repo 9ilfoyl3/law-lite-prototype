@@ -277,9 +277,9 @@
         window.open(`../../pages/case-files.html?caseId=${encodeURIComponent(caseId)}&readonly=1`, '_blank');
     }
 
-    // E3: 未删除案件可编辑（跳转 case-files.html 非 readonly 模式，支持修改案件基本信息）
+    // v1.43: 编辑案件改为弹框编辑结构化信息（与用户侧 cases.html 编辑按钮交互一致）
     function editCase(caseId) {
-        window.open(`../../pages/case-files.html?caseId=${encodeURIComponent(caseId)}`, '_blank');
+        openEditCase(caseId);
     }
 
     function deleteCase(caseId) {
@@ -457,6 +457,237 @@
                 applyFilters();
             }
         );
+    }
+
+    // ===== 编辑案件弹框（v1.43：与用户侧 cases.html 编辑按钮交互一致）=====
+    let editingCaseId = '';
+    // 案由树选择器状态（参考用户侧 cases.js 同名实现）
+    let selectedCauseValue = '';
+
+    // 取当前业务系统的案由树（带深拷贝，避免污染全局常量）
+    function getCurrentCauseTree() {
+        const src = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentBusiness]) || [];
+        // 深拷贝并补全 expanded 字段
+        return src.map(l1 => ({
+            name: l1.name,
+            expanded: !!l1.expanded,
+            children: (l1.children || []).map(l2 => {
+                if (typeof l2 === 'string') return l2;
+                return {
+                    name: l2.name,
+                    expanded: !!l2.expanded,
+                    children: (l2.children || []).slice()
+                };
+            })
+        }));
+    }
+
+    function openEditCase(caseId) {
+        const c = allCases.find(x => x.id === caseId);
+        if (!c) return;
+        editingCaseId = caseId;
+
+        // 当事人标签随业务系统联动
+        const system = (typeof businessSystems !== 'undefined' && businessSystems[currentBusiness]) || null;
+        const labels = (system && Array.isArray(system.partiesLabels) && system.partiesLabels.length >= 2)
+            ? system.partiesLabels
+            : ['原告', '被告'];
+        document.getElementById('editPartyALabel').textContent = labels[0];
+        document.getElementById('editPartyBLabel').textContent = labels[1];
+
+        // 案字下拉联动
+        const wordSelect = document.getElementById('editCaseWord');
+        const words = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[currentBusiness]) || [];
+        wordSelect.innerHTML = '<option value="">请选择案字</option>' +
+            words.map(w => `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`).join('');
+        wordSelect.value = c.caseWord || '';
+
+        // 案由回填
+        const causeText = document.getElementById('editCaseCauseText');
+        const causeHidden = document.getElementById('editCaseCauseHidden');
+        if (c.cause) {
+            causeHidden.value = c.cause;
+            causeText.textContent = c.cause;
+            causeText.classList.remove('placeholder');
+        } else {
+            causeHidden.value = '';
+            causeText.textContent = '请选择案由';
+            causeText.classList.add('placeholder');
+        }
+        selectedCauseValue = c.cause || '';
+
+        // 其他字段回填
+        document.getElementById('editCaseName').value = c.caseName || '';
+        document.getElementById('editCaseNumber').value = c.caseNumber || '';
+        document.getElementById('editPartyA').value = c.partyA || '';
+        document.getElementById('editPartyB').value = c.partyB || '';
+        document.getElementById('editHandler').value = getCaseHandlers(c).join('、');
+        document.getElementById('editCaseDate').value = c.date || '';
+
+        document.getElementById('editCaseModal').classList.add('show');
+    }
+
+    function closeEditCase() {
+        document.getElementById('editCaseModal').classList.remove('show');
+        editingCaseId = '';
+    }
+
+    function submitEditCase() {
+        const caseName = document.getElementById('editCaseName').value.trim();
+        if (!caseName) {
+            showNotification('请填写案件名称', 'error');
+            return;
+        }
+
+        // 直接在 businessSystems 中查找原始案件对象，确保修改能正确持久化
+        // （allCases 中的元素是 {...c} 浅拷贝，修改它不会同步到 businessSystems）
+        const system = (typeof businessSystems !== 'undefined' && businessSystems[currentBusiness]) || null;
+        const c = system && Array.isArray(system.cases)
+            ? system.cases.find(x => x.id === editingCaseId)
+            : null;
+        if (!c) { closeEditCase(); return; }
+
+        const cause = document.getElementById('editCaseCauseHidden').value;
+        // type 通过 getCauseType 自动推导；若案由为空则保留原 type
+        const type = cause ? (typeof getCauseType === 'function' ? getCauseType(cause, currentBusiness) : c.type) : c.type;
+
+        c.caseName = caseName;
+        c.caseNumber = document.getElementById('editCaseNumber').value.trim();
+        c.caseWord = document.getElementById('editCaseWord').value || '';
+        c.cause = cause;
+        c.type = type;
+        c.partyA = document.getElementById('editPartyA').value.trim();
+        c.partyB = document.getElementById('editPartyB').value.trim();
+
+        // 承办人支持多人——按顿号/逗号拆分，同步 handler 与 handlers
+        const handlerText = document.getElementById('editHandler').value.trim();
+        const handlerArr = handlerText ? handlerText.split(/[、,，]/).map(s => s.trim()).filter(Boolean) : [];
+        if (handlerArr.length > 0) {
+            c.handler = handlerArr[0];
+            c.handlers = handlerArr.slice();
+        }
+        // 留空则保留原承办人，不清空
+
+        c.date = document.getElementById('editCaseDate').value || c.date;
+        c.updatedAt = nowStr();
+
+        saveBusinessSystems();
+        console.log(`[admin-cases] 编辑案件: ${c.id} (${c.caseName})`);
+        showNotification('案件信息已更新', 'success');
+        closeEditCase();
+        loadData();
+        applyFilters();
+    }
+
+    // ===== 案由树形选择器 =====
+    function openCauseSelector() {
+        const currentValue = document.getElementById('editCaseCauseHidden').value || '';
+        selectedCauseValue = currentValue;
+        const searchInput = document.getElementById('causeSearchInput');
+        if (searchInput) searchInput.value = '';
+        renderCauseTree();
+        document.getElementById('causeSelectorModal').classList.add('show');
+    }
+
+    function closeCauseSelector() {
+        document.getElementById('causeSelectorModal').classList.remove('show');
+    }
+
+    function renderCauseTree() {
+        const container = document.getElementById('causeTreeContainer');
+        if (!container) return;
+        const tree = getCurrentCauseTree();
+        container.innerHTML = tree.map((l1, i1) => {
+            const l1Escaped = l1.name.replace(/'/g, "\\'");
+            return `
+            <div class="cause-level-1 ${l1.expanded ? 'expanded' : ''}" data-level="1" data-index="${i1}">
+                <div class="cause-level-1-header" data-cause="${escapeHtml(l1.name)}" data-level="1" data-index="${i1}">
+                    <i class="fas fa-chevron-right cause-expand-icon" onclick="event.stopPropagation(); window.AdminCases.toggleCauseLevel1(${i1})"></i>
+                    <span class="cause-level-1-name" onclick="event.stopPropagation(); window.AdminCases.selectCause('${l1Escaped}')">${escapeHtml(l1.name)}</span>
+                </div>
+                <div class="cause-level-2-container">
+                    ${l1.children.map((l2, i2) => {
+                        if (typeof l2 === 'string') {
+                            return renderCauseItem(l2, `l1-${i1}`);
+                        }
+                        const l2Escaped = l2.name.replace(/'/g, "\\'");
+                        return `
+                        <div class="cause-level-2 ${l2.expanded ? 'expanded' : ''}" data-level="2" data-index="${i1}-${i2}">
+                            <div class="cause-level-2-header" data-cause="${escapeHtml(l2.name)}" data-level="2" data-index="${i1}-${i2}">
+                                <i class="fas fa-chevron-right cause-expand-icon" onclick="event.stopPropagation(); window.AdminCases.toggleCauseLevel2(${i1}, ${i2})"></i>
+                                <span class="cause-level-2-name" onclick="event.stopPropagation(); window.AdminCases.selectCause('${l2Escaped}')">${escapeHtml(l2.name)}</span>
+                            </div>
+                            <div class="cause-level-3-container">
+                                ${(l2.children || []).map(c => renderCauseItem(c, `l2-${i1}-${i2}`)).join('')}
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+        }).join('');
+        updateCauseSelection();
+    }
+
+    function renderCauseItem(causeName, groupKey) {
+        const escaped = causeName.replace(/'/g, "\\'");
+        return `
+            <div class="cause-item ${selectedCauseValue === causeName ? 'selected' : ''}" data-cause="${escapeHtml(causeName)}" data-group="${groupKey}" onclick="window.AdminCases.selectCause('${escaped}')">
+                <span class="cause-name">${escapeHtml(causeName)}</span>
+                <i class="fas fa-check-circle cause-check"></i>
+            </div>
+        `;
+    }
+
+    function toggleCauseLevel1(index) {
+        const tree = getCurrentCauseTree();
+        if (!tree[index]) return;
+        tree[index].expanded = !tree[index].expanded;
+        renderCauseTree();
+    }
+
+    function toggleCauseLevel2(i1, i2) {
+        const tree = getCurrentCauseTree();
+        const l2 = tree[i1] && tree[i1].children && tree[i1].children[i2];
+        if (l2 && typeof l2 !== 'string') {
+            l2.expanded = !l2.expanded;
+            renderCauseTree();
+        }
+    }
+
+    function selectCause(causeName) {
+        selectedCauseValue = causeName;
+        document.getElementById('editCaseCauseHidden').value = causeName;
+        document.getElementById('editCaseCauseText').textContent = causeName;
+        document.getElementById('editCaseCauseText').classList.remove('placeholder');
+        updateCauseSelection();
+        closeCauseSelector();
+    }
+
+    function updateCauseSelection() {
+        document.querySelectorAll('#causeTreeContainer .cause-item').forEach(item => {
+            item.classList.toggle('selected', item.dataset.cause === selectedCauseValue);
+        });
+        document.querySelectorAll('#causeTreeContainer .cause-level-1-header, #causeTreeContainer .cause-level-2-header').forEach(header => {
+            const isSelected = header.dataset.cause === selectedCauseValue;
+            header.classList.toggle('selected', isSelected);
+        });
+    }
+
+    function filterCauseTree() {
+        const keyword = (document.getElementById('causeSearchInput').value || '').trim().toLowerCase();
+        document.querySelectorAll('#causeTreeContainer .cause-item').forEach(item => {
+            const name = (item.querySelector('.cause-name').textContent || '').toLowerCase();
+            const match = !keyword || name.includes(keyword);
+            item.style.display = match ? 'flex' : 'none';
+            if (match && keyword) {
+                let parent = item.closest('.cause-level-2');
+                if (parent) parent.classList.add('expanded');
+                parent = item.closest('.cause-level-1');
+                if (parent) parent.classList.add('expanded');
+            }
+        });
     }
 
     // ===== 数据写入 =====
@@ -641,6 +872,16 @@
         clearSelection,
         viewCase,
         editCase,
+        openEditCase,
+        closeEditCase,
+        submitEditCase,
+        openCauseSelector,
+        closeCauseSelector,
+        renderCauseTree,
+        toggleCauseLevel1,
+        toggleCauseLevel2,
+        selectCause,
+        filterCauseTree,
         changeHandler,
         batchChangeHandler,
         closeHandlerModal,
