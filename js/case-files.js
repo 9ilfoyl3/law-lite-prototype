@@ -2875,8 +2875,6 @@ function openMyElementsFromModal() {
 
 // ===== 右栏 - 结果面板 =====
 function showResultLoading() {
-    document.getElementById('resultTabs').style.display = 'none';
-    document.getElementById('resultFooter').style.display = 'none';
     document.getElementById('resultBody').innerHTML = `
         <div class="result-loading">
             <div class="spinner"></div>
@@ -2891,8 +2889,6 @@ let streamingTimer = null;
 let streamingStartTime = 0;
 
 function startStreamingOutput(fullContent, title) {
-    document.getElementById('resultTabs').style.display = 'none';
-    document.getElementById('resultFooter').style.display = 'none';
     const body = document.getElementById('resultBody');
 
     // 构建流式输出区
@@ -2979,8 +2975,6 @@ function escapeHtmlForStreaming(text) {
 function showResult(html, title) {
     resultContent = html;
     resultEditContent = html.replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-    document.getElementById('resultTabs').style.display = 'flex';
-    document.getElementById('resultFooter').style.display = 'flex';
     document.getElementById('resultBody').innerHTML = `<div class="fade-in">${resultContent}</div>`;
     setLayoutState('generated');
     showNotification('文书生成完成', 'success');

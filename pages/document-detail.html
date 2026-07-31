@@ -15,6 +15,8 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            width: 100%;
+            flex: 1;
             overflow: hidden;
         }
 
@@ -305,14 +307,8 @@
                 </div>
             </div>
             <div class="doc-detail-actions">
-                <button class="doc-detail-btn" onclick="refineDocument()">
-                    <i class="fas fa-pen-nib"></i> 精修
-                </button>
-                <button class="doc-detail-btn" onclick="printDocument()">
-                    <i class="fas fa-print"></i> 打印
-                </button>
-                <button class="doc-detail-btn primary" onclick="downloadDocument()">
-                    <i class="fas fa-download"></i> 下载
+                <button class="doc-detail-btn primary" onclick="refineDocument()">
+                    <i class="fas fa-pen-nib"></i> 文书精修
                 </button>
             </div>
         </header>
@@ -342,6 +338,6 @@
 
     <script src="../js/common.js?v=29"></script>
     <script src="../js/case-data.js?v=58"></script>
-    <script src="../js/document-detail.js?v=4"></script>
+    <script src="../js/document-detail.js?v=5"></script>
 </body>
 </html>

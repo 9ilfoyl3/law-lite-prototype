@@ -2421,12 +2421,14 @@ function findDocumentVersion(caseId, versionId) {
     return null;
 }
 
-// v1.37: 查看指定版本（新标签页预览）
+// v1.37: 查看指定版本（跳转文书详情页，同全部文书面板的"查看"入口）
+// V1.1.13: 不再打开独立预览小窗口，统一跳转 document-detail.html
 function previewDocumentVersion(versionId) {
     const res = findDocumentVersion(documentsCaseId, versionId);
     if (!res) { showNotification('版本不存在', 'error'); return; }
-    const { caseItem, version } = res;
-    openDocumentPreviewWindow({ title: version.title || caseItem.caseName, versions: [version] }, documentsCaseId);
+    const { doc } = res;
+    if (!doc || !doc.id) { showNotification('文书数据异常，无法查看', 'error'); return; }
+    window.location.href = `document-detail.html?caseId=${encodeURIComponent(documentsCaseId)}&docId=${encodeURIComponent(doc.id)}`;
 }
 
 // v2.24: 精修指定版本（跳转文书精修页，与详情页功能一致）
@@ -3034,7 +3036,6 @@ function renderAllDocs() {
             <div class="docs-fs-item-actions">
                 <button class="docs-fs-action-btn" onclick="viewDocFromPanel('${doc._caseId}','${doc.id}')"><i class="fas fa-eye"></i> 查看</button>
                 <button class="docs-fs-action-btn" onclick="refineDocFromPanel('${doc._caseId}','${doc.id}')"><i class="fas fa-pen-nib"></i> 精修</button>
-                <button class="docs-fs-action-btn" onclick="regenerateDocFromPanel('${doc._caseId}','${doc.id}')"><i class="fas fa-redo"></i> 重新生成</button>
                 <button class="docs-fs-action-btn" onclick="downloadDocFromPanel('${doc._caseId}','${doc.id}')"><i class="fas fa-download"></i> 下载</button>
                 <button class="docs-fs-action-btn danger" onclick="deleteDocFromPanel('${doc._caseId}','${doc.id}')"><i class="fas fa-trash-alt"></i> 删除</button>
             </div>

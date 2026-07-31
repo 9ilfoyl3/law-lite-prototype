@@ -261,31 +261,6 @@ function goBackToCases() {
     window.location.href = 'cases.html';
 }
 
-function printDocument() {
-    window.print();
-}
-
-function downloadDocument() {
-    const paper = document.getElementById('docPaper');
-    if (!paper || !paper.innerHTML) return;
-    const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>${pageCaseItem.caseName || '法律文书'}</title>
-    <style>body{font-family:'Noto Serif SC','SimSun',serif;line-height:2;padding:40px;max-width:800px;margin:0 auto;}h2{text-align:center;font-size:22pt;}p{text-indent:2em;font-size:14pt;}</style>
-</head>
-<body>${paper.innerHTML}</body>
-</html>`;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${pageCaseItem.caseName || '法律文书'}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
 // v1.38: 精修跳转（任务 5.2）
 function refineDocument() {
     if (!pageCaseId || !pageDoc) {
