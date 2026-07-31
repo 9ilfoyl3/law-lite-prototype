@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>04 · 生成文书配置依赖图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --chart-series-2: #8b94f5;
+    --warn: #d4a017;
+    --radius: 8px;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1080px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .step-list { display: flex; flex-direction: column; gap: var(--spacer-12); position: relative; }
+  .step-list::before { content: ''; position: absolute; left: 17px; top: 28px; bottom: 28px; width: 2px; background: var(--border); }
+  .step { display: grid; grid-template-columns: 36px 1fr; gap: var(--spacer-12); position: relative; z-index: 1; }
+  .step-num {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--brand); color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; flex-shrink: 0;
+  }
+  .step-num.muted { border-color: var(--border); color: var(--text-muted); }
+  .step-card { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--spacer-12) var(--spacer-16); background: var(--surface); }
+  .step-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacer-8); margin-bottom: 6px; flex-wrap: wrap; }
+  .step-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .mode-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--surface-muted); color: var(--text-muted);
+    border: 1px solid var(--border); white-space: nowrap;
+  }
+  .mode-tag.brand { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .mode-tag.alt { background: var(--surface-muted); color: var(--chart-series-2); border-color: var(--chart-series-2); }
+  .mode-tag.new { background: #fdf6e3; color: var(--warn); border-color: var(--warn); }
+  .step-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px; }
+  .dep-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .dep {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text);
+    padding: 5px 8px; background: var(--surface-muted);
+    border-radius: 6px; border-left: 2px solid var(--brand);
+  }
+  .dep .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+  .dep small { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+  .dep.warn { border-left-color: var(--warn); }
+  .dep.warn .dot { background: var(--warn); }
+  .dep.new { border-left-color: var(--warn); background: #fdf6e3; }
+  .dep.new .dot { background: var(--warn); }
+  @media (max-width: 720px) { .dep-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">生成文书每一步的配置依赖（V1.1）</div>
+  <div class="widget-sub">每个生成步骤所消费的后台配置项与运行时数据（标注管理后台位置与 V1.1 调整点）</div>
+
+  <div class="step-list">
+
+    <div class="step">
+      <div class="step-num muted">1</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-name">案件上传与文件解析</span>
+          <span class="mode-tag">系统级</span>
+        </div>
+        <div class="step-desc">用户上传卷宗材料，系统自动解析为可结构化使用的文本。解析状态机驱动列表页/详情页展示。</div>
+        <div class="dep-grid">
+          <div class="dep"><span class="dot"></span>文件解析服务<small>系统</small></div>
+          <div class="dep"><span class="dot"></span>解析状态机 parseStatus<small>case-data.js</small></div>
+          <div class="dep"><span class="dot"></span>异常类型 errorType<small>case-data.js</small></div>
+          <div class="dep warn"><span class="dot"></span>异常处理弹窗<small>cases.js</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num muted">2</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-name">自动补充结构化信息</span>
+          <span class="mode-tag">系统级</span>
+        </div>
+        <div class="step-desc">从材料中识别案由、案字、当事人等结构化字段，作为后续 workflow 匹配与要件过滤的输入。</div>
+        <div class="dep-grid">
+          <div class="dep"><span class="dot"></span>案由三级层级<small>admin/cause-management</small></div>
+          <div class="dep"><span class="dot"></span>案字字典 caseWordListByOrg<small>case-data.js</small></div>
+          <div class="dep new"><span class="dot"></span>案由大类→案字白名单<small>caseWordWhitelistByCauseCategory · getCauseCategory 支持一/二/三级反查 (V1.1.3)</small></div>
+          <div class="dep"><span class="dot"></span>文书类型清单<small>admin/doc-types</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-name">生成入口 · 按钮可用性 + 配置预填</span>
+          <span class="mode-tag brand">决策点</span>
+        </div>
+        <div class="step-desc">用户点击「生成文书」，按钮可用性按解析状态判断；列表页配置通过 sessionStorage 传递至详情页自动预填。前端不做 Token 估算。</div>
+        <div class="dep-grid">
+          <div class="dep"><span class="dot"></span>按钮可用性规则<small>cases.js / case-files.js</small></div>
+          <div class="dep warn"><span class="dot"></span>解析中/无材料置灰<small>8.2.1 主链路约束</small></div>
+          <div class="dep"><span class="dot"></span>sessionStorage 配置预填<small>cases.js → case-files.js</small></div>
+          <div class="dep"><span class="dot"></span>自动勾选全部材料<small>case-files.js</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-name">一步生成模式（列表页/详情页）</span>
+          <span class="mode-tag brand">默认路径</span>
+        </div>
+        <div class="step-desc">全文书类型默认展示一步生成 Tab。用户配置文书类型/模板/提示词后调用 workflow，流式输出文书。模型由 workflow 匹配决定，只读展示。</div>
+        <div class="dep-grid">
+          <div class="dep"><span class="dot"></span>文书类型下拉（全量）<small>admin/doc-types</small></div>
+          <div class="dep"><span class="dot"></span>标准模板 + 我的模板<small>admin/doc-templates · my-templates</small></div>
+          <div class="dep"><span class="dot"></span>模板 optgroup 分组<small>mergeMyDocTemplates</small></div>
+          <div class="dep"><span class="dot"></span>标准提示词 + 我的提示词<small>admin/prompt-templates · my-prompts</small></div>
+          <div class="dep"><span class="dot"></span>提示词颜色区分+启用停用+历史版本<small>my-prompts.js</small></div>
+          <div class="dep warn"><span class="dot"></span>要件（可选 plus，仅裁判文书）<small>admin/element-presets · my-elements</small></div>
+          <div class="dep warn"><span class="dot"></span>要件按案字过滤<small>filterElementsByCaseWord</small></div>
+          <div class="dep warn"><span class="dot"></span>个案要件(橙)默认勾选 + 答案预生成<small>mergeCaseElements (V1.1.4)</small></div>
+          <div class="dep new"><span class="dot"></span>案字白名单过滤<small>getAllowedCaseWordsForCause (V1.1.3)</small></div>
+          <div class="dep"><span class="dot"></span>启用/停用过滤<small>case-data.js merge 函数</small></div>
+          <div class="dep"><span class="dot"></span>workflow 匹配（5级优先级）<small>getWorkflowByCaseWord</small></div>
+          <div class="dep"><span class="dot"></span>模型只读展示<small>workflow.modelId</small></div>
+          <div class="dep"><span class="dot"></span>流式输出渲染区<small>case-files.js</small></div>
+          <div class="dep warn"><span class="dot"></span>workflow 超限异常提示<small>case-files.js</small></div>
+          <div class="dep warn"><span class="dot"></span>弹框 UI 统一（overlay/dialog 分离）<small>showWorkflowOverflowModal (V1.1.4)</small></div>
+          <div class="dep warn"><span class="dot"></span>case7 演示：demoOverflow + 36 材料×6000 超限<small>case-data.js (V1.1.4)</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-name">分步生成模式（仅裁判文书 · 详情页）</span>
+          <span class="mode-tag alt">仅裁判文书</span>
+        </div>
+        <div class="step-desc">仅裁判文书类型展示分步生成 Tab。6 步硬编码序列，手动逐步触发，步骤间依赖校验，片段拼接产出完整文书。</div>
+        <div class="dep-grid">
+          <div class="dep"><span class="dot"></span>分步 Tab 可见性判断<small>updateStepsTabVisibility</small></div>
+          <div class="dep"><span class="dot"></span>6步硬编码序列<small>stepConfigsByOrg (court)</small></div>
+          <div class="dep"><span class="dot"></span>步骤依赖关系<small>案件信息→原告诉请→被告答辩→争议焦点→事实认定→裁判结果</small></div>
+          <div class="dep warn"><span class="dot"></span>步骤4选填前3步<small>required=false</small></div>
+          <div class="dep warn"><span class="dot"></span>步骤5/6必填前一步<small>required=true</small></div>
+          <div class="dep"><span class="dot"></span>依赖提示条 buildStepDependencyHintHtml<small>case-files.js</small></div>
+          <div class="dep"><span class="dot"></span>每步独立选材料<small>case-files.js</small></div>
+          <div class="dep"><span class="dot"></span>手动逐步触发（不自动）<small>case-files.js</small></div>
+          <div class="dep"><span class="dot"></span>片段拼接产出<small>case-files.js</small></div>
+          <div class="dep"><span class="dot"></span>标准模板 + 我的模板<small>admin/doc-templates · my-templates</small></div>
+          <div class="dep"><span class="dot"></span>标准提示词 + 我的提示词<small>admin/prompt-templates · my-prompts</small></div>
+          <div class="dep warn"><span class="dot"></span>要件（可选 plus）<small>admin/element-presets · my-elements</small></div>
+          <div class="dep"><span class="dot"></span>启用/停用过滤<small>case-data.js merge 函数</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num muted">6</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-name">文书产出与归档</span>
+          <span class="mode-tag">终点</span>
+        </div>
+        <div class="step-desc">生成结果保存为文书版本（按 docType 合并，不覆盖已有版本），支持历史文书管理、精修、重新配置。</div>
+        <div class="dep-grid">
+          <div class="dep"><span class="dot"></span>版本数据结构<small>case.documents[].versions[]</small></div>
+          <div class="dep"><span class="dot"></span>版本 CRUD 工具<small>addDocumentVersion / getAllDocumentVersions</small></div>
+          <div class="dep"><span class="dot"></span>历史文书列表（时间倒序）<small>cases.js / case-files.js</small></div>
+          <div class="dep"><span class="dot"></span>文书徽章（蓝色，可点击）<small>cases.js</small></div>
+          <div class="dep"><span class="dot"></span>文书精修独立页<small>document-polish.html</small></div>
+          <div class="dep"><span class="dot"></span>精修保存为新版本<small>document-polish.js</small></div>
+          <div class="dep"><span class="dot"></span>重新配置回填最近版本<small>reconfigWithLatestSnapshot</small></div>
+          <div class="dep"><span class="dot"></span>查看 / 下载 / 删除<small>cases.js / case-files.js</small></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -361,6 +361,17 @@
         wfEditingType = 'material';  // E1: 固定一步生成型，编辑时强制转为一步生成型
         wfSelectedCaseWords = new Set(wf.caseWords || []);
         wfSelectedCauses = new Set(wf.causes || []);  // v1.32: 回填匹配案由
+        // v1.37 (V1.1.11): 编辑回填后清理已选案字中不在已选案由白名单内的项（兼容旧数据不一致）
+        if (wfSelectedCauses.size > 0) {
+            const allowedSet = new Set(getAllowedCaseWordsBySelectedCauses());
+            if (allowedSet.size > 0) {
+                const toRemove = [];
+                wfSelectedCaseWords.forEach(w => {
+                    if (!allowedSet.has(w)) toRemove.push(w);
+                });
+                toRemove.forEach(w => wfSelectedCaseWords.delete(w));
+            }
+        }
         const isBuiltin = !!wf.isBuiltin;
         wfEditingBuiltin = isBuiltin;
         document.getElementById('wfModalTitle').textContent = isBuiltin ? '编辑内置 workflow（另存为自定义覆盖）' : '编辑 workflow';
@@ -400,6 +411,21 @@
         renderCausesPicker(wfEditingDocType, wfSelectedCauses);
     };
 
+    // v1.37 (V1.1.11): 计算当前已选案由允许的案字白名单并集
+    // 未选任何案由时返回当前业务系统全部案字（兜底）
+    function getAllowedCaseWordsBySelectedCauses() {
+        const allWords = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[currentOrg]) || [];
+        if (typeof getAllowedCaseWordsForCause !== 'function' || wfSelectedCauses.size === 0) {
+            return allWords.slice();
+        }
+        const allowedSet = new Set();
+        wfSelectedCauses.forEach(cause => {
+            const whitelist = getAllowedCaseWordsForCause(currentOrg, cause);
+            whitelist.forEach(w => allowedSet.add(w));
+        });
+        return allowedSet.size > 0 ? Array.from(allowedSet) : allWords.slice();
+    }
+
     function renderCaseWordsPicker(docTypeKey, selected) {
         const picker = document.getElementById('wfCaseWordsPicker');
         const wordList = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[currentOrg]) || [];
@@ -417,15 +443,25 @@
                 wf.caseWords.forEach(w => usedWords.add(w));
             }
         });
+        // v1.37 (V1.1.11): 按已选案由联动过滤，仅展示白名单并集内的案字
+        const allowedWords = getAllowedCaseWordsBySelectedCauses();
+        const allowedSet = new Set(allowedWords);
+        const hasCauseFilter = wfSelectedCauses.size > 0 && allowedWords.length < wordList.length;
         picker.innerHTML = wordList.map(w => {
             const isSel = selected.has(w);
             const isUsed = usedWords.has(w);
+            // 不在白名单内的案字：不渲染（未选案由时白名单=全部，不会走到这里）
+            if (hasCauseFilter && !allowedSet.has(w)) return '';
             const cls = 'case-word-option' + (isSel ? ' selected' : '');
             const title = isUsed ? '已被同类型其他 workflow 匹配' : '';
             return '<label class="' + cls + '" title="' + title + '">'
                 + '<input type="checkbox" value="' + escapeHtml(w) + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleCaseWord(\'' + escapeHtml(w) + '\', this.checked)">'
                 + '<span>' + escapeHtml(w) + (isUsed ? ' ⚠' : '') + '</span></label>';
         }).join('');
+        // 若过滤后为空，显示提示
+        if (hasCauseFilter && allowedWords.length === 0) {
+            picker.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">已选案由未匹配到允许的案字白名单</span>';
+        }
     }
 
     window.toggleCaseWord = function(word, checked) {
@@ -500,9 +536,22 @@
             + '</div></div>';
     }
 
+    // v1.37 (V1.1.11): 勾选/取消案由后联动重渲案字选择器，并清理已选但不在新白名单内的案字
     window.toggleCause = function(name, checked) {
         if (checked) wfSelectedCauses.add(name);
         else wfSelectedCauses.delete(name);
+        // 计算新白名单并集
+        const allowedSet = new Set(getAllowedCaseWordsBySelectedCauses());
+        // 清理已选案字中不在新白名单内的（仅当有案由过滤时才清理）
+        if (wfSelectedCauses.size > 0 && allowedSet.size > 0) {
+            const toRemove = [];
+            wfSelectedCaseWords.forEach(w => {
+                if (!allowedSet.has(w)) toRemove.push(w);
+            });
+            toRemove.forEach(w => wfSelectedCaseWords.delete(w));
+        }
+        // 联动重渲案字选择器
+        renderCaseWordsPicker(wfEditingDocType, wfSelectedCaseWords);
     };
 
     // v1.32: 展开/折叠案由树节点
@@ -623,9 +672,19 @@
         const wf = workflows.find(w => w.id === wfId);
         if (!wf) return;
         const wfType = wf.type || 'step';
-        // E1: 移除"同类型至少保留1个"约束，允许删除任意 workflow（含最后一个分步型/一步型）
         const isBuiltinWf = !!wf.isBuiltin;
         const isCustomized = getWfOrgData(currentOrg)[docTypeKey] && getWfOrgData(currentOrg)[docTypeKey].length > 0;
+
+        // v1.37 (V1.1.10): 同类型仅剩 1 个 workflow 时禁用删除（保证用户侧"一步生成" Tab 始终可用）
+        // 仅对一步生成型校验（分步型由前端硬编码，不受此处约束）
+        if (wfType === 'material') {
+            const sameTypeCount = workflows.filter(w => (w.type || 'step') === 'material').length;
+            if (sameTypeCount <= 1) {
+                showNotification('该类型下仅剩 1 个一步生成型 workflow，不可删除（需保证用户侧"一步生成" Tab 可用）', 'warning');
+                return;
+            }
+        }
+
         const confirmText = (isBuiltinWf && isCustomized)
             ? '确定移除 workflow「' + wf.name + '」的自定义覆盖吗？移除后将恢复内置默认。'
             : '确定删除 workflow「' + wf.name + '」吗？此操作不可恢复。';

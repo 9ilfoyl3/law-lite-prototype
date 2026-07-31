@@ -311,24 +311,15 @@ const agentflowWorkflowList = [
 // 获取当前业务系统下某文书类型的 workflow 列表（合并内置 + 自定义）
 // typeFilter: 'step' | 'material' | undefined（不过滤）
 // 返回数组：[{id, name, type, caseWords, causes, isBuiltin}]
+// v1.37 (V1.1.10): 内置默认仅 1 个"一步生成型" workflow（全兜底），不生成内置分步型
+//                  （分步型由前端 stepConfigsByOrg 硬编码提供，仅裁判文书有）
 function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
-    // 1. 取内置 workflow（v1.32: 每个 docType 生成两个内置 workflow，不再迁移 stepConfigsByOrg 的 steps）
+    // 1. 取内置 workflow（仅一步生成型，全兜底）
     // v1.35: 内置 workflow 默认使用 DEFAULT_MODEL_ID（千问3.6）
     const builtins = [];
-    // v1.32: 分步生成型 workflow
-    builtins.push({
-        id: 'wf-' + docTypeKey + '-default',
-        name: '默认',
-        type: 'step',
-        caseWords: [],
-        causes: [],
-        modelId: DEFAULT_MODEL_ID,
-        isBuiltin: true
-    });
-    // v1.32: 直接生成型 workflow
     builtins.push({
         id: 'wf-' + docTypeKey + '-material-default',
-        name: '默认-直接生成',
+        name: '默认',
         type: 'material',
         caseWords: [],
         causes: [],

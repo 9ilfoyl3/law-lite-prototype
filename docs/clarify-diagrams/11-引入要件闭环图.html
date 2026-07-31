@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>11 · 引入要件闭环图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --warn: #d4a017;
+    --info: #3b82f6;
+    --success: #10b981;
+    --orange: #f59e0b;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1200px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .svg-wrap { width: 100%; }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">引入要件闭环图（V1.1）</div>
+  <div class="widget-sub">可选 Plus 功能，可 0 个可多个；本案要件入口在材料树顶部固定条</div>
+  <div class="svg-wrap">
+  <svg viewBox="0 0 1180 1240" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+      </marker>
+      <marker id="arrowBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+      </marker>
+      <marker id="arrowWarn" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+      </marker>
+      <marker id="arrowLoop" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#9ca3af" />
+      </marker>
+    </defs>
+
+    <!-- 顶部：要件定义 -->
+    <g>
+      <rect x="280" y="20" width="620" height="76" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="590" y="46" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="500">要件定义</text>
+      <text x="590" y="66" text-anchor="middle" fill="#6b7280" font-size="11">小要件 = query 问题列表 + 通用问答流程（调知识库召回）</text>
+      <text x="590" y="80" text-anchor="middle" fill="#6b7280" font-size="11">所有调用调同一个 API · 可选 Plus 功能，可 0 个可多个</text>
+    </g>
+
+    <!-- 三种要件类型卡片 -->
+    <g>
+      <rect x="80" y="120" width="320" height="80" rx="8" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/>
+      <rect x="80" y="120" width="320" height="24" rx="8" fill="#3b82f6"/>
+      <rect x="80" y="136" width="320" height="8" fill="#3b82f6"/>
+      <text x="240" y="138" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">标准要件（蓝标签）</text>
+      <text x="240" y="162" text-anchor="middle" fill="#1f2937" font-size="11">根据案件的案由案字确定的问题</text>
+      <text x="240" y="178" text-anchor="middle" fill="#6b7280" font-size="11">系统预置 · 管理后台维护</text>
+      <text x="240" y="192" text-anchor="middle" fill="#6b7280" font-size="11">filterElementsByCaseWord 过滤</text>
+    </g>
+    <g>
+      <rect x="430" y="120" width="320" height="80" rx="8" fill="#ffffff" stroke="#10b981" stroke-width="1.5"/>
+      <rect x="430" y="120" width="320" height="24" rx="8" fill="#10b981"/>
+      <rect x="430" y="136" width="320" height="8" fill="#10b981"/>
+      <text x="590" y="138" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">我的要件（绿标签）</text>
+      <text x="590" y="162" text-anchor="middle" fill="#1f2937" font-size="11">用户维护的案由案字对应的问题</text>
+      <text x="590" y="178" text-anchor="middle" fill="#6b7280" font-size="11">用户个人模板 · my-elements.html 维护</text>
+      <text x="590" y="192" text-anchor="middle" fill="#6b7280" font-size="11">带「我的」徽章</text>
+    </g>
+    <g>
+      <rect x="780" y="120" width="320" height="80" rx="8" fill="#ffffff" stroke="#f59e0b" stroke-width="1.5"/>
+      <rect x="780" y="120" width="320" height="24" rx="8" fill="#f59e0b"/>
+      <rect x="780" y="136" width="320" height="8" fill="#f59e0b"/>
+      <text x="940" y="138" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">个案要件（橙标签）</text>
+      <text x="940" y="162" text-anchor="middle" fill="#1f2937" font-size="11">根据某一个案子，用户自己编辑维护</text>
+      <text x="940" y="178" text-anchor="middle" fill="#6b7280" font-size="11">案件级别 · 案件详情页维护</text>
+      <text x="940" y="192" text-anchor="middle" fill="#6b7280" font-size="11">localStorage.caseCustomElements_${caseId}</text>
+    </g>
+
+    <!-- 左侧：材料树 + 入口固定条 -->
+    <g>
+      <rect x="40" y="240" width="320" height="430" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="200" y="262" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">案件详情页 · 左栏材料树（25%）</text>
+
+      <!-- header -->
+      <rect x="60" y="276" width="280" height="32" rx="4" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="200" y="296" text-anchor="middle" fill="#6b7280" font-size="11">材料树 header</text>
+
+      <!-- material-col-elements-bar（入口固定条） -->
+      <rect x="60" y="316" width="280" height="44" rx="4" fill="#ede9fe" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="200" y="334" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">material-col-elements-bar</text>
+      <text x="200" y="350" text-anchor="middle" fill="#6b7280" font-size="10">header 下方 · 搜索框上方 · 固定条</text>
+
+      <!-- 入口按钮 -->
+      <rect x="80" y="368" width="240" height="32" rx="16" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="200" y="388" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">本案要件 (N)</text>
+
+      <!-- 搜索框 -->
+      <rect x="60" y="412" width="280" height="28" rx="4" fill="#ffffff" stroke="#e5e7eb"/>
+      <text x="200" y="430" text-anchor="middle" fill="#9ca3af" font-size="11">搜索框 🔍</text>
+
+      <!-- 材料列表（滚动） -->
+      <rect x="60" y="448" width="280" height="200" rx="4" fill="#f9fafb" stroke="#e5e7eb" stroke-dasharray="3,3"/>
+      <text x="200" y="468" text-anchor="middle" fill="#6b7280" font-size="11">材料树（可滚动）</text>
+      <text x="200" y="486" text-anchor="middle" fill="#9ca3af" font-size="10">- 起诉状.pdf</text>
+      <text x="200" y="500" text-anchor="middle" fill="#9ca3af" font-size="10">- 答辩状.pdf</text>
+      <text x="200" y="514" text-anchor="middle" fill="#9ca3af" font-size="10">- 证据清单.docx</text>
+      <text x="200" y="528" text-anchor="middle" fill="#9ca3af" font-size="10">- 庭审笔录.pdf</text>
+      <text x="200" y="542" text-anchor="middle" fill="#9ca3af" font-size="10">...</text>
+      <text x="200" y="600" text-anchor="middle" fill="#6d5ce7" font-size="10" font-weight="500">材料多时无需滚动即可见入口</text>
+      <text x="200" y="616" text-anchor="middle" fill="#d4a017" font-size="10">折叠材料树时入口随之隐藏</text>
+    </g>
+
+    <!-- 入口 → 抽屉 箭头 -->
+    <path d="M 320 384 L 380 384 L 380 416" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+    <rect x="324" y="362" width="80" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+    <text x="364" y="376" text-anchor="middle" fill="#6d5ce7" font-size="10">点击入口</text>
+
+    <!-- 中间：抽屉 + 弹框第一步 -->
+    <g>
+      <rect x="380" y="240" width="380" height="430" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="570" y="262" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">右侧滑出抽屉 · 要件列表</text>
+      <text x="570" y="278" text-anchor="middle" fill="#6b7280" font-size="11">默认收起 · 不占主布局空间</text>
+
+      <!-- 抽屉内容 -->
+      <rect x="400" y="296" width="340" height="240" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="570" y="318" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="500">要件列表（按类型分组）</text>
+
+      <!-- 标准要件示例 -->
+      <rect x="416" y="332" width="60" height="20" rx="10" fill="#3b82f6"/>
+      <text x="446" y="346" text-anchor="middle" fill="#ffffff" font-size="10">标准</text>
+      <text x="486" y="346" fill="#1f2937" font-size="11">主体资格要件</text>
+
+      <rect x="416" y="358" width="60" height="20" rx="10" fill="#3b82f6"/>
+      <text x="446" y="372" text-anchor="middle" fill="#ffffff" font-size="10">标准</text>
+      <text x="486" y="372" fill="#1f2937" font-size="11">诉讼请求要件</text>
+
+      <!-- 我的要求件示例 -->
+      <rect x="416" y="384" width="60" height="20" rx="10" fill="#10b981"/>
+      <text x="446" y="398" text-anchor="middle" fill="#ffffff" font-size="10">我的</text>
+      <text x="486" y="398" fill="#1f2937" font-size="11">证据充分性要件</text>
+
+      <!-- 个案要件示例 -->
+      <rect x="416" y="410" width="60" height="20" rx="10" fill="#f59e0b"/>
+      <text x="446" y="424" text-anchor="middle" fill="#ffffff" font-size="10">个案</text>
+      <text x="486" y="424" fill="#1f2937" font-size="11">本案特殊答辩</text>
+
+      <text x="570" y="460" text-anchor="middle" fill="#6b7280" font-size="10">N = 已配置要件数</text>
+      <text x="570" y="476" text-anchor="middle" fill="#6b7280" font-size="10">点击「引入要件」打开弹框</text>
+      <text x="570" y="500" text-anchor="middle" fill="#6b7280" font-size="10">无「管理我的要件」链接（顶部全局导航已有）</text>
+      <text x="570" y="520" text-anchor="middle" fill="#d4a017" font-size="10">无 要件时显示空状态</text>
+
+      <!-- 弹框触发按钮 -->
+      <rect x="430" y="556" width="280" height="40" rx="8" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="570" y="580" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">引入要件 → 弹出 elementConfirmModal</text>
+
+      <!-- 持久化提示 -->
+      <text x="570" y="618" text-anchor="middle" fill="#6b7280" font-size="10">持久化：caseCustomElements_${caseId} · caseElements_${caseId}</text>
+      <text x="570" y="634" text-anchor="middle" fill="#6b7280" font-size="10">下次进入恢复</text>
+    </g>
+
+    <!-- 抽屉 → 弹框第一步 -->
+    <path d="M 570 596 L 570 700" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+
+    <!-- 弹框第一步：选择要件 -->
+    <g>
+      <rect x="80" y="704" width="1020" height="180" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <rect x="80" y="704" width="1020" height="32" rx="8" fill="#6d5ce7"/>
+      <rect x="80" y="724" width="1020" height="12" fill="#6d5ce7"/>
+      <text x="590" y="724" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">弹框第一步（elementConfirmModal · 选择要件）</text>
+
+      <text x="100" y="758" fill="#1f2937" font-size="12" font-weight="500">默认勾选所有可用要件</text>
+      <text x="100" y="778" fill="#d4a017" font-size="11" font-weight="500">个案要件(橙)默认勾选 + 答案预生成（mergeCaseElements）</text>
+      <text x="100" y="796" fill="#6b7280" font-size="11">用户可取消不需要的要件（checkbox 列表）</text>
+      <text x="100" y="814" fill="#6b7280" font-size="11">三种类型混合展示，按蓝/绿/橙标签区分</text>
+      <text x="100" y="832" fill="#6b7280" font-size="11">仅裁判文书 + 案由案字过滤后展示</text>
+
+      <!-- 提示文案 -->
+      <rect x="500" y="748" width="580" height="56" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
+      <text x="790" y="770" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="500">提示文案</text>
+      <text x="790" y="788" text-anchor="middle" fill="#1f2937" font-size="11">引入要件后系统将针对每个问题预生成答案</text>
+      <text x="790" y="802" text-anchor="middle" fill="#1f2937" font-size="11">并整合到文书中，生成时间可能会稍长</text>
+
+      <!-- 底部按钮 -->
+      <rect x="500" y="820" width="120" height="40" rx="6" fill="#ffffff" stroke="#e5e7eb"/>
+      <text x="560" y="844" text-anchor="middle" fill="#6b7280" font-size="12">取消</text>
+      <rect x="640" y="820" width="200" height="40" rx="6" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="740" y="844" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">引入要件并生成</text>
+
+      <text x="870" y="844" fill="#9ca3af" font-size="10">点击触发 AI 预生成</text>
+    </g>
+
+    <!-- 弹框第一步 → 第二步 -->
+    <path d="M 740 884 L 740 912" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+
+    <!-- 弹框第二步：确认 AI 预生成答案 -->
+    <g>
+      <rect x="80" y="916" width="1020" height="180" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <rect x="80" y="916" width="1020" height="32" rx="8" fill="#6d5ce7"/>
+      <rect x="80" y="936" width="1020" height="12" fill="#6d5ce7"/>
+      <text x="590" y="936" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">弹框第二步（确认 AI 预生成答案）</text>
+
+      <text x="100" y="970" fill="#1f2937" font-size="12" font-weight="500">展示每个要件问题及预生成参考答案</text>
+      <text x="100" y="990" fill="#6b7280" font-size="11">用户可直接修改或补充（textarea 输入框）</text>
+      <text x="100" y="1008" fill="#6b7280" font-size="11">所有调用调同一个 API（调知识库召回）</text>
+      <text x="100" y="1026" fill="#6b7280" font-size="11">AI 预生成 → 用户确认 → 整合到文书</text>
+
+      <!-- 答案展示示例 -->
+      <rect x="500" y="960" width="580" height="76" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="516" y="980" fill="#3b82f6" font-size="11" font-weight="500">[标准]</text>
+      <text x="556" y="980" fill="#1f2937" font-size="11">主体资格要件</text>
+      <text x="516" y="998" fill="#6b7280" font-size="10">问题：本案原告是否具备诉讼主体资格？</text>
+      <text x="516" y="1016" fill="#1f2937" font-size="10">参考答案：原告 XX 系 ... （可编辑）</text>
+
+      <!-- 底部按钮 -->
+      <rect x="500" y="1040" width="140" height="40" rx="6" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="570" y="1064" text-anchor="middle" fill="#6d5ce7" font-size="12">上一步</text>
+      <rect x="660" y="1040" width="180" height="40" rx="6" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="750" y="1064" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">确认生成</text>
+
+      <text x="870" y="1064" fill="#9ca3af" font-size="10">「上一步」保留勾选状态</text>
+    </g>
+
+    <!-- 上一步回环 -->
+    <path d="M 500 1060 L 60 1060 L 60 804 L 500 804" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#arrowLoop)"/>
+    <rect x="20" y="920" width="120" height="20" rx="10" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="80" y="934" text-anchor="middle" fill="#6b7280" font-size="10">返回第一步保留勾选</text>
+
+    <!-- 第二步 → 文书生成入参 -->
+    <path d="M 750 1096 L 750 1132" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+
+    <g>
+      <rect x="380" y="1136" width="740" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="750" y="1162" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">要件结果 → 文书生成入参（可选字段）</text>
+      <text x="750" y="1182" text-anchor="middle" fill="#6b7280" font-size="11">作为可选 plus 上下文传递给 workflow（可 0 个可多个）</text>
+      <text x="750" y="1196" text-anchor="middle" fill="#6b7280" font-size="11">问答答案持久化到 localStorage.caseElements_${caseId}</text>
+      <text x="750" y="1210" text-anchor="middle" fill="#6b7280" font-size="11">下次进入恢复 · 个案要件持久化到 caseCustomElements_${caseId}</text>
+    </g>
+
+    <!-- 终点提示 -->
+    <text x="750" y="1232" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">闭环完成 · 可选 Plus · 不强制引入 · 无要件时显示空状态</text>
+  </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>主路径 / 焦点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px solid #e5e7eb"></span>普通节点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>标准要件（蓝标签）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span>我的要件（绿标签）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>个案要件（橙标签）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#eff6ff;border:1px solid #3b82f6"></span>info 提示</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fdf6e3;border:1px solid #d4a017"></span>异常 / 警告</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px dashed #9ca3af"></span>回环 / 上一步</span>
+  </div>
+</div>
+</body>
+</html>

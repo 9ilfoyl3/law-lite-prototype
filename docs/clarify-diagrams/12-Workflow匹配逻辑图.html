@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>12 · Workflow 匹配逻辑图（V1.1）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --brand-soft: #ede9fe;
+    --warn: #d4a017;
+    --danger: #e74c3c;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1080px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .svg-wrap { width: 100%; }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">Workflow 匹配逻辑图（V1.1）</div>
+  <div class="widget-sub">getWorkflowByCaseWord 5 级优先级匹配：案字 + 案由 双字段决策，命中即返回；全未命中则阻止生成</div>
+  <div class="svg-wrap">
+  <svg viewBox="0 0 1080 1000" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- 普通箭头（向下流转） -->
+      <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+      </marker>
+      <!-- 命中箭头（紫色，向右分流到成功分支） -->
+      <marker id="arrowHit" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+      </marker>
+      <!-- fallback 箭头（黄色，兜底命中路径） -->
+      <marker id="arrowFallback" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+      </marker>
+      <!-- 失败箭头（红色） -->
+      <marker id="arrowFail" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#e74c3c" />
+      </marker>
+    </defs>
+
+    <!-- ===== 输入：案字 + 案由 ===== -->
+    <g>
+      <rect x="60" y="30" width="200" height="56" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="160" y="54" text-anchor="middle" fill="#6d5ce7" font-size="13" font-weight="500">案字 caseWord</text>
+      <text x="160" y="72" text-anchor="middle" fill="#6b7280" font-size="11">当前案件的案字字段</text>
+    </g>
+    <g>
+      <rect x="280" y="30" width="200" height="56" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="380" y="54" text-anchor="middle" fill="#6d5ce7" font-size="13" font-weight="500">案由 cause</text>
+      <text x="380" y="72" text-anchor="middle" fill="#6b7280" font-size="11">当前案件的案由字段</text>
+    </g>
+
+    <!-- 案字白名单约束说明 -->
+    <g>
+      <rect x="500" y="30" width="180" height="56" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+      <text x="590" y="50" text-anchor="middle" fill="#d4a017" font-size="12" font-weight="500">案字白名单约束</text>
+      <text x="590" y="66" text-anchor="middle" fill="#6b7280" font-size="10">民事→民初/民终/民再</text>
+      <text x="590" y="80" text-anchor="middle" fill="#6b7280" font-size="9">getAllowedCaseWordsForCause</text>
+    </g>
+    <!-- 案由 → 白名单约束 虚线（案由决定案字可选范围） -->
+    <path d="M 480 58 L 500 58" stroke="#d4a017" stroke-width="1" stroke-dasharray="3,3" fill="none"/>
+
+    <!-- 函数入口 -->
+    <path d="M 160 86 L 160 110 L 380 110 L 380 86" stroke="#6b7280" stroke-width="1" fill="none"/>
+    <path d="M 270 110 L 270 132" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowHit)"/>
+    <g>
+      <rect x="100" y="136" width="340" height="36" rx="18" fill="#6d5ce7" stroke="#6d5ce7"/>
+      <text x="270" y="159" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">getWorkflowByCaseWord(caseWord, cause)</text>
+    </g>
+    <path d="M 270 172 L 270 198" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowHit)"/>
+
+    <!-- ===== 优先级 1：双精确匹配 ===== -->
+    <g>
+      <rect x="60" y="202" width="420" height="108" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <rect x="60" y="202" width="6" height="108" rx="3" fill="#6d5ce7"/>
+      <text x="84" y="228" fill="#1f2937" font-size="14" font-weight="600">优先级 1 · 双精确匹配</text>
+      <text x="84" y="248" fill="#6b7280" font-size="11">条件：案字精确命中 ∧ 案由精确命中</text>
+      <text x="84" y="266" fill="#6b7280" font-size="11">行为：命中即返回（最高优先级）</text>
+      <text x="84" y="284" fill="#6b7280" font-size="11">数据：workflowMap[caseWord][cause]</text>
+      <rect x="84" y="290" width="56" height="16" rx="8" fill="#6d5ce7"/>
+      <text x="112" y="302" text-anchor="middle" fill="#ffffff" font-size="10">命中 ✓</text>
+    </g>
+    <path d="M 480 256 L 620 256" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowHit)"/>
+    <rect x="500" y="241" width="80" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+    <text x="540" y="255" text-anchor="middle" fill="#6d5ce7" font-size="11">命中即返回</text>
+    <path d="M 270 310 L 270 336" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <text x="284" y="326" fill="#6b7280" font-size="10">未命中</text>
+
+    <!-- ===== 优先级 2：案字精确 + 案由 fallback ===== -->
+    <g>
+      <rect x="60" y="340" width="420" height="108" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <rect x="60" y="340" width="6" height="108" rx="3" fill="#6d5ce7"/>
+      <text x="84" y="366" fill="#1f2937" font-size="14" font-weight="600">优先级 2 · 案字精确 + 案由 fallback</text>
+      <text x="84" y="386" fill="#6b7280" font-size="11">条件：案字精确命中 ∧ 案由不在匹配范围</text>
+      <text x="84" y="404" fill="#6b7280" font-size="11">行为：案由使用 fallback（'*' 通配）</text>
+      <text x="84" y="422" fill="#6b7280" font-size="11">数据：workflowMap[caseWord]['*']</text>
+      <rect x="84" y="428" width="56" height="16" rx="8" fill="#6d5ce7"/>
+      <text x="112" y="440" text-anchor="middle" fill="#ffffff" font-size="10">命中 ✓</text>
+    </g>
+    <path d="M 480 394 L 620 394" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowHit)"/>
+    <rect x="500" y="379" width="80" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+    <text x="540" y="393" text-anchor="middle" fill="#6d5ce7" font-size="11">命中即返回</text>
+    <path d="M 270 448 L 270 474" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <text x="284" y="464" fill="#6b7280" font-size="10">未命中</text>
+
+    <!-- ===== 优先级 3：案字 fallback + 案由精确 ===== -->
+    <g>
+      <rect x="60" y="478" width="420" height="108" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <rect x="60" y="478" width="6" height="108" rx="3" fill="#6d5ce7"/>
+      <text x="84" y="504" fill="#1f2937" font-size="14" font-weight="600">优先级 3 · 案字 fallback + 案由精确</text>
+      <text x="84" y="524" fill="#6b7280" font-size="11">条件：案字无精确配置 ∧ 案由精确命中</text>
+      <text x="84" y="542" fill="#6b7280" font-size="11">行为：案字使用 fallback（'*' 通配）</text>
+      <text x="84" y="560" fill="#6b7280" font-size="11">数据：workflowMap['*'][cause]</text>
+      <rect x="84" y="566" width="56" height="16" rx="8" fill="#6d5ce7"/>
+      <text x="112" y="578" text-anchor="middle" fill="#ffffff" font-size="10">命中 ✓</text>
+    </g>
+    <path d="M 480 532 L 620 532" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowHit)"/>
+    <rect x="500" y="517" width="80" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+    <text x="540" y="531" text-anchor="middle" fill="#6d5ce7" font-size="11">命中即返回</text>
+    <path d="M 270 586 L 270 612" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <text x="284" y="602" fill="#6b7280" font-size="10">未命中</text>
+
+    <!-- ===== 优先级 4：全 fallback（兜底） ===== -->
+    <g>
+      <rect x="60" y="616" width="420" height="108" rx="10" fill="#fdf6e3" stroke="#d4a017" stroke-width="2"/>
+      <rect x="60" y="616" width="6" height="108" rx="3" fill="#d4a017"/>
+      <text x="84" y="642" fill="#1f2937" font-size="14" font-weight="600">优先级 4 · 全 fallback（兜底）</text>
+      <text x="84" y="662" fill="#6b7280" font-size="11">条件：案字和案由都使用 fallback</text>
+      <text x="84" y="680" fill="#6b7280" font-size="11">行为：通配兜底匹配</text>
+      <text x="84" y="698" fill="#6b7280" font-size="11">数据：workflowMap['*']['*'] 或 '+' 配置</text>
+      <rect x="84" y="704" width="56" height="16" rx="8" fill="#d4a017"/>
+      <text x="112" y="716" text-anchor="middle" fill="#ffffff" font-size="10">命中 ✓</text>
+    </g>
+    <path d="M 480 670 L 620 670" stroke="#d4a017" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowFallback)"/>
+    <rect x="500" y="655" width="80" height="20" rx="10" fill="#ffffff" stroke="#d4a017"/>
+    <text x="540" y="669" text-anchor="middle" fill="#d4a017" font-size="11">兜底命中</text>
+    <path d="M 270 724 L 270 750" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowFlow)"/>
+    <text x="284" y="740" fill="#6b7280" font-size="10">未命中</text>
+
+    <!-- ===== 优先级 5：取第一个可用 ===== -->
+    <g>
+      <rect x="60" y="754" width="420" height="108" rx="10" fill="#fdf6e3" stroke="#d4a017" stroke-width="2"/>
+      <rect x="60" y="754" width="6" height="108" rx="3" fill="#d4a017"/>
+      <text x="84" y="780" fill="#1f2937" font-size="14" font-weight="600">优先级 5 · 取第一个可用</text>
+      <text x="84" y="800" fill="#6b7280" font-size="11">条件：以上 4 级全部未命中</text>
+      <text x="84" y="818" fill="#6b7280" font-size="11">行为：取 workflow 列表第一个可用项</text>
+      <text x="84" y="836" fill="#6b7280" font-size="11">数据：workflows[0]</text>
+      <rect x="84" y="842" width="56" height="16" rx="8" fill="#d4a017"/>
+      <text x="112" y="854" text-anchor="middle" fill="#ffffff" font-size="10">命中 ✓</text>
+    </g>
+    <path d="M 480 808 L 620 808" stroke="#d4a017" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowFallback)"/>
+    <rect x="500" y="793" width="80" height="20" rx="10" fill="#ffffff" stroke="#d4a017"/>
+    <text x="540" y="807" text-anchor="middle" fill="#d4a017" font-size="11">兜底命中</text>
+
+    <!-- ===== 匹配成功分支（右侧汇聚） ===== -->
+    <!-- 汇聚竖线（L1~L5 命中点汇集到右侧主干） -->
+    <path d="M 620 256 L 620 808" stroke="#6d5ce7" stroke-width="2" fill="none"/>
+    <!-- 成功卡片 -->
+    <g>
+      <rect x="680" y="370" width="340" height="300" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
+      <text x="850" y="398" text-anchor="middle" fill="#6d5ce7" font-size="15" font-weight="600">✓ 匹配成功</text>
+      <line x1="700" y1="412" x2="1000" y2="412" stroke="#6d5ce7" stroke-width="1"/>
+
+      <text x="700" y="438" fill="#1f2937" font-size="13" font-weight="500">返回结果</text>
+      <text x="710" y="458" fill="#6b7280" font-size="11">• workflowId（用于调用 API）</text>
+      <text x="710" y="476" fill="#6b7280" font-size="11">• modelId（前端只读展示，不可切换）</text>
+
+      <line x1="700" y1="494" x2="1000" y2="494" stroke="#e5e7eb" stroke-width="1"/>
+
+      <text x="700" y="520" fill="#1f2937" font-size="13" font-weight="500">前端约束</text>
+      <text x="710" y="540" fill="#6b7280" font-size="11">• 不做 Token 估算</text>
+      <text x="710" y="558" fill="#6b7280" font-size="11">• 不展示 Token 预估字段</text>
+      <text x="710" y="576" fill="#6b7280" font-size="11">• 模型字段只读展示</text>
+
+      <line x1="700" y1="594" x2="1000" y2="594" stroke="#e5e7eb" stroke-width="1"/>
+
+      <text x="700" y="620" fill="#1f2937" font-size="13" font-weight="500">后续动作</text>
+      <text x="710" y="640" fill="#6b7280" font-size="11">• 调用 workflow API 流式输出</text>
+      <text x="710" y="658" fill="#6b7280" font-size="11">• 渲染流式结果到展示区</text>
+    </g>
+    <!-- 汇聚线到成功卡片 -->
+    <path d="M 620 520 L 680 520" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowHit)"/>
+
+    <!-- ===== 匹配失败分支（底部） ===== -->
+    <path d="M 270 862 L 270 892" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowFail)"/>
+    <text x="284" y="880" fill="#e74c3c" font-size="10">未命中</text>
+    <g>
+      <rect x="60" y="896" width="420" height="86" rx="10" fill="#fef2f2" stroke="#e74c3c" stroke-width="1.5"/>
+      <rect x="60" y="896" width="6" height="86" rx="3" fill="#e74c3c"/>
+      <text x="84" y="922" fill="#1f2937" font-size="14" font-weight="600">✗ 匹配失败</text>
+      <text x="84" y="942" fill="#6b7280" font-size="11">5 级优先级全部未命中（workflows 列表为空）</text>
+      <text x="84" y="960" fill="#e74c3c" font-size="11">提示：「该文书类型未配置 workflow」</text>
+      <text x="84" y="976" fill="#6b7280" font-size="11">阻止生成操作（按钮置灰 / 拦截调用）</text>
+    </g>
+
+  </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>主路径 / 精确命中</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px solid #e5e7eb"></span>普通节点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fdf6e3;border:1px solid #d4a017"></span>fallback / 兜底命中</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fef2f2;border:1px solid #e74c3c"></span>失败 / 阻止生成</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#6b7280"></span>未命中向下流转</span>
+  </div>
+</div>
+</body>
+</html>

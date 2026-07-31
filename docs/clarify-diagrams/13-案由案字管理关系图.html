@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>13 · 案由案字管理关系图</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --warn: #d4a017;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1080px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .svg-wrap { width: 100%; }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">案由案字管理关系图</div>
+  <div class="widget-sub">案由大类 → 案字白名单映射 · 数据流向 · 历史数据兼容</div>
+  <div class="svg-wrap">
+  <svg viewBox="0 0 1080 800" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7" />
+      </marker>
+      <marker id="arrowFlow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6b7280" />
+      </marker>
+      <marker id="arrowWarn" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#d4a017" />
+      </marker>
+    </defs>
+
+    <!-- ===== 左侧：映射表 ===== -->
+    <g>
+      <rect x="20" y="70" width="500" height="520" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <rect x="20" y="70" width="500" height="36" rx="8" fill="#6d5ce7"/>
+      <rect x="20" y="94" width="500" height="12" fill="#6d5ce7"/>
+      <text x="270" y="93" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">映射表 caseWordWhitelistByCauseCategory</text>
+      <text x="270" y="124" text-anchor="middle" fill="#6b7280" font-size="11">位于 case-data.js · 案由大类 → 允许案字列表</text>
+
+      <!-- 列头 -->
+      <text x="105" y="148" text-anchor="middle" fill="#6b7280" font-size="11" font-weight="500">案由大类</text>
+      <text x="320" y="148" text-anchor="middle" fill="#6b7280" font-size="11" font-weight="500">允许案字</text>
+      <line x1="40" y1="156" x2="500" y2="156" stroke="#e5e7eb" stroke-width="1"/>
+
+      <!-- Row 1 民事 -->
+      <rect x="40" y="173" width="130" height="54" rx="6" fill="#6d5ce7"/>
+      <text x="105" y="205" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">民事</text>
+      <path d="M 175 200 L 200 200" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="210" y="184" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="242" y="205" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">民初</text>
+      <rect x="282" y="184" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="314" y="205" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">民终</text>
+      <rect x="354" y="184" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="386" y="205" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">民再</text>
+
+      <!-- Row 2 刑事 -->
+      <rect x="40" y="248" width="130" height="54" rx="6" fill="#6d5ce7"/>
+      <text x="105" y="280" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">刑事</text>
+      <path d="M 175 275 L 200 275" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="210" y="259" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="242" y="280" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">刑初</text>
+      <rect x="282" y="259" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="314" y="280" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">刑终</text>
+      <rect x="354" y="259" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="386" y="280" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">刑再</text>
+
+      <!-- Row 3 行政 -->
+      <rect x="40" y="323" width="130" height="54" rx="6" fill="#6d5ce7"/>
+      <text x="105" y="355" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">行政</text>
+      <path d="M 175 350 L 200 350" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="210" y="334" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="242" y="355" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">行初</text>
+      <rect x="282" y="334" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="314" y="355" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">行终</text>
+
+      <!-- Row 4 国家赔偿 -->
+      <rect x="40" y="398" width="130" height="54" rx="6" fill="#6d5ce7"/>
+      <text x="105" y="430" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">国家赔偿</text>
+      <path d="M 175 425 L 200 425" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="210" y="409" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="242" y="430" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">赔</text>
+      <rect x="282" y="409" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="314" y="430" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">监</text>
+
+      <!-- Row 5 执行 -->
+      <rect x="40" y="473" width="130" height="54" rx="6" fill="#6d5ce7"/>
+      <text x="105" y="505" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">执行</text>
+      <path d="M 175 500 L 200 500" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="210" y="484" width="64" height="32" rx="16" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="242" y="505" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">执</text>
+
+      <!-- Footer note -->
+      <text x="270" y="565" text-anchor="middle" fill="#6b7280" font-size="11">白名单为静态配置 · 运行时只读 · 修改需更新 case-data.js</text>
+    </g>
+
+    <!-- ===== 右侧：使用场景流程 ===== -->
+    <g>
+      <rect x="560" y="70" width="500" height="520" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <rect x="560" y="70" width="500" height="36" rx="8" fill="#6d5ce7"/>
+      <rect x="560" y="94" width="500" height="12" fill="#6d5ce7"/>
+      <text x="810" y="93" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">使用场景 · 数据流向</text>
+
+      <!-- Step 1 -->
+      <rect x="580" y="120" width="460" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="600" y="145" fill="#1f2937" font-size="13" font-weight="500">① 管理员 · admin-element-presets.html</text>
+      <text x="600" y="166" fill="#6b7280" font-size="11">维护要件时，案字选择框仅展示</text>
+      <text x="600" y="183" fill="#6b7280" font-size="11">当前案由大类允许的选项</text>
+      <rect x="900" y="135" width="120" height="22" rx="11" fill="#ede9fe" stroke="#6d5ce7"/>
+      <text x="960" y="150" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">案字选择框过滤</text>
+
+      <!-- Arrow 1 -->
+      <path d="M 810 200 L 810 230" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="826" y="206" width="168" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="910" y="220" text-anchor="middle" fill="#6d5ce7" font-size="10">getAllowedCaseWordsForCause</text>
+
+      <!-- Step 2 -->
+      <rect x="580" y="230" width="460" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="600" y="255" fill="#1f2937" font-size="13" font-weight="500">② 用户 · my-elements.html</text>
+      <text x="600" y="276" fill="#6b7280" font-size="11">维护个人要件时，案字选择框</text>
+      <text x="600" y="293" fill="#6b7280" font-size="11">同样按案由大类过滤</text>
+      <rect x="900" y="245" width="120" height="22" rx="11" fill="#ede9fe" stroke="#6d5ce7"/>
+      <text x="960" y="260" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">同样过滤</text>
+
+      <!-- Arrow 2 -->
+      <path d="M 810 310 L 810 340" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+      <rect x="836" y="316" width="148" height="20" rx="10" fill="#ffffff" stroke="#6d5ce7"/>
+      <text x="910" y="330" text-anchor="middle" fill="#6d5ce7" font-size="10">filterElementsByCaseWord</text>
+
+      <!-- Step 3 -->
+      <rect x="580" y="340" width="460" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="600" y="365" fill="#1f2937" font-size="13" font-weight="500">③ 文书生成 · filterElementsByCaseWord</text>
+      <text x="600" y="386" fill="#6b7280" font-size="11">要件按案字过滤，案字白名单</text>
+      <text x="600" y="403" fill="#6b7280" font-size="11">进一步约束可见案字范围</text>
+      <rect x="900" y="355" width="120" height="22" rx="11" fill="#ede9fe" stroke="#6d5ce7"/>
+      <text x="960" y="370" text-anchor="middle" fill="#6d5ce7" font-size="11" font-weight="500">双重视角过滤</text>
+
+      <!-- Arrow 3 -->
+      <path d="M 810 420 L 810 440" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
+
+      <!-- Outcome -->
+      <rect x="580" y="440" width="460" height="60" rx="8" fill="#ede9fe" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="810" y="465" text-anchor="middle" fill="#6d5ce7" font-size="13" font-weight="500">避免管理关系错乱</text>
+      <text x="810" y="485" text-anchor="middle" fill="#6b7280" font-size="11">如民事案件选了执字 · 跨类要件不再混入</text>
+
+      <!-- Function ref -->
+      <rect x="580" y="515" width="460" height="85" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+      <text x="600" y="535" fill="#1f2937" font-size="11" font-weight="500">关键函数（case-data.js）</text>
+      <text x="600" y="555" fill="#6b7280" font-size="11">getCauseCategory(案由) → 案由大类</text>
+      <text x="600" y="572" fill="#d4a017" font-size="10">反查支持：一级案由大类 / 二级案由分组 / 三级案由叶子</text>
+      <text x="600" y="588" fill="#6b7280" font-size="11">getAllowedCaseWordsForCause(案由) → 允许案字列表</text>
+    </g>
+
+    <!-- ===== 底部：历史数据兼容 ===== -->
+    <g>
+      <rect x="20" y="600" width="1040" height="160" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <rect x="20" y="600" width="1040" height="32" rx="8" fill="#fdf6e3"/>
+      <rect x="20" y="620" width="1040" height="12" fill="#fdf6e3"/>
+      <text x="540" y="621" text-anchor="middle" fill="#d4a017" font-size="13" font-weight="500">历史数据兼容处理</text>
+
+      <!-- Col 1 -->
+      <rect x="40" y="648" width="320" height="100" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="56" y="670" fill="#1f2937" font-size="12" font-weight="500">① 已有不在白名单的案字</text>
+      <text x="56" y="690" fill="#6b7280" font-size="11">保留显示但标记"已禁用"</text>
+      <rect x="56" y="700" width="64" height="28" rx="14" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+      <text x="88" y="719" text-anchor="middle" fill="#9ca3af" font-size="11" text-decoration="line-through">执</text>
+      <rect x="128" y="700" width="64" height="28" rx="14" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+      <text x="160" y="719" text-anchor="middle" fill="#9ca3af" font-size="11" text-decoration="line-through">民特</text>
+      <text x="204" y="719" fill="#9ca3af" font-size="10">灰 + 删除线</text>
+
+      <!-- Col 2 -->
+      <rect x="380" y="648" width="320" height="100" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="396" y="670" fill="#1f2937" font-size="12" font-weight="500">② 不强制清理</text>
+      <text x="396" y="690" fill="#6b7280" font-size="11">由用户手动处理</text>
+      <text x="396" y="708" fill="#6b7280" font-size="11">不自动删除/迁移历史数据</text>
+      <text x="396" y="726" fill="#6b7280" font-size="11">保留可追溯性 · 降低误操作风险</text>
+
+      <!-- Col 3 -->
+      <rect x="720" y="648" width="320" height="100" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+      <text x="736" y="670" fill="#1f2937" font-size="12" font-weight="500">③ 运行时不再读取</text>
+      <text x="736" y="690" fill="#6b7280" font-size="11">已禁用案字关联的要件</text>
+      <text x="736" y="708" fill="#6b7280" font-size="11">不参与文书生成过滤</text>
+      <text x="736" y="726" fill="#d4a017" font-size="11">filterElementsByCaseWord 跳过</text>
+    </g>
+
+    <!-- SVG 内图例 -->
+    <g>
+      <rect x="20" y="772" width="14" height="14" rx="2" fill="#6d5ce7"/>
+      <text x="40" y="784" fill="#6b7280" font-size="11">主路径 / 焦点</text>
+      <rect x="140" y="772" width="14" height="14" rx="2" fill="#ffffff" stroke="#e5e7eb"/>
+      <text x="160" y="784" fill="#6b7280" font-size="11">普通节点</text>
+      <rect x="240" y="772" width="14" height="14" rx="2" fill="#ede9fe" stroke="#6d5ce7"/>
+      <text x="260" y="784" fill="#6b7280" font-size="11">关键提示</text>
+      <rect x="360" y="772" width="14" height="14" rx="2" fill="#fdf6e3" stroke="#d4a017"/>
+      <text x="380" y="784" fill="#6b7280" font-size="11">异常 / 警告</text>
+      <rect x="480" y="772" width="14" height="14" rx="2" fill="#f3f4f6" stroke="#9ca3af"/>
+      <text x="500" y="784" fill="#6b7280" font-size="11">已禁用（灰+删除线）</text>
+    </g>
+  </svg>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>主路径 / 焦点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ffffff;border:1px solid #e5e7eb"></span>普通节点</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ede9fe;border:1px solid #6d5ce7"></span>关键提示</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fdf6e3;border:1px solid #d4a017"></span>异常 / 警告</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f3f4f6;border:1px solid #9ca3af"></span>已禁用（灰+删除线）</span>
+  </div>
+</div>
+</body>
+</html>

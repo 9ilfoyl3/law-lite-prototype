@@ -353,16 +353,16 @@
                 <div class="form-hint">管理后台仅支持配置一步生成型 workflow（输入参数直接出文书结果，用于用户侧"一步生成" tab）；分步生成型由内置默认提供，无需在后台配置</div>
             </div>
             <!-- v1.36 (V1.1.8): 使用模型字段已移除，模型由 agentflow 平台 workflow 内部决定，前端不再配置 -->
-            <div class="form-row">
-                <label class="form-label">匹配案字（不选 = 案字兜底）</label>
-                <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
-                <div class="form-hint">案字从案件案号自动识别；同一案字在多个<strong>同类型</strong> workflow 间不可重复</div>
-            </div>
-            <!-- v1.32: 新增匹配案由选择器 -->
+            <!-- v1.37 (V1.1.11): 匹配案由选择器移至匹配案字上方（先选案由再选案字，案字按已选案由联动过滤） -->
             <div class="form-row">
                 <label class="form-label">匹配案由（不选 = 案由兜底）</label>
                 <div id="wfCausesPicker" class="cause-picker-wrap"></div>
-                <div class="form-hint">从当前业务系统案由树中选择（3 级）；不选任何案由 = 兜底；同一案由在多个<strong>同类型</strong> workflow 间不可重复</div>
+                <div class="form-hint">从当前业务系统案由树中选择（3 级）；不选任何案由 = 兜底；同一案由在多个<strong>同类型</strong> workflow 间不可重复；勾选案由后，下方案字仅展示该案由所属大类允许的白名单</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">匹配案字（不选 = 案字兜底）</label>
+                <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
+                <div class="form-hint">案字从案件案号自动识别；同一案字在多个<strong>同类型</strong> workflow 间不可重复；按已选案由联动过滤，未选案由时展示全部案字</div>
             </div>
             <!-- E1: workflow 类型说明（仅一步生成型） -->
             <div class="form-row" id="wfMaterialRow">
@@ -380,7 +380,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=57"></script>
-    <script src="../../js/admin-doc-types.js?v=8"></script>
+    <script src="../../js/case-data.js?v=58"></script>
+    <script src="../../js/admin-doc-types.js?v=10"></script>
 </body>
 </html>
