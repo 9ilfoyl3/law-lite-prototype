@@ -2336,6 +2336,11 @@
             white-space: pre-wrap;
             word-break: break-word;
         }
+        .case-elements-item-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
         .case-elements-item-edit-btn {
             display: inline-flex;
             align-items: center;
@@ -2354,6 +2359,68 @@
             border-color: var(--accent-primary);
             color: var(--accent-primary);
         }
+        .case-elements-item-edit-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .case-elements-item-edit-btn.primary:hover {
+            opacity: 0.9;
+        }
+        /* v2.28: 要件追问历史与输入区（对齐分步生成追问样式） */
+        .case-elements-followup-list {
+            margin-top: 4px;
+        }
+        .case-elements-followup-item {
+            margin-top: 8px;
+            padding: 6px 8px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+        }
+        .case-elements-followup-q {
+            font-size: 12px;
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+        }
+        .case-elements-followup-q i { color: var(--accent-primary); margin-top: 1px; flex-shrink: 0; }
+        .case-elements-followup-a {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            padding-left: 17px;
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+        }
+        .case-elements-followup-a i { color: var(--text-muted); margin-top: 1px; flex-shrink: 0; }
+        .case-elements-followup-area {
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        .case-elements-followup-input-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .case-elements-followup-text {
+            flex: 1;
+            padding: 5px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .case-elements-followup-text:focus { border-color: var(--accent-primary); }
         /* v2.27: 内联编辑文本框 */
         .inline-edit-area .inline-edit-textarea {
             width: 100%;

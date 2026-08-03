@@ -1,4 +1,6 @@
 // ============ Case Files Page JavaScript ============
+// v2.29 本案要件内联编辑与生成联动优化：1)内联编辑区移除"修改答案"文字标签与 placeholder，仅保留文本框与保存/取消按钮；2)新增 hasExistingElementAnswers/collectExistingElementAnswers 辅助函数；3)generateByMaterial（一步生成）、compileSteps（分步生成编译）新增"已 AI 总结则默认引入"逻辑——caseElementsAnswers 存在任意要件答案时不再弹框，直接引入已生成要件答案并直接生成，友好提示告知；未做过 AI 总结时维持原弹框询问逻辑；4)compileSteps 要件范围同步用 mergeCaseElements 合并个案要件（与 generateByMaterial 一致）
+// v2.28 本案要件答案操作升级（对齐分步生成步骤操作模式）：1)原"修改"按钮更名为"编辑"；2)新增"重新生成"按钮（regenerateElementAnswer，覆盖原答案）；3)新增"追问"按钮（followUpElement/submitElementFollowUp，多轮对话式追问，历史持久化到 caseElementsFollowUps/localStorage.caseElementsFollowUps_${caseId}）；4)移除答案区"AI 生成答案"文字标签，仅展示答案正文；5)三个操作按钮仅在已生成答案后出现
 // v2.27 本案要件交互重构：1)删除要件项"问答/已答·查看"按钮；2)AI总结改为批量总结全部要件（无需勾选，自动全选并生成答案）；3)已答状态直接在要件项下方展示答案内容（绿色卡片 + AI生成答案标签 + 修改按钮）；4)新增 editElementAnswerInline/saveElementAnswerInline 内联编辑功能（替代原 openElementQaModal 弹窗）；5)清理 .case-elements-item-qa-btn CSS，新增 .case-elements-item-answer/.inline-edit-textarea 样式
 // v2.26 本案要件抽屉优化：1)抽屉宽度 380px → 50vw（min-width 380px 兜底）；2)删除底部"关闭"按钮（头部 × 与遮罩点击仍可关闭）；3)新增"AI总结"按钮（紫色品牌色区分），对已勾选要件批量生成答案，用户可在问答弹窗中修改（复用 generateMockElementAnswer，与生成文书弹框引入要件逻辑一致）
 // v2.25 分步生成 tab 隐藏顶部"核心材料"提示条（分步每步独立选材料，与材料树全局勾选无关）
@@ -1334,11 +1336,18 @@ function generateByMaterial() {
     const _matDocType = document.getElementById('matDocType')?.value || '';
     const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (_matDocType === 'judgment' && _hasElements) {
-        showPreElementConfirmModal(allPresets, () => {
-            doGenerateByMaterial(null);
-        }, (elementAnswers) => {
+        // v2.28: 已做过 AI 总结则默认直接引入，不弹框
+        if (hasExistingElementAnswers()) {
+            const elementAnswers = collectExistingElementAnswers();
+            showNotification(`已引入 ${elementAnswers.length} 个案由要件辅助生成`, 'info');
             doGenerateByMaterial(elementAnswers);
-        });
+        } else {
+            showPreElementConfirmModal(allPresets, () => {
+                doGenerateByMaterial(null);
+            }, (elementAnswers) => {
+                doGenerateByMaterial(elementAnswers);
+            });
+        }
     } else {
         doGenerateByMaterial(null);
     }
@@ -2565,15 +2574,22 @@ function compileSteps() {
     if (guardReadOnly('compileSteps')) return;
     const _org3 = localStorage.getItem('currentBusiness') || 'court';
     const _cw3 = parseCaseWord(caseItem.caseNumber, _org3);
-    const allPresets = getAllElementPresets(caseItem.cause, _org3, _cw3);
+    const allPresets = mergeCaseElements(getAllElementPresets(caseItem.cause, _org3, _cw3), caseItem.id);
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
-    const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0);
+    const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (stepDocType === 'judgment' && _hasElements3) {
-        showPreElementConfirmModal(allPresets, () => {
-            doCompileSteps(null);
-        }, (elementAnswers) => {
+        // v2.28: 已做过 AI 总结则默认直接引入，不弹框
+        if (hasExistingElementAnswers()) {
+            const elementAnswers = collectExistingElementAnswers();
+            showNotification(`已引入 ${elementAnswers.length} 个案由要件辅助生成`, 'info');
             doCompileSteps(elementAnswers);
-        });
+        } else {
+            showPreElementConfirmModal(allPresets, () => {
+                doCompileSteps(null);
+            }, (elementAnswers) => {
+                doCompileSteps(elementAnswers);
+            });
+        }
     } else {
         doCompileSteps(null);
     }
@@ -3550,6 +3566,7 @@ let caseElementsDrawerOpen = false;
 let caseElementsCache = { standard: [], mine: [], case: [] }; // 当前案件三类要件缓存
 let caseElementsAnswers = {};      // { [要件名]: 答案 }，与 localStorage.caseElements_${caseId} 同步
 let caseElementsSelection = new Set(); // 选中的要件名集合
+let caseElementsFollowUps = {};    // { [要件名]: [{q,a}] }，与 localStorage.caseElementsFollowUps_${caseId} 同步
 let currentQaElement = null;       // 当前正在问答的要件对象
 
 // ---- 个案要件存取（案件维度）----
@@ -3605,12 +3622,54 @@ function saveElementSelection(cid, set) {
     localStorage.setItem(`caseElementsSelection_${cid}`, JSON.stringify(Array.from(set || [])));
 }
 
+// ---- 要件追问历史存取（案件维度）----
+function loadElementFollowUps(cid) {
+    if (!cid) return {};
+    try {
+        const obj = JSON.parse(localStorage.getItem(`caseElementsFollowUps_${cid}`) || '{}');
+        return (obj && typeof obj === 'object') ? obj : {};
+    } catch (e) { return {}; }
+}
+function saveElementFollowUps(cid, obj) {
+    if (!cid) return;
+    localStorage.setItem(`caseElementsFollowUps_${cid}`, JSON.stringify(obj || {}));
+}
+
+// v2.28: 判断案件是否已做过 AI 总结（caseElementsAnswers 中存在任意要件答案）
+function hasExistingElementAnswers() {
+    if (!caseItem) return false;
+    const all = [
+        ...(caseElementsCache.standard || []),
+        ...(caseElementsCache.mine || []),
+        ...(caseElementsCache.case || [])
+    ];
+    return all.some(p => p && p.name && (caseElementsAnswers[p.name] || '').trim().length > 0);
+}
+
+// v2.28: 收集已生成的要件答案，供 generateByMaterial/compileSteps 直接引入
+function collectExistingElementAnswers() {
+    const result = [];
+    const all = [
+        ...(caseElementsCache.standard || []).map(p => ({ ...p, source: 'standard' })),
+        ...(caseElementsCache.mine || []).map(p => ({ ...p, source: 'mine' })),
+        ...(caseElementsCache.case || []).map(p => ({ ...p, source: 'case' }))
+    ];
+    all.forEach(p => {
+        const ans = (caseElementsAnswers[p.name] || '').trim();
+        if (ans) {
+            result.push({ name: p.name, desc: p.desc, question: p.question, answer: ans });
+        }
+    });
+    return result;
+}
+
 // 加载当前案件的全部要件（标准 + 我的 + 个案），同步刷新缓存与答案
 function loadCaseElementsAll() {
     if (!caseItem) {
         caseElementsCache = { standard: [], mine: [], case: [] };
         caseElementsAnswers = {};
         caseElementsSelection = new Set();
+        caseElementsFollowUps = {};
         return caseElementsCache;
     }
     const _org = localStorage.getItem('currentBusiness') || org || 'court';
@@ -3624,6 +3683,7 @@ function loadCaseElementsAll() {
     caseElementsCache = { standard, mine, case: caseCustom };
     caseElementsAnswers = loadElementAnswers(caseItem.id);
     caseElementsSelection = loadElementSelection(caseItem.id);
+    caseElementsFollowUps = loadElementFollowUps(caseItem.id);
     return caseElementsCache;
 }
 
@@ -3705,14 +3765,28 @@ function renderElementsGroup(title, items, source) {
         const delBtn = source === 'case'
             ? `<button type="button" class="case-elements-item-del-btn" onclick="deleteCaseElement('${escapeJsString(p.name)}')" title="删除该个案要件"><i class="fas fa-trash-alt"></i></button>`
             : '';
-        // v2.27: 已答状态直接在要件项下方展示答案内容，不再用"问答/已答·查看"按钮跳转
-        const answerHtml = answered
-            ? `<div class="case-elements-item-answer">
-                   <div class="answer-label"><i class="fas fa-comment-dots"></i> AI 生成答案</div>
+        // 已答状态直接在要件项下方展示答案内容；操作按钮参考分步生成（编辑/重新生成/追问）
+        let answerHtml = '';
+        if (answered) {
+            const followUps = (caseElementsFollowUps[p.name] || []);
+            const followUpsHtml = followUps.length > 0
+                ? followUps.map(f => `
+                    <div class="case-elements-followup-item">
+                        <div class="case-elements-followup-q"><i class="fas fa-question-circle"></i> ${escapeHtmlForElements(f.q)}</div>
+                        <div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(f.a)}</div>
+                    </div>
+                `).join('')
+                : '';
+            answerHtml = `<div class="case-elements-item-answer">
                    <div class="answer-text">${escapeHtmlForElements(answer)}</div>
-                   <button type="button" class="case-elements-item-edit-btn" onclick="editElementAnswerInline('${escapeJsString(p.name)}')"><i class="fas fa-edit"></i> 修改</button>
-               </div>`
-            : '';
+                   <div class="case-elements-item-actions">
+                       <button type="button" class="case-elements-item-edit-btn" onclick="editElementAnswerInline('${escapeJsString(p.name)}')"><i class="fas fa-edit"></i> 编辑</button>
+                       <button type="button" class="case-elements-item-edit-btn" onclick="regenerateElementAnswer('${escapeJsString(p.name)}')"><i class="fas fa-redo"></i> 重新生成</button>
+                       <button type="button" class="case-elements-item-edit-btn" onclick="followUpElement('${escapeJsString(p.name)}')"><i class="fas fa-comments"></i> 追问</button>
+                   </div>
+                   <div class="case-elements-followup-list">${followUpsHtml}</div>
+               </div>`;
+        }
         return `
             <div class="case-elements-item">
                 <input type="checkbox" ${checked} onchange="toggleDrawerElementSelection('${escapeJsString(p.name)}', this.checked)">
@@ -3755,8 +3829,7 @@ function editElementAnswerInline(name) {
     if (existingAnswer) existingAnswer.remove();
     const editHtml = `
         <div class="case-elements-item-answer inline-edit-area">
-            <div class="answer-label"><i class="fas fa-edit"></i> 修改答案</div>
-            <textarea class="inline-edit-textarea" placeholder="修改 AI 生成的答案...">${escapeHtmlForElements(current)}</textarea>
+            <textarea class="inline-edit-textarea" placeholder="">${escapeHtmlForElements(current)}</textarea>
             <div class="inline-edit-actions">
                 <button type="button" class="case-elements-item-edit-btn" onclick="saveElementAnswerInline('${escapeJsString(name)}')"><i class="fas fa-save"></i> 保存</button>
                 <button type="button" class="case-elements-item-edit-btn" onclick="renderElementsList();"><i class="fas fa-times"></i> 取消</button>
@@ -3781,6 +3854,90 @@ function saveElementAnswerInline(name) {
     }
     renderElementsList();
     showNotification('答案已保存', 'success');
+}
+
+// 重新生成要件答案：基于当前要件重新调用 AI 生成，覆盖原答案（追问历史保留）
+function regenerateElementAnswer(name) {
+    if (!caseItem) return;
+    const all = [
+        ...(caseElementsCache.standard || []).map(p => ({ ...p, source: 'standard' })),
+        ...(caseElementsCache.mine || []).map(p => ({ ...p, source: 'mine' })),
+        ...(caseElementsCache.case || []).map(p => ({ ...p, source: 'case' }))
+    ];
+    const preset = all.find(p => p.name === name);
+    if (!preset) {
+        showNotification('未找到该要件', 'warning');
+        return;
+    }
+    const answer = generateMockElementAnswer(preset, caseItem);
+    caseElementsAnswers[name] = answer;
+    caseElementsSelection.add(name);
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    saveElementSelection(caseItem.id, caseElementsSelection);
+    renderElementsList();
+    showNotification('答案已重新生成', 'success');
+}
+
+// 追问：在要件答案下方 toggle 追问输入区，支持多轮对话
+function followUpElement(name) {
+    if (!caseItem) return;
+    const areaId = `elementFollowUpArea_${name.replace(/\s/g, '_')}`;
+    const existing = document.getElementById(areaId);
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    // 定位当前要件答案区
+    const items = document.querySelectorAll('.case-elements-item');
+    let targetAnswer = null;
+    items.forEach(el => {
+        const titleEl = el.querySelector('.case-elements-item-title');
+        if (titleEl && titleEl.textContent.includes(name)) {
+            targetAnswer = el.querySelector('.case-elements-item-answer');
+        }
+    });
+    if (!targetAnswer) return;
+    const followupList = targetAnswer.querySelector('.case-elements-followup-list');
+    const wrap = document.createElement('div');
+    wrap.className = 'case-elements-followup-area';
+    wrap.id = areaId;
+    wrap.innerHTML = `
+        <div class="case-elements-followup-input-row">
+            <input type="text" placeholder="输入追问问题，按 Enter 发送..." class="case-elements-followup-text">
+            <button type="button" class="case-elements-item-edit-btn primary" onclick="submitElementFollowUp('${escapeJsString(name)}')"><i class="fas fa-paper-plane"></i> 发送</button>
+        </div>
+    `;
+    followupList.insertAdjacentElement('afterend', wrap);
+    const input = wrap.querySelector('.case-elements-followup-text');
+    if (input) {
+        input.focus();
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); submitElementFollowUp(name); }
+        });
+    }
+}
+
+// 提交追问：模拟 AI 回答并持久化到 caseElementsFollowUps
+function submitElementFollowUp(name) {
+    if (!caseItem) return;
+    const areaId = `elementFollowUpArea_${name.replace(/\s/g, '_')}`;
+    const area = document.getElementById(areaId);
+    const input = area ? area.querySelector('.case-elements-followup-text') : null;
+    if (!input || !input.value.trim()) return;
+    const q = input.value.trim();
+    if (!caseElementsFollowUps[name]) caseElementsFollowUps[name] = [];
+    // 原型 mock：基于要件名返回模拟回答
+    const mockAnswers = [
+        `根据案件材料进一步分析，「${name}」的答案已得到补充印证。`,
+        `补充说明：该要件涉及的法律依据可在文书中引用具体条款增强说服力。`,
+        `经进一步检索，建议结合相关证据链对「${name}」的结论予以强化。`
+    ];
+    const a = mockAnswers[caseElementsFollowUps[name].length % mockAnswers.length];
+    caseElementsFollowUps[name].push({ q, a });
+    saveElementFollowUps(caseItem.id, caseElementsFollowUps);
+    renderElementsList();
+    // 重新展开追问输入框
+    setTimeout(() => followUpElement(name), 0);
 }
 
 function sourceLabel(source) {
@@ -3889,6 +4046,8 @@ function deleteCaseElement(name) {
     saveElementAnswers(caseItem.id, caseElementsAnswers);
     caseElementsSelection.delete(name);
     saveElementSelection(caseItem.id, caseElementsSelection);
+    delete caseElementsFollowUps[name];
+    saveElementFollowUps(caseItem.id, caseElementsFollowUps);
     loadCaseElementsAll();
     renderElementsList();
     refreshCaseElementsEntryCount();
