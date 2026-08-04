@@ -1,6 +1,8 @@
 // ============ Admin Doc Templates Management ============
 // v1.0 文书模板管理：维护各业务系统模板，关联文书类型
 // v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
+// v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑弹窗提供模板示例下载；③ 列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段
+// v1.3 内置模板预置默认正文：内置模板 content 赋予 TEMPLATE_EXAMPLE_TEXT，使预览/下载按钮默认可用（自定义模板未上传正文时仍置灰）
 // 数据持久化：localStorage.adminDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTemplates 在加载时合并到 system.docTemplates
 
@@ -13,6 +15,42 @@
     let editingKey = null;        // 当前编辑的模板 key（编辑模式时非空）
     let editingIsBuiltin = false; // 编辑的是内置模板（编辑后转为自定义）
     let pendingConfirmAction = null;
+    let pendingTemplateContent = ''; // v1.2 新增/编辑弹窗中暂存的模板正文（由上传文件确定）
+    let pendingTemplateFileName = ''; // 上传文件名展示
+
+    // v1.2 模板示例正文（占位符格式参考用户提供的民事判决书截图）
+    const TEMPLATE_EXAMPLE_TEXT = `{{courtName}}
+民事判决书
+
+                                                                       {{caseNumber}}
+
+{{plaintiffDefendantInfo}}
+{{proceduralInfo}}
+{{plaintiffClaim}}
+{{foundFacts}}
+{{courtHolds}}
+{{legalProvisionCitation}}
+{{judgmentContent}}
+
+    如不服本判决，可以在判决书送达之日起十五日内，向本院递交上诉状，并按对方当事人的人数或者代表人的人数提出副本，上诉于江苏省苏州市中级人民法院。同时按照国务院《诉讼费用交纳办法》规定向江苏省苏州市中级人民法院预交上诉案件受理费。
+
+
+
+
+
+                                                    审判员 {{judgeName}}
+
+
+
+
+
+                                                     {{judgmentDate}}
+
+
+
+
+
+书记员 {{clerkName}}`;
 
     // ===== 工具函数 =====
     function getStorage() {
@@ -75,11 +113,12 @@
 
         const result = {};
         // 内置模板（字符串）
+        // 内置模板 content 赋予系统预置默认正文（TEMPLATE_EXAMPLE_TEXT），使预览/下载按钮可用
         Object.entries(builtins).forEach(([key, name]) => {
             result[key] = {
                 name: name,
                 docType: tplToDocType[key] || '',
-                content: '',
+                content: TEMPLATE_EXAMPLE_TEXT,
                 isBuiltin: true,
                 enabled: !builtinDisabled.includes(key)
             };
@@ -104,6 +143,36 @@
     function genTemplateKey(name, docType) {
         const base = (docType || 'tpl') + '-' + Date.now().toString(36);
         return base;
+    }
+
+    // v1.2 通用工具：下载文本内容为文件
+    function downloadTextFile(text, filename) {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    // v1.2 通用工具：在新窗口预览文本（保留换行）
+    function previewTextInWindow(title, text) {
+        const w = window.open('', '_blank');
+        if (!w) {
+            showNotification('预览窗口被浏览器拦截，请允许弹窗', 'warning');
+            return;
+        }
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+            <style>body{font-family:'Noto Sans SC',-apple-system,sans-serif;padding:32px;line-height:1.8;max-width:720px;margin:0 auto;color:#1a1a2e;white-space:pre-wrap;word-break:break-word;}</style>
+            </head><body>${escapeHtml(text)}</body></html>`;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
     }
 
     // ===== 通知 =====
@@ -190,9 +259,16 @@
             const toggleBtn = isEnabled
                 ? '<button class="action-btn toggle-off" onclick="toggleTemplateEnabled(\'' + key + '\')">停用</button>'
                 : '<button class="action-btn toggle-on" onclick="toggleTemplateEnabled(\'' + key + '\')">启用</button>';
+            const hasContent = (t.content || '').trim().length > 0;
+            const viewDisabled = hasContent ? '' : ' disabled';
+            const contentActions = '<button class="action-btn view"' + viewDisabled + ' onclick="previewTemplateContent(\'' + key + '\')">预览</button>'
+                  + '<button class="action-btn view"' + viewDisabled + ' onclick="downloadTemplateByKey(\'' + key + '\')">下载</button>'
+                  + '<button class="action-btn view" onclick="reuploadTemplateByKey(\'' + key + '\')">重新上传</button>';
             const actions = t.isBuiltin
-                ? '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>' + toggleBtn
-                : '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
+                ? contentActions
+                  + '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>' + toggleBtn
+                : contentActions
+                  + '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
                   + toggleBtn
                   + '<button class="action-btn delete" onclick="deleteTemplate(\'' + key + '\')">删除</button>';
             return '<tr>'
@@ -209,15 +285,31 @@
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    // v1.2 刷新弹窗中模板正文上传区显示
+    function refreshTplUploadUI() {
+        const uploadArea = document.getElementById('tplUploadArea');
+        const fileActions = document.getElementById('tplFileActions');
+        const filenameEl = document.getElementById('tplUploadFilename');
+        const hasContent = pendingTemplateContent.length > 0;
+        if (uploadArea) uploadArea.style.display = hasContent ? 'none' : 'block';
+        if (fileActions) fileActions.style.display = hasContent ? 'flex' : 'none';
+        if (filenameEl) {
+            filenameEl.style.display = pendingTemplateFileName ? 'block' : 'none';
+            filenameEl.textContent = pendingTemplateFileName ? '已选择文件：' + pendingTemplateFileName : '';
+        }
+    }
+
     // ===== 新增/编辑弹窗 =====
     window.openAddModal = function() {
         editingKey = null;
         editingIsBuiltin = false;
+        pendingTemplateContent = '';
+        pendingTemplateFileName = '';
         document.getElementById('modalTitle').textContent = '新增模板';
         document.getElementById('tplName').value = '';
-        document.getElementById('tplContent').value = '';
         fillDocTypeSelect('');
         document.getElementById('tplDocType').disabled = false;
+        refreshTplUploadUI();
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
     };
@@ -228,19 +320,75 @@
         if (!t) return;
         editingKey = key;
         editingIsBuiltin = !!t.isBuiltin;
+        pendingTemplateContent = t.content || '';
+        pendingTemplateFileName = t.content ? '已保存的模板正文' : '';
         document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置模板（另存为自定义）' : '编辑模板';
         document.getElementById('tplName').value = t.name;
-        document.getElementById('tplContent').value = t.content || '';
         fillDocTypeSelect(t.docType);
         // 编辑内置时禁用文书类型切换，避免逻辑歧义（内置只能在原类型上覆盖）
         document.getElementById('tplDocType').disabled = editingIsBuiltin;
+        refreshTplUploadUI();
         document.getElementById('tplModal').classList.add('show');
+    };
+
+    // v1.2 模板文件上传处理（原型阶段仅解析 .txt；doc/docx 提示需配套解析能力）
+    window.handleTemplateFileUpload = function(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const name = file.name || '';
+        const ext = name.split('.').pop().toLowerCase();
+        if (!['txt', 'doc', 'docx'].includes(ext)) {
+            showNotification('仅支持 .txt / .doc / .docx 格式', 'warning');
+            event.target.value = '';
+            return;
+        }
+        if (ext === 'txt') {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingTemplateContent = (e.target.result || '').toString();
+                pendingTemplateFileName = name;
+                refreshTplUploadUI();
+                showNotification('模板正文已读取', 'success');
+            };
+            reader.onerror = function() {
+                showNotification('文件读取失败', 'error');
+            };
+            reader.readAsText(file, 'utf-8');
+        } else {
+            // doc/docx 原型阶段用 mock 解析提示：仅取文件名作为占位
+            pendingTemplateContent = `// 文件：${name}\n// 注：doc/docx 格式需配套文档解析服务，原型阶段仅保存文件名标识。`;
+            pendingTemplateFileName = name;
+            refreshTplUploadUI();
+            showNotification('已接收 ' + ext + ' 文件（原型阶段仅保存标识）', 'warning');
+        }
+        event.target.value = '';
+    };
+
+    // v1.2 下载模板示例
+    window.downloadTemplateExample = function() {
+        downloadTextFile(TEMPLATE_EXAMPLE_TEXT, '民事判决书模板示例.txt');
+    };
+
+    // v1.2 下载当前弹窗中的模板正文
+    window.downloadCurrentTemplateContent = function() {
+        if (!pendingTemplateContent) return;
+        const title = document.getElementById('tplName').value.trim() || '模板正文';
+        downloadTextFile(pendingTemplateContent, title + '.txt');
+    };
+
+    // v1.2 重新上传：清空当前内容，显示上传区
+    window.reuploadTemplateContent = function() {
+        pendingTemplateContent = '';
+        pendingTemplateFileName = '';
+        refreshTplUploadUI();
     };
 
     window.closeModal = function() {
         document.getElementById('tplModal').classList.remove('show');
         editingKey = null;
         editingIsBuiltin = false;
+        pendingTemplateContent = '';
+        pendingTemplateFileName = '';
     };
 
     function fillDocTypeSelect(selected) {
@@ -254,7 +402,7 @@
     window.saveTemplate = function() {
         const name = document.getElementById('tplName').value.trim();
         const docType = document.getElementById('tplDocType').value;
-        const content = document.getElementById('tplContent').value;
+        const content = pendingTemplateContent;
 
         if (!name) {
             showNotification('请填写模板名', 'error');
@@ -311,6 +459,32 @@
         renderLeft();
         renderRight();
         showNotification(editingKey ? '模板已更新' : '模板已新增', 'success');
+    };
+
+    // v1.2 列表操作：预览模板正文
+    window.previewTemplateContent = function(key) {
+        const all = getAllTemplates(currentOrg);
+        const t = all[key];
+        if (!t || !(t.content || '').trim()) return;
+        previewTextInWindow('模板预览：' + t.name, t.content);
+    };
+
+    // v1.2 列表操作：下载模板正文
+    window.downloadTemplateByKey = function(key) {
+        const all = getAllTemplates(currentOrg);
+        const t = all[key];
+        if (!t || !(t.content || '').trim()) return;
+        downloadTextFile(t.content, (t.name || '模板正文') + '.txt');
+    };
+
+    // v1.2 列表操作：重新上传（直接打开编辑弹窗并定位到上传区）
+    window.reuploadTemplateByKey = function(key) {
+        editTemplate(key);
+        // 打开编辑弹窗后，默认清空已有内容，让用户直接选择新文件
+        setTimeout(() => {
+            reuploadTemplateContent();
+            document.getElementById('tplFileInput').click();
+        }, 80);
     };
 
     // ===== 启用/停用切换 =====

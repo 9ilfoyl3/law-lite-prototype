@@ -45,7 +45,7 @@
 | 用户管理 | [pages/admin/users.html](pages/admin/users.html) | 用户全生命周期管理、批量导入/删除 |
 | 法院维护 | [pages/admin/court-tree.html](pages/admin/court-tree.html) | 超管专用：维护法院上下级组织树，分配法院管理员账号 |
 | 部门维护 | [pages/admin/department.html](pages/admin/department.html) | 法院管理员维护本法院部门组织 |
-| 案件管理 | [pages/admin/cases.html](pages/admin/cases.html) | 全院视角案件管理（可编辑模式、多承办人） |
+| 案件管理 | [pages/admin/cases.html](pages/admin/cases.html) | 全院案件查看（材料树/文书列表/内容预览）+ 结构化信息编辑 + 列配置（仅法院） |
 | 系统运行报告 | [pages/admin/system-report.html](pages/admin/system-report.html) | 静态周报/月报/自定义报告，支持导出 PDF（V1.1 待定） |
 | 知识库分类管理 | [pages/admin/knowledge-base.html](pages/admin/knowledge-base.html) | 全员公开库分类体系维护（V1.1 待定） |
 | 知识库文档管理 | [pages/admin/knowledge-documents.html](pages/admin/knowledge-documents.html) | 知识库文档上传、状态管理、解析索引（V1.1 待定） |

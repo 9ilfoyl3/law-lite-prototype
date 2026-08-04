@@ -120,24 +120,6 @@
         .page-header h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0 0 6px 0; }
         .page-header p { font-size: 14px; color: var(--text-secondary); margin: 0; }
 
-        /* 业务系统切换按钮组（与用户侧 cases.html 一致） */
-        .business-switch { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-primary); padding: 4px; border-radius: 8px; }
-        .business-switch-btn {
-            padding: 7px 14px; border: none; background: transparent; border-radius: 6px;
-            font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer;
-            transition: all 0.2s; font-family: inherit;
-        }
-        .business-switch-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
-        .business-switch-btn.active { background: var(--accent-primary); color: #fff; }
-        .business-switch-tip { display: inline-flex; align-items: center; margin-left: 8px; color: var(--text-muted); cursor: help; position: relative; }
-        .business-switch-tip:hover .business-switch-tooltip { display: block; }
-        .business-switch-tooltip {
-            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
-            background: #1f2937; color: #fff; padding: 8px 12px; border-radius: 6px;
-            font-size: 12px; line-height: 1.6; white-space: nowrap; z-index: 100;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
         /* 筛选栏 */
         .filter-bar {
             background: var(--bg-secondary);
@@ -169,6 +151,31 @@
         }
         .filter-bar .btn-reset:hover { background: var(--bg-primary); border-color: #d1d5db; }
 
+        /* 列配置 UI（参考用户侧 cases.html 风格） */
+        .col-config-wrap { position: relative; }
+        .col-config-toolbar-btn {
+            padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 6px;
+            background: var(--bg-secondary); color: var(--text-secondary); font-size: 14px; cursor: pointer;
+            font-family: inherit; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .col-config-toolbar-btn:hover { background: var(--bg-primary); border-color: #d1d5db; }
+        .col-config-toolbar-btn.active { background: var(--accent-light); color: var(--accent-primary); border-color: #bfdbfe; }
+        .col-config-panel {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 4px;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 200px; z-index: 50;
+        }
+        .col-config-panel.show { display: block; }
+        .col-config-header { padding: 10px 14px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .col-config-close { border: none; background: transparent; cursor: pointer; color: var(--text-muted); font-size: 14px; }
+        .col-config-close:hover { color: var(--text-primary); }
+        .col-config-body { padding: 8px 0; }
+        .col-config-item { display: flex; align-items: center; padding: 8px 14px; cursor: pointer; font-size: 13px; }
+        .col-config-item:hover { background: var(--bg-primary); }
+        .col-config-item input { margin-right: 8px; cursor: pointer; }
+        .col-config-footer { padding: 8px 14px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); }
+
         /* 批量操作栏 */
         .batch-bar {
             background: var(--accent-light); border: 1px solid #bfdbfe;
@@ -182,8 +189,6 @@
         }
         .batch-bar .btn-delete { background: var(--bg-secondary); color: #b91c1c; border: 1px solid #fecaca; }
         .batch-bar .btn-delete:hover { background: #fef2f2; }
-        .batch-bar .btn-handler { background: var(--bg-secondary); color: #1e40af; border: 1px solid #bfdbfe; }
-        .batch-bar .btn-handler:hover { background: #eff6ff; }
         .batch-bar .btn-clear { margin-left: auto; background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 13px; }
         .batch-bar .btn-clear:hover { color: var(--text-primary); }
 
@@ -193,12 +198,15 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .case-grid { display: grid; min-width: 1200px; }
+        /* grid-template-columns 由 JS 动态设置（默认：复选框 | 案件名称 | 文件数 | 文书数 | 更新时间 | 操作） */
         .case-grid .grid-head,
         .case-grid .grid-row {
             display: grid;
-            grid-template-columns: 40px minmax(0, 2.4fr) minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 1fr) 180px;
+            grid-template-columns: var(--case-grid-cols, 40px minmax(0,3fr) 100px 100px minmax(0,1fr) 180px);
             align-items: center;
         }
+        .case-grid .grid-head > div,
+        .case-grid .grid-row > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .case-grid .grid-head {
             background: var(--bg-primary); border-bottom: 1px solid var(--border-color);
             font-size: 12px; font-weight: 600; color: var(--text-secondary);
@@ -229,11 +237,13 @@
         .case-grid .col-center { text-align: center; }
         .case-grid .case-name-link { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
         .case-grid .case-name-link:hover { text-decoration: underline; }
-        .case-grid .org-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
-        .org-tag.court { background: #dbeafe; color: #1e40af; }
-        .org-tag.procuratorate { background: #ede9fe; color: #5b21b6; }
-        .org-tag.justice { background: #d1fae5; color: #065f46; }
-        .case-grid .file-count-cell.has-error { color: var(--accent-danger); font-weight: 600; }
+        /* 文件数 / 文书数链接样式 */
+        .case-grid .file-count-link { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
+        .case-grid .file-count-link:hover { text-decoration: underline; }
+        .case-grid .file-count-cell.has-error { color: var(--accent-warning); font-weight: 600; cursor: pointer; }
+        .case-grid .doc-count-link { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
+        .case-grid .doc-count-link:hover { text-decoration: underline; }
+        .case-grid .doc-count-link.disabled { color: var(--text-muted); cursor: not-allowed; pointer-events: none; }
         .case-grid .action-cell { display: flex; justify-content: center; gap: 6px; }
         .case-grid .action-btn {
             padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer;
@@ -243,10 +253,10 @@
         .case-grid .action-btn:hover { background: #f3f4f6; }
         .case-grid .action-btn.view { color: var(--accent-primary); border-color: #bfdbfe; }
         .case-grid .action-btn.view:hover { background: var(--accent-light); }
-        .case-grid .action-btn.handler { color: #1e40af; border-color: #bfdbfe; }
-        .case-grid .action-btn.handler:hover { background: #eff6ff; }
         .case-grid .action-btn.delete { color: #b91c1c; border-color: #fecaca; }
         .case-grid .action-btn.delete:hover { background: #fef2f2; }
+        .case-grid .action-btn.handler { color: #6d28d9; border-color: #ddd6fe; }
+        .case-grid .action-btn.handler:hover { background: #f5f3ff; }
         .case-grid .action-btn.restore { color: #047857; border-color: #a7f3d0; }
         .case-grid .action-btn.restore:hover { background: #ecfdf5; }
 
@@ -290,22 +300,131 @@
         .modal-box .btn-cancel:hover { background: #e5e7eb; }
         .modal-box .btn-confirm { background: var(--accent-danger); color: #fff; }
         .modal-box .btn-confirm:hover { background: #dc2626; }
-        /* 改承办人弹窗表单 */
-        .handler-modal .form-row { margin-bottom: 16px; }
-        .handler-modal .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
-        .handler-modal .form-value { font-size: 14px; color: var(--text-primary); padding: 8px 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; }
-        .handler-modal .form-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; font-family: inherit; }
-        .handler-modal .form-select:focus { outline: none; border-color: var(--accent-primary); }
-        /* v1.39: 承办人多选 checkbox 列表容器 */
-        .handler-modal .handler-checkbox-list {
-            max-height: 240px; overflow-y: auto;
-            border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 6px; background: var(--bg-primary);
-        }
-        .handler-modal .handler-checkbox-list label:hover { background: var(--bg-secondary); }
-        .handler-modal .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
-        /* ===== 编辑案件弹窗（v1.43：与用户侧 cases.html 编辑按钮交互一致） ===== */
+        /* ===== 材料树弹窗（materialTreeModal） ===== */
+        .material-tree-modal { max-width: 640px; width: 90%; }
+        .material-tree-body { max-height: 60vh; overflow-y: auto; margin-bottom: 16px; }
+        .material-group { margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+        .material-group-header {
+            padding: 10px 14px; background: var(--bg-primary); font-size: 13px; font-weight: 600;
+            color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px;
+        }
+        .material-group-header .group-toggle { transition: transform 0.2s; font-size: 11px; color: var(--text-muted); }
+        .material-group.expanded .material-group-header .group-toggle { transform: rotate(90deg); }
+        .material-group:not(.expanded) .material-group-items { display: none; }
+        .material-group-header .group-count { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-left: auto; }
+        .material-group-items { padding: 4px 0; }
+        .material-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 14px 8px 36px; font-size: 13px;
+        }
+        .material-item:hover { background: var(--bg-primary); }
+        .material-item .material-name { display: flex; align-items: center; gap: 8px; color: var(--text-primary); min-width: 0; overflow: hidden; }
+        .material-item .material-name i { color: var(--text-muted); }
+        .material-item .material-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .material-item .preview-btn {
+            padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px;
+            background: var(--bg-secondary); color: var(--accent-primary); font-size: 12px; cursor: pointer; white-space: nowrap;
+        }
+        .material-item .preview-btn:hover { background: var(--accent-light); }
+
+        /* ===== 文书列表弹窗（documentListModal） ===== */
+        .document-list-modal { max-width: 640px; width: 90%; }
+        .document-list-body { max-height: 60vh; overflow-y: auto; margin-bottom: 16px; }
+        .doc-version-item {
+            padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 8px;
+            margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        }
+        .doc-version-info { flex: 1; min-width: 0; }
+        .doc-version-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .doc-version-meta { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .doc-version-meta span { white-space: nowrap; }
+        .doc-version-badge { padding: 1px 6px; border-radius: 8px; font-size: 11px; background: var(--accent-light); color: var(--accent-primary); }
+        .doc-version-tag { padding: 1px 6px; border-radius: 8px; font-size: 11px; background: #f3f4f6; color: var(--text-secondary); }
+        .doc-version-tag.polish { background: #fef3c7; color: #92400e; }
+        .doc-version-tag.regenerate { background: #ede9fe; color: #6d28d9; }
+        .doc-version-preview-btn {
+            padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px;
+            background: var(--bg-secondary); color: var(--accent-primary); font-size: 12px; cursor: pointer; white-space: nowrap;
+        }
+        .doc-version-preview-btn:hover { background: var(--accent-light); }
+
+        /* ===== 弹窗空状态（共享） ===== */
+        .modal-empty { padding: 40px 20px; text-align: center; color: var(--text-muted); }
+        .modal-empty i { font-size: 36px; margin-bottom: 10px; color: var(--border-color); display: block; }
+        .modal-empty p { font-size: 13px; margin: 0; }
+
+        /* ===== 内容预览弹窗（contentPreviewModal） ===== */
+        .content-preview-modal { max-width: 720px; width: 90%; }
+        .content-preview-body {
+            max-height: 60vh; overflow-y: auto; white-space: pre-wrap;
+            font-size: 14px; line-height: 1.8; color: var(--text-primary);
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 16px; margin-bottom: 16px;
+        }
+
+        /* ===== 改承办人弹窗（handlerModal） ===== */
+        .handler-modal { max-width: 720px; width: 90%; }
+        .handler-modal-body { display: flex; gap: 16px; max-height: 56vh; }
+        .handler-dept-tree {
+            width: 200px; flex-shrink: 0; border: 1px solid var(--border-color);
+            border-radius: 8px; overflow-y: auto; background: var(--bg-primary);
+        }
+        .handler-dept-tree-header {
+            padding: 10px 14px; font-size: 13px; font-weight: 600;
+            color: var(--text-secondary); border-bottom: 1px solid var(--border-color);
+            position: sticky; top: 0; background: var(--bg-primary); z-index: 1;
+        }
+        .handler-dept-item {
+            padding: 8px 14px; font-size: 13px; cursor: pointer;
+            color: var(--text-secondary); transition: all 0.15s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .handler-dept-item:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .handler-dept-item.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
+        .handler-dept-item .dept-count { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+        .handler-user-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .handler-search-bar { position: relative; margin-bottom: 10px; }
+        .handler-search-bar input {
+            width: 100%; padding: 8px 14px 8px 36px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 13px; font-family: inherit; background: var(--bg-secondary); color: var(--text-primary);
+            outline: none; box-sizing: border-box;
+        }
+        .handler-search-bar input:focus { border-color: var(--accent-primary); }
+        .handler-search-bar i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
+        .handler-user-list {
+            flex: 1; overflow-y: auto; border: 1px solid var(--border-color);
+            border-radius: 8px; background: var(--bg-secondary);
+        }
+        .handler-user-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; font-size: 13px; cursor: pointer;
+            border-bottom: 1px solid #f3f4f6; transition: background 0.15s;
+        }
+        .handler-user-item:last-child { border-bottom: none; }
+        .handler-user-item:hover { background: var(--bg-primary); }
+        .handler-user-item input { cursor: pointer; }
+        .handler-user-item .user-name { color: var(--text-primary); font-weight: 500; }
+        .handler-user-item .user-dept { color: var(--text-muted); font-size: 12px; }
+        .handler-user-empty { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+        .handler-selected-area {
+            margin-top: 12px; padding: 10px 14px;
+            border: 1px solid var(--border-color); border-radius: 8px;
+            background: var(--bg-primary); min-height: 44px;
+        }
+        .handler-selected-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+        .handler-selected-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .handler-tag {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 12px;
+            font-size: 12px; background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+        .handler-tag .remove-tag { cursor: pointer; font-size: 11px; opacity: 0.6; }
+        .handler-tag .remove-tag:hover { opacity: 1; }
+
+        /* ===== 编辑案件弹窗 ===== */
         .edit-modal .modal-box { min-width: 520px; max-width: 560px; }
         .edit-modal .form-row { margin-bottom: 16px; }
         .edit-modal .form-row:last-child { margin-bottom: 0; }
@@ -339,7 +458,7 @@
         .edit-modal .cause-trigger:hover { border-color: var(--accent-primary); }
         .edit-modal .cause-trigger .placeholder { color: var(--text-muted); }
 
-        /* ===== 案由树形选择器弹窗（参考用户侧 cases.html 风格） ===== */
+        /* ===== 案由树形选择器弹窗 ===== */
         .cause-selector-mask {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.5); z-index: 1100;
@@ -497,16 +616,7 @@
                 <div class="page-header">
                     <div class="page-title-wrap">
                         <h1>案件管理</h1>
-                        <p>管理全院案件数据（编辑详情 + 改承办人 + 批量删除）</p>
-                    </div>
-                    <div class="business-switch">
-                        <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
-                        <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
-                        <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
-                        <span class="business-switch-tip" tabindex="0">
-                            <i class="fas fa-info-circle"></i>
-                            <span class="business-switch-tooltip">该切换功能为原型演示用<br>实际一套环境只存在一种业务场景</span>
-                        </span>
+                        <p>查看全院案件材料与文书，编辑案件结构化信息</p>
                     </div>
                 </div>
 
@@ -528,7 +638,53 @@
                         <option value="2023">2023年</option>
                         <option value="custom">自定义</option>
                     </select>
-                    <button class="btn-reset" onclick="resetFilters()">重置</button>
+                    <button class="btn-reset" onclick="AdminCases.resetFilters()">重置</button>
+
+                    <!-- 列配置 -->
+                    <div class="col-config-wrap" style="margin-left:auto;">
+                        <button class="col-config-toolbar-btn" id="colConfigBtn" onclick="AdminCases.toggleColConfig()" title="列配置">
+                            <i class="fas fa-cog"></i>
+                            列配置
+                            <i class="fas fa-caret-down" style="margin-left:4px;font-size:12px;"></i>
+                        </button>
+                        <div class="col-config-panel" id="colConfigPanel">
+                            <div class="col-config-header">
+                                <span>列配置</span>
+                                <button class="col-config-close" onclick="AdminCases.toggleColConfig()"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="col-config-body">
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="caseNumber" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>案号</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="cause" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>案由</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="parties" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>当事人</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="handler" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>承办人</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="dept" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>部门</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="uploadDate" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>上传日期</span>
+                                </label>
+                                <label class="col-config-item">
+                                    <input type="checkbox" data-column="caseWord" onchange="AdminCases.toggleColumn(this.dataset.column)">
+                                    <span>案字</span>
+                                </label>
+                            </div>
+                            <div class="col-config-footer">勾选即时生效，无需确认</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 自定义日期范围（默认隐藏） -->
@@ -542,21 +698,18 @@
                 <!-- 批量操作栏 -->
                 <div class="batch-bar" id="batchBar">
                     <span class="batch-info" id="batchInfo">已选 0 件</span>
-                    <button class="btn btn-handler" onclick="batchChangeHandler()">批量改承办人</button>
-                    <button class="btn btn-delete" onclick="batchDelete()">批量删除</button>
-                    <button class="btn-clear" onclick="clearSelection()">取消选择</button>
+                    <button class="btn btn-secondary" onclick="AdminCases.batchChangeHandler()">批量改承办人</button>
+                    <button class="btn btn-delete" onclick="AdminCases.batchDelete()">批量删除</button>
+                    <button class="btn-clear" onclick="AdminCases.clearSelection()">取消选择</button>
                 </div>
 
                 <!-- 案件表格 -->
                 <div class="case-table-wrap">
-                    <div class="case-grid" id="caseGrid">
+                    <div class="case-grid" id="caseGrid" style="--case-grid-cols: 40px minmax(0,3fr) 100px 100px minmax(0,1fr) 180px;">
                         <div class="grid-head">
-                            <div class="col-center"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></div>
+                            <div class="col-center"><input type="checkbox" id="selectAll" onchange="AdminCases.toggleSelectAll(this)"></div>
                             <div>案件名称</div>
-                            <div>案号</div>
-                            <div>案由</div>
-                            <div>承办人</div>
-                            <div>部门</div>
+                            <!-- 可选列由 JS 动态渲染 -->
                             <div class="col-center">文件数</div>
                             <div class="col-center">文书数</div>
                             <div class="col-center">更新时间</div>
@@ -570,7 +723,7 @@
                 <div class="pagination" id="pagination">
                     <span class="pagination-info" id="paginationInfo">共 0 条</span>
                     <div class="pagination-right">
-                        <select class="page-size-select" id="pageSize" onchange="changePageSize(this.value)">
+                        <select class="page-size-select" id="pageSize" onchange="AdminCases.changePageSize(this.value)">
                             <option value="10">10条/页</option>
                             <option value="20" selected>20条/页</option>
                             <option value="50">50条/页</option>
@@ -588,37 +741,13 @@
             <h3 id="confirmTitle">确认操作</h3>
             <p id="confirmText">确定执行此操作吗？</p>
             <div class="modal-actions">
-                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-cancel" onclick="AdminCases.closeConfirm()">取消</button>
                 <button class="btn btn-confirm" id="confirmBtn">确认</button>
             </div>
         </div>
     </div>
 
-    <!-- 改承办人弹窗（v1.39: 多选） -->
-    <div class="modal-mask" id="handlerModal">
-        <div class="modal-box handler-modal">
-            <h3 id="handlerModalTitle">修改承办人（可多选）</h3>
-            <div class="form-row">
-                <label class="form-label" id="handlerCaseLabel">案件</label>
-                <div class="form-value" id="handlerCaseName">-</div>
-            </div>
-            <div class="form-row">
-                <label class="form-label">当前承办人</label>
-                <div class="form-value" id="handlerCurrent">-</div>
-            </div>
-            <div class="form-row">
-                <label class="form-label">新承办人（可勾选多个）</label>
-                <div class="handler-checkbox-list" id="handlerNew"></div>
-                <div class="form-hint">候选来自本法院活跃用户，支持多人协作承办</div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-cancel" onclick="closeHandlerModal()">取消</button>
-                <button class="btn btn-confirm" id="handlerConfirmBtn" style="background:var(--accent-primary);" onclick="execChangeHandler()">确认修改</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 编辑案件弹窗（v1.43：与用户侧 cases.html 编辑按钮交互一致） -->
+    <!-- 编辑案件弹窗 -->
     <div class="modal-mask edit-modal" id="editCaseModal" onclick="if(event.target===this) window.AdminCases.closeEditCase()">
         <div class="modal-box">
             <h3><i class="fas fa-edit" style="margin-right:8px;color:var(--accent-primary);"></i>编辑案件信息</h3>
@@ -662,7 +791,7 @@
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="window.AdminCases.closeEditCase()">取消</button>
-                <button class="btn btn-confirm" style="background:var(--accent-primary);" onclick="window.AdminCases.submitEditCase()">保存</button>
+                <button class="btn btn-confirm" id="editCaseSaveBtn" style="background:var(--accent-primary);" onclick="window.AdminCases.submitEditCase()">保存</button>
             </div>
         </div>
     </div>
@@ -685,11 +814,73 @@
         </div>
     </div>
 
+    <!-- 材料树弹窗 -->
+    <div class="modal-mask" id="materialTreeModal" onclick="if(event.target===this) window.AdminCases.closeMaterialTree()">
+        <div class="modal-box material-tree-modal">
+            <h3 id="materialTreeTitle"><i class="fas fa-folder-open" style="margin-right:8px;color:var(--accent-primary);"></i><span id="materialTreeCaseName">案件材料</span></h3>
+            <div id="materialTreeBody" class="material-tree-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="window.AdminCases.closeMaterialTree()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文书列表弹窗 -->
+    <div class="modal-mask" id="documentListModal" onclick="if(event.target===this) window.AdminCases.closeDocumentList()">
+        <div class="modal-box document-list-modal">
+            <h3 id="documentListTitle"><i class="fas fa-file-alt" style="margin-right:8px;color:var(--accent-primary);"></i><span id="documentListCaseName">案件文书</span></h3>
+            <p id="documentListCount" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">共 0 份文书</p>
+            <div id="documentListBody" class="document-list-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="window.AdminCases.closeDocumentList()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 内容预览弹窗 -->
+    <div class="modal-mask" id="contentPreviewModal" onclick="if(event.target===this) window.AdminCases.closeContentPreview()">
+        <div class="modal-box content-preview-modal">
+            <h3 id="contentPreviewTitle"><i class="fas fa-eye" style="margin-right:8px;color:var(--accent-primary);"></i>内容预览</h3>
+            <div id="contentPreviewBody" class="content-preview-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="window.AdminCases.closeContentPreview()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 改承办人弹窗 -->
+    <div class="modal-mask" id="handlerModal" onclick="if(event.target===this) window.AdminCases.closeHandlerModal()">
+        <div class="modal-box handler-modal">
+            <h3 id="handlerModalTitle"><i class="fas fa-user-edit" style="margin-right:8px;color:var(--accent-primary);"></i>改承办人</h3>
+            <div class="handler-modal-body">
+                <div class="handler-dept-tree">
+                    <div class="handler-dept-tree-header">部门列表</div>
+                    <div id="handlerDeptTree"></div>
+                </div>
+                <div class="handler-user-area">
+                    <div class="handler-search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="handlerSearchInput" placeholder="搜索用户名..." oninput="window.AdminCases.onHandlerSearch(this.value)">
+                    </div>
+                    <div class="handler-user-list" id="handlerUserList"></div>
+                </div>
+            </div>
+            <div class="handler-selected-area">
+                <div class="handler-selected-label">已选承办人：</div>
+                <div class="handler-selected-tags" id="handlerSelectedTags"></div>
+            </div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="btn btn-cancel" onclick="window.AdminCases.closeHandlerModal()">取消</button>
+                <button class="btn btn-confirm" style="background:var(--accent-primary);" onclick="window.AdminCases.submitHandlerChange()">确定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 通知容器 -->
     <div id="notificationContainer" style="position:fixed;top:20px;right:20px;z-index:2000;"></div>
 
     <!-- 脚本 -->
     <script src="../../js/case-data.js?v=58"></script>
-    <script src="../../js/admin-cases.js?v=7"></script>
+    <script src="../../js/admin-cases.js?v=10"></script>
 </body>
 </html>

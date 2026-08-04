@@ -134,6 +134,41 @@
         .form-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
         .form-actions { display: flex; gap: 8px; margin-top: 12px; }
 
+        /* 模板文件上传 */
+        .tpl-upload-area {
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 18px 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            margin-bottom: 8px;
+        }
+        .tpl-upload-area:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+        .tpl-upload-area i { font-size: 24px; margin-bottom: 4px; display: block; }
+        .tpl-upload-title { font-size: 13px; font-weight: 500; }
+        .tpl-upload-hint { font-size: 11px; margin-top: 2px; }
+        .tpl-upload-filename { font-size: 12px; margin-top: 6px; color: var(--text-primary); font-weight: 500; }
+        .tpl-file-actions {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 8px; margin-bottom: 8px;
+        }
+        .tpl-content-status { font-size: 12px; color: var(--text-primary); font-weight: 500; margin-right: auto; }
+        .tpl-example-row { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+        .tpl-example-row a { color: var(--accent-primary); text-decoration: none; margin-left: 4px; }
+        .tpl-example-row a:hover { text-decoration: underline; }
+        .tpl-example-hint { color: var(--text-muted); margin-left: 4px; }
+        .action-btn.view { color: var(--text-secondary); border-color: var(--border-color); }
+        .action-btn.view:hover { background: var(--bg-secondary); }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
         .empty-state {
             text-align: center; padding: 60px 20px; color: var(--text-muted);
             background: var(--bg-primary); border: 1px dashed var(--border-color);
@@ -198,6 +233,6 @@
     <div class="toast" id="toast"></div>
 
     <script src="../js/case-data.js?v=58"></script>
-    <script src="../js/my-templates.js?v=2"></script>
+    <script src="../js/my-templates.js?v=3"></script>
 </body>
 </html>

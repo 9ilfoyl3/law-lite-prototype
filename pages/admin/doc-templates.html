@@ -84,6 +84,7 @@
         .tpl-table tbody td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
         .tpl-table tbody tr:last-child td { border-bottom: none; }
         .tpl-table tbody tr:hover { background: var(--bg-primary); }
+        .tpl-table td { vertical-align: middle; }
         .tpl-name-cell { font-weight: 500; color: var(--text-primary); }
         .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 6px; }
         .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
@@ -95,6 +96,44 @@
         .action-btn.edit:hover { background: var(--accent-light); }
         .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
         .action-btn.delete:hover { background: #fef2f2; }
+        .action-btn.view { color: var(--text-secondary); border-color: var(--border-color); }
+        .action-btn.view:hover { background: #f3f4f6; }
+        .action-btn:disabled,
+        .action-btn.disabled {
+            opacity: 0.5; cursor: not-allowed; pointer-events: none;
+        }
+
+        /* 模板文件上传 */
+        .tpl-upload-area {
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 22px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            margin-bottom: 10px;
+        }
+        .tpl-upload-area:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+        .tpl-upload-area i { font-size: 28px; margin-bottom: 6px; display: block; }
+        .tpl-upload-title { font-size: 13px; font-weight: 500; }
+        .tpl-upload-hint { font-size: 11px; margin-top: 4px; }
+        .tpl-upload-filename { font-size: 12px; margin-top: 8px; color: var(--text-primary); font-weight: 500; }
+        .tpl-file-actions {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            padding: 10px 12px; background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 8px; margin-bottom: 10px;
+        }
+        .tpl-content-status { font-size: 12px; color: var(--text-primary); font-weight: 500; margin-right: auto; }
+        .tpl-example-row { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+        .tpl-example-row a { color: var(--accent-primary); text-decoration: none; margin-left: 4px; }
+        .tpl-example-row a:hover { text-decoration: underline; }
+        .tpl-example-hint { color: var(--text-muted); margin-left: 4px; }
 
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
@@ -241,9 +280,25 @@
                 <select class="form-select" id="tplDocType"></select>
             </div>
             <div class="form-row">
-                <label class="form-label">模板正文（可选）</label>
-                <textarea class="form-textarea" id="tplContent" placeholder="预设的模板正文片段，留空则由 AI 自动生成"></textarea>
-                <div class="form-hint">支持 \\n 换行；如需硬编码段落可在此填写</div>
+                <label class="form-label">模板正文</label>
+                <div class="tpl-upload-area" id="tplUploadArea" onclick="document.getElementById('tplFileInput').click()">
+                    <input type="file" id="tplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleTemplateFileUpload(event)">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <div class="tpl-upload-title">点击或拖拽上传模板文件</div>
+                    <div class="tpl-upload-hint">支持 .txt / .doc / .docx 格式；内容将解析为纯文本并持久化</div>
+                    <div class="tpl-upload-filename" id="tplUploadFilename" style="display:none;"></div>
+                </div>
+                <div class="tpl-file-actions" id="tplFileActions" style="display:none;">
+                    <span class="tpl-content-status" id="tplContentStatus">已上传模板正文</span>
+                    <button type="button" class="btn btn-secondary" onclick="downloadCurrentTemplateContent()"><i class="fas fa-download"></i> 下载当前正文</button>
+                    <button type="button" class="btn btn-secondary" onclick="reuploadTemplateContent()"><i class="fas fa-redo"></i> 重新上传</button>
+                </div>
+                <div class="tpl-example-row">
+                    <span>没有模板文件？</span>
+                    <a href="javascript:void(0)" onclick="downloadTemplateExample()">下载模板示例</a>
+                    <span class="tpl-example-hint">（含常见占位符，如 {{courtName}}、{{caseNumber}} 等）</span>
+                </div>
+                <div class="form-hint">模板正文不支持在线编辑，请通过上传文件确定内容</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
@@ -267,6 +322,6 @@
     <div id="notificationContainer"></div>
 
     <script src="../../js/case-data.js?v=58"></script>
-    <script src="../../js/admin-doc-templates.js?v=2"></script>
+    <script src="../../js/admin-doc-templates.js?v=4"></script>
 </body>
 </html>

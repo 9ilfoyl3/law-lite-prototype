@@ -1,6 +1,7 @@
 // ============ My Templates (用户侧自定义文书模板) ============
 // v1.0 个人文书模板维护，关联文书类型
 // v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
+// v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑表单提供模板示例下载；③ 卡片列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段；⑥ 修复保存时读取 content 及表单上传区显示逻辑
 // 数据持久化：localStorage.myDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeMyDocTemplates 在加载时合并到 system.docTemplates（key 加 my- 前缀）
 
@@ -11,6 +12,42 @@
     let currentOrg = 'court';
     let currentDocTypeFilter = ''; // '' = 全部
     let editingKey = null;         // 当前编辑的 key（null=新增模式）
+    let pendingMyTemplateContent = '';    // v1.2 新增/编辑表单中暂存的模板正文
+    let pendingMyTemplateFileName = '';   // v1.2 上传文件名展示
+
+    // v1.2 模板示例正文
+    const MY_TEMPLATE_EXAMPLE_TEXT = `{{courtName}}
+民事判决书
+
+                                                                       {{caseNumber}}
+
+{{plaintiffDefendantInfo}}
+{{proceduralInfo}}
+{{plaintiffClaim}}
+{{foundFacts}}
+{{courtHolds}}
+{{legalProvisionCitation}}
+{{judgmentContent}}
+
+    如不服本判决，可以在判决书送达之日起十五日内，向本院递交上诉状，并按对方当事人的人数或者代表人的人数提出副本，上诉于江苏省苏州市中级人民法院。同时按照国务院《诉讼费用交纳办法》规定向江苏省苏州市中级人民法院预交上诉案件受理费。
+
+
+
+
+
+                                                    审判员 {{judgeName}}
+
+
+
+
+
+                                                     {{judgmentDate}}
+
+
+
+
+
+书记员 {{clerkName}}`;
 
     // ===== 存储 =====
     function getStorage() {
@@ -43,6 +80,36 @@
     function escapeHtml(s) {
         if (s === undefined || s === null) return '';
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // v1.2 通用工具：下载文本文件
+    function downloadTextFile(text, filename) {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    // v1.2 通用工具：新窗口预览文本
+    function previewTextInWindow(title, text) {
+        const w = window.open('', '_blank');
+        if (!w) {
+            showToast('预览窗口被浏览器拦截，请允许弹窗', 'error');
+            return;
+        }
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+            <style>body{font-family:'Noto Sans SC',-apple-system,sans-serif;padding:32px;line-height:1.8;max-width:720px;margin:0 auto;color:#1e293b;white-space:pre-wrap;word-break:break-word;}</style>
+            </head><body>${escapeHtml(text)}</body></html>`;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
     }
 
     // ===== 通知 =====
@@ -100,6 +167,8 @@
         const toggleBtn = isEnabled
             ? '<button class="action-btn toggle-off" onclick="toggleEnabled(\'' + key + '\')">停用</button>'
             : '<button class="action-btn toggle-on" onclick="toggleEnabled(\'' + key + '\')">启用</button>';
+        const hasContent = (t.content || '').trim().length > 0;
+        const viewDisabled = hasContent ? '' : ' disabled';
         return '<div class="item-card">'
             + '<div class="item-row">'
             + '<div>'
@@ -109,6 +178,9 @@
             + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
             + '</div>'
             + '<div class="item-actions">'
+            + '<button class="action-btn view"' + viewDisabled + ' onclick="previewMyTemplate(\'' + key + '\')">预览</button>'
+            + '<button class="action-btn view"' + viewDisabled + ' onclick="downloadMyTemplate(\'' + key + '\')">下载</button>'
+            + '<button class="action-btn view" onclick="reuploadMyTemplate(\'' + key + '\')">重新上传</button>'
             + '<button class="action-btn edit" onclick="editItem(\'' + key + '\')">编辑</button>'
             + toggleBtn
             + '<button class="action-btn delete" onclick="deleteItem(\'' + key + '\')">删除</button>'
@@ -116,6 +188,27 @@
             + '</div>'
             + '</div>';
     }
+
+    // v1.2 卡片操作：预览/下载/重新上传
+    window.previewMyTemplate = function(key) {
+        const orgData = getOrgData(currentOrg);
+        const t = orgData[key];
+        if (!t || !(t.content || '').trim()) return;
+        previewTextInWindow('模板预览：' + t.name, t.content);
+    };
+    window.downloadMyTemplate = function(key) {
+        const orgData = getOrgData(currentOrg);
+        const t = orgData[key];
+        if (!t || !(t.content || '').trim()) return;
+        downloadTextFile(t.content, (t.name || '我的模板正文') + '.txt');
+    };
+    window.reuploadMyTemplate = function(key) {
+        editItem(key);
+        setTimeout(() => {
+            reuploadMyTemplateContent();
+            document.getElementById('myTplFileInput').click();
+        }, 80);
+    };
 
     // 切换启用/停用状态
     window.toggleEnabled = function(key) {
@@ -177,6 +270,8 @@
             return;
         }
         editingKey = '__new__';
+        pendingMyTemplateContent = '';
+        pendingMyTemplateFileName = '';
         renderList();
         // 滚动到顶部
         document.getElementById('itemList').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -188,11 +283,17 @@
             return;
         }
         editingKey = key;
+        const orgData = getOrgData(currentOrg);
+        const t = orgData[key];
+        pendingMyTemplateContent = t ? (t.content || '') : '';
+        pendingMyTemplateFileName = pendingMyTemplateContent ? '已保存的模板正文' : '';
         renderList();
     };
 
     window.cancelEdit = function() {
         editingKey = null;
+        pendingMyTemplateContent = '';
+        pendingMyTemplateFileName = '';
         renderList();
     };
 
@@ -202,8 +303,24 @@
         const docTypeOptions = Object.entries(docTypes).map(([k, cfg]) =>
             '<option value="' + k + '"' + (t && t.docType === k ? ' selected' : '') + '>' + escapeHtml(cfg.name) + '</option>'
         ).join('');
-        const content = (t && t.content) || '';
         const name = (t && t.name) || '';
+        const hasContent = pendingMyTemplateContent.length > 0;
+
+        const uploadArea = '<div class="tpl-upload-area" id="myTplUploadArea" style="display:' + (hasContent ? 'none' : 'block') + ';" onclick="document.getElementById(\'myTplFileInput\').click()">'
+            + '<input type="file" id="myTplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleMyTemplateFileUpload(event)">'
+            + '<i class="fas fa-cloud-upload-alt"></i>'
+            + '<div class="tpl-upload-title">点击上传模板文件</div>'
+            + '<div class="tpl-upload-hint">支持 .txt / .doc / .docx 格式；内容将解析为纯文本并持久化</div>'
+            + '<div class="tpl-upload-filename" id="myTplUploadFilename" style="display:' + (pendingMyTemplateFileName ? 'block' : 'none') + ';">' + (pendingMyTemplateFileName ? '已选择文件：' + escapeHtml(pendingMyTemplateFileName) : '') + '</div>'
+            + '</div>';
+        const fileActions = '<div class="tpl-file-actions" id="myTplFileActions" style="display:' + (hasContent ? 'flex' : 'none') + ';">'
+            + '<span class="tpl-content-status">已上传模板正文</span>'
+            + '<button type="button" class="btn btn-secondary" onclick="downloadCurrentMyTemplateContent()"><i class="fas fa-download"></i> 下载当前正文</button>'
+            + '<button type="button" class="btn btn-secondary" onclick="reuploadMyTemplateContent()"><i class="fas fa-redo"></i> 重新上传</button>'
+            + '</div>';
+        const exampleRow = '<div class="tpl-example-row">'
+            + '<span>没有模板文件？</span><a href="javascript:void(0)" onclick="downloadMyTemplateExample()">下载模板示例</a>'
+            + '<span class="tpl-example-hint">（含常见占位符，如 {{courtName}}、{{caseNumber}} 等）</span></div>';
 
         return '<div class="item-card editing">'
             + '<div class="form-group">'
@@ -215,8 +332,10 @@
             + '<select class="form-select" id="formDocType">' + docTypeOptions + '</select>'
             + '</div>'
             + '<div class="form-group">'
-            + '<label class="form-label">模板正文（可选）</label>'
-            + '<textarea class="form-textarea" id="formContent" placeholder="预设的模板正文片段，留空则由 AI 自动生成">' + escapeHtml(content) + '</textarea>'
+            + '<label class="form-label">模板正文</label>'
+            + fileActions + uploadArea
+            + exampleRow
+            + '<div class="form-hint">模板正文不支持在线编辑，请通过上传文件确定内容</div>'
             + '</div>'
             + '<div class="form-actions">'
             + '<button class="btn btn-primary" onclick="saveItem(\'' + (isNew ? '' : key) + '\')">保存</button>'
@@ -228,7 +347,7 @@
     window.saveItem = function(existingKey) {
         const name = document.getElementById('formName').value.trim();
         const docType = document.getElementById('formDocType').value;
-        const content = document.getElementById('formContent').value;
+        const content = pendingMyTemplateContent;
 
         if (!name) {
             showToast('请填写模板名', 'error');
@@ -258,9 +377,63 @@
         setOrgData(currentOrg, orgData);
 
         editingKey = null;
+        pendingMyTemplateContent = '';
+        pendingMyTemplateFileName = '';
         renderLeft();
         renderList();
         showToast(existingKey ? '模板已更新' : '模板已新增', 'success');
+    };
+
+    // v1.2 模板文件上传处理（原型阶段仅解析 .txt；doc/docx 提示需配套解析能力）
+    window.handleMyTemplateFileUpload = function(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const name = file.name || '';
+        const ext = name.split('.').pop().toLowerCase();
+        if (!['txt', 'doc', 'docx'].includes(ext)) {
+            showToast('仅支持 .txt / .doc / .docx 格式', 'error');
+            event.target.value = '';
+            return;
+        }
+        if (ext === 'txt') {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingMyTemplateContent = (e.target.result || '').toString();
+                pendingMyTemplateFileName = name;
+                renderList();
+                showToast('模板正文已读取', 'success');
+            };
+            reader.onerror = function() {
+                showToast('文件读取失败', 'error');
+            };
+            reader.readAsText(file, 'utf-8');
+        } else {
+            // doc/docx 原型阶段用 mock 解析提示：仅取文件名作为占位
+            pendingMyTemplateContent = '// 文件：' + name + '\n// 注：doc/docx 格式需配套文档解析服务，原型阶段仅保存文件名标识。';
+            pendingMyTemplateFileName = name;
+            renderList();
+            showToast('已接收 ' + ext + ' 文件（原型阶段仅保存标识）', 'success');
+        }
+        event.target.value = '';
+    };
+
+    // v1.2 下载模板示例
+    window.downloadMyTemplateExample = function() {
+        downloadTextFile(MY_TEMPLATE_EXAMPLE_TEXT, '民事判决书模板示例.txt');
+    };
+
+    // v1.2 下载当前弹窗/表单中的模板正文
+    window.downloadCurrentMyTemplateContent = function() {
+        if (!pendingMyTemplateContent) return;
+        const title = (document.getElementById('formName') && document.getElementById('formName').value.trim()) || '我的模板正文';
+        downloadTextFile(pendingMyTemplateContent, title + '.txt');
+    };
+
+    // v1.2 重新上传：清空当前内容，恢复上传区
+    window.reuploadMyTemplateContent = function() {
+        pendingMyTemplateContent = '';
+        pendingMyTemplateFileName = '';
+        renderList();
     };
 
     // ===== 删除 =====

@@ -1,12 +1,15 @@
 /**
- * 管理后台 - 案件管理 MVP 逻辑
- * 依赖：case-data.js（businessSystems 全局变量、CASE_DATA_KEY）
- * 数据源：localStorage: caseAssistant_businessSystems + adminUsers
+ * 管理后台 - 案件管理 v2.1
+ * 依赖：case-data.js
+ * 功能：案件列表（列配置）、材料树查看、文书列表查看、内容预览、结构化信息编辑、改承办人
+ * v2.0 改造：移除业务切换/详情页跳转/生成文书/文件上传；新增列配置/材料树弹窗/文书列表弹窗/内容预览
+ * v2.1 新增：改承办人功能（独立操作，部门树+用户列表+搜索+多选）
  */
 (function() {
     'use strict';
 
     // ===== 全局状态 =====
+    const currentBusiness = 'court'; // 固定法院业务系统
     let allCases = [];          // 合并后的所有案件（带 org 标签）
     let filteredCases = [];     // 筛选后的案件
     let users = [];             // 用户表（用于反查部门）
@@ -14,31 +17,45 @@
     let selectedIds = new Set();// 已选案件 ID
     let currentPage = 1;
     let pageSize = 20;
-    let currentBusiness = 'court'; // 当前业务系统（默认法院，与用户侧一致）
+    let visibleColumns = new Set(); // 可选列可见集合
 
-    const ORG_LABELS = {
-        court: '法院',
-        procuratorate: '检察院',
-        justice: '司法局'
-    };
+    // 弹窗状态
+    let materialTreeCaseId = '';
+    let documentListCaseId = '';
+    let editingCaseId = '';
+    let selectedCauseValue = '';
+    let confirmCallback = null;
+
+    // 改承办人弹窗状态
+    let handlerTargetCaseIds = []; // 改承办人的目标案件 ID 列表（单选或批量）
+    let handlerSelectedNames = new Set(); // 已选的用户名集合
+    let handlerCurrentDeptId = ''; // 当前选中的部门 ID
+    let handlerSearchKeyword = ''; // 搜索关键词
+    let departments = []; // 部门列表（从 localStorage 读取）
+
+    // 可选列定义
+    const OPTIONAL_COLUMNS = [
+        { key: 'caseNumber', label: '案号' },
+        { key: 'cause', label: '案由' },
+        { key: 'parties', label: '当事人' },
+        { key: 'handler', label: '承办人' },
+        { key: 'dept', label: '部门' },
+        { key: 'uploadDate', label: '上传日期' },
+        { key: 'caseWord', label: '案字' }
+    ];
+
+    const COL_CONFIG_KEY = 'adminCaseListColumns';
+    // 列顺序：复选框 | 案件名称 | [可选列...] | 文件数 | 文书数 | 更新时间 | 操作
+    const BASE_COL_TEMPLATE_LEFT = '40px minmax(0,3fr)';
+    const BASE_COL_TEMPLATE_RIGHT = '100px 100px minmax(0,1fr) 180px';
 
     // ===== 数据加载 =====
     function loadData() {
-        // 加载用户表，构建 handler -> dept 映射
-        try {
-            users = JSON.parse(localStorage.getItem('adminUsers')) || [];
-        } catch (e) {
-            users = [];
-        }
+        try { users = JSON.parse(localStorage.getItem('adminUsers')) || []; } catch (e) { users = []; }
+        try { departments = JSON.parse(localStorage.getItem('adminDepartments')) || []; } catch (e) { departments = []; }
         userDeptMap = {};
-        users.forEach(u => {
-            if (u.name) userDeptMap[u.name] = u.dept || '-';
-        });
+        users.forEach(u => { if (u.name) userDeptMap[u.name] = u.dept || '-'; });
 
-        // 从 localStorage 读取当前业务系统（与用户侧 cases.js 共享）
-        currentBusiness = localStorage.getItem('currentBusiness') || 'court';
-
-        // 仅加载当前业务系统的案件
         allCases = [];
         if (typeof businessSystems === 'undefined') {
             console.error('[admin-cases] businessSystems 未定义，请确认 case-data.js 已加载');
@@ -46,9 +63,7 @@
         }
         const system = businessSystems[currentBusiness];
         if (system && Array.isArray(system.cases)) {
-            system.cases.forEach(c => {
-                allCases.push({ ...c, _org: currentBusiness });
-            });
+            system.cases.forEach(c => { allCases.push({ ...c, _org: currentBusiness }); });
         }
     }
 
@@ -63,7 +78,7 @@
         return Array.isArray(c.documents) ? c.documents.length : 0;
     }
 
-    // 判断是否有 解析异常
+    // 判断是否有解析异常
     function hasOcrError(c) {
         if (!Array.isArray(c.files)) return false;
         return c.files.some(f => f && f.ocrStatus === 'error');
@@ -75,6 +90,111 @@
         return c.files.filter(f => f && f.ocrStatus === 'error').length;
     }
 
+    // ===== 列配置 =====
+    function loadColumnConfig() {
+        try {
+            const arr = JSON.parse(localStorage.getItem(COL_CONFIG_KEY));
+            visibleColumns = new Set(Array.isArray(arr) ? arr : []);
+        } catch (e) {
+            visibleColumns = new Set();
+        }
+    }
+
+    function saveColumnConfig() {
+        try {
+            localStorage.setItem(COL_CONFIG_KEY, JSON.stringify([...visibleColumns]));
+        } catch (e) { /* ignore */ }
+    }
+
+    function renderColConfigPanel() {
+        const panel = document.getElementById('colConfigPanel');
+        if (!panel) return;
+        panel.innerHTML = OPTIONAL_COLUMNS.map(col => `
+            <label class="col-config-item">
+                <input type="checkbox" value="${escapeHtml(col.key)}" ${visibleColumns.has(col.key) ? 'checked' : ''} onchange="window.AdminCases.toggleColumn('${col.key}')">
+                <span>${escapeHtml(col.label)}</span>
+            </label>
+        `).join('');
+    }
+
+    function toggleColConfig() {
+        const panel = document.getElementById('colConfigPanel');
+        if (!panel) return;
+        if (panel.classList.contains('show')) {
+            panel.classList.remove('show');
+        } else {
+            renderColConfigPanel();
+            panel.classList.add('show');
+        }
+    }
+
+    function toggleColumn(col) {
+        if (visibleColumns.has(col)) visibleColumns.delete(col);
+        else visibleColumns.add(col);
+        saveColumnConfig();
+        renderColConfigPanel();
+        renderTable();
+        updateBatchBar();
+    }
+
+    function getColTemplate() {
+        const extra = [...visibleColumns].map(() => 'minmax(0,1fr)').join(' ');
+        return extra ? `${BASE_COL_TEMPLATE_LEFT} ${extra} ${BASE_COL_TEMPLATE_RIGHT}` : `${BASE_COL_TEMPLATE_LEFT} ${BASE_COL_TEMPLATE_RIGHT}`;
+    }
+
+    function buildColumn(key, c) {
+        switch (key) {
+            case 'caseNumber':
+                return `<div title="${escapeHtml(c.caseNumber || '')}">${escapeHtml(c.caseNumber || '-')}</div>`;
+            case 'cause':
+                return `<div title="${escapeHtml(c.cause || '')}">${escapeHtml(c.cause || '-')}</div>`;
+            case 'parties':
+                return `<div>${escapeHtml(c.partyA || '-')} 诉 ${escapeHtml(c.partyB || '-')}</div>`;
+            case 'handler':
+                return `<div title="${escapeHtml(getCaseHandlers(c).join('、'))}">${escapeHtml(getCaseHandlers(c).join('、') || '-')}</div>`;
+            case 'dept':
+                return `<div>${escapeHtml(getDeptOf(c))}</div>`;
+            case 'uploadDate':
+                return `<div>${escapeHtml(c.date || '-')}</div>`;
+            case 'caseWord':
+                return `<div>${c.caseWord ? `<span class="case-word-tag">${escapeHtml(c.caseWord)}</span>` : '-'}</div>`;
+            default:
+                return '<div>-</div>';
+        }
+    }
+
+    function renderGridHead(headEl) {
+        if (!headEl) headEl = document.querySelector('#caseGrid .grid-head');
+        if (!headEl) return;
+        const leftHeads = `
+            <div class="col-center"><input type="checkbox" id="selectAll" onchange="window.AdminCases.toggleSelectAll(this)"></div>
+            <div>案件名称</div>`;
+        const extraHeads = [...visibleColumns].map(key => {
+            const col = OPTIONAL_COLUMNS.find(c => c.key === key);
+            return `<div>${escapeHtml(col ? col.label : key)}</div>`;
+        }).join('');
+        const rightHeads = `
+            <div class="col-center">文件数</div>
+            <div class="col-center">文书数</div>
+            <div class="col-center">更新时间</div>
+            <div class="col-center">操作</div>`;
+        headEl.innerHTML = leftHeads + extraHeads + rightHeads;
+    }
+
+    function updateGridColumns() {
+        const tpl = getColTemplate();
+        const grid = document.getElementById('caseGrid');
+        if (grid) grid.style.setProperty('--case-grid-cols', tpl);
+        const head = document.querySelector('#caseGrid .grid-head');
+        if (head) {
+            head.style.gridTemplateColumns = tpl;
+            renderGridHead(head);
+        }
+        document.querySelectorAll('#gridBody .grid-row').forEach(r => {
+            r.style.gridTemplateColumns = tpl;
+        });
+    }
+
     // ===== 筛选 =====
     function applyFilters() {
         const search = document.getElementById('caseSearch').value.toLowerCase().trim();
@@ -83,16 +203,12 @@
         const year = document.getElementById('yearFilter').value;
 
         filteredCases = allCases.filter(c => {
-            // 关键词搜索：案件名称/案号/当事人
             if (search) {
                 const hay = `${c.caseName || ''} ${c.caseNumber || ''} ${c.partyA || ''} ${c.partyB || ''}`.toLowerCase();
                 if (!hay.includes(search)) return false;
             }
-            // 部门
             if (dept && getDeptOf(c) !== dept) return false;
-            // 承办人（v1.39: 多承办人——命中任一承办人即保留）
             if (handler && getCaseHandlers(c).indexOf(handler) < 0) return false;
-            // 年份
             if (year === 'custom') {
                 const from = document.getElementById('dateFrom').value;
                 const to = document.getElementById('dateTo').value;
@@ -106,11 +222,53 @@
             return true;
         });
 
-        // 按更新时间倒序
         filteredCases.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 
         currentPage = 1;
         render();
+    }
+
+    function rebuildDeptAndHandlerOptions() {
+        const deptFilter = document.getElementById('deptFilter');
+        const handlerFilter = document.getElementById('handlerFilter');
+
+        const depts = new Set();
+        users.forEach(u => { if (u.dept) depts.add(u.dept); });
+
+        const handlers = new Set();
+        allCases.forEach(c => {
+            getCaseHandlers(c).forEach(h => { if (h) handlers.add(h); });
+        });
+
+        const curDept = deptFilter.value;
+        deptFilter.innerHTML = '<option value="">全部部门</option>' +
+            Array.from(depts).sort().map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+        deptFilter.value = curDept;
+
+        const curHandler = handlerFilter.value;
+        handlerFilter.innerHTML = '<option value="">全部承办人</option>' +
+            Array.from(handlers).sort().map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        handlerFilter.value = curHandler;
+    }
+
+    function resetFilters() {
+        document.getElementById('caseSearch').value = '';
+        document.getElementById('deptFilter').value = '';
+        document.getElementById('handlerFilter').value = '';
+        document.getElementById('yearFilter').value = '';
+        document.getElementById('dateFrom').value = '';
+        document.getElementById('dateTo').value = '';
+        const customBar = document.getElementById('customDateBar');
+        if (customBar) customBar.style.display = 'none';
+        rebuildDeptAndHandlerOptions();
+        applyFilters();
+    }
+
+    function onYearChange() {
+        const year = document.getElementById('yearFilter').value;
+        const customBar = document.getElementById('customDateBar');
+        if (customBar) customBar.style.display = (year === 'custom') ? 'flex' : 'none';
+        applyFilters();
     }
 
     // ===== 渲染 =====
@@ -130,35 +288,32 @@
 
         if (pageData.length === 0) {
             gridBody.innerHTML = `
-                <div class="grid-row" style="display:block;">
-                    <div class="empty-state" style="grid-column: 1 / -1;">
-                        <i class="fas fa-folder-open"></i>
-                        <p>暂无符合条件的案件</p>
-                    </div>
-                </div>`;
-            // 修正：空状态直接覆盖
-            gridBody.innerHTML = `
                 <div style="padding: 60px 20px; text-align:center; color:#9ca3af;">
                     <i class="fas fa-folder-open" style="font-size:48px; margin-bottom:12px; color:#e5e7eb;"></i>
                     <p style="font-size:14px; margin:0;">暂无符合条件的案件</p>
                 </div>`;
+            updateGridColumns();
             return;
         }
 
         gridBody.innerHTML = pageData.map(c => {
-            const dept = getDeptOf(c);
-            const docCount = getDocCount(c);
+            const isDeleted = !!c.isDeleted;
+            const fileCount = c.fileCount || 0;
             const ocrError = hasOcrError(c);
             const ocrErrCount = getOcrErrorCount(c);
-            const isDeleted = !!c.isDeleted;
-            const fileCountCell = ocrError
-                ? `<span class="file-count-cell has-error" title="存在 ${ocrErrCount} 份 解析异常材料">${c.fileCount || 0}</span>`
-                : `${c.fileCount || 0}`;
+            const docCount = getDocCount(c);
             const checked = selectedIds.has(c.id) ? 'checked' : '';
             const rowCls = [ocrError ? 'has-ocr-error' : '', isDeleted ? 'is-deleted-row' : ''].join(' ').trim();
-            const deletedBadge = isDeleted ? `<span class="deleted-badge" title="软删除于 ${c.deletedAt || '-'}">已删除</span>` : '';
+            const deletedBadge = isDeleted ? `<span class="deleted-badge" title="软删除于 ${escapeHtml(c.deletedAt || '-')}">已删除</span>` : '';
 
-            // E3: 已删除行操作列显示「查看(只读) / 恢复」；未删除行显示「编辑 / 改承办人 / 删除」
+            const fileCountCell = ocrError
+                ? `<span class="file-count-cell has-error" title="存在 ${ocrErrCount} 份解析异常材料" onclick="window.AdminCases.openMaterialTree('${c.id}')">${fileCount}</span>`
+                : `<span class="file-count-link" onclick="window.AdminCases.openMaterialTree('${c.id}')">${fileCount}</span>`;
+
+            const docCountCell = docCount > 0
+                ? `<span class="doc-count-link" onclick="window.AdminCases.openDocumentList('${c.id}')">${docCount}</span>`
+                : `<span class="doc-count-link disabled">${docCount}</span>`;
+
             const actionCell = isDeleted
                 ? `<div class="action-cell">
                         <button class="action-btn view" onclick="window.AdminCases.viewCase('${c.id}')">查看</button>
@@ -166,33 +321,29 @@
                    </div>`
                 : `<div class="action-cell">
                         <button class="action-btn view" onclick="window.AdminCases.editCase('${c.id}')">编辑</button>
-                        <button class="action-btn handler" onclick="window.AdminCases.changeHandler('${c.id}')">改承办人</button>
+                        <button class="action-btn handler" onclick="window.AdminCases.openHandlerModal(['${c.id}'])">改承办人</button>
                         <button class="action-btn delete" onclick="window.AdminCases.deleteCase('${c.id}')">删除</button>
                    </div>`;
 
-            // E3: 未删除案件名称链接跳转可编辑模式（无 readonly），已删除案件保持只读
-            const caseNameHref = isDeleted
-                ? `../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}&readonly=1`
-                : `../../pages/case-files.html?caseId=${encodeURIComponent(c.id)}`;
+            const extraCols = [...visibleColumns].map(col => buildColumn(col, c)).join('');
 
             return `
-                <div class="grid-row ${rowCls}" data-case-id="${c.id}">
+                <div class="grid-row ${rowCls}" data-case-id="${escapeHtml(c.id)}">
                     <div class="col-center">
-                        <input type="checkbox" class="row-check" data-case-id="${c.id}" ${checked} onchange="window.AdminCases.toggleRow('${c.id}', this.checked)">
+                        <input type="checkbox" class="row-check" data-case-id="${escapeHtml(c.id)}" ${checked} onchange="window.AdminCases.toggleRow('${c.id}', this.checked)">
                     </div>
                     <div>
-                        <a class="case-name-link" href="${caseNameHref}" target="_blank" title="${escapeHtml(c.caseName || '')}">${escapeHtml(c.caseName || '-')}</a>${deletedBadge}
+                        <span class="case-name-text" title="${escapeHtml(c.caseName || '')}">${escapeHtml(c.caseName || '-')}</span>${deletedBadge}
                     </div>
-                    <div title="${escapeHtml(c.caseNumber || '')}">${escapeHtml(c.caseNumber || '-')}</div>
-                    <div title="${escapeHtml(c.cause || '')}">${escapeHtml(c.cause || '-')}</div>
-                    <div title="${escapeHtml(getCaseHandlers(c).join('、'))}">${escapeHtml(getCaseHandlers(c).join('、') || '-')}</div>
-                    <div>${escapeHtml(dept)}</div>
+                    ${extraCols}
                     <div class="col-center">${fileCountCell}</div>
-                    <div class="col-center">${docCount}</div>
+                    <div class="col-center">${docCountCell}</div>
                     <div class="col-center">${escapeHtml(c.updatedAt || '-')}</div>
-                    ${actionCell}
+                    <div class="col-center">${actionCell}</div>
                 </div>`;
         }).join('');
+
+        updateGridColumns();
     }
 
     function renderPagination() {
@@ -206,9 +357,7 @@
 
         const btns = document.getElementById('paginationBtns');
         let html = '';
-        // 上一页
         html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="window.AdminCases.goPage(${currentPage - 1})"><i class="fas fa-chevron-left"></i></button>`;
-        // 页码（最多显示 7 个）
         let s = Math.max(1, currentPage - 3);
         let e = Math.min(totalPages, s + 6);
         s = Math.max(1, e - 6);
@@ -223,7 +372,6 @@
             if (e < totalPages - 1) html += `<span style="padding:0 4px;color:#9ca3af;">...</span>`;
             html += `<button class="page-btn" onclick="window.AdminCases.goPage(${totalPages})">${totalPages}</button>`;
         }
-        // 下一页
         html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="window.AdminCases.goPage(${currentPage + 1})"><i class="fas fa-chevron-right"></i></button>`;
         btns.innerHTML = html;
     }
@@ -239,13 +387,14 @@
         } else {
             bar.classList.remove('show');
         }
-        // 全选框状态：当前页全部选中则勾选
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize;
         const pageData = filteredCases.slice(start, end);
         const allChecked = pageData.length > 0 && pageData.every(c => selectedIds.has(c.id));
-        selectAll.checked = allChecked;
-        selectAll.indeterminate = !allChecked && pageData.some(c => selectedIds.has(c.id));
+        if (selectAll) {
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = !allChecked && pageData.some(c => selectedIds.has(c.id));
+        }
     }
 
     function toggleRow(caseId, checked) {
@@ -271,15 +420,215 @@
         render();
     }
 
-    // ===== 行内操作 =====
-    // E3: 已删除案件只读查看
-    function viewCase(caseId) {
-        window.open(`../../pages/case-files.html?caseId=${encodeURIComponent(caseId)}&readonly=1`, '_blank');
+    // ===== 分页 =====
+    function goPage(page) {
+        const totalPages = Math.max(1, Math.ceil(filteredCases.length / pageSize));
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        renderTable();
+        renderPagination();
+        updateBatchBar();
     }
 
-    // v1.43: 编辑案件改为弹框编辑结构化信息（与用户侧 cases.html 编辑按钮交互一致）
+    function changePageSize(val) {
+        pageSize = parseInt(val) || 20;
+        currentPage = 1;
+        render();
+    }
+
+    // ===== 材料树弹窗 =====
+    function openMaterialTree(caseId) {
+        materialTreeCaseId = caseId;
+        const c = allCases.find(x => x.id === caseId);
+        const nameEl = document.getElementById('materialTreeCaseName');
+        if (nameEl) nameEl.textContent = (c && (c.caseName || c.caseNumber)) || '-';
+        renderMaterialTreeBody();
+        const modal = document.getElementById('materialTreeModal');
+        if (modal) modal.classList.add('show');
+    }
+
+    function closeMaterialTree() {
+        const modal = document.getElementById('materialTreeModal');
+        if (modal) modal.classList.remove('show');
+        materialTreeCaseId = '';
+    }
+
+    function renderMaterialTreeBody() {
+        const body = document.getElementById('materialTreeBody');
+        if (!body) return;
+        const c = allCases.find(x => x.id === materialTreeCaseId);
+        const files = (c && Array.isArray(c.files)) ? c.files : [];
+        const successFiles = files.filter(f => f && (f.parseStatus === 'success' || f.ocrStatus === 'done'));
+
+        if (successFiles.length === 0) {
+            body.innerHTML = `<div class="modal-empty"><i class="fas fa-folder-open"></i><p>暂无材料</p></div>`;
+            return;
+        }
+
+        const categories = classifyMaterials(successFiles);
+        body.innerHTML = Object.keys(categories).map(cat => {
+            const items = categories[cat];
+            const itemHtml = items.map(f => {
+                const fid = f.id || '';
+                return `<div class="material-item">
+                    <div class="material-name"><i class="fas fa-file-alt"></i><span title="${escapeHtml(f.name || '')}">${escapeHtml(f.name || '-')}</span></div>
+                    <button class="preview-btn" onclick="window.AdminCases.previewMaterial('${fid}')">预览</button>
+                </div>`;
+            }).join('');
+            return `<div class="material-group expanded">
+                <div class="material-group-header" onclick="this.parentElement.classList.toggle('expanded')">
+                    <i class="fas fa-chevron-right group-toggle"></i>
+                    <span>${escapeHtml(cat)}</span>
+                    <span class="group-count">${items.length}</span>
+                </div>
+                <div class="material-group-items">${itemHtml}</div>
+            </div>`;
+        }).join('');
+    }
+
+    // classifyMaterials 简化实现（不依赖 case-files.js）
+    function classifyMaterials(files) {
+        const categories = {};
+        files.forEach(f => {
+            const name = f.name || '';
+            let category = f.category || '';
+            if (!category) {
+                for (const [cat, keys] of Object.entries(MATERIAL_CATEGORIES)) {
+                    if (cat === '其他材料') continue;
+                    if (keys.some(k => name.includes(k))) { category = cat; break; }
+                }
+            }
+            if (!category) category = '其他材料';
+            if (!categories[category]) categories[category] = [];
+            categories[category].push(f);
+        });
+        Object.keys(categories).forEach(k => { if (!categories[k].length) delete categories[k]; });
+        return categories;
+    }
+
+    // ===== 材料内容预览 =====
+    function previewMaterial(fileId) {
+        const c = allCases.find(x => x.id === materialTreeCaseId);
+        const files = (c && Array.isArray(c.files)) ? c.files : [];
+        const f = files.find(x => x.id === fileId);
+        const fileName = (f && f.name) || '未知文件';
+
+        const titleEl = document.getElementById('contentPreviewTitle');
+        const bodyEl = document.getElementById('contentPreviewBody');
+        if (titleEl) titleEl.textContent = fileName;
+        if (bodyEl) bodyEl.textContent = `这是 ${fileName} 的内容预览。\n\n（原型阶段材料内容为占位文本，实际系统中将展示文件解析后的全文内容。）`;
+        const modal = document.getElementById('contentPreviewModal');
+        if (modal) modal.classList.add('show');
+    }
+
+    function closeContentPreview() {
+        const modal = document.getElementById('contentPreviewModal');
+        if (modal) modal.classList.remove('show');
+    }
+
+    // ===== 文书列表弹窗 =====
+    function openDocumentList(caseId) {
+        documentListCaseId = caseId;
+        const c = allCases.find(x => x.id === caseId);
+        const nameEl = document.getElementById('documentListCaseName');
+        if (nameEl) nameEl.textContent = (c && (c.caseName || c.caseNumber)) || '-';
+        const countEl = document.getElementById('documentListCount');
+        if (countEl) countEl.textContent = `共 ${getDocCount(c || {})} 份文书`;
+        renderDocumentListBody();
+        const modal = document.getElementById('documentListModal');
+        if (modal) modal.classList.add('show');
+    }
+
+    function closeDocumentList() {
+        const modal = document.getElementById('documentListModal');
+        if (modal) modal.classList.remove('show');
+        documentListCaseId = '';
+    }
+
+    function renderDocumentListBody() {
+        const body = document.getElementById('documentListBody');
+        if (!body) return;
+        let list = [];
+        try {
+            list = (typeof getAllDocumentVersions === 'function') ? getAllDocumentVersions(documentListCaseId) : [];
+        } catch (e) { list = []; }
+
+        if (!list || list.length === 0) {
+            body.innerHTML = `<div class="modal-empty"><i class="fas fa-file-alt"></i><p>暂无文书</p></div>`;
+            return;
+        }
+
+        body.innerHTML = list.map(v => {
+            const versionNo = (v.versionTotal - v.versionIndex + 1);
+            const genMethodLabel = v.genMethod === 'step' ? '分步生成' : '一步生成';
+            const typeTag = v.type === 'polish'
+                ? `<span class="doc-version-tag polish">精修</span>`
+                : v.type === 'regenerate'
+                    ? `<span class="doc-version-tag regenerate">重新生成</span>`
+                    : '';
+            const vid = v.versionId || '';
+            return `<div class="doc-version-item">
+                <div class="doc-version-info">
+                    <div class="doc-version-title">${escapeHtml(v.title || '未命名文书')}</div>
+                    <div class="doc-version-meta">
+                        <span class="doc-version-badge">v${versionNo}</span>
+                        <span>${genMethodLabel}</span>
+                        ${typeTag}
+                        <span>${escapeHtml(v.createdAt || '-')}</span>
+                        <span>${escapeHtml(v.createdBy || '-')}</span>
+                    </div>
+                </div>
+                <button class="doc-version-preview-btn" onclick="window.AdminCases.previewDocument('${vid}')">预览</button>
+            </div>`;
+        }).join('');
+    }
+
+    // ===== 文书内容预览 =====
+    function previewDocument(versionId) {
+        let res = null;
+        if (typeof findDocumentVersion === 'function') {
+            try { res = findDocumentVersion(documentListCaseId, versionId); } catch (e) { res = null; }
+        }
+        if (!res && typeof findCaseById === 'function') {
+            // 兜底：case-data.js 未提供 findDocumentVersion 时本地查找
+            const r = findCaseById(documentListCaseId);
+            if (r && r.caseItem) {
+                for (const doc of (r.caseItem.documents || [])) {
+                    if (!doc || !Array.isArray(doc.versions)) continue;
+                    const v = doc.versions.find(x => x.versionId === versionId);
+                    if (v) { res = { caseItem: r.caseItem, doc, version: v }; break; }
+                }
+            }
+        }
+        if (!res) { showNotification('版本不存在', 'error'); return; }
+
+        const { doc, version } = res;
+        const title = (version && version.title) || (doc && doc.title) || '文书预览';
+        const content = stripHtml((version && version.content) || '');
+
+        const titleEl = document.getElementById('contentPreviewTitle');
+        const bodyEl = document.getElementById('contentPreviewBody');
+        if (titleEl) titleEl.textContent = title;
+        if (bodyEl) bodyEl.textContent = content;
+        const modal = document.getElementById('contentPreviewModal');
+        if (modal) modal.classList.add('show');
+    }
+
+    // 通过 DOM 临时元素剥离 HTML 标签
+    function stripHtml(html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html || '';
+        return tmp.textContent || tmp.innerText || '';
+    }
+
+    // ===== 行内操作 =====
     function editCase(caseId) {
-        openEditCase(caseId);
+        openEditCase(caseId, false);
+    }
+
+    // 已删除案件只读查看：打开编辑弹窗，所有字段 disabled
+    function viewCase(caseId) {
+        openEditCase(caseId, true);
     }
 
     function deleteCase(caseId) {
@@ -300,7 +649,6 @@
         );
     }
 
-    // 恢复软删除案件：清除 isDeleted / deletedAt 字段，案件重新对用户侧可见
     function restoreCase(caseId) {
         const c = allCases.find(x => x.id === caseId);
         if (!c) return;
@@ -317,125 +665,6 @@
                 applyFilters();
             }
         );
-    }
-
-    // ===== 改承办人（v1.39: 多选）=====
-    let handlerAction = null; // { type: 'single'|'batch', caseId? }
-
-    function buildHandlerOptions() {
-        // 从用户表取 active 用户名，去重排序
-        const names = [...new Set(users.filter(u => u.status === 'active').map(u => u.name).filter(Boolean))].sort();
-        return names;
-    }
-
-    // v1.39: 渲染承办人多选 checkbox 列表（替代原 select 单选）
-    // selectedNames: 预选中的姓名数组
-    function renderHandlerCheckboxes(selectedNames) {
-        const container = document.getElementById('handlerNew');
-        if (!container) return;
-        const names = buildHandlerOptions();
-        const selectedSet = new Set((selectedNames || []).filter(Boolean));
-        if (names.length === 0) {
-            container.innerHTML = '<div style="padding:12px; color:var(--text-muted); font-size:13px;">暂无活跃用户，请先在用户管理中创建</div>';
-            return;
-        }
-        container.innerHTML = names.map(n => `
-            <label style="display:flex; align-items:center; padding:7px 10px; cursor:pointer; border-radius:4px; transition:background 0.15s;"
-                   onmouseover="this.style.background='var(--bg-secondary)'"
-                   onmouseout="this.style.background='transparent'">
-                <input type="checkbox" value="${escapeHtml(n)}" ${selectedSet.has(n) ? 'checked' : ''} style="margin-right:10px; cursor:pointer;">
-                <span style="font-size:14px; color:var(--text-primary);">${escapeHtml(n)}</span>
-            </label>
-        `).join('');
-    }
-
-    // 收集弹窗中勾选的承办人姓名数组
-    function getSelectedHandlerNames() {
-        const checkboxes = document.querySelectorAll('#handlerNew input[type="checkbox"]:checked');
-        return Array.from(checkboxes).map(cb => cb.value).filter(Boolean);
-    }
-
-    function changeHandler(caseId) {
-        const c = allCases.find(x => x.id === caseId);
-        if (!c) return;
-        handlerAction = { type: 'single', caseId };
-        document.getElementById('handlerModalTitle').textContent = '修改承办人（可多选）';
-        document.getElementById('handlerCaseLabel').textContent = '案件';
-        document.getElementById('handlerCaseName').textContent = c.caseName || c.caseNumber || '-';
-        document.getElementById('handlerCurrent').textContent = getCaseHandlers(c).join('、') || '-';
-        // 预选中当前承办人
-        renderHandlerCheckboxes(getCaseHandlers(c));
-        document.getElementById('handlerConfirmBtn').textContent = '确认修改';
-        document.getElementById('handlerModal').classList.add('show');
-    }
-
-    function batchChangeHandler() {
-        if (selectedIds.size === 0) return;
-        handlerAction = { type: 'batch' };
-        document.getElementById('handlerModalTitle').textContent = '修改承办人（可多选）';
-        document.getElementById('handlerCaseLabel').textContent = '已选案件';
-        document.getElementById('handlerCaseName').textContent = `共 ${selectedIds.size} 件`;
-        document.getElementById('handlerCurrent').textContent = '（将统一替换为新承办人列表）';
-        renderHandlerCheckboxes([]);
-        document.getElementById('handlerConfirmBtn').textContent = '确认批量修改';
-        document.getElementById('handlerModal').classList.add('show');
-    }
-
-    function closeHandlerModal() {
-        document.getElementById('handlerModal').classList.remove('show');
-        handlerAction = null;
-    }
-
-    function execChangeHandler() {
-        if (!handlerAction) return;
-        const newNames = getSelectedHandlerNames();
-        if (newNames.length === 0) {
-            showNotification('请至少选择一名承办人', 'info');
-            return;
-        }
-        const newLabel = newNames.join('、');
-        if (handlerAction.type === 'single') {
-            const c = allCases.find(x => x.id === handlerAction.caseId);
-            if (!c) { closeHandlerModal(); return; }
-            const oldLabel = getCaseHandlers(c).join('、') || '-';
-            // v1.39: 写入 handlers 数组，同步 handler 为第一个（向后兼容）
-            c.handlers = newNames.slice();
-            c.handler = newNames[0];
-            c.updatedAt = nowStr();
-            saveBusinessSystems();
-            console.log(`[admin-cases] 改承办人: ${c.id} (${c.caseName}) ${oldLabel} → ${newLabel}`);
-            showNotification(`已将「${c.caseName}」承办人改为 ${newLabel}`, 'success');
-            // 单个直接执行（无需二次确认）
-            loadData();
-            applyFilters();
-            closeHandlerModal();
-        } else {
-            // 批量
-            showConfirm(
-                '批量改承办人确认',
-                `确定将选中的 ${selectedIds.size} 件案件的承办人改为 ${newLabel} 吗？`,
-                () => {
-                    let count = 0;
-                    selectedIds.forEach(id => {
-                        const c = allCases.find(x => x.id === id);
-                        if (c) {
-                            const oldLabel = getCaseHandlers(c).join('、') || '-';
-                            c.handlers = newNames.slice();
-                            c.handler = newNames[0];
-                            c.updatedAt = nowStr();
-                            console.log(`[admin-cases] 批量改承办人: ${c.id} (${c.caseName}) ${oldLabel} → ${newLabel}`);
-                            count++;
-                        }
-                    });
-                    saveBusinessSystems();
-                    showNotification(`已将 ${count} 件案件承办人改为 ${newLabel}`, 'success');
-                    selectedIds.clear();
-                    loadData();
-                    applyFilters();
-                }
-            );
-            closeHandlerModal();
-        }
     }
 
     // ===== 批量操作 =====
@@ -459,35 +688,172 @@
         );
     }
 
-    // ===== 编辑案件弹框（v1.43：与用户侧 cases.html 编辑按钮交互一致）=====
-    let editingCaseId = '';
-    // 案由树选择器状态（参考用户侧 cases.js 同名实现）
-    let selectedCauseValue = '';
-
-    // 取当前业务系统的案由树（带深拷贝，避免污染全局常量）
-    function getCurrentCauseTree() {
-        const src = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentBusiness]) || [];
-        // 深拷贝并补全 expanded 字段
-        return src.map(l1 => ({
-            name: l1.name,
-            expanded: !!l1.expanded,
-            children: (l1.children || []).map(l2 => {
-                if (typeof l2 === 'string') return l2;
-                return {
-                    name: l2.name,
-                    expanded: !!l2.expanded,
-                    children: (l2.children || []).slice()
-                };
-            })
-        }));
+    // ===== 改承办人 =====
+    function batchChangeHandler() {
+        if (selectedIds.size === 0) return;
+        openHandlerModal([...selectedIds]);
     }
 
-    function openEditCase(caseId) {
+    function openHandlerModal(caseIds) {
+        handlerTargetCaseIds = caseIds || [];
+        handlerSelectedNames = new Set();
+        handlerCurrentDeptId = '';
+        handlerSearchKeyword = '';
+
+        // 回填已有承办人（单案件时）
+        if (handlerTargetCaseIds.length === 1) {
+            const c = allCases.find(x => x.id === handlerTargetCaseIds[0]);
+            if (c) {
+                getCaseHandlers(c).forEach(h => handlerSelectedNames.add(h));
+            }
+        }
+
+        // 渲染弹窗标题
+        const titleEl = document.getElementById('handlerModalTitle');
+        if (titleEl) {
+            const count = handlerTargetCaseIds.length;
+            titleEl.innerHTML = `<i class="fas fa-user-edit" style="margin-right:8px;color:var(--accent-primary);"></i>${count > 1 ? '批量改承办人（' + count + ' 件案件）' : '改承办人'}`;
+        }
+
+        // 清空搜索框
+        const searchInput = document.getElementById('handlerSearchInput');
+        if (searchInput) searchInput.value = '';
+
+        renderHandlerDeptTree();
+        renderHandlerUserList();
+        renderHandlerSelectedTags();
+
+        document.getElementById('handlerModal').classList.add('show');
+    }
+
+    function closeHandlerModal() {
+        document.getElementById('handlerModal').classList.remove('show');
+    }
+
+    function renderHandlerDeptTree() {
+        const treeEl = document.getElementById('handlerDeptTree');
+        if (!treeEl) return;
+
+        // 获取有效用户涉及的部门 ID
+        const activeUsers = users.filter(u => u.status !== 'inactive');
+        const deptIdsWithUsers = new Set(activeUsers.map(u => u.deptId).filter(Boolean));
+
+        // 过滤部门：有用户的部门 + 状态为 active
+        const validDepts = departments.filter(d => d.status !== 'inactive' && deptIdsWithUsers.has(d.id));
+
+        let html = `<div class="handler-dept-item ${!handlerCurrentDeptId ? 'active' : ''}" onclick="window.AdminCases.selectHandlerDept('')">
+            <i class="fas fa-layer-group"></i><span>全部</span>
+        </div>`;
+        validDepts.forEach(d => {
+            const count = activeUsers.filter(u => u.deptId === d.id).length;
+            html += `<div class="handler-dept-item ${handlerCurrentDeptId === d.id ? 'active' : ''}" onclick="window.AdminCases.selectHandlerDept('${escapeHtml(d.id)}')">
+                <i class="fas fa-folder"></i><span>${escapeHtml(d.name)}</span><span class="dept-count">${count}</span>
+            </div>`;
+        });
+        treeEl.innerHTML = html;
+    }
+
+    function selectHandlerDept(deptId) {
+        handlerCurrentDeptId = deptId;
+        renderHandlerDeptTree();
+        renderHandlerUserList();
+    }
+
+    function onHandlerSearch(val) {
+        handlerSearchKeyword = (val || '').toLowerCase().trim();
+        renderHandlerUserList();
+    }
+
+    function renderHandlerUserList() {
+        const listEl = document.getElementById('handlerUserList');
+        if (!listEl) return;
+
+        let filtered = users.filter(u => u.status !== 'inactive');
+        if (handlerCurrentDeptId) {
+            filtered = filtered.filter(u => u.deptId === handlerCurrentDeptId);
+        }
+        if (handlerSearchKeyword) {
+            filtered = filtered.filter(u => (u.name || '').toLowerCase().includes(handlerSearchKeyword));
+        }
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div class="handler-user-empty">暂无符合条件的用户</div>';
+            return;
+        }
+
+        listEl.innerHTML = filtered.map(u => {
+            const checked = handlerSelectedNames.has(u.name);
+            const deptName = u.dept || (departments.find(d => d.id === u.deptId) || {}).name || '-';
+            return `<label class="handler-user-item">
+                <input type="checkbox" ${checked ? 'checked' : ''} onchange="window.AdminCases.toggleHandlerUser('${escapeHtml(u.name)}', this.checked)">
+                <span class="user-name">${escapeHtml(u.name)}</span>
+                <span class="user-dept">${escapeHtml(deptName)}</span>
+            </label>`;
+        }).join('');
+    }
+
+    function toggleHandlerUser(name, checked) {
+        if (checked) handlerSelectedNames.add(name);
+        else handlerSelectedNames.delete(name);
+        renderHandlerSelectedTags();
+    }
+
+    function removeHandlerUser(name) {
+        handlerSelectedNames.delete(name);
+        renderHandlerUserList();
+        renderHandlerSelectedTags();
+    }
+
+    function renderHandlerSelectedTags() {
+        const tagsEl = document.getElementById('handlerSelectedTags');
+        if (!tagsEl) return;
+        if (handlerSelectedNames.size === 0) {
+            tagsEl.innerHTML = '<span style="font-size:12px;color:var(--text-muted);">未选择</span>';
+            return;
+        }
+        tagsEl.innerHTML = [...handlerSelectedNames].map(name =>
+            `<span class="handler-tag">${escapeHtml(name)}<i class="fas fa-times remove-tag" onclick="window.AdminCases.removeHandlerUser('${escapeHtml(name)}')"></i></span>`
+        ).join('');
+    }
+
+    function submitHandlerChange() {
+        if (handlerSelectedNames.size === 0) {
+            showNotification('请至少选择一名承办人', 'error');
+            return;
+        }
+
+        const system = (typeof businessSystems !== 'undefined' && businessSystems[currentBusiness]) || null;
+        if (!system || !Array.isArray(system.cases)) { closeHandlerModal(); return; }
+
+        const handlerArr = [...handlerSelectedNames];
+        const primaryHandler = handlerArr[0];
+
+        let updated = 0;
+        handlerTargetCaseIds.forEach(caseId => {
+            const c = system.cases.find(x => x.id === caseId);
+            if (c) {
+                c.handler = primaryHandler;
+                c.handlers = handlerArr.slice();
+                c.updatedAt = nowStr();
+                updated++;
+            }
+        });
+
+        saveBusinessSystems();
+        console.log(`[admin-cases] 改承办人: ${updated} 件案件 → ${handlerArr.join('、')}`);
+        showNotification(`已更新 ${updated} 件案件的承办人`, 'success');
+        closeHandlerModal();
+        loadData();
+        applyFilters();
+    }
+
+    // ===== 编辑案件弹窗 =====
+    function openEditCase(caseId, readonly) {
         const c = allCases.find(x => x.id === caseId);
         if (!c) return;
         editingCaseId = caseId;
 
-        // 当事人标签随业务系统联动
+        // 当事人标签联动
         const system = (typeof businessSystems !== 'undefined' && businessSystems[currentBusiness]) || null;
         const labels = (system && Array.isArray(system.partiesLabels) && system.partiesLabels.length >= 2)
             ? system.partiesLabels
@@ -524,6 +890,31 @@
         document.getElementById('editHandler').value = getCaseHandlers(c).join('、');
         document.getElementById('editCaseDate').value = c.date || '';
 
+        // readonly 模式处理
+        const titleEl = document.querySelector('#editCaseModal h3');
+        const saveBtn = document.getElementById('editCaseSaveBtn');
+        const fields = document.querySelectorAll('#editCaseModal input, #editCaseModal select, #editCaseModal textarea');
+        const causeTrigger = document.getElementById('editCaseCauseTrigger');
+        if (readonly) {
+            if (titleEl) titleEl.innerHTML = `<i class="fas fa-eye" style="margin-right:8px;color:var(--accent-primary);"></i>查看案件信息`;
+            fields.forEach(f => { f.disabled = true; });
+            if (causeTrigger) {
+                causeTrigger.disabled = true;
+                causeTrigger.style.pointerEvents = 'none';
+                causeTrigger.style.opacity = '0.6';
+            }
+            if (saveBtn) saveBtn.style.display = 'none';
+        } else {
+            if (titleEl) titleEl.innerHTML = `<i class="fas fa-edit" style="margin-right:8px;color:var(--accent-primary);"></i>编辑案件信息`;
+            fields.forEach(f => { f.disabled = false; });
+            if (causeTrigger) {
+                causeTrigger.disabled = false;
+                causeTrigger.style.pointerEvents = '';
+                causeTrigger.style.opacity = '';
+            }
+            if (saveBtn) saveBtn.style.display = '';
+        }
+
         document.getElementById('editCaseModal').classList.add('show');
     }
 
@@ -540,7 +931,6 @@
         }
 
         // 直接在 businessSystems 中查找原始案件对象，确保修改能正确持久化
-        // （allCases 中的元素是 {...c} 浅拷贝，修改它不会同步到 businessSystems）
         const system = (typeof businessSystems !== 'undefined' && businessSystems[currentBusiness]) || null;
         const c = system && Array.isArray(system.cases)
             ? system.cases.find(x => x.id === editingCaseId)
@@ -548,7 +938,6 @@
         if (!c) { closeEditCase(); return; }
 
         const cause = document.getElementById('editCaseCauseHidden').value;
-        // type 通过 getCauseType 自动推导；若案由为空则保留原 type
         const type = cause ? (typeof getCauseType === 'function' ? getCauseType(cause, currentBusiness) : c.type) : c.type;
 
         c.caseName = caseName;
@@ -566,7 +955,6 @@
             c.handler = handlerArr[0];
             c.handlers = handlerArr.slice();
         }
-        // 留空则保留原承办人，不清空
 
         c.date = document.getElementById('editCaseDate').value || c.date;
         c.updatedAt = nowStr();
@@ -580,6 +968,23 @@
     }
 
     // ===== 案由树形选择器 =====
+    // 取当前业务系统的案由树（带深拷贝，避免污染全局常量）
+    function getCurrentCauseTree() {
+        const src = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentBusiness]) || [];
+        return src.map(l1 => ({
+            name: l1.name,
+            expanded: !!l1.expanded,
+            children: (l1.children || []).map(l2 => {
+                if (typeof l2 === 'string') return l2;
+                return {
+                    name: l2.name,
+                    expanded: !!l2.expanded,
+                    children: (l2.children || []).slice()
+                };
+            })
+        }));
+    }
+
     function openCauseSelector() {
         const currentValue = document.getElementById('editCaseCauseHidden').value || '';
         selectedCauseValue = currentValue;
@@ -620,12 +1025,10 @@
                             <div class="cause-level-3-container">
                                 ${(l2.children || []).map(c => renderCauseItem(c, `l2-${i1}-${i2}`)).join('')}
                             </div>
-                        </div>
-                        `;
+                        </div>`;
                     }).join('')}
                 </div>
-            </div>
-        `;
+            </div>`;
         }).join('');
         updateCauseSelection();
     }
@@ -636,8 +1039,7 @@
             <div class="cause-item ${selectedCauseValue === causeName ? 'selected' : ''}" data-cause="${escapeHtml(causeName)}" data-group="${groupKey}" onclick="window.AdminCases.selectCause('${escaped}')">
                 <span class="cause-name">${escapeHtml(causeName)}</span>
                 <i class="fas fa-check-circle cause-check"></i>
-            </div>
-        `;
+            </div>`;
     }
 
     function toggleCauseLevel1(index) {
@@ -670,8 +1072,7 @@
             item.classList.toggle('selected', item.dataset.cause === selectedCauseValue);
         });
         document.querySelectorAll('#causeTreeContainer .cause-level-1-header, #causeTreeContainer .cause-level-2-header').forEach(header => {
-            const isSelected = header.dataset.cause === selectedCauseValue;
-            header.classList.toggle('selected', isSelected);
+            header.classList.toggle('selected', header.dataset.cause === selectedCauseValue);
         });
     }
 
@@ -707,91 +1108,7 @@
         }
     }
 
-    // ===== 筛选栏联动 =====
-    function rebuildDeptAndHandlerOptions() {
-        const deptFilter = document.getElementById('deptFilter');
-        const handlerFilter = document.getElementById('handlerFilter');
-
-        // 收集部门（从用户表）
-        const depts = new Set();
-        users.forEach(u => {
-            if (u.dept) depts.add(u.dept);
-        });
-
-        // 收集承办人（仅当前业务系统下；v1.39: 多承办人聚合）
-        const handlers = new Set();
-        allCases.forEach(c => {
-            getCaseHandlers(c).forEach(h => { if (h) handlers.add(h); });
-        });
-
-        // 渲染部门下拉
-        const curDept = deptFilter.value;
-        deptFilter.innerHTML = '<option value="">全部部门</option>' +
-            Array.from(depts).sort().map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
-        deptFilter.value = curDept;
-
-        // 渲染承办人下拉
-        const curHandler = handlerFilter.value;
-        handlerFilter.innerHTML = '<option value="">全部承办人</option>' +
-            Array.from(handlers).sort().map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
-        handlerFilter.value = curHandler;
-    }
-
-    // ===== 业务系统切换 =====
-    function switchBusiness(type) {
-        if (type === currentBusiness) return;
-        currentBusiness = type;
-        localStorage.setItem('currentBusiness', type);
-        selectedIds.clear();
-
-        // 更新按钮高亮
-        document.querySelectorAll('.business-switch-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.type === type);
-        });
-
-        // 重新加载数据并刷新
-        loadData();
-        rebuildDeptAndHandlerOptions();
-        applyFilters();
-        console.log(`[admin-cases] 切换业务系统: ${type}`);
-    }
-
-    function resetFilters() {
-        document.getElementById('caseSearch').value = '';
-        document.getElementById('deptFilter').value = '';
-        document.getElementById('handlerFilter').value = '';
-        document.getElementById('yearFilter').value = '';
-        document.getElementById('dateFrom').value = '';
-        document.getElementById('dateTo').value = '';
-        document.getElementById('customDateBar').style.display = 'none';
-        rebuildDeptAndHandlerOptions();
-        applyFilters();
-    }
-
-    function onYearChange() {
-        const year = document.getElementById('yearFilter').value;
-        document.getElementById('customDateBar').style.display = (year === 'custom') ? 'flex' : 'none';
-        applyFilters();
-    }
-
-    // ===== 分页 =====
-    function goPage(page) {
-        const totalPages = Math.max(1, Math.ceil(filteredCases.length / pageSize));
-        if (page < 1 || page > totalPages) return;
-        currentPage = page;
-        renderTable();
-        renderPagination();
-        updateBatchBar();
-    }
-
-    function changePageSize(val) {
-        pageSize = parseInt(val) || 20;
-        currentPage = 1;
-        render();
-    }
-
     // ===== 确认弹窗 =====
-    let confirmCallback = null;
     function showConfirm(title, text, callback) {
         document.getElementById('confirmTitle').textContent = title;
         document.getElementById('confirmText').textContent = text;
@@ -801,10 +1118,12 @@
         confirmCallback = callback;
         document.getElementById('confirmModal').classList.add('show');
     }
+
     function closeConfirm() {
         document.getElementById('confirmModal').classList.remove('show');
         confirmCallback = null;
     }
+
     function execConfirm() {
         if (confirmCallback) confirmCallback();
         closeConfirm();
@@ -844,13 +1163,8 @@
 
     // ===== 初始化 =====
     function init() {
+        loadColumnConfig();
         loadData();
-
-        // 同步业务系统按钮高亮状态
-        document.querySelectorAll('.business-switch-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.type === currentBusiness);
-        });
-
         rebuildDeptAndHandlerOptions();
 
         // 绑定事件
@@ -862,6 +1176,15 @@
         document.getElementById('dateTo').addEventListener('change', applyFilters);
         document.getElementById('confirmBtn').addEventListener('click', execConfirm);
 
+        // 点击外部关闭列配置面板
+        document.addEventListener('click', function(e) {
+            const panel = document.getElementById('colConfigPanel');
+            const btn = document.querySelector('.col-config-toolbar-btn');
+            if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+                panel.classList.remove('show');
+            }
+        });
+
         applyFilters();
     }
 
@@ -870,8 +1193,8 @@
         toggleRow,
         toggleSelectAll,
         clearSelection,
-        viewCase,
         editCase,
+        viewCase,
         openEditCase,
         closeEditCase,
         submitEditCase,
@@ -882,17 +1205,30 @@
         toggleCauseLevel2,
         selectCause,
         filterCauseTree,
-        changeHandler,
-        batchChangeHandler,
-        closeHandlerModal,
-        execChangeHandler,
         deleteCase,
         restoreCase,
         batchDelete,
         goPage,
         changePageSize,
         resetFilters,
-        switchBusiness
+        toggleColConfig,
+        toggleColumn,
+        openMaterialTree,
+        closeMaterialTree,
+        openDocumentList,
+        closeDocumentList,
+        previewMaterial,
+        previewDocument,
+        closeContentPreview,
+        closeConfirm,
+        batchChangeHandler,
+        openHandlerModal,
+        closeHandlerModal,
+        selectHandlerDept,
+        onHandlerSearch,
+        toggleHandlerUser,
+        removeHandlerUser,
+        submitHandlerChange
     };
 
     if (document.readyState === 'loading') {
