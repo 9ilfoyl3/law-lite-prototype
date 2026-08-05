@@ -3,6 +3,7 @@
 // v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
 // v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑弹窗提供模板示例下载；③ 列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段
 // v1.3 内置模板预置默认正文：内置模板 content 赋予 TEMPLATE_EXAMPLE_TEXT，使预览/下载按钮默认可用（自定义模板未上传正文时仍置灰）
+// v1.4 模板表格新增「上传时间」「更新时间」两列：保存时记录 createdAt / updatedAt（新增两者相同，编辑/重新上传仅更新 updatedAt）；内置模板无持久化时间显示为空
 // 数据持久化：localStorage.adminDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTemplates 在加载时合并到 system.docTemplates
 
@@ -132,7 +133,9 @@
                     docType: val.docType || tplToDocType[key] || '',
                     content: val.content || '',
                     isBuiltin: false,
-                    enabled: val.enabled !== false
+                    enabled: val.enabled !== false,
+                    createdAt: val.createdAt || '', // v1.4 上传/创建时间
+                    updatedAt: val.updatedAt || ''  // v1.4 最近更新时间
                 };
             }
         });
@@ -271,10 +274,15 @@
                   + '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
                   + toggleBtn
                   + '<button class="action-btn delete" onclick="deleteTemplate(\'' + key + '\')">删除</button>';
+            // v1.4 上传时间/更新时间（内置模板无持久化时间，显示为空）
+            const createdAt = t.createdAt || '';
+            const updatedAt = t.updatedAt || '';
             return '<tr>'
                 + '<td class="tpl-name-cell">' + escapeHtml(t.name) + badge + '</td>'
                 + '<td>' + escapeHtml(docTypeName) + '</td>'
                 + '<td>' + statusBadge + '</td>'
+                + '<td class="tpl-time-cell">' + (createdAt ? escapeHtml(createdAt) : '<span class="tpl-time-empty">-</span>') + '</td>'
+                + '<td class="tpl-time-cell">' + (updatedAt ? escapeHtml(updatedAt) : '<span class="tpl-time-empty">-</span>') + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
         }).join('');
@@ -283,6 +291,14 @@
     function escapeHtml(s) {
         if (s === undefined || s === null) return '';
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // v1.4 时间工具：返回格式化时间（YYYY-MM-DD HH:mm）
+    function nowTime() {
+        const d = new Date();
+        const p = n => (n < 10 ? '0' + n : '' + n);
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+            + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     }
 
     // v1.2 刷新弹窗中模板正文上传区显示
@@ -438,11 +454,18 @@
             if (origT) origEnabled = origT.enabled !== false;
         }
 
+        // v1.4 记录上传/更新时间：新增时两者相同；编辑时保留原 createdAt，仅更新 updatedAt
+        const now = nowTime();
+        const prevTemplate = orgData[key];
+        const createdAt = (editingKey && prevTemplate && prevTemplate.createdAt) ? prevTemplate.createdAt : now;
+
         orgData[key] = {
             name: name,
             docType: docType,
             content: content,
-            enabled: origEnabled
+            enabled: origEnabled,
+            createdAt: createdAt,
+            updatedAt: now
         };
 
         // 编辑内置模板后，该 key 变为自定义；从 __builtinDisabled__ 清理冗余 key

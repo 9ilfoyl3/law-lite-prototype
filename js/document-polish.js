@@ -1,7 +1,9 @@
 // ============ 文书精修页面 ============
-// v1.0 精修独立页面：左侧文书内容展示区 + 右侧对话式精修区
+// v1.2 左侧文书区接入 DocEditor 可复用文档编辑器，支持工具栏格式化与直接编辑
+// v1.1 精修独立页面：左侧文书内容展示区 + 右侧对话式精修区
 // 通过 URL 参数 caseId + versionId 加载对应版本
 // 精修结果保存为新版本（type='polish'），不覆盖原版本
+// 上下文区展示已选材料名与文书要求，移除固定文书类型/模型名展示
 
 let polishCaseId = '';
 let polishVersionId = '';
@@ -12,6 +14,7 @@ let originalContent = '';      // 原始文书内容（用于撤销）
 let currentContent = '';       // 当前文书内容
 let editHistory = [];          // 精修历史（用于多步撤销）
 let hasUnsavedChanges = false; // 是否有未保存的修改
+let docEditor = null;          // 左侧文档编辑器实例
 
 // ===== 初始化 =====
 function initPolishPage() {
@@ -74,7 +77,7 @@ function loadFromContext(ctx) {
     document.getElementById('polishDocTitle').textContent = ctx.docTitle || '法律文书';
     document.getElementById('polishCaseName').textContent = ctx.caseName || '';
     document.getElementById('versionTag').textContent = '未保存';
-    document.getElementById('docPaper').innerHTML = currentContent || '<p style="color:var(--text-muted);">暂无内容</p>';
+    initDocEditor(currentContent || '<p style="color:var(--text-muted);">暂无内容</p>');
     renderContextInfo(ctx);
 }
 
@@ -89,36 +92,92 @@ function renderPolishPage() {
     const versionNo = idx >= 0 ? `v${versions.length - idx}` : '原版本';
     document.getElementById('versionTag').textContent = versionNo;
 
-    // 文书内容
-    document.getElementById('docPaper').innerHTML = currentContent || '<p style="color:var(--text-muted);">暂无内容</p>';
+    // 文书内容：使用可复用文档编辑器
+    initDocEditor(currentContent || '<p style="color:var(--text-muted);">暂无内容</p>');
 
     renderContextInfo();
 }
 
-// 渲染上下文信息（文书类型/模板/生成方式/模型）
+// 初始化/复用左侧文档编辑器
+function initDocEditor(content) {
+    const root = document.getElementById('docEditorRoot');
+    if (!root) return;
+    if (docEditor) {
+        docEditor.setContent(content);
+    } else if (typeof DocEditor !== 'undefined') {
+        docEditor = new DocEditor(root, {
+            content: content,
+            placeholder: '暂无内容',
+            showToolbar: true,
+            onChange: (html) => {
+                currentContent = html;
+                hasUnsavedChanges = true;
+                document.getElementById('editHint').textContent = '有未保存的精修改动';
+            }
+        });
+    } else {
+        root.innerHTML = `<div class="polish-doc-paper">${content}</div>`;
+    }
+}
+
+// 渲染上下文信息（案件名、已选材料、文书要求）
 function renderContextInfo(ctx) {
     const cfg = polishVersion?.config || {};
-    const docTypes = getCurrentDocTypes();
-    const docTypeName = cfg.docType ? (docTypes[cfg.docType]?.name || '法律文书') : '法律文书';
-    const templates = cfg.docType ? getDocTypeTemplates(cfg.docType) : {};
-    const templateName = cfg.template ? (getTemplateName(templates[cfg.template]) || '') : '';
-    const genMethodLabel = polishVersion?.genMethod === 'step' ? '分步生成' : '一步生成';
-    const modelName = getModelById(cfg.modelId)?.name || '';
-
     const caseName = ctx?.caseName || polishCaseItem?.caseName || '';
     const caseNumber = ctx?.caseNumber || polishCaseItem?.caseNumber || '';
 
-    document.getElementById('contextRow').innerHTML = `
-        <div class="polish-context-item"><i class="fas fa-folder"></i> ${caseName}${caseNumber ? '（' + caseNumber + '）' : ''}</div>
-        <div class="polish-context-item"><i class="fas fa-file"></i> ${docTypeName}</div>
-        ${templateName ? `<div class="polish-context-item"><i class="fas fa-th-large"></i> ${templateName}</div>` : ''}
-        <div class="polish-context-item"><i class="fas fa-cog"></i> ${genMethodLabel}</div>
-        ${modelName ? `<div class="polish-context-item"><i class="fas fa-microchip"></i> ${modelName}</div>` : ''}
+    // 从版本配置或 fallback 上下文中解析已选材料名与文书要求
+    const materialIds = cfg.materialIds || ctx?.materialIds || [];
+    const materialNames = getMaterialNamesByIds(materialIds);
+    const promptText = cfg.prompt || ctx?.prompt || '';
+
+    // 案件名
+    let contextHtml = `
+        <div class="polish-context-item">
+            <i class="fas fa-folder"></i>
+            <span class="polish-context-label">案件：</span>
+            <span class="polish-context-value">${caseName}${caseNumber ? '（' + caseNumber + '）' : ''}</span>
+        </div>
     `;
+
+    // 已选材料
+    if (materialNames.length) {
+        contextHtml += `
+            <div class="polish-context-item">
+                <i class="fas fa-file-alt"></i>
+                <span class="polish-context-label">已选材料：</span>
+                <span class="polish-context-value">${escapeHtml(materialNames.join('、'))}</span>
+            </div>
+        `;
+    }
+
+    // 文书要求（若有）
+    if (promptText) {
+        contextHtml += `
+            <div class="polish-context-item">
+                <i class="fas fa-comment"></i>
+                <span class="polish-context-label">文书要求：</span>
+                <span class="polish-context-value">${escapeHtml(promptText)}</span>
+            </div>
+        `;
+    }
+
+    document.getElementById('contextRow').innerHTML = contextHtml;
+}
+
+// 根据 materialIds 从案件材料中解析材料名
+function getMaterialNamesByIds(ids) {
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return [];
+    const materials = polishCaseItem?.materials || polishCaseItem?.files || [];
+    return ids.map(id => {
+        const item = materials.find(m => m && (m.id === id || m.fileId === id));
+        return item ? (item.name || item.fileName || `材料${id}`) : `材料${id}`;
+    }).filter(Boolean);
 }
 
 function showError(msg) {
-    document.getElementById('docPaper').innerHTML = `<p style="color:#dc2626;text-align:center;">${msg}</p>`;
+    const root = document.getElementById('docEditorRoot');
+    if (root) root.innerHTML = `<div class="polish-doc-paper"><p style="color:#dc2626;text-align:center;">${msg}</p></div>`;
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('saveBtn').disabled = true;
 }
@@ -160,9 +219,10 @@ function sendPolishMessage() {
         currentContent = currentContent + editNote;
 
         // 更新文书展示
-        const paper = document.getElementById('docPaper');
-        paper.innerHTML = currentContent;
-        paper.classList.add('editing');
+        if (docEditor) {
+            docEditor.setContent(currentContent);
+        }
+        document.getElementById('editHint').textContent = '有未保存的精修改动';
 
         // 助手回复
         const replies = [
@@ -209,15 +269,14 @@ function undoLastEdit() {
         return;
     }
     currentContent = editHistory.pop();
-    document.getElementById('docPaper').innerHTML = currentContent;
+    if (docEditor) {
+        docEditor.setContent(currentContent);
+    }
     if (editHistory.length === 0) {
         document.getElementById('undoBtn').disabled = true;
-        document.getElementById('docPaper').classList.remove('editing');
     }
     hasUnsavedChanges = editHistory.length > 0;
-    if (!hasUnsavedChanges) {
-        document.getElementById('editHint').textContent = '精修指令将在此区域生效';
-    }
+    document.getElementById('editHint').textContent = hasUnsavedChanges ? '有未保存的精修改动' : '精修指令将在此区域生效';
     showNotification('已撤销上一步精修', 'success');
 }
 
@@ -229,8 +288,7 @@ function saveAsNewVersion() {
     }
 
     // 获取编辑区最新内容（支持用户手动编辑）
-    const paper = document.getElementById('docPaper');
-    const latestContent = paper.innerHTML;
+    const latestContent = docEditor ? docEditor.getContent() : currentContent;
 
     // 从原版本继承配置
     const origCfg = polishVersion?.config || {};
@@ -300,3 +358,71 @@ window.addEventListener('beforeunload', function(e) {
 
 // ===== 启动 =====
 initPolishPage();
+
+// ===== 可拖动分隔条（文书 / 精修对话 宽度调整） =====
+// 默认 3:1（文书 75% / 对话 25%），用户可拖动分隔条调整
+// 拖动时动态设置两列 flex-basis，松手后持久化到 localStorage
+(function initPolishResizer() {
+    const resizer = document.getElementById('polishResizer');
+    const docCol = document.querySelector('.polish-doc-col');
+    const chatCol = document.querySelector('.polish-chat-col');
+    if (!resizer || !docCol || !chatCol) return;
+
+    // 恢复上次比例
+    try {
+        const saved = localStorage.getItem('polishDocFlex');
+        if (saved) {
+            const parts = saved.split('|');
+            if (parts.length === 2) {
+                docCol.style.flex = parts[0];
+                chatCol.style.flex = parts[1];
+            }
+        }
+    } catch (e) { /* ignore */ }
+
+    let dragging = false;
+    let startX = 0;
+    let startBodyWidth = 0;
+    let startDocWidth = 0;
+
+    resizer.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        const body = document.querySelector('.polish-body');
+        startBodyWidth = body ? body.getBoundingClientRect().width : window.innerWidth;
+        startDocWidth = docCol.getBoundingClientRect().width;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const delta = e.clientX - startX;
+        let newDocWidth = startDocWidth + delta;
+        // 限制最小宽度（与 CSS min-width 对齐）
+        const minDoc = 320;
+        const minChat = 240;
+        const maxDoc = startBodyWidth - 6 - minChat; // 6 = resizer 宽度
+        if (newDocWidth < minDoc) newDocWidth = minDoc;
+        if (newDocWidth > maxDoc) newDocWidth = maxDoc;
+        const newChatWidth = startBodyWidth - 6 - newDocWidth;
+        const docRatio = newDocWidth / startBodyWidth;
+        const chatRatio = newChatWidth / startBodyWidth;
+        docCol.style.flex = `${docRatio} 1 0`;
+        chatCol.style.flex = `${chatRatio} 1 0`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        resizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        // 持久化
+        try {
+            localStorage.setItem('polishDocFlex', `${docCol.style.flex}|${chatCol.style.flex}`);
+        } catch (e) { /* ignore */ }
+    });
+})();

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4432,7 +4432,7 @@
             document.getElementById('taskSelectorModal').classList.remove('active');
         }
 
-        // 任务类型对应的输入提示词
+        // 任务类型对应的输入文书要求
         const taskPlaceholders = {
             '庭审提纲': '上传案件材料，输入您的庭审要求，我来帮您生成庭审提纲',
             '争议焦点': '上传案件材料，我来帮您分析争议焦点',
@@ -4453,7 +4453,7 @@
             document.getElementById('taskTag').style.display = 'inline-flex';
             document.getElementById('taskBtn').classList.add('active');
             
-            // 更新输入框提示词
+            // 更新输入框文书要求
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
@@ -4480,7 +4480,7 @@
             document.getElementById('taskTag').style.display = 'none';
             document.getElementById('taskBtn').classList.remove('active');
             
-            // 恢复默认提示词
+            // 恢复默认文书要求
             document.getElementById('inputField').placeholder = '请选择任务类型，我会为您提供帮助……';
             
             // 隐藏案由和案件选择，并清除已选择的案由和案件
@@ -7396,7 +7396,7 @@
             document.getElementById('taskTag').style.display = 'inline-flex';
             document.getElementById('taskBtn').classList.add('active');
             
-            // 更新输入框提示词
+            // 更新输入框文书要求
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
@@ -8231,7 +8231,7 @@
             document.getElementById('taskTag').style.display = 'inline-flex';
             document.getElementById('taskBtn').classList.add('active');
             
-            // 更新输入框提示词
+            // 更新输入框文书要求
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
@@ -8268,7 +8268,7 @@
             document.getElementById('taskTag').style.display = 'inline-flex';
             document.getElementById('taskBtn').classList.add('active');
             
-            // 更新输入框提示词
+            // 更新输入框文书要求
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             

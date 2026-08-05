@@ -1,4 +1,5 @@
 // ============ Case Files Page JavaScript ============
+// v2.30 文书生成结果接入可复用文档编辑器：1)流式输出速度加快；2)流式输出期间禁用【文书精修】【重新配置】按钮，完成后启用；3)流式输出完成后右栏自动渲染 DocEditor，用户可直接编辑文书；4)保存/下载/精修均读取编辑器最新内容
 // v2.29 本案要件内联编辑与生成联动优化：1)内联编辑区移除"修改答案"文字标签与 placeholder，仅保留文本框与保存/取消按钮；2)新增 hasExistingElementAnswers/collectExistingElementAnswers 辅助函数；3)generateByMaterial（一步生成）、compileSteps（分步生成编译）新增"已 AI 总结则默认引入"逻辑——caseElementsAnswers 存在任意要件答案时不再弹框，直接引入已生成要件答案并直接生成，友好提示告知；未做过 AI 总结时维持原弹框询问逻辑；4)compileSteps 要件范围同步用 mergeCaseElements 合并个案要件（与 generateByMaterial 一致）
 // v2.28 本案要件答案操作升级（对齐分步生成步骤操作模式）：1)原"修改"按钮更名为"编辑"；2)新增"重新生成"按钮（regenerateElementAnswer，覆盖原答案）；3)新增"追问"按钮（followUpElement/submitElementFollowUp，多轮对话式追问，历史持久化到 caseElementsFollowUps/localStorage.caseElementsFollowUps_${caseId}）；4)移除答案区"AI 生成答案"文字标签，仅展示答案正文；5)三个操作按钮仅在已生成答案后出现
 // v2.27 本案要件交互重构：1)删除要件项"问答/已答·查看"按钮；2)AI总结改为批量总结全部要件（无需勾选，自动全选并生成答案）；3)已答状态直接在要件项下方展示答案内容（绿色卡片 + AI生成答案标签 + 修改按钮）；4)新增 editElementAnswerInline/saveElementAnswerInline 内联编辑功能（替代原 openElementQaModal 弹窗）；5)清理 .case-elements-item-qa-btn CSS，新增 .case-elements-item-answer/.inline-edit-textarea 样式
@@ -9,11 +10,11 @@
 // v2.22 材料解析状态展示（PRD 10章）：renderMaterialTree 仅展示 parseStatus==='success' 的文件；存在解析中/异常文件时顶部显示解析进度概览"共N个，已解析M个，异常K个"；监听 case-file-parse-updated 事件自动刷新材料树
 // v2.21 V1.1 分步生成步骤序列硬编码：stepConfigsByOrg.court.judgment 改为 6 步固定清单（案件信息/原告诉请/被告答辩/争议焦点/事实认定/裁判结果），新增 inputs 依赖定义（source=material/prev_step/case_context，步骤4 争议焦点依赖前3步为选填）；同步将 step.title 字段引用改为 step.name；新增 updateStepsTabVisibility 仅裁判文书类型展示分步生成 Tab；renderStepGenConfig 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型；新增 buildStepDependencyHintHtml 在步骤 body 顶部展示依赖状态提示条（无依赖/必填未完成红色阻止/可选未完成黄色警告/全部已完成蓝色信息）；必填依赖未完成时生成本步按钮置灰并在 generateSingleStepManually 入口加双保险校验
 // v2.20 模型改为只读展示：模型由 workflow 的 modelId 决定（agentflow 平台镜像），新增 refreshModelFromWorkflow 在文书类型/生成方式/初始化/重新配置等时机刷新；onModelChange 置为 no-op；applyListGenParams/applyRegenerateConfig/reconfigWithLatestSnapshot 不再从 URL 或历史文书恢复模型
-// v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/提示词/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
+// v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/文书要求/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
 // v2.18 workflow 匹配维度升级为案字+案由：getWorkflowByCaseWord/getMaterialWorkflowByCaseWord/getStepsConfigForDocType 调用补 cause 参数
 // v2.17 workflow 区分分步型/材料型：分步生成 tab 仅匹配 step 型，材料生成 tab 新增 refreshMaterialWorkflow 匹配 material 型（用户侧不感知）
-// v2.16 移除「我的模板」「我的提示词」入口（迁移至案件列表页 cases.js）；清理 applyReadOnlyMode 中对应隐藏逻辑
-// v2.14 提示词标签优先读管理后台 adminPromptTemplates；模板渲染兼容对象结构
+// v2.16 移除「我的模板」「我的文书要求」入口（迁移至案件列表页 cases.js）；清理 applyReadOnlyMode 中对应隐藏逻辑
+// v2.14 文书要求标签优先读管理后台 adminPromptTemplates；模板渲染兼容对象结构
 // v2.13 支持管理后台只读模式（?readonly=1）：隐藏编辑/删除/生成按钮
 // v2.12 材料生成【生成文书】按钮在未选材料或未选文书类型时置灰禁用
 
@@ -33,6 +34,7 @@ let stepGenerationStarted = false;          // 分步生成是否已开始（控
 let resultContent = '';                     // 右栏结果内容HTML
 let resultEditContent = '';                 // 右栏编辑模式内容
 let lastSavedVersionId = '';                // 最近保存的文书版本ID（用于精修跳转）
+let resultDocEditor = null;                 // 右栏文档编辑器实例
 let pendingUploadFiles = [];
 let pendingElementAll = { standard: [], mine: [], case: [] }; // 待确认的案由要件
 let pendingElementSelections = new Set();
@@ -40,16 +42,19 @@ let pendingElementConfirmCallback = null;   // 要素确认回调
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
 let stepDocType = '';                       // 分步生成视图中的文书类型
 let stepTemplate = '';                      // 分步生成视图中的文书模板
-let stepRequirement = '';                   // 分步生成视图中的提示词
+let stepRequirement = '';                   // 分步生成视图中的文书要求
 
 // ===== 每步材料选择建议（写死） =====
 const stepMaterialHints = {
-    caseInfo: '建议选择起诉状、立案登记表、案件基本信息表、受理通知书等',
     plaintiff: '建议选择起诉状、原告证据清单、原告身份证明、授权委托书等',
     defendant: '建议选择答辩状、被告证据清单、被告身份证明、质证意见等',
     dispute: '建议选择起诉状、答辩状、证据清单、争议焦点整理材料等',
     facts: '建议选择证据材料、庭审笔录、调查取证材料、鉴定意见等',
     verdict: '建议选择证据材料、庭审笔录、法律意见书、调解记录等',
+    // 民终（二审）专属步骤
+    originalReview: '建议选择原审判决书、原审起诉状、原审证据材料、原审庭审笔录等',
+    appellant: '建议选择上诉状、上诉人证据清单、上诉理由书、新证据材料等',
+    appellee: '建议选择答辩状、被上诉人证据清单、质证意见、被上诉人代理词等',
     trialFocus: '建议选择起诉状、答辩状、证据清单、争议焦点整理等',
     questions: '建议选择庭审笔录、证据材料、争议焦点整理等',
     notes: '建议选择庭审安排、当事人信息、程序性文书等',
@@ -68,65 +73,107 @@ const stepMaterialHints = {
 
 // ===== 分步生成步骤序列（V1.1 硬编码） =====
 // v2.21 按会议调整：步骤序列硬编码前端，不依赖 agentflow SSE 动态返回
-// 数据结构: {id, name, apiId, inputs: [{field, required, source}]}
+// 数据结构: {id, name, apiId, inputs: [{field, required, source}], manualOnly?}
 //   - source: 'material'=该步已选材料 / 'prev_step'=前序步骤输出 / 'case_context'=案件上下文
+//   - manualOnly: true 表示仅支持直接输入（合规要求，不调用 AI 生成）
 //   - V1.1 分步生成仅裁判文书（judgment），其他文书类型不展示分步生成 Tab
-//   - V1.1 步骤依赖关系（后续可能变化）：
-//     步骤4 争议焦点：可选依赖步骤1+2+3 返回内容（选填，为空允许执行）
-//     步骤5 事实认定：必填依赖步骤4 返回内容
-//     步骤6 裁判结果：必填依赖步骤5 返回内容
+//   - judgment 按案字分组：default=民初（一审，5 步），民终=二审（6 步）
+//     由 case-data.js 的 resolveStepsByCaseWord(entry, caseWord) 解析
 const stepConfigsByOrg = {
     court: {
-        // 裁判文书分步生成（6 步固定清单，V1.1 硬编码）
-        judgment: [
-            {
-                id: 'caseInfo', name: '案件信息', apiId: 'wf-step-case-info',
-                inputs: [
-                    { field: 'materials', required: true, source: 'material' },
-                    { field: 'caseContext', required: true, source: 'case_context' }
-                ]
-            },
-            {
-                id: 'plaintiff', name: '原告诉请', apiId: 'wf-step-plaintiff',
-                inputs: [
-                    { field: 'materials', required: true, source: 'material' },
-                    { field: 'caseContext', required: true, source: 'case_context' }
-                ]
-            },
-            {
-                id: 'defendant', name: '被告答辩', apiId: 'wf-step-defendant',
-                inputs: [
-                    { field: 'materials', required: true, source: 'material' },
-                    { field: 'caseContext', required: true, source: 'case_context' }
-                ]
-            },
-            {
-                id: 'dispute', name: '争议焦点', apiId: 'wf-step-dispute',
-                inputs: [
-                    { field: 'materials', required: true, source: 'material' },
-                    // 可选依赖前 3 步返回内容（步骤1+2+3），为空时允许执行
-                    { field: 'prevStep_caseInfo', required: false, source: 'prev_step', fromStep: 'caseInfo' },
-                    { field: 'prevStep_plaintiff', required: false, source: 'prev_step', fromStep: 'plaintiff' },
-                    { field: 'prevStep_defendant', required: false, source: 'prev_step', fromStep: 'defendant' }
-                ]
-            },
-            {
-                id: 'facts', name: '事实认定', apiId: 'wf-step-facts',
-                inputs: [
-                    { field: 'materials', required: true, source: 'material' },
-                    // 必填依赖步骤4 返回内容
-                    { field: 'prevStep_dispute', required: true, source: 'prev_step', fromStep: 'dispute' }
-                ]
-            },
-            {
-                id: 'verdict', name: '裁判结果', apiId: 'wf-step-verdict',
-                inputs: [
-                    { field: 'materials', required: true, source: 'material' },
-                    // 必填依赖步骤5 返回内容
-                    { field: 'prevStep_facts', required: true, source: 'prev_step', fromStep: 'facts' }
-                ]
-            }
-        ]
+        // 裁判文书分步生成（按案字区分一审/二审）
+        judgment: {
+            // 民初（一审）：5 步
+            default: [
+                {
+                    id: 'plaintiff', name: '原告诉请', apiId: 'wf-step-plaintiff',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        { field: 'caseContext', required: true, source: 'case_context' }
+                    ]
+                },
+                {
+                    id: 'defendant', name: '被告答辩', apiId: 'wf-step-defendant',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        { field: 'caseContext', required: true, source: 'case_context' }
+                    ]
+                },
+                {
+                    id: 'dispute', name: '争议焦点', apiId: 'wf-step-dispute',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        // 可选依赖前 2 步返回内容（步骤1+2），为空时允许执行
+                        { field: 'prevStep_plaintiff', required: false, source: 'prev_step', fromStep: 'plaintiff' },
+                        { field: 'prevStep_defendant', required: false, source: 'prev_step', fromStep: 'defendant' }
+                    ]
+                },
+                {
+                    id: 'facts', name: '事实认定', apiId: 'wf-step-facts',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        // 必填依赖步骤3 返回内容
+                        { field: 'prevStep_dispute', required: true, source: 'prev_step', fromStep: 'dispute' }
+                    ]
+                },
+                {
+                    id: 'verdict', name: '裁判结果', apiId: 'wf-step-verdict',
+                    // 合规要求：裁判方向属法官主观意识，仅支持直接输入，不调用 AI 生成
+                    manualOnly: true,
+                    inputs: []
+                }
+            ],
+            // 民终（二审）：6 步
+            '民终': [
+                {
+                    id: 'originalReview', name: '原审查明认定', apiId: 'wf-step-original-review',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        { field: 'caseContext', required: true, source: 'case_context' }
+                    ]
+                },
+                {
+                    id: 'appellant', name: '上诉人诉讼', apiId: 'wf-step-appellant',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        { field: 'caseContext', required: true, source: 'case_context' }
+                    ]
+                },
+                {
+                    id: 'appellee', name: '被上诉人抗辩', apiId: 'wf-step-appellee',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        { field: 'caseContext', required: true, source: 'case_context' }
+                    ]
+                },
+                {
+                    id: 'dispute', name: '争议焦点', apiId: 'wf-step-dispute',
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        // 可选依赖前 3 步返回内容（步骤1+2+3），为空时允许执行
+                        { field: 'prevStep_originalReview', required: false, source: 'prev_step', fromStep: 'originalReview' },
+                        { field: 'prevStep_appellant', required: false, source: 'prev_step', fromStep: 'appellant' },
+                        { field: 'prevStep_appellee', required: false, source: 'prev_step', fromStep: 'appellee' }
+                    ]
+                },
+                {
+                    id: 'facts', name: '事实认定', apiId: 'wf-step-facts',
+                    // 二审事实认定：既支持材料生成，也支持直接输入
+                    allowDirectInput: true,
+                    inputs: [
+                        { field: 'materials', required: true, source: 'material' },
+                        // 必填依赖步骤4 返回内容
+                        { field: 'prevStep_dispute', required: true, source: 'prev_step', fromStep: 'dispute' }
+                    ]
+                },
+                {
+                    id: 'verdict', name: '裁判结果', apiId: 'wf-step-verdict',
+                    // 合规要求：裁判方向属法官主观意识，仅支持直接输入，不调用 AI 生成
+                    manualOnly: true,
+                    inputs: []
+                }
+            ]
+        }
         // 其他文书类型（trial/execution 等）V1.1 不配置分步序列（不展示分步生成 Tab）
     }
     // 检察院/司法局 V1.1 分步生成暂不配置（后续场景扩展时复制模块改代码）
@@ -171,7 +218,7 @@ function applyReadOnlyMode() {
     const compileStepsBtn = document.getElementById('compileStepsBtn');
     if (compileStepsBtn) compileStepsBtn.style.display = 'none';
 
-    // 禁用模型选择器、文书类型/模板下拉、提示词 textarea
+    // 禁用模型选择器、文书类型/模板下拉、文书要求 textarea
     const modelSelect = document.getElementById('modelSelect');
     if (modelSelect) modelSelect.disabled = true;
     const docTypeSelect = document.getElementById('docTypeSelect');
@@ -918,7 +965,7 @@ function setLayoutState(state) {
 
 // v2.19/v1.37: 重新配置——默认回填最近一次历史文书的快照数据
 // v1.37: 改用 getAllDocumentVersions 取最新版本，从 version.config 回填（任务 4.4）
-// 回填内容：文书类型 / 模板 / 提示词 / 已选材料集合 / 生成方式
+// 回填内容：文书类型 / 模板 / 文书要求 / 已选材料集合 / 生成方式
 // 模型由 workflow 决定（v2.20 不恢复），回填 docType 后由 refreshModelFromWorkflow 自动刷新
 function reconfigWithLatestSnapshot() {
     if (guardReadOnly('reconfigWithLatestSnapshot')) return;
@@ -938,7 +985,7 @@ function reconfigWithLatestSnapshot() {
 
     // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 refreshModelFromWorkflow 自动刷新）
 
-    // 2. 文书类型 / 模板 / 提示词（材料生成视图）
+    // 2. 文书类型 / 模板 / 文书要求（材料生成视图）
     if (cfg.docType) {
         const matDocTypeEl = document.getElementById('matDocType');
         if (matDocTypeEl) {
@@ -1060,9 +1107,15 @@ function formatFileSize(bytes) {
 function updateStepsTabVisibility() {
     const orgKey = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
     const stepConfigOrg = (typeof stepConfigsByOrg !== 'undefined' && stepConfigsByOrg[orgKey]) || {};
-    const hasStepConfig = Object.keys(stepConfigOrg).some(key =>
-        Array.isArray(stepConfigOrg[key]) && stepConfigOrg[key].length > 0
-    );
+    // 兼容两种结构：数组（旧）或对象（按案字分组，v1.36）
+    const hasStepConfig = Object.keys(stepConfigOrg).some(key => {
+        const entry = stepConfigOrg[key];
+        if (Array.isArray(entry)) return entry.length > 0;
+        if (entry && typeof entry === 'object') {
+            return Object.keys(entry).some(k => Array.isArray(entry[k]) && entry[k].length > 0);
+        }
+        return false;
+    });
     const stepsTab = document.querySelector('.gen-tab[data-method="steps"]');
     if (stepsTab) {
         stepsTab.style.display = hasStepConfig ? '' : 'none';
@@ -1213,15 +1266,20 @@ function syncMaterialConfigFromStep() {
 function renderStepGenConfig() {
     const docTypeSelect = document.getElementById('stepDocType');
     const templateSelect = document.getElementById('stepTemplate');
-    const requirementTextarea = document.getElementById('stepRequirement');
-    if (!docTypeSelect || !templateSelect || !requirementTextarea) return;
+    if (!docTypeSelect || !templateSelect) return;
 
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
     const docTypes = getCurrentDocTypes();
     // v2.21: 分步生成 tab 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型（V1.1 仅裁判文书 judgment）
+    // v1.36: 兼容 stepConfigsByOrg 为对象（按案字分组）的结构
     const stepConfigOrg = (typeof stepConfigsByOrg !== 'undefined' && stepConfigsByOrg[org]) || {};
     const filteredEntries = Object.entries(docTypes).filter(([key]) => {
-        return Array.isArray(stepConfigOrg[key]) && stepConfigOrg[key].length > 0;
+        const entry = stepConfigOrg[key];
+        if (Array.isArray(entry)) return entry.length > 0;
+        if (entry && typeof entry === 'object') {
+            return Object.keys(entry).some(k => Array.isArray(entry[k]) && entry[k].length > 0);
+        }
+        return false;
     });
     const filteredKeys = filteredEntries.map(([key]) => key);
 
@@ -1229,7 +1287,6 @@ function renderStepGenConfig() {
     if (filteredKeys.length === 0) {
         docTypeSelect.innerHTML = '<option value="">暂无可用类型</option>';
         templateSelect.innerHTML = '';
-        requirementTextarea.value = '';
         return;
     }
     if (filteredKeys.indexOf(stepDocType) < 0) {
@@ -1249,43 +1306,6 @@ function renderStepGenConfig() {
         stepTemplate = templateKeys[0];
         templateSelect.value = stepTemplate;
     }
-
-    requirementTextarea.value = stepRequirement || '';
-    renderStepReqTemplates(currentDocType);
-}
-
-// 分步生成 tab 的提示词快捷按钮渲染（与材料生成共用数据，UI 容器不同）
-function renderStepReqTemplates(docTypeKey) {
-    const container = document.getElementById('stepReqTemplates');
-    if (!container) return;
-    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    const templates = getReqTemplates(org, docTypeKey);
-    if (!templates.length) {
-        container.innerHTML = '';
-        container.style.display = 'none';
-        return;
-    }
-    container.style.display = 'flex';
-    const std = templates.filter(t => t.source !== 'mine');
-    const mine = templates.filter(t => t.source === 'mine');
-    const renderTag = t => {
-        const cls = t.source === 'mine' ? 'req-template-tag mine' : 'req-template-tag';
-        return `<button type="button" class="${cls}" onclick="applyStepReqTemplate(this)" data-text="${(t.text || '').replace(/"/g, '&quot;')}">${t.name}</button>`;
-    };
-    let html = '';
-    if (std.length) html += std.map(renderTag).join('');
-    if (mine.length) {
-        if (std.length) html += '<span class="req-template-divider"></span>';
-        html += mine.map(renderTag).join('');
-    }
-    container.innerHTML = html;
-}
-
-function applyStepReqTemplate(btn) {
-    document.getElementById('stepRequirement').value = btn.dataset.text.replace(/\\n/g, '\n');
-    document.querySelectorAll('#stepReqTemplates .req-template-tag').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    onStepRequirementChange(document.getElementById('stepRequirement').value);
 }
 
 function onStepDocTypeChange(docTypeKey) {
@@ -1297,17 +1317,12 @@ function onStepDocTypeChange(docTypeKey) {
     templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
     stepTemplate = templateKeys[0] || '';
     if (stepTemplate) templateSelect.value = stepTemplate;
-    renderStepReqTemplates(docTypeKey);
     refreshStepsConfig();
     renderSteps();
 }
 
 function onStepTemplateChange(templateKey) {
     stepTemplate = templateKey;
-}
-
-function onStepRequirementChange(value) {
-    stepRequirement = value;
 }
 
 function generateByMaterial() {
@@ -1521,7 +1536,7 @@ function doGenerateByMaterial(elementAnswers) {
     // v2.23 (任务 8.8/9.5): 流式输出展示
     const template = document.getElementById('matTemplate').value;
     const docTypeName = getCurrentDocTypes()[docType]?.name || '';
-    const templateName = getCurrentTemplates()[template] || '';
+    const templateName = getCurrentTemplates()[template]?.name || '';
     const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers);
 
     startStreamingOutput(fullContent, templateName);
@@ -1739,11 +1754,15 @@ function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepP
             }
         }
     }
-    // 2. fallback：内置 stepConfigsByOrg + fallbackMap
+    // 2. fallback：内置 stepConfigsByOrg + fallbackMap（按案字解析）
     const orgConfigs = (typeof stepConfigsByOrg !== 'undefined')
         ? (stepConfigsByOrg[org] || stepConfigsByOrg.court)
         : {};
-    if (docTypeKey && orgConfigs[docTypeKey]) return orgConfigs[docTypeKey];
+    if (docTypeKey && orgConfigs[docTypeKey]) {
+        return (typeof resolveStepsByCaseWord === 'function')
+            ? resolveStepsByCaseWord(orgConfigs[docTypeKey], caseWord)
+            : orgConfigs[docTypeKey];
+    }
 
     const fallbackMap = {
         reconsideration: 'review',
@@ -1751,12 +1770,23 @@ function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepP
         court: 'prosecution'
     };
     const key = fallbackMap[docTypeKey];
-    if (key && orgConfigs[key]) return orgConfigs[key];
+    if (key && orgConfigs[key]) {
+        return (typeof resolveStepsByCaseWord === 'function')
+            ? resolveStepsByCaseWord(orgConfigs[key], caseWord)
+            : orgConfigs[key];
+    }
 
     const firstDocType = Object.keys(getCurrentDocTypes())[0];
-    if (firstDocType && orgConfigs[firstDocType]) return orgConfigs[firstDocType];
+    if (firstDocType && orgConfigs[firstDocType]) {
+        return (typeof resolveStepsByCaseWord === 'function')
+            ? resolveStepsByCaseWord(orgConfigs[firstDocType], caseWord)
+            : orgConfigs[firstDocType];
+    }
 
-    return Object.values(orgConfigs)[0] || [];
+    const firstEntry = Object.values(orgConfigs)[0] || [];
+    return (typeof resolveStepsByCaseWord === 'function')
+        ? resolveStepsByCaseWord(firstEntry, caseWord)
+        : firstEntry;
 }
 
 // v2.21: 构建步骤依赖提示 HTML
@@ -1871,13 +1901,41 @@ function renderSteps() {
             expandedStepIndex = i;
         }
 
+        // 步骤输入模式（合规要求）：
+        //   - manualOnly: 仅直接输入（裁判结果），不展示材料区/生成本步/直接输入按钮
+        //     waiting 状态直接展示输入框+友好提示，用户打字即交互，无需点击按钮
+        //   - allowDirectInput: 既支持材料生成也支持直接输入（二审事实认定）
+        //   - 默认: 仅材料生成，不展示直接输入按钮
+        const isManualOnly = !!s.manualOnly;
+        const showDirectInput = !isManualOnly && !!s.allowDirectInput;
+        const showGenerate = !isManualOnly;
+        const showMaterials = !isManualOnly;
+
+        const matCountHtml = showMaterials ? `<span class="step-acc-mat-count">已选 ${matCount} 件</span>` : '';
+        const materialsAreaHtml = showMaterials ? materialsHtml : '';
+        const matsSummaryHtml = showMaterials ? selectedMatsSummaryHtml : '';
+        // manualOnly 步骤无前置依赖，跳过依赖提示条
+        const depHintHtml = isManualOnly ? '' : buildStepDependencyHintHtml(i);
+
+        // manualOnly 步骤（裁判结果）waiting 状态直接展示输入框，无需点击「直接输入」按钮
+        let manualInputHtml = '';
+        if (isManualOnly && state === 'waiting' && !isGenerating) {
+            manualInputHtml = `
+                <div class="step-manual-hint"><i class="fas fa-info-circle"></i><span>本步为法官主观判断内容，合规要求不由 AI 生成，请直接在下方输入框填写裁判结果</span></div>
+                <textarea class="step-edit-textarea" id="stepDirectInput_${i}" placeholder="请直接输入裁判结果，支持多段（每行一段）..."></textarea>
+                <div class="step-actions">
+                    <button class="step-action-btn save" onclick="saveDirectInput(${i})"><i class="fas fa-save"></i> 保存</button>
+                </div>
+            `;
+        }
+
         return `
             <div class="step-accordion ${state === 'current' ? 'current' : ''} ${state === 'done' ? 'done' : ''} ${isExpanded ? 'expanded' : ''}" id="step_${i}">
                 <div class="step-acc-header" onclick="toggleStep(${i})">
                     <div class="step-acc-title">
                         <div class="step-acc-num ${state}">${state === 'done' ? '<i class="fas fa-check"></i>' : (i + 1)}</div>
                         <span>${s.name}</span>
-                        <span class="step-acc-mat-count">已选 ${matCount} 件</span>
+                        ${matCountHtml}
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <span class="step-acc-status ${state}">${state === 'current' ? '生成中' : (state === 'done' ? '已完成' : '等待中')}</span>
@@ -1885,20 +1943,23 @@ function renderSteps() {
                     </div>
                 </div>
                 <div class="step-acc-body">
-                    ${buildStepDependencyHintHtml(i)}
-                    ${materialsHtml}
-                    ${selectedMatsSummaryHtml}
+                    ${depHintHtml}
+                    ${materialsAreaHtml}
+                    ${matsSummaryHtml}
                     <div class="step-content-area" id="stepContent_${i}">${contentHtml}</div>
+                    ${manualInputHtml}
                     ${state === 'done' ? `
                         <div class="step-actions">
                             <button class="step-action-btn" onclick="editStep(${i})"><i class="fas fa-edit"></i> 编辑</button>
-                            <button class="step-action-btn" onclick="regenerateStep(${i})"><i class="fas fa-redo"></i> 重新生成</button>
-                            <button class="step-action-btn" onclick="followUpStep(${i})"><i class="fas fa-comments"></i> 追问</button>
+                            ${showGenerate ? `
+                                <button class="step-action-btn" onclick="regenerateStep(${i})"><i class="fas fa-redo"></i> 重新生成</button>
+                                <button class="step-action-btn" onclick="followUpStep(${i})"><i class="fas fa-comments"></i> 追问</button>
+                            ` : ''}
                         </div>
                     ` : (state === 'waiting' && !isGenerating ? `
                         <div class="step-actions">
-                            <button class="step-action-btn" onclick="directInputStep(${i})"><i class="fas fa-keyboard"></i> 直接输入</button>
-                            ${(() => {
+                            ${showDirectInput ? `<button class="step-action-btn" onclick="directInputStep(${i})"><i class="fas fa-keyboard"></i> 直接输入</button>` : ''}
+                            ${showGenerate ? (() => {
                                 // v2.21: 必填依赖未完成时置灰生成本步按钮
                                 const step = stepsConfig[i];
                                 const prevDeps = (step.inputs || []).filter(inp => inp.source === 'prev_step' && inp.fromStep);
@@ -1910,7 +1971,7 @@ function renderSteps() {
                                     return `<button class="step-action-btn primary" disabled title="需先完成必填前置步骤"><i class="fas fa-play"></i> 生成本步</button>`;
                                 }
                                 return `<button class="step-action-btn primary" onclick="generateSingleStepManually(${i})"><i class="fas fa-play"></i> 生成本步</button>`;
-                            })()}
+                            })() : ''}
                         </div>
                     ` : '')}
                 </div>
@@ -1928,8 +1989,14 @@ async function generateSingleStepManually(index) {
     if (index < 0 || index >= stepsConfig.length) return;
     if (stepStates[index] === 'done') return;
 
-    // v2.21: 校验必填前置依赖是否已完成
     const step = stepsConfig[index];
+    // 合规例外：manualOnly 步骤（裁判结果）不允许 AI 生成，UI 已隐藏按钮，此处防御性拦截
+    if (step.manualOnly) {
+        showNotification('该步骤仅支持直接输入，不支持 AI 生成', 'warning');
+        return;
+    }
+
+    // v2.21: 校验必填前置依赖是否已完成
     const requiredUndoneDeps = (step.inputs || [])
         .filter(inp => inp.source === 'prev_step' && inp.fromStep && inp.required)
         .filter(dep => {
@@ -2309,13 +2376,6 @@ function generateStepContent(stepId, caseData, orgType, selectedMaterials) {
     const partyB = caseData.partyB || '被告';
 
     const generators = {
-        caseInfo: () => [
-            `案件名称：${caseData.caseName || caseData.caseNumber || '-'}`,
-            `案号：${caseData.caseNumber || '-'}`,
-            `案由：${cause || '-'}`,
-            `当事人：${partyA} 与 ${partyB}`,
-            `承办人：${caseData.handler || '-'}`
-        ],
         plaintiff: () => {
             if (cause.includes('借贷')) return [
                 '请求判令被告偿还借款本金及逾期利息',
@@ -2349,6 +2409,22 @@ function generateStepContent(stepId, caseData, orgType, selectedMaterials) {
             '支持原告合理部分的诉讼请求',
             '驳回原告缺乏依据的诉讼请求',
             '案件受理费由双方按比例负担'
+        ],
+        // 民终（二审）专属步骤
+        originalReview: () => [
+            `原审诉请：${partyA} 诉 ${partyB} ${cause || '纠纷'}一案，原审原告提出相应诉讼请求`,
+            `原审查明事实：原审法院经审理认定了双方当事人的基本法律关系及主要事实`,
+            `原审法院认为：原审法院根据查明的事实和证据，对案件性质及责任承担作出认定，并据此作出原审判决`
+        ],
+        appellant: () => [
+            '上诉人诉请内容：上诉人不服原审判决，请求二审法院依法改判或发回重审',
+            '上诉人诉请分析：上诉人认为原审在事实认定、法律适用或程序上存在错误',
+            '上诉人证据分析：上诉人提交了新证据或对原审证据提出新的质证意见'
+        ],
+        appellee: () => [
+            '被上诉人抗辩内容：被上诉人认为原审判决认定事实清楚、适用法律正确，请求驳回上诉',
+            '被上诉人诉请分析：被上诉人对上诉人主张的事实及理由逐项予以反驳',
+            '被上诉人证据分析：被上诉人坚持原审证据的证明力，并对上诉人新证据的关联性提出异议'
         ],
         // 检察院
         crimeFacts: () => [
@@ -2417,16 +2493,27 @@ function generateStepContent(stepId, caseData, orgType, selectedMaterials) {
 }
 
 // v2.24: 直接输入 —— 用户不通过 AI 生成，手动输入步骤内容
+// 仅 manualOnly（裁判结果）与 allowDirectInput（二审事实认定）步骤允许直接输入
+// 仅材料生成的步骤（前四步）防御性拦截
 function directInputStep(index) {
     if (guardReadOnly('directInputStep')) return;
-    const stepId = stepsConfig[index].id;
+    const step = stepsConfig[index];
+    if (!step.manualOnly && !step.allowDirectInput) {
+        showNotification('该步骤仅支持材料生成，不支持直接输入', 'warning');
+        return;
+    }
+    const stepId = step.id;
     if (!stepData[stepId]) stepData[stepId] = { items: [], materials: new Set() };
 
     const contentEl = document.getElementById(`stepContent_${index}`);
     if (!contentEl) return;
     contentEl.classList.add('editing');
+    // manualOnly 步骤（裁判结果）使用合规专属提示文案
+    const placeholder = step.manualOnly
+        ? '请直接输入裁判结果（裁判方向属法官主观意识，合规要求不由 AI 生成），支持多段（每行一段）...'
+        : '请直接输入本步骤的内容，支持多段（每行一段）...';
     contentEl.innerHTML = `
-        <textarea class="step-edit-textarea" id="stepDirectInput_${index}" placeholder="请直接输入本步骤的内容，支持多段（每行一段）..."></textarea>
+        <textarea class="step-edit-textarea" id="stepDirectInput_${index}" placeholder="${placeholder}"></textarea>
         <div class="step-actions">
             <button class="step-action-btn save" onclick="saveDirectInput(${index})"><i class="fas fa-save"></i> 保存</button>
             <button class="step-action-btn" onclick="renderSteps(); document.getElementById('step_${index}').classList.add('expanded');">取消</button>
@@ -2601,7 +2688,7 @@ function doCompileSteps(elementAnswers) {
     stepsConfig.forEach(s => {
         const data = stepData[s.id];
         if (data && data.items && data.items.length) {
-            allItems.push(`<h3>${s.title}</h3>`);
+            allItems.push(`<h3>${s.name}</h3>`);
             data.items.forEach((item, i) => {
                 allItems.push(`<p>${i + 1}. ${item}</p>`);
             });
@@ -2614,7 +2701,7 @@ function doCompileSteps(elementAnswers) {
         elementHint = `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-puzzle-piece"></i> 已引入案由要件辅助生成：${names}</div>`;
     }
 
-    const templateName = getCurrentTemplates()[stepTemplate] || '';
+    const templateName = getTemplateName(getCurrentTemplates()[stepTemplate]);
     const docTypeName = getCurrentDocTypes()[stepDocType]?.name || '法律文书';
     const title = templateName ? `${docTypeName}（${templateName}）` : docTypeName;
     const reqHint = stepRequirement ? `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-info-circle"></i> 生成需求：${stepRequirement}</div>` : '';
@@ -2899,63 +2986,147 @@ function showResultLoading() {
     `;
 }
 
-// v2.23 (任务 8.8/9.5): 流式输出展示 + 进度指示
-// 不可取消，完成后自动渲染为格式化文书
+// v2.30/v2.23 (任务 8.8/9.5): 流式输出展示 + 进度指示
+// 不可取消，完成后自动渲染为文档编辑器
 let streamingTimer = null;
 let streamingStartTime = 0;
 
 function startStreamingOutput(fullContent, title) {
     const body = document.getElementById('resultBody');
 
-    // 构建流式输出区
+    // v2.31: 流式开始即切换到结果视图，让结果栏可见
+    setLayoutState('generated');
+
+    // 流式输出期间禁用【文书精修】【重新配置】按钮
+    setResultActionButtonsDisabled(true);
+
+    // 清理旧编辑器实例
+    if (resultDocEditor) {
+        resultDocEditor.destroy();
+        resultDocEditor = null;
+    }
+
+    // v2.31: 构建流式输出区（顶部进度 + 思考过程 + 文书内容）
     body.innerHTML = `
         <div class="streaming-output-area">
             <div class="streaming-progress-bar">
                 <div class="streaming-progress-info">
                     <span><i class="fas fa-circle-notch fa-spin"></i> 正在生成：${escapeHtmlForStreaming(title || '法律文书')}</span>
-                    <span class="streaming-stats" id="streamingStats">已输出 0 字 · 预计剩余 --</span>
+                    <span class="streaming-stats" id="streamingStats">思考中...</span>
                 </div>
                 <div class="streaming-progress-track"><div class="streaming-progress-fill" id="streamingProgressFill" style="width:0%"></div></div>
+            </div>
+            <div class="streaming-thinking" id="streamingThinking">
+                <div class="streaming-thinking-title"><i class="fas fa-brain"></i> 思考过程</div>
+                <div id="streamingThinkingList"></div>
             </div>
             <div class="streaming-content" id="streamingContent"></div>
         </div>
     `;
 
-    // 分段流式输出（按段落切分）
+    // v2.31: 阶段一——逐条展示思考过程
+    const thinkingSteps = buildThinkingSteps(title);
+    const thinkingListEl = document.getElementById('streamingThinkingList');
+    const contentEl = document.getElementById('streamingContent');
+    const statsEl = document.getElementById('streamingStats');
+    const fillEl = document.getElementById('streamingProgressFill');
+
+    streamingStartTime = Date.now();
+    let thinkIndex = 0;
+
+    const renderNextThinking = () => {
+        if (thinkIndex >= thinkingSteps.length) {
+            // 思考过程完成，移除光标，进入阶段二
+            const lastCursor = thinkingListEl.querySelector('.think-cursor');
+            if (lastCursor) lastCursor.remove();
+            statsEl.textContent = '正在生成文书正文...';
+            startStreamingContent(fullContent, title, contentEl, statsEl, fillEl);
+            return;
+        }
+        // 移除上一条光标
+        const prevCursor = thinkingListEl.querySelector('.think-cursor');
+        if (prevCursor) prevCursor.remove();
+
+        const item = document.createElement('div');
+        item.className = 'streaming-thinking-item';
+        item.innerHTML = `${escapeHtmlForStreaming(thinkingSteps[thinkIndex])}<span class="think-cursor"></span>`;
+        thinkingListEl.appendChild(item);
+        thinkingListEl.scrollTop = thinkingListEl.scrollHeight;
+
+        const progress = Math.round((thinkIndex + 1) / (thinkingSteps.length + 4) * 100);
+        fillEl.style.width = progress + '%';
+        statsEl.textContent = `思考中 · ${thinkIndex + 1}/${thinkingSteps.length}`;
+
+        thinkIndex++;
+        streamingTimer = setTimeout(renderNextThinking, 420 + Math.random() * 380);
+    };
+    renderNextThinking();
+}
+
+// 根据文书标题生成思考过程文案
+function buildThinkingSteps(title) {
+    const t = title || '法律文书';
+    return [
+        `正在阅读案件材料，梳理案情脉络与当事人信息...`,
+        `分析原告诉求、被告抗辩及举证质证要点...`,
+        `审查证据材料，判断真实性、合法性与关联性...`,
+        `归纳本案争议焦点，匹配适用法律条文...`,
+        `组织${t}的裁判理由与论据结构...`,
+        `生成${t}正文内容并校对排版格式...`
+    ];
+}
+
+// 阶段二：逐步渲染文书正文段落
+function startStreamingContent(fullContent, title, contentEl, statsEl, fillEl) {
     const segments = splitContentToSegments(fullContent);
     let segIndex = 0;
     let outputChars = 0;
-    streamingStartTime = Date.now();
+    const totalSteps = segments.length + 6; // 思考6步基准
 
     const renderNext = () => {
         if (segIndex >= segments.length) {
-            // 输出完成，自动渲染为格式化文书
+            // 输出完成，自动渲染为文档编辑器
             finishStreaming(fullContent, title);
             return;
         }
         const seg = segments[segIndex];
-        const contentEl = document.getElementById('streamingContent');
         contentEl.innerHTML += seg;
         outputChars += seg.replace(/<[^>]+>/g, '').length;
+        contentEl.scrollTop = contentEl.scrollHeight;
 
-        // 更新进度
-        const progress = Math.round((segIndex + 1) / segments.length * 100);
-        const fill = document.getElementById('streamingProgressFill');
-        if (fill) fill.style.width = progress + '%';
-        const stats = document.getElementById('streamingStats');
-        if (stats) {
-            const elapsed = (Date.now() - streamingStartTime) / 1000;
-            const speed = outputChars / (elapsed || 1);
-            const remainSegs = segments.length - segIndex - 1;
-            const remainChars = remainSegs * (outputChars / (segIndex + 1));
-            const remainSec = speed > 0 ? Math.ceil(remainChars / speed) : 0;
-            stats.textContent = `已输出 ${outputChars} 字 · 预计剩余 ${remainSec}s · 第 ${segIndex + 1}/${segments.length} 段`;
-        }
+        // 更新进度（思考过程占基准6步，正文段落实时叠加）
+        const progress = Math.min(100, Math.round((segIndex + 1 + 6) / totalSteps * 100));
+        fillEl.style.width = progress + '%';
+        const elapsed = (Date.now() - streamingStartTime) / 1000;
+        const speed = outputChars / (elapsed || 1);
+        const remainSegs = segments.length - segIndex - 1;
+        const remainChars = remainSegs * (outputChars / (segIndex + 1));
+        const remainSec = speed > 0 ? Math.ceil(remainChars / speed) : 0;
+        statsEl.textContent = `已输出 ${outputChars} 字 · 预计剩余 ${remainSec}s · 第 ${segIndex + 1}/${segments.length} 段`;
 
         segIndex++;
-        streamingTimer = setTimeout(renderNext, 150 + Math.random() * 200);
+        // v2.31: 文书正文输出速度适中（每段 500-900ms），整体约3秒
+        streamingTimer = setTimeout(renderNext, 500 + Math.random() * 400);
     };
     renderNext();
+}
+
+// 设置右栏顶部操作按钮禁用/启用状态
+function setResultActionButtonsDisabled(disabled) {
+    const refineBtn = document.getElementById('resultRefineBtn');
+    const reconfigBtn = document.getElementById('resultReconfigBtn');
+    if (refineBtn) {
+        refineBtn.disabled = disabled;
+        refineBtn.style.opacity = disabled ? '0.5' : '';
+        refineBtn.style.cursor = disabled ? 'not-allowed' : '';
+        refineBtn.title = disabled ? '生成中，请稍候' : '基于当前文书上下文进行多轮精修';
+    }
+    if (reconfigBtn) {
+        reconfigBtn.disabled = disabled;
+        reconfigBtn.style.opacity = disabled ? '0.5' : '';
+        reconfigBtn.style.cursor = disabled ? 'not-allowed' : '';
+        reconfigBtn.title = disabled ? '生成中，请稍候' : '重新配置生成参数（默认回填最近一次历史文书快照）';
+    }
 }
 
 // 将文书内容按段落切分为多个片段
@@ -2979,6 +3150,8 @@ function splitContentToSegments(html) {
 function finishStreaming(fullContent, title) {
     if (streamingTimer) { clearTimeout(streamingTimer); streamingTimer = null; }
     showResult(fullContent, title);
+    // v2.30: 流式输出完成后启用操作按钮
+    setResultActionButtonsDisabled(false);
     // v2.24 (任务 8.8): 流式输出完成后统一提示
     showNotification('文书已生成完成', 'success');
 }
@@ -2991,19 +3164,31 @@ function escapeHtmlForStreaming(text) {
 function showResult(html, title) {
     resultContent = html;
     resultEditContent = html.replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-    document.getElementById('resultBody').innerHTML = `<div class="fade-in">${resultContent}</div>`;
+
+    const body = document.getElementById('resultBody');
+    body.innerHTML = '';
+
+    // v2.30: 渲染可复用文档编辑器
+    if (typeof DocEditor !== 'undefined') {
+        resultDocEditor = new DocEditor(body, {
+            content: resultContent,
+            placeholder: '暂无生成结果',
+            showToolbar: true,
+            onChange: (content) => {
+                resultContent = content;
+            }
+        });
+    } else {
+        body.innerHTML = `<div class="fade-in">${resultContent}</div>`;
+    }
+
     setLayoutState('generated');
     showNotification('文书生成完成', 'success');
 }
 
 function switchResultTab(tab) {
-    document.querySelectorAll('.result-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-    const body = document.getElementById('resultBody');
-    if (tab === 'preview') {
-        body.innerHTML = `<div class="fade-in">${resultContent}</div>`;
-    } else {
-        body.innerHTML = `<textarea class="result-edit-area" id="resultEditTextarea">${resultEditContent}</textarea>`;
-    }
+    // v2.30: 编辑器模式替代预览/源码 tab 切换，保留函数避免旧调用报错
+    console.log('[case-files] switchResultTab 已废弃，当前使用文档编辑器');
 }
 
 function toggleResultCol() {
@@ -3012,10 +3197,9 @@ function toggleResultCol() {
 
 function saveResult() {
     if (guardReadOnly('saveResult')) return;
-    // 如果在编辑模式，先获取编辑后的内容
-    const editArea = document.getElementById('resultEditTextarea');
-    if (editArea) {
-        resultEditContent = editArea.value;
+    // v2.30: 从文档编辑器获取最新内容
+    if (resultDocEditor) {
+        resultContent = resultDocEditor.getContent();
     }
 
     // 记录当前生成配置
@@ -3088,8 +3272,8 @@ function updateHistoryDocsBtnState() {
 }
 
 function downloadResult() {
-    const editArea = document.getElementById('resultEditTextarea');
-    const content = editArea ? editArea.value : resultContent.replace(/<[^>]+>/g, '');
+    // v2.30: 优先从文档编辑器获取纯文本内容
+    const content = resultDocEditor ? resultDocEditor.getText() : resultContent.replace(/<[^>]+>/g, '');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -3103,6 +3287,10 @@ function downloadResult() {
 // ===== 文书精修：跳转多轮对话页面 =====
 function refineResult() {
     if (guardReadOnly('refineResult')) return;
+    // v2.30: 跳转前同步编辑器最新内容
+    if (resultDocEditor) {
+        resultContent = resultDocEditor.getContent();
+    }
     if (!resultContent) {
         showNotification('请先生成文书', 'warning');
         return;
@@ -3118,8 +3306,9 @@ function refineResult() {
     // 未保存：通过 localStorage 传递临时内容
     const matDocType = document.getElementById('matDocType');
     const matTemplate = document.getElementById('matTemplate');
+    const matRequirement = document.getElementById('matRequirement');
     const docTypeName = matDocType ? (getCurrentDocTypes()[matDocType.value]?.name || '') : '';
-    const templateName = matTemplate ? (getCurrentTemplates()[matTemplate.value] || '') : '';
+    const templateName = matTemplate ? getTemplateName(getCurrentTemplates()[matTemplate.value]) : '';
     const title = docTypeName ? (templateName ? `${docTypeName} · ${templateName}` : docTypeName) : (templateName || '法律文书');
     const ctx = {
         caseId: caseItem.id,
@@ -3127,7 +3316,9 @@ function refineResult() {
         caseNumber: caseItem.caseNumber || '',
         docTitle: title,
         docContent: resultContent,
-        source: 'case-files'
+        source: 'case-files',
+        materialIds: [...selectedMaterialIds],
+        prompt: matRequirement ? matRequirement.value.trim() : ''
     };
     localStorage.setItem('refineContext', JSON.stringify(ctx));
     const win = window.open('document-polish.html', '_blank');

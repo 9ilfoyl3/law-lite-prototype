@@ -718,7 +718,7 @@
         }
         .req-template-tag:hover { background: #fde68a; border-color: #f59e0b; }
         .req-template-tag.active { background: #f59e0b; color: #fff; border-color: #d97706; }
-        /* v2.15: 用户侧自定义提示词标签（绿色，区别于系统/管理后台的黄色） */
+        /* v2.15: 用户侧自定义文书要求标签（绿色，区别于系统/管理后台的黄色） */
         .req-template-tag.mine { color: #065f46; background: #d1fae5; border-color: #6ee7b7; }
         .req-template-tag.mine:hover { background: #a7f3d0; border-color: #34d399; }
         .req-template-tag.mine.active { background: #10b981; color: #fff; border-color: #059669; }
@@ -956,6 +956,25 @@
         .step-dependency-hint .dep-item .dep-status {
             font-size: 11px;
             opacity: 0.85;
+        }
+        /* v2.25: manualOnly 步骤（裁判结果）直接输入友好提示 */
+        .step-manual-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+        .step-manual-hint i {
+            margin-top: 2px;
+            font-size: 12px;
+            flex-shrink: 0;
         }
         .step-selected-mats {
             display: flex;
@@ -1413,6 +1432,57 @@
             border-radius: 2px;
             transition: width 0.3s ease;
         }
+        /* v2.31 思考过程区 */
+        .streaming-thinking {
+            padding: 12px 16px 14px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            max-height: 38%;
+            overflow-y: auto;
+        }
+        .streaming-thinking-title {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .streaming-thinking-title i { color: var(--accent-primary); }
+        .streaming-thinking-item {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            padding: 3px 0 3px 18px;
+            position: relative;
+            animation: streamThinkIn 0.35s ease;
+        }
+        .streaming-thinking-item::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 12px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            opacity: 0.55;
+        }
+        .streaming-thinking-item .think-cursor {
+            display: inline-block;
+            width: 7px;
+            height: 14px;
+            background: var(--accent-primary);
+            margin-left: 3px;
+            vertical-align: middle;
+            animation: blink 0.9s steps(2) infinite;
+        }
+        @keyframes streamThinkIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink { 50% { opacity: 0; } }
         .streaming-content {
             flex: 1;
             overflow-y: auto;
@@ -2679,6 +2749,95 @@
             margin-top: 2px;
             flex-shrink: 0;
         }
+
+        /* ===== Doc Editor (共用组件) ===== */
+        .doc-editor-root {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: var(--bg-secondary);
+        }
+        .doc-editor-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+        .doc-editor-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .doc-editor-toolbar-sep {
+            width: 1px;
+            height: 18px;
+            background: var(--border-color);
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+        .doc-editor-toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            width: 30px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .doc-editor-toolbar-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        .doc-editor-toolbar-btn.active {
+            background: var(--accent-light);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .doc-editor-toolbar-btn .btn-label {
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .doc-editor-shell {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 16px;
+            background: #f0f0f0;
+        }
+        .doc-editor-paper {
+            max-width: 800px;
+            min-height: 600px;
+            margin: 0 auto;
+            padding: 50px 60px;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            border-radius: 4px;
+            font-family: "Noto Serif SC", "SimSun", serif;
+            font-size: 14px;
+            line-height: 2;
+            color: #333;
+            outline: none;
+        }
+        .doc-editor-paper:focus {
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.08), 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .doc-editor-paper p { margin: 1em 0; text-indent: 2em; }
+        .doc-editor-paper h2 { text-align: center; font-size: 20pt; font-weight: bold; margin: 0 0 24px; }
+        .doc-editor-paper h3 { font-size: 13pt; font-weight: bold; margin: 20px 0 12px; }
+        .doc-editor-paper ul, .doc-editor-paper ol { margin: 1em 0; padding-left: 2em; }
+        .doc-editor-paper li { margin: 0.3em 0; }
     </style>
 </head>
 <body>
@@ -2809,7 +2968,7 @@
                                         <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial()"></select>
                                     </div>
                                     <div class="gen-form-row">
-                                        <label class="gen-form-label">提示词</label>
+                                        <label class="gen-form-label">文书要求</label>
                                         <div class="req-template-tags" id="matReqTemplates"></div>
                                         <textarea class="gen-form-textarea" id="matRequirement" placeholder="可选：描述特殊要求或关注点" oninput="syncStepConfigFromMaterial()"></textarea>
                                     </div>
@@ -2836,11 +2995,6 @@
                                 <div class="gen-form-row">
                                     <label class="gen-form-label">文书模板</label>
                                     <select class="gen-form-select" id="stepTemplate" onchange="onStepTemplateChange(this.value)"></select>
-                                </div>
-                                <div class="gen-form-row">
-                                    <label class="gen-form-label">提示词</label>
-                                    <div class="req-template-tags" id="stepReqTemplates"></div>
-                                    <textarea class="gen-form-textarea" id="stepRequirement" placeholder="可选：描述特殊要求或关注点" oninput="onStepRequirementChange(this.value)"></textarea>
                                 </div>
                             </div>
                             <div class="auto-switch-alert" id="autoSwitchAlert">
@@ -3087,8 +3241,9 @@
     </div>
 
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=58"></script>
-    <script src="../js/case-files.js?v=89"></script>
+    <script src="../js/case-data.js?v=59"></script>
+    <script src="../js/doc-editor.js?v=1"></script>
+    <script src="../js/case-files.js?v=100"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

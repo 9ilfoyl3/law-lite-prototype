@@ -2,6 +2,7 @@
 // v1.0 个人文书模板维护，关联文书类型
 // v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
 // v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑表单提供模板示例下载；③ 卡片列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段；⑥ 修复保存时读取 content 及表单上传区显示逻辑
+// v1.3 模板卡片新增「上传时间」「更新时间」展示：保存时记录 createdAt / updatedAt
 // 数据持久化：localStorage.myDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeMyDocTemplates 在加载时合并到 system.docTemplates（key 加 my- 前缀）
 
@@ -80,6 +81,14 @@
     function escapeHtml(s) {
         if (s === undefined || s === null) return '';
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // v1.3 时间工具：返回格式化时间（YYYY-MM-DD HH:mm）
+    function nowTime() {
+        const d = new Date();
+        const p = n => (n < 10 ? '0' + n : '' + n);
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+            + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     }
 
     // v1.2 通用工具：下载文本文件
@@ -169,6 +178,16 @@
             : '<button class="action-btn toggle-on" onclick="toggleEnabled(\'' + key + '\')">启用</button>';
         const hasContent = (t.content || '').trim().length > 0;
         const viewDisabled = hasContent ? '' : ' disabled';
+        // v1.3 展示上传时间与更新时间（缺省内容兼容旧数据）
+        const createdAt = t.createdAt || '';
+        const updatedAt = t.updatedAt || '';
+        const timeMeta = (createdAt || updatedAt)
+            ? '<div class="item-meta">'
+                + (createdAt ? '<span class="tpl-time-block">上传：' + escapeHtml(createdAt) + '</span>' : '')
+                + (createdAt && updatedAt ? '<span class="tpl-time-sep">·</span>' : '')
+                + (updatedAt ? '<span class="tpl-time-block">更新：' + escapeHtml(updatedAt) + '</span>' : '')
+                + '</div>'
+            : '';
         return '<div class="item-card">'
             + '<div class="item-row">'
             + '<div>'
@@ -176,6 +195,7 @@
             + '<span class="item-badge">我的</span>'
             + statusBadge
             + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
+            + timeMeta
             + '</div>'
             + '<div class="item-actions">'
             + '<button class="action-btn view"' + viewDisabled + ' onclick="previewMyTemplate(\'' + key + '\')">预览</button>'
@@ -368,11 +388,16 @@
         }
         // 编辑时保留原 enabled 字段；新增时默认启用
         const prevEnabled = existingKey && orgData[key] ? (orgData[key].enabled !== false) : true;
+        // v1.3 记录上传时间与更新时间
+        const now = nowTime();
+        const createdAt = existingKey && orgData[key] && orgData[key].createdAt ? orgData[key].createdAt : now;
         orgData[key] = {
             name: name,
             docType: docType,
             content: content,
-            enabled: prevEnabled
+            enabled: prevEnabled,
+            createdAt: createdAt,
+            updatedAt: now
         };
         setOrgData(currentOrg, orgData);
 

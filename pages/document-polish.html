@@ -73,12 +73,37 @@
             overflow: hidden;
         }
         .polish-doc-col {
-            flex: 1;
+            flex: 3;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid var(--border-color);
+            border-right: none;
             background: var(--bg-primary);
             overflow: hidden;
+            min-width: 320px;
+        }
+        /* 可拖动分隔条（文书 75% / 精修对话 25% 默认比例，用户可拖动调整） */
+        .polish-resizer {
+            flex: 0 0 6px;
+            cursor: col-resize;
+            background: var(--border-color);
+            position: relative;
+            transition: background 0.15s;
+        }
+        .polish-resizer:hover,
+        .polish-resizer.dragging {
+            background: var(--accent-primary);
+        }
+        .polish-resizer::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 28px;
+            background: #fff;
+            border-radius: 1px;
+            opacity: 0.8;
         }
         .polish-doc-toolbar {
             display: flex;
@@ -103,7 +128,8 @@
         .polish-doc-content {
             flex: 1;
             overflow-y: auto;
-            padding: 40px 60px;
+            padding: 0;
+            background: #f0f0f0;
         }
         .polish-doc-paper {
             max-width: 800px;
@@ -120,16 +146,105 @@
         .polish-doc-paper p { margin: 1em 0; text-indent: 2em; }
         .polish-doc-paper h2 { text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 24px; }
         .polish-doc-paper h3 { font-size: 13pt; font-weight: bold; margin: 20px 0 12px; }
-        .polish-doc-paper.editing { outline: 2px dashed var(--accent-primary); }
+        .polish-doc-paper { outline: 2px dashed var(--accent-primary); }
+
+        /* ===== Doc Editor (共用组件) ===== */
+        .doc-editor-root {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: var(--bg-secondary);
+        }
+        .doc-editor-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+        .doc-editor-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .doc-editor-toolbar-sep {
+            width: 1px;
+            height: 18px;
+            background: var(--border-color);
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+        .doc-editor-toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            width: 30px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .doc-editor-toolbar-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        .doc-editor-toolbar-btn.active {
+            background: var(--accent-light);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .doc-editor-toolbar-btn .btn-label {
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .doc-editor-shell {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 16px;
+            background: #f0f0f0;
+        }
+        .doc-editor-paper {
+            max-width: 800px;
+            min-height: 600px;
+            margin: 0 auto;
+            padding: 50px 60px;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            border-radius: 4px;
+            font-family: "Noto Serif SC", "SimSun", serif;
+            font-size: 14px;
+            line-height: 2;
+            color: #333;
+            outline: none;
+        }
+        .doc-editor-paper:focus {
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.08), 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .doc-editor-paper p { margin: 1em 0; text-indent: 2em; }
+        .doc-editor-paper h2 { text-align: center; font-size: 20pt; font-weight: bold; margin: 0 0 24px; }
+        .doc-editor-paper h3 { font-size: 13pt; font-weight: bold; margin: 20px 0 12px; }
+        .doc-editor-paper ul, .doc-editor-paper ol { margin: 1em 0; padding-left: 2em; }
+        .doc-editor-paper li { margin: 0.3em 0; }
 
         /* ===== Chat Column ===== */
         .polish-chat-col {
-            width: 420px;
-            flex: 0 0 auto;
+            flex: 1;
             display: flex;
             flex-direction: column;
             background: var(--bg-secondary);
             overflow: hidden;
+            min-width: 240px;
         }
         .polish-chat-header {
             padding: 12px 20px;
@@ -225,9 +340,11 @@
             color: var(--text-secondary);
             flex-shrink: 0;
         }
-        .polish-context-row { display: flex; gap: 16px; flex-wrap: wrap; }
-        .polish-context-item { display: flex; align-items: center; gap: 4px; }
-        .polish-context-item i { color: var(--text-muted); font-size: 11px; }
+        .polish-context-row { display: flex; flex-direction: column; gap: 8px; }
+        .polish-context-item { display: flex; align-items: flex-start; gap: 6px; line-height: 1.5; }
+        .polish-context-item i { color: var(--text-muted); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
+        .polish-context-label { color: var(--text-muted); flex-shrink: 0; }
+        .polish-context-value { color: var(--text-secondary); word-break: break-all; }
     </style>
 </head>
 <body>
@@ -266,12 +383,13 @@
                     <span id="editHint" style="color:var(--text-muted);">精修指令将在此区域生效</span>
                 </div>
             </div>
-            <div class="polish-doc-content">
-                <div class="polish-doc-paper" id="docPaper" contenteditable="true">
-                    <p style="color:var(--text-muted);text-align:center;">正在加载文书内容...</p>
-                </div>
+            <div class="polish-doc-content" id="docEditorRoot">
+                <!-- 文档编辑器由 document-polish.js 初始化 -->
             </div>
         </div>
+
+        <!-- Resizer（可拖动分隔条） -->
+        <div class="polish-resizer" id="polishResizer" title="拖动调整宽度"></div>
 
         <!-- Right: Chat -->
         <div class="polish-chat-col">
@@ -299,7 +417,8 @@
     </div>
 
     <script src="../js/common.js?v=30"></script>
-    <script src="../js/case-data.js?v=58"></script>
-    <script src="../js/document-polish.js?v=1"></script>
+    <script src="../js/case-data.js?v=59"></script>
+    <script src="../js/doc-editor.js?v=1"></script>
+    <script src="../js/document-polish.js?v=5"></script>
 </body>
 </html>

@@ -217,7 +217,7 @@
                     <a href="doc-types.html" class="nav-item active"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
                     <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
-                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>提示词管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>文书要求管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item" style="display:none;"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
@@ -252,7 +252,7 @@
                 <div class="page-header">
                     <div class="page-title-wrap">
                         <h1>文书类型管理</h1>
-                        <p>维护各业务系统的文书类型，作为模板与提示词的分类容器</p>
+                        <p>维护各业务系统的文书类型，作为模板与文书要求的分类容器</p>
                     </div>
                     <div class="business-switch">
                         <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
@@ -274,7 +274,7 @@
                                 <th style="width:40px;"></th>
                                 <th>类型名称</th>
                                 <th style="width:90px;">模板数</th>
-                                <th style="width:90px;">提示词数</th>
+                                <th style="width:90px;">文书要求数</th>
                                 <th style="width:90px;">workflow</th>
                                 <th style="width:90px;">状态</th>
                                 <th style="width:180px;">操作</th>
@@ -298,7 +298,7 @@
             <div class="form-row">
                 <label class="form-label">类型名称 <span class="required">*</span></label>
                 <input type="text" class="form-input" id="tplName" placeholder="如：司法建议书">
-                <div class="form-hint" id="nameHint">用于模板和提示词的分类，不可与现有类型重名</div>
+                <div class="form-hint" id="nameHint">用于模板和文书要求的分类，不可与现有类型重名</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
@@ -380,7 +380,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=58"></script>
+    <script src="../../js/case-data.js?v=59"></script>
     <script src="../../js/admin-doc-types.js?v=10"></script>
 </body>
 </html>

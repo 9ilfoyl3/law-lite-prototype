@@ -10,7 +10,7 @@
 2. **材料组织**：案件文件页按分类管理材料、文件问答、材料树操作
 3. **文书生成**：一步生成（材料生成）+ 分步生成（仅裁判文书，6 步硬编码）两种模式，引入案由要件作为可选增强
 4. **文书流转**：文书详情查看、下载打印、文书精修（多轮对话）、历史文书版本管理
-5. **个人配置**：我的要件、我的模板、我的提示词，与系统/管理后台数据分层合并展示
+5. **个人配置**：我的要件、我的模板、我的文书要求，与系统/管理后台数据分层合并展示
 
 > 原型说明：业务系统通过顶部切换按钮（法院 / 检察院 / 司法局）切换，切换后案由树、案字、文书类型/模板、要件、示例案件随之联动。
 
@@ -31,7 +31,7 @@
 | 文书精修 | [pages/document-polish.html](pages/document-polish.html) | 独立页面：左侧文书内容 + 右侧对话式精修，保存为新版本 |
 | 我的要求件 | [pages/my-elements.html](pages/my-elements.html) | 按案由维护用户自定义要件（含案字白名单约束） |
 | 我的模板 | [pages/my-templates.html](pages/my-templates.html) | 用户侧个人文书模板维护，关联文书类型 |
-| 我的提示词 | [pages/my-prompts.html](pages/my-prompts.html) | 用户侧个人提示词维护（含历史版本管理） |
+| 我的文书要求 | [pages/my-prompts.html](pages/my-prompts.html) | 用户侧个人文书要求维护（含历史版本管理） |
 | AI 聊天 | [pages/chat.html](pages/chat.html) | 自然语言交互入口（演示性质，未来以浮窗形式整合） |
 | 历史任务 | [pages/tasks.html](pages/tasks.html) | 按任务类型展示历史任务记录 |
 | 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理（待开发） |
@@ -53,7 +53,7 @@
 | 文书类型管理 | [pages/admin/doc-types.html](pages/admin/doc-types.html) | 文书类型 CRUD + workflow 子配置（仅一步生成型，移除使用模型字段） |
 | 要件管理 | [pages/admin/element-presets.html](pages/admin/element-presets.html) | 标准要件维护（含案字白名单约束、启用/停用） |
 | 文书模板管理 | [pages/admin/doc-templates.html](pages/admin/doc-templates.html) | 文书模板 CRUD（移除案由关联、启用/停用） |
-| 提示词管理 | [pages/admin/prompt-templates.html](pages/admin/prompt-templates.html) | 提示词 CRUD（含历史版本管理、启用/停用） |
+| 文书要求管理 | [pages/admin/prompt-templates.html](pages/admin/prompt-templates.html) | 文书要求 CRUD（含历史版本管理、启用/停用） |
 | 风控与审计 | [pages/admin/risk-audit.html](pages/admin/risk-audit.html) | 敏感词库、审计日志（含拦截记录），支持导出 PDF |
 | 系统初始化配置 | [pages/admin/settings.html](pages/admin/settings.html) | 部署时一次性配置（含批量文书队列允许个数） |
 | 模型配置与用量 | [pages/admin/model-management.html](pages/admin/model-management.html) | 模型部署清单、场景模型配置、配额与用量（V1.1 菜单入口已隐藏，代码保留） |

@@ -72,7 +72,7 @@ function getSafeContextLimit(modelId) {
     return Math.floor(getModelContextLimit(modelId) * getSafetyRatio());
 }
 
-// v1.35: 估算文本 token 数（用于模板正文与提示词）
+// v1.35: 估算文本 token 数（用于模板正文与文书要求）
 // 中文文本近似 1 字符 ≈ 1.5 tokens，英文 1 单词 ≈ 1.3 tokens；这里取简化值 1.5
 function estimateTextTokens(text) {
     if (!text) return 0;
@@ -404,15 +404,29 @@ function matchWorkflowByCaseWordAndCause(workflows, caseWord, cause) {
 
 // 根据案字+案由匹配【分步生成型】workflow，返回其 steps 数组
 // v1.32: 匹配规则升级为案字+案由双维度；steps 字段保留兼容（旧数据），新数据无 steps 时回退到 stepConfigsByOrg
+// v1.36: stepConfigsByOrg 支持按案字分组（对象结构），由 resolveStepsByCaseWord 解析
+//   - entry 为数组时直接返回（兼容旧结构）
+//   - entry 为对象时按 caseWord 精确匹配，未命中取 default，再未命中取第一个非空数组
+function resolveStepsByCaseWord(entry, caseWord) {
+    if (Array.isArray(entry)) return entry;
+    if (!entry || typeof entry !== 'object') return [];
+    if (caseWord && Array.isArray(entry[caseWord]) && entry[caseWord].length > 0) {
+        return entry[caseWord];
+    }
+    if (Array.isArray(entry.default) && entry.default.length > 0) return entry.default;
+    const firstKey = Object.keys(entry).find(k => Array.isArray(entry[k]) && entry[k].length > 0);
+    return firstKey ? entry[firstKey] : [];
+}
+
 function getStepsConfigForDocType(docTypeKey, caseWord, cause) {
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
     const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
     if (workflows.length === 0) {
-        // 回退到内置 stepConfigsByOrg
+        // 回退到内置 stepConfigsByOrg（按案字解析）
         const fallback = (typeof stepConfigsByOrg !== 'undefined'
             && stepConfigsByOrg[org]
             && stepConfigsByOrg[org][docTypeKey]) || [];
-        return fallback;
+        return resolveStepsByCaseWord(fallback, caseWord);
     }
     const matched = matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
     if (matched && Array.isArray(matched.steps) && matched.steps.length > 0) {
@@ -422,7 +436,7 @@ function getStepsConfigForDocType(docTypeKey, caseWord, cause) {
     const fallback = (typeof stepConfigsByOrg !== 'undefined'
         && stepConfigsByOrg[org]
         && stepConfigsByOrg[org][docTypeKey]) || [];
-    return fallback;
+    return resolveStepsByCaseWord(fallback, caseWord);
 }
 
 // 统计某文书类型下的 workflow 数量（供管理后台表格显示）
@@ -581,9 +595,9 @@ function getTemplateName(tpl) {
     return tpl.name || '';
 }
 
-// v1.13: 获取「提示词」提示词模板
+// v1.13: 获取「文书要求」文书要求模板
 // 优先级：管理后台 adminPromptTemplates（为空回退默认） + 用户侧 myPromptTemplates（追加，标记 source='mine'）
-// v1.23: 过滤掉 enabled === false 的项；内置提示词停用记录于 __builtinDisabled__ 字典
+// v1.23: 过滤掉 enabled === false 的项；内置文书要求停用记录于 __builtinDisabled__ 字典
 function getReqTemplates(org, docTypeKey) {
     // 基础数据：admin 或默认
     let base = [];
@@ -604,7 +618,7 @@ function getReqTemplates(org, docTypeKey) {
     if (useDefault) {
         const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
         base = defaults.slice();
-        // 内置提示词停用：读取 __builtinDisabled__ 字典，过滤对应 index
+        // 内置文书要求停用：读取 __builtinDisabled__ 字典，过滤对应 index
         try {
             const adminData = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
             const orgData = adminData[org] || {};
@@ -1194,7 +1208,7 @@ function getAllElementPresets(cause, org, caseWord) {
     return { standard, mine };
 }
 
-// 提示词内置模板，按业务系统 × 文书类型分组
+// 文书要求内置模板，按业务系统 × 文书类型分组
 const defaultRequirementTemplates = {
     court: {
         judgment: [

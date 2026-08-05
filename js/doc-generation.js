@@ -1024,7 +1024,7 @@ function getRespondentItems(cause, c) {
 
 // --- 复议决定（司法局）---
 function getDecisionItems(cause, c, requirement) {
-    // 根据提示词或默认作出维持决定
+    // 根据文书要求或默认作出维持决定
     if (requirement && (requirement.includes('撤销') || requirement.includes('违法'))) {
         return [
             `经审查，${c.partyB}作出的原行政行为主要事实不清、证据不足；`,
