@@ -1155,8 +1155,8 @@ function openBatchFullscreen() {
 
 function closeBatchFullscreen() {
     if (batchState.timerInterval) {
-        if (!confirm('批量任务正在执行，离开将停止。确定返回吗？')) return;
-        stopBatchTimer();
+        // v2.32: 批量任务后台执行——关闭面板不中断任务，仅提示用户
+        showNotification('批量任务将在后台继续执行，可在顶部「任务通知」查看进度', 'info');
     }
     document.getElementById('batchFullscreen').classList.remove('show');
 }
@@ -1294,7 +1294,7 @@ function renderBatchConfig() {
         </button>
 
         <div style="margin-top:16px;padding:14px;background:#fff7ed;border-radius:10px;font-size:12px;color:#9a3412;line-height:1.65;">
-            <i class="fas fa-info-circle"></i> 批量任务将串行执行，您可以等待完成或返回案件列表处理其他事务。完成后可统一下载。
+            <i class="fas fa-info-circle"></i> 批量任务将在后台串行执行，您可以关闭此面板返回案件列表处理其他事务。完成后通过顶部「任务通知」查看结果并统一下载。
         </div>
     `;
 
@@ -1389,11 +1389,11 @@ function renderBatchRunning() {
                 <div class="batch-running-icon"><i class="fas fa-cogs"></i></div>
                 <div class="batch-running-info">
                     <h3>批量生成进行中...</h3>
-                    <p id="batchProgressText">正在处理 0/${results.length} 个案件</p>
+                    <p id="batchProgressText">正在处理 ${batchState.completedCount + batchState.failedCount}/${results.length} 个案件</p>
                 </div>
             </div>
             <div class="batch-running-right">
-                <div class="batch-running-time" id="batchElapsedTime">00:00</div>
+                <div class="batch-running-time" id="batchElapsedTime">${formatBatchTime(batchState.totalElapsed || 0)}</div>
                 <div class="batch-running-label">已用时</div>
             </div>
         </div>
@@ -1419,6 +1419,9 @@ function renderBatchItem(result, idx) {
 }
 
 function updateBatchRunningUI() {
+    // v2.32: 面板关闭后不操作 DOM，仅靠任务通知徽章展示进度
+    const batchFullscreen = document.getElementById('batchFullscreen');
+    if (!batchFullscreen || !batchFullscreen.classList.contains('show')) return;
     const listEl = document.getElementById('batchQueueList');
     if (listEl) listEl.innerHTML = batchState.results.map((r, i) => renderBatchItem(r, i)).join('');
     const progressEl = document.getElementById('batchProgressText');
@@ -1560,9 +1563,12 @@ async function runBatchAsync(taskId) {
         docTitle: `${baseTitle} · 成功 ${batchState.completedCount} 个 · 共 ${totalWordsForHistory.toLocaleString()} 字`
     });
 
-    // 渲染结果总览页，确保"生成结果明细"有数据
-    renderBatchDone();
+    // v2.32: 若全屏面板仍打开，渲染结果总览页；否则仅停止计时器，用户通过任务通知查看结果
     stopBatchTimer();
+    const batchFullscreen = document.getElementById('batchFullscreen');
+    if (batchFullscreen && batchFullscreen.classList.contains('show')) {
+        renderBatchDone();
+    }
 }
 
 function updateBatchTaskProgress(taskId, progress, success, failed) {
@@ -1612,9 +1618,10 @@ function renderBatchTaskPanel() {
         const statusCls = isRunning ? 'running' : 'done';
         const time = new Date(t.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         // v2.24: 已完成任务展示"查看结果"按钮，跳转结果总览页
+        // v2.33: 运行中任务展示"查看进度"按钮，跳转全屏进度页
         const resultBtn = !isRunning
             ? `<button class="batch-task-failed-btn" style="background:var(--accent-primary,#2563eb);" onclick="showBatchTaskResult('${t.id}')">查看结果</button>`
-            : '';
+            : `<button class="batch-task-failed-btn" style="background:#f59e0b;" onclick="showBatchTaskProgress('${t.id}')">查看进度</button>`;
         const failedHint = !isRunning && (t.failed || 0) > 0
             ? `<div class="batch-task-failed-hint">有 ${t.failed} 个失败案件，请在结果详情中处理</div>`
             : '';
@@ -1634,6 +1641,27 @@ function renderBatchTaskPanel() {
 }
 
 // v2.24: 从任务通知面板打开结果总览页
+// v2.33: 从任务通知面板查看进行中任务的实时进度
+function showBatchTaskProgress(taskId) {
+    // 关闭任务通知面板
+    const panel = document.getElementById('batchTaskPanel');
+    if (panel) panel.classList.remove('show');
+
+    // 打开批量全屏面板
+    const fullscreen = document.getElementById('batchFullscreen');
+    if (!fullscreen) return;
+    fullscreen.classList.add('show');
+
+    // batchState 仍是当前运行中任务的状态（同一页面内只有一个 running 任务）
+    // 重新渲染执行中视图
+    renderBatchRunning();
+
+    // 若计时器已停（异常情况），重启
+    if (!batchState.timerInterval) {
+        startBatchTimer();
+    }
+}
+
 function showBatchTaskResult(taskId) {
     const state = getBatchQueueState();
     const task = state.tasks.find(t => t.id === taskId);
