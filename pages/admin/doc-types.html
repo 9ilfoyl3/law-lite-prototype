@@ -169,6 +169,25 @@
         .wf-id-select:disabled { background: var(--bg-primary); cursor: not-allowed; color: var(--text-muted); }
         .wf-name-readonly { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-primary); color: var(--text-muted); font-family: inherit; box-sizing: border-box; }
 
+        /* v1.38 (V1.1.2): workflow 文书格式约束子配置 */
+        .wf-format-section { border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; background: var(--bg-primary); }
+        .wf-format-section-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .wf-format-section-title i { color: var(--accent-primary); font-size: 12px; }
+        .wf-format-section-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+        .wf-format-upload-area { border: 1px dashed var(--border-color); border-radius: 8px; padding: 18px 14px; text-align: center; cursor: pointer; transition: all 0.15s; color: var(--text-secondary); background: var(--bg-secondary); }
+        .wf-format-upload-area:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--accent-light); }
+        .wf-format-upload-area i { font-size: 24px; margin-bottom: 4px; display: block; }
+        .wf-format-upload-title { font-size: 13px; font-weight: 500; }
+        .wf-format-upload-hint { font-size: 11px; margin-top: 2px; }
+        .wf-format-file-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; }
+        .wf-format-status { font-size: 12px; color: var(--text-primary); font-weight: 500; margin-right: auto; display: flex; align-items: center; gap: 6px; }
+        .wf-format-status i { color: var(--accent-success); }
+        .wf-format-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .wf-format-empty { font-size: 12px; color: var(--text-muted); padding: 8px 0; }
+        .action-btn.view { color: var(--text-secondary); border-color: var(--border-color); }
+        .action-btn.view:hover { background: #f3f4f6; }
+        .action-btn:disabled, .action-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
         /* 案字/案由选择 */
         .case-word-option { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; cursor: pointer; background: var(--bg-secondary); color: var(--text-secondary); user-select: none; }
         .case-word-option:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
@@ -371,6 +390,17 @@
                     节点序列由 agentflow 平台 workflow 内部决定。一步生成型 workflow 在用户"一步生成" tab 中输入参数后直接输出文书；分步生成型 workflow 由内置默认提供，用户在"分步生成" tab 中按节点逐个确认，无需在管理后台配置。
                 </div>
             </div>
+            <!-- v1.38 (V1.1.2): workflow 文书格式约束子配置（一个 workflow 对应一个格式骨架，仅管理后台可见） -->
+            <div class="form-row" id="wfFormatRow">
+                <div class="wf-format-section">
+                    <div class="wf-format-section-title"><i class="fas fa-file-contract"></i>文书格式约束（格式骨架）</div>
+                    <div class="wf-format-section-hint">为该 workflow 配置一个文书格式骨架（带占位符，如 {{courtName}}、{{caseNumber}} 等）。文书生成第二步将按此骨架套版填充占位符。不配置则直接输出 AI 生成内容。仅管理后台可见。</div>
+                    <div id="wfFormatContent">
+                        <!-- 由 JS 渲染：未配置时显示上传区；已配置时显示文件操作 -->
+                    </div>
+                    <input type="file" id="wfFormatFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleWfFormatFileUpload(event)">
+                </div>
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeWfModal()">取消</button>
                 <button class="btn btn-confirm" onclick="saveWorkflow()">保存</button>
@@ -380,7 +410,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=59"></script>
-    <script src="../../js/admin-doc-types.js?v=10"></script>
+    <script src="../../js/case-data.js?v=60"></script>
+    <script src="../../js/admin-doc-types.js?v=12"></script>
 </body>
 </html>

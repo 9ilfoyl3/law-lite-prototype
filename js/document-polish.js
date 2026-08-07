@@ -1,9 +1,8 @@
 // ============ 文书精修页面 ============
-// v1.2 左侧文书区接入 DocEditor 可复用文档编辑器，支持工具栏格式化与直接编辑
 // v1.1 精修独立页面：左侧文书内容展示区 + 右侧对话式精修区
 // 通过 URL 参数 caseId + versionId 加载对应版本
 // 精修结果保存为新版本（type='polish'），不覆盖原版本
-// 上下文区展示已选材料名与文书要求，移除固定文书类型/模型名展示
+// v1.1 上下文区展示已选材料名与文书要求，移除固定文书类型/模型名展示
 
 let polishCaseId = '';
 let polishVersionId = '';
@@ -14,7 +13,6 @@ let originalContent = '';      // 原始文书内容（用于撤销）
 let currentContent = '';       // 当前文书内容
 let editHistory = [];          // 精修历史（用于多步撤销）
 let hasUnsavedChanges = false; // 是否有未保存的修改
-let docEditor = null;          // 左侧文档编辑器实例
 
 // ===== 初始化 =====
 function initPolishPage() {
@@ -77,7 +75,7 @@ function loadFromContext(ctx) {
     document.getElementById('polishDocTitle').textContent = ctx.docTitle || '法律文书';
     document.getElementById('polishCaseName').textContent = ctx.caseName || '';
     document.getElementById('versionTag').textContent = '未保存';
-    initDocEditor(currentContent || '<p style="color:var(--text-muted);">暂无内容</p>');
+    document.getElementById('docPaper').innerHTML = currentContent || '<p style="color:var(--text-muted);">暂无内容</p>';
     renderContextInfo(ctx);
 }
 
@@ -92,32 +90,10 @@ function renderPolishPage() {
     const versionNo = idx >= 0 ? `v${versions.length - idx}` : '原版本';
     document.getElementById('versionTag').textContent = versionNo;
 
-    // 文书内容：使用可复用文档编辑器
-    initDocEditor(currentContent || '<p style="color:var(--text-muted);">暂无内容</p>');
+    // 文书内容
+    document.getElementById('docPaper').innerHTML = currentContent || '<p style="color:var(--text-muted);">暂无内容</p>';
 
     renderContextInfo();
-}
-
-// 初始化/复用左侧文档编辑器
-function initDocEditor(content) {
-    const root = document.getElementById('docEditorRoot');
-    if (!root) return;
-    if (docEditor) {
-        docEditor.setContent(content);
-    } else if (typeof DocEditor !== 'undefined') {
-        docEditor = new DocEditor(root, {
-            content: content,
-            placeholder: '暂无内容',
-            showToolbar: true,
-            onChange: (html) => {
-                currentContent = html;
-                hasUnsavedChanges = true;
-                document.getElementById('editHint').textContent = '有未保存的精修改动';
-            }
-        });
-    } else {
-        root.innerHTML = `<div class="polish-doc-paper">${content}</div>`;
-    }
 }
 
 // 渲染上下文信息（案件名、已选材料、文书要求）
@@ -126,10 +102,9 @@ function renderContextInfo(ctx) {
     const caseName = ctx?.caseName || polishCaseItem?.caseName || '';
     const caseNumber = ctx?.caseNumber || polishCaseItem?.caseNumber || '';
 
-    // 从版本配置或 fallback 上下文中解析已选材料名与文书要求
-    const materialIds = cfg.materialIds || ctx?.materialIds || [];
-    const materialNames = getMaterialNamesByIds(materialIds);
-    const promptText = cfg.prompt || ctx?.prompt || '';
+    // 从版本配置中解析已选材料名
+    const materialNames = getMaterialNamesByIds(cfg.materialIds);
+    const promptText = cfg.prompt || '';
 
     // 案件名
     let contextHtml = `
@@ -176,8 +151,7 @@ function getMaterialNamesByIds(ids) {
 }
 
 function showError(msg) {
-    const root = document.getElementById('docEditorRoot');
-    if (root) root.innerHTML = `<div class="polish-doc-paper"><p style="color:#dc2626;text-align:center;">${msg}</p></div>`;
+    document.getElementById('docPaper').innerHTML = `<p style="color:#dc2626;text-align:center;">${msg}</p>`;
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('saveBtn').disabled = true;
 }
@@ -219,10 +193,9 @@ function sendPolishMessage() {
         currentContent = currentContent + editNote;
 
         // 更新文书展示
-        if (docEditor) {
-            docEditor.setContent(currentContent);
-        }
-        document.getElementById('editHint').textContent = '有未保存的精修改动';
+        const paper = document.getElementById('docPaper');
+        paper.innerHTML = currentContent;
+        paper.classList.add('editing');
 
         // 助手回复
         const replies = [
@@ -269,14 +242,15 @@ function undoLastEdit() {
         return;
     }
     currentContent = editHistory.pop();
-    if (docEditor) {
-        docEditor.setContent(currentContent);
-    }
+    document.getElementById('docPaper').innerHTML = currentContent;
     if (editHistory.length === 0) {
         document.getElementById('undoBtn').disabled = true;
+        document.getElementById('docPaper').classList.remove('editing');
     }
     hasUnsavedChanges = editHistory.length > 0;
-    document.getElementById('editHint').textContent = hasUnsavedChanges ? '有未保存的精修改动' : '精修指令将在此区域生效';
+    if (!hasUnsavedChanges) {
+        document.getElementById('editHint').textContent = '精修指令将在此区域生效';
+    }
     showNotification('已撤销上一步精修', 'success');
 }
 
@@ -288,7 +262,8 @@ function saveAsNewVersion() {
     }
 
     // 获取编辑区最新内容（支持用户手动编辑）
-    const latestContent = docEditor ? docEditor.getContent() : currentContent;
+    const paper = document.getElementById('docPaper');
+    const latestContent = paper.innerHTML;
 
     // 从原版本继承配置
     const origCfg = polishVersion?.config || {};

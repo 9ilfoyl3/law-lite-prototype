@@ -1536,18 +1536,34 @@ function doGenerateByMaterial(elementAnswers) {
     // v2.23 (任务 8.8/9.5): 流式输出展示
     const template = document.getElementById('matTemplate').value;
     const docTypeName = getCurrentDocTypes()[docType]?.name || '';
-    const templateName = getCurrentTemplates()[template]?.name || '';
-    const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers);
+    const templateObj = getCurrentTemplates()[template] || {};
+    const templateName = templateObj.name || '';
+    // V1.1.2: 取模板 content（内容参考文本）作为第一步生成的结构指引
+    const templateContent = templateObj.content || '';
+    // V1.1.2: 匹配当前文书类型+案字+案由对应的【一步生成型】workflow，取 workflowId 用于第二步套格式骨架
+    const caseWord = extractCaseWordFromCaseNumber();
+    const cause = extractCauseFromCase();
+    let workflowId = '';
+    try {
+        const matchedWf = (typeof getMaterialWorkflowByCaseWord === 'function')
+            ? getMaterialWorkflowByCaseWord(org, docType, caseWord, cause)
+            : null;
+        workflowId = (matchedWf && matchedWf.id) ? matchedWf.id : '';
+    } catch (e) { /* ignore */ }
+    const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers, templateContent, workflowId);
 
     startStreamingOutput(fullContent, templateName);
 }
 
 // 生成 Mock 文书内容
-function generateMockDocument(caseData, orgType, docTypeName, templateName, elementAnswers) {
+// V1.1.2: 两步生成流程——第一步按模板 content 内容指引生成；第二步按匹配 workflow 的格式骨架套版填充占位符
+function generateMockDocument(caseData, orgType, docTypeName, templateName, elementAnswers, templateContent, workflowId) {
     const cause = caseData.cause || '纠纷';
     const caseName = caseData.caseName || caseData.caseNumber || '';
+    const caseNumber = caseData.caseNumber || '';
     const partyA = caseData.partyA || '原告';
     const partyB = caseData.partyB || '被告';
+    const courtName = caseData.courtName || 'XX人民法院';
     const title = templateName || docTypeName || '法律文书';
 
     let elementHint = '';
@@ -1556,6 +1572,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
         elementHint = `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-puzzle-piece"></i> 已引入案由要件辅助生成：${names}</div>`;
     }
 
+    // ===== 特殊类型分支：材料总结（保持原有逻辑，不参与两步生成）=====
     if (docTypeName === '材料总结') {
         return `<div class="result-doc">
             <h2>${title}</h2>
@@ -1576,23 +1593,260 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
         </div>`;
     }
 
+    // ===== 第一步·按模板 content 内容指引生成 =====
+    // 支持两种模板格式：
+    //   A. 完整文书结构（含 [占位符]，如裁判文书模板）→ 替换 [占位符] 后直接作为完整文书输出
+    //   B. 板块列表（"1. 板块名：描述"格式）→ 按板块生成正文，可继续第二步套格式骨架
+    //   C. 空模板 → 回退默认 4 段结构，可继续第二步套格式骨架
+    const sections = parseTemplateSections(templateContent);
+    let bodyHtml = '';
+    let isFullDocTemplate = false;  // 标记是否为完整文书结构模板（A 类）
+
+    if (sections.length > 0) {
+        // B 类：板块列表格式
+        const cnNums = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+        sections.forEach((sec, idx) => {
+            const num = cnNums[idx] || (idx + 1);
+            bodyHtml += `<h3>${num}、${escapeHtmlForStreaming(sec.title)}</h3>`;
+            bodyHtml += `<p>${generateSectionContent(sec.title, sec.desc, caseData, orgType)}</p>`;
+        });
+    } else if (templateContent && templateContent.trim()) {
+        // A 类：完整文书结构模板（含 [占位符]）——替换 [占位符] 后直接输出，跳过第二步套格式骨架
+        isFullDocTemplate = true;
+        bodyHtml = applyTemplateContent(templateContent, {
+            cause, caseName, caseNumber, partyA, partyB, courtName, orgType
+        });
+    } else {
+        // C 类：空模板回退默认 4 段结构
+        bodyHtml = `<h3>一、案件基本情况</h3>
+            <p>经审理查明，${partyA}与${partyB}因${cause}产生纠纷。根据已选材料分析，案件基本事实如下...</p>
+            <h3>二、证据分析</h3>
+            <p>根据当事人提交的证据材料，本院对证据的真实性、合法性、关联性进行了审查...</p>
+            <h3>三、本院认为</h3>
+            <p>本院认为，本案的争议焦点在于${cause}的相关事实认定和法律适用...</p>
+            <h3>四、判决/决定结果</h3>
+            <p>综上，依照相关法律规定，本院作出如下判决/决定...</p>`;
+    }
+
+    // A 类完整文书模板：第一步已生成完整文书，直接返回（不再套格式骨架，避免框架重复）
+    if (isFullDocTemplate) {
+        return `<div class="result-doc">
+            <div class="result-doc-meta" style="margin-bottom:8px;">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
+            ${elementHint}
+            ${bodyHtml}
+        </div>`;
+    }
+
+    // ===== 第二步·按匹配 workflow 的格式骨架套版填充占位符 =====
+    let formatSkeleton = null;
+    try {
+        if (workflowId && typeof getAdminWorkflowFormat === 'function') {
+            formatSkeleton = getAdminWorkflowFormat(orgType, workflowId);
+        }
+    } catch (e) { /* ignore */ }
+
+    if (formatSkeleton && formatSkeleton.content) {
+        return applyFormatSkeleton(formatSkeleton.content, {
+            title, caseName, caseNumber, cause, partyA, partyB, courtName,
+            bodyHtml, elementHint, orgType
+        });
+    }
+
+    // 未配置格式骨架时直接输出第一步内容
     return `<div class="result-doc">
         <h2>${title}</h2>
         <div class="result-doc-meta">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
         <p>案由：${cause}</p>
         <p>当事人：${partyA} 与 ${partyB}</p>
         ${elementHint}
-        <h3>一、案件基本情况</h3>
-        <p>经审理查明，${partyA}与${partyB}因${cause}产生纠纷。根据已选材料分析，案件基本事实如下...</p>
-        <h3>二、证据分析</h3>
-        <p>根据当事人提交的证据材料，本院对证据的真实性、合法性、关联性进行了审查...</p>
-        <h3>三、本院认为</h3>
-        <p>本院认为，本案的争议焦点在于${cause}的相关事实认定和法律适用...</p>
-        <h3>四、判决/决定结果</h3>
-        <p>综上，依照相关法律规定，本院作出如下判决/决定...</p>
+        ${bodyHtml}
         <p style="text-align:right;margin-top:32px;">${getSignerLabel(orgType)}</p>
         <p style="text-align:right;">${new Date().toLocaleDateString('zh-CN')}</p>
     </div>`;
+}
+
+// V1.1.2: 替换模板 content 中的 [占位符] 为 mock 数据（A 类完整文书模板专用）
+// [占位符] 为描述性占位符（给 AI 看的格式要求），mock 阶段按关键词匹配替换为真实/mock 数据
+function applyTemplateContent(templateContent, ctx) {
+    const cause = ctx.cause || '纠纷';
+    const partyA = ctx.partyA || '原告';
+    const partyB = ctx.partyB || '被告';
+    const courtName = ctx.courtName || 'XX人民法院';
+    const caseNumber = ctx.caseNumber || '';
+    const signer = getSignerLabel(ctx.orgType);
+    const now = new Date();
+    const year = now.getFullYear();
+    const p = n => (n < 10 ? '0' + n : '' + n);
+    const dateStr = `${year}年${p(now.getMonth() + 1)}月${p(now.getDate())}日`;
+    const cnDateStr = `${year}年${p(now.getMonth() + 1)}月${p(now.getDate())}日`;
+
+    // 从案号提取案字代字与案号（如（2025）苏0105民初123号 → 苏0105 / 民初 / 123）
+    let caseWord = 'XX', caseSeq = 'XXX';
+    const cnMatch = caseNumber.match(/[（(](\d{4})[)）](\S+?)(民初|民终|刑初|刑终|行初|行终|执|赔|监)(\d+)号/);
+    if (cnMatch) {
+        caseWord = cnMatch[2];
+        caseSeq = cnMatch[4];
+    }
+
+    // 通用 mock 数据
+    const mockAddr = 'XX市XX区XX路XX号';
+    const mockId = 'XXXXXXXXXXXXXXXXXX';
+    const mockBirth = 'XXXX年XX月XX日';
+    const mockNation = '汉族';
+    const mockGender = '男';
+    const mockAgent = '张XX';
+    const mockLawFirm = 'XX律师事务所律师';
+    const mockCompanyPos = '该公司总经理';
+    const mockLegalRep = '李XX';
+    const mockClerk = '王XX';
+    const mockAssistant = '赵XX';
+    const mockProcedure = '简易程序';
+    const mockCourtSession = '如期到庭参加诉讼';
+
+    // 按 [占位符] 内容关键词匹配替换；未匹配的 [占位符] 替换为 "……"
+    let out = templateContent;
+    // 先替换包含具体格式的复合占位符（优先级高，避免被通用规则误替换）
+    const complexRules = [
+        [/\[法院名称[：:][^\]]*\]/g, courtName],
+        [/\[原告名称\]/g, partyA],
+        [/\[原告姓名\]/g, partyA],
+        [/\[被告名称\]/g, partyB],
+        [/\[被告姓名\]/g, partyB],
+        [/\[原告住所地\]/g, mockAddr],
+        [/\[原告现住址\]/g, mockAddr],
+        [/\[被告住所地\]/g, mockAddr],
+        [/\[被告现住址\]/g, mockAddr],
+        [/\[法定代表人姓名\]/g, mockLegalRep],
+        [/\[该公司职位[^\]]*\]/g, mockCompanyPos],
+        [/\[原告性别\]/g, mockGender],
+        [/\[被告性别\]/g, mockGender],
+        [/\[XXXX年XX月XX日出生\]/g, mockBirth],
+        [/\[原告民族\]/g, mockNation],
+        [/\[被告民族\]/g, mockNation],
+        [/\[原告公民身份号码\]/g, mockId],
+        [/\[被告公民身份号码\]/g, mockId],
+        [/\[原告委托诉讼代理人姓名\]/g, mockAgent],
+        [/\[被告委托诉讼代理人姓名\]/g, mockAgent],
+        [/\[XX律所律师[^\]]*\]/g, mockLawFirm],
+        [/\[年份\]/g, String(year)],
+        [/\[案字代字\]/g, caseWord],
+        [/\[案号\]/g, caseSeq],
+        [/\[案由\]/g, cause],
+        [/\[立案日期XXXX年XX月XX日\]/g, dateStr],
+        [/\[开庭日期XXXX年XX月XX日\]/g, dateStr],
+        [/\[适用程序\]/g, mockProcedure],
+        [/\[审判员XXX\]/g, signer],
+        [/\[审判员姓名\]/g, signer],
+        [/\[原告方到庭情况\]/g, `${partyA}${mockCourtSession}`],
+        [/\[被告方到庭情况\]/g, `${partyB}${mockCourtSession}`],
+        [/\[原告诉讼请求[^\]]*\]/g, '1、……；2、……；3、……（结合材料按原文输出）'],
+        [/\[按照原文内容输出事实与理由[^\]]*\]/g, '（结合材料按原文输出事实与理由，不总结、不遗漏）……'],
+        [/\[被告答辩内容[^\]]*\]/g, '（引用原文内容输出被告答辩）……'],
+        [/\[经审理查明的案件事实[^\]]*\]/g, `经审理查明：${partyA}与${partyB}因${cause}产生纠纷……（结合材料认定案件事实）`],
+        [/\[从法院角度[^\]]*\]/g, `本院认为，本案的争议焦点在于${cause}的相关事实认定和法律适用……（结合要件与证据逐一分析、采纳或不采纳）`],
+        [/\[结合本案事实及法律法规[^\]]*\]/g, '结合本案事实及法律法规进行综合论述……'],
+        [/\[相关法律法规及条款\]/g, '相关法律法规及条款'],
+        [/\[判决主文第一项\]/g, '……'],
+        [/\[判决主文第二项\]/g, '……'],
+        [/\[XXX\]/g, 'XXX'],
+        [/\[负担方\]/g, partyB],
+        [/\[上级法院名称\]/g, 'XX市中级人民法院'],
+        [/\[二○XX年XX月XX日\]/g, cnDateStr],
+        [/\[法官助理姓名\]/g, mockAssistant],
+        [/\[书记员姓名\]/g, mockClerk],
+        // 程序段（含嵌套占位符的整段）
+        [/\[原告XXXXXX[^\]]*\]/g, `${partyA}诉${partyB}${cause}一案，本院于${dateStr}立案后，依法适用${mockProcedure}由${signer}公开开庭进行了审理。${partyA}与${partyB}均${mockCourtSession}，本案现已审理终结。`]
+    ];
+    complexRules.forEach(([reg, val]) => { out = out.replace(reg, val); });
+    // 剩余未匹配的 [占位符] 替换为 "……"
+    out = out.replace(/\[[^\]]*\]/g, '……');
+
+    // 纯文本转 HTML：按空行分段为 <p>，保留换行
+    const paragraphs = out.split(/\n\s*\n/);
+    const html = paragraphs.map(para => {
+        const trimmed = para.trim();
+        if (!trimmed) return '';
+        return '<p style="line-height:1.9;margin:0 0 12px 0;">' + escapeHtmlForStreaming(trimmed).replace(/\n/g, '<br>') + '</p>';
+    }).join('');
+    return html;
+}
+
+// V1.1.2: 解析模板 content 中的板块列表
+// 支持格式："1. 板块名：描述" 或 "1. 板块名" （冒号后为描述）
+function parseTemplateSections(templateContent) {
+    if (!templateContent || !templateContent.trim()) return [];
+    const sections = [];
+    const lines = templateContent.split(/\r?\n/);
+    const reg = /^\s*\d+[\.、\)]\s*(.+?)$/;
+    for (const line of lines) {
+        const m = line.match(reg);
+        if (m) {
+            const rest = m[1].trim();
+            const parts = rest.split(/[：:]/);
+            const title = (parts[0] || '').trim();
+            const desc = parts.slice(1).join('：').trim();
+            if (title) sections.push({ title, desc });
+        }
+    }
+    return sections;
+}
+
+// V1.1.2: 根据板块名生成 mock 内容（按关键词匹配）
+function generateSectionContent(title, desc, caseData, orgType) {
+    const cause = caseData.cause || '纠纷';
+    const partyA = caseData.partyA || '原告';
+    const partyB = caseData.partyB || '被告';
+    const t = (title || '');
+    if (t.indexOf('诉请') >= 0 || t.indexOf('诉讼请求') >= 0 || t.indexOf('原告诉') >= 0) {
+        return `${partyA}提出诉讼请求：...（结合材料归纳原告的诉讼请求及事实理由）`;
+    }
+    if (t.indexOf('答辩') >= 0 || t.indexOf('抗辩') >= 0 || t.indexOf('被告诉') >= 0 || t.indexOf('上诉人') >= 0) {
+        return `${partyB}答辩：...（结合材料归纳被告的答辩意见及抗辩理由）`;
+    }
+    if (t.indexOf('争议焦点') >= 0 || t.indexOf('争议') >= 0) {
+        return `本案争议焦点为：...（结合双方主张提炼核心争议）`;
+    }
+    if (t.indexOf('事实') >= 0 && t.indexOf('认定') >= 0) {
+        return `经审理查明：${partyA}与${partyB}因${cause}产生纠纷...（结合材料认定案件事实）`;
+    }
+    if (t.indexOf('事实') >= 0) {
+        return `经审理查明：${partyA}与${partyB}因${cause}产生纠纷...（结合材料归纳案件事实）`;
+    }
+    if (t.indexOf('理由') >= 0 || t.indexOf('认为') >= 0) {
+        return `本院认为，本案的争议焦点在于${cause}的相关事实认定和法律适用...（结合要件与证据进行说理）`;
+    }
+    if (t.indexOf('裁判结果') >= 0 || t.indexOf('判决') >= 0 || t.indexOf('主文') >= 0) {
+        return `综上，依照相关法律规定，判决如下：...（裁判主文）`;
+    }
+    if (desc) {
+        return `${desc}（结合材料生成具体内容）`;
+    }
+    return `（结合材料生成${title}相关内容）`;
+}
+
+// V1.1.2: 按格式骨架套版填充占位符
+// 支持占位符：{{courtName}} {{caseNumber}} {{caseName}} {{cause}} {{partyA}} {{partyB}}
+//             {{title}} {{body}} {{signer}} {{date}} {{elementHint}}
+function applyFormatSkeleton(skeleton, ctx) {
+    let out = skeleton;
+    const dateStr = new Date().toLocaleDateString('zh-CN');
+    const replacements = {
+        '{{courtName}}': ctx.courtName || '',
+        '{{caseNumber}}': ctx.caseNumber || '',
+        '{{caseName}}': ctx.caseName || '',
+        '{{cause}}': ctx.cause || '',
+        '{{partyA}}': ctx.partyA || '',
+        '{{partyB}}': ctx.partyB || '',
+        '{{title}}': ctx.title || '',
+        '{{body}}': ctx.bodyHtml || '',
+        '{{signer}}': getSignerLabel(ctx.orgType),
+        '{{date}}': dateStr,
+        '{{elementHint}}': ctx.elementHint || ''
+    };
+    Object.entries(replacements).forEach(([k, v]) => {
+        out = out.split(k).join(v);
+    });
+    return `<div class="result-doc">${out}</div>`;
 }
 
 function getSignerLabel(orgType) {

@@ -115,6 +115,119 @@
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    // v1.38 (V1.1.2): workflow 格式约束相关工具
+    function nowTime() {
+        const d = new Date();
+        const p = n => (n < 10 ? '0' + n : '' + n);
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+            + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function downloadTextFile(text, filename) {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+    function previewTextInWindow(title, text) {
+        const w = window.open('', '_blank');
+        if (!w) {
+            showNotification('预览窗口被浏览器拦截，请允许弹窗', 'warning');
+            return;
+        }
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+            <style>body{font-family:'Noto Sans SC',-apple-system,sans-serif;padding:32px;line-height:1.8;max-width:720px;margin:0 auto;color:#1a1a2e;white-space:pre-wrap;word-break:break-word;}</style>
+            </head><body>${escapeHtml(text)}</body></html>`;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    }
+    // v1.38: 渲染 workflow 格式约束区（未配置→上传区；已配置→文件操作）
+    function renderWfFormatContent() {
+        const el = document.getElementById('wfFormatContent');
+        if (!el) return;
+        const hasContent = pendingWfFormatContent.length > 0;
+        if (!hasContent) {
+            el.innerHTML = '<div class="wf-format-upload-area" onclick="document.getElementById(\'wfFormatFileInput\').click()">'
+                + '<i class="fas fa-cloud-upload-alt"></i>'
+                + '<div class="wf-format-upload-title">点击上传格式骨架文件</div>'
+                + '<div class="wf-format-upload-hint">支持 .txt / .doc / .docx 格式；内容将解析为纯文本并持久化</div>'
+                + '</div>';
+            return;
+        }
+        const fileName = pendingWfFormatFileName || '格式骨架.txt';
+        el.innerHTML = '<div class="wf-format-file-actions">'
+            + '<span class="wf-format-status"><i class="fas fa-check-circle"></i>' + escapeHtml(fileName) + '</span>'
+            + '<div class="wf-format-actions">'
+            + '<button class="action-btn view" onclick="previewWfFormat()">预览</button>'
+            + '<button class="action-btn view" onclick="downloadWfFormat()">下载</button>'
+            + '<button class="action-btn view" onclick="reuploadWfFormat()">重新上传</button>'
+            + '<button class="action-btn delete" onclick="clearWfFormat()">清除</button>'
+            + '</div>'
+            + '</div>';
+    }
+    // v1.38: 文件上传处理（原型阶段仅解析 .txt；doc/docx 提示需配套解析能力）
+    window.handleWfFormatFileUpload = function(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const name = file.name || '';
+        const ext = name.split('.').pop().toLowerCase();
+        if (!['txt', 'doc', 'docx'].includes(ext)) {
+            showNotification('仅支持 .txt / .doc / .docx 格式', 'warning');
+            event.target.value = '';
+            return;
+        }
+        if (ext === 'txt') {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingWfFormatContent = (e.target.result || '').toString();
+                pendingWfFormatFileName = name;
+                renderWfFormatContent();
+                showNotification('格式骨架已读取', 'success');
+            };
+            reader.onerror = function() {
+                showNotification('文件读取失败', 'error');
+            };
+            reader.readAsText(file, 'utf-8');
+        } else {
+            // doc/docx 原型阶段用 mock 解析提示：仅取文件名作为占位
+            pendingWfFormatContent = `// 文件：${name}\n// 注：doc/docx 格式需配套文档解析服务，原型阶段仅保存文件名标识。`;
+            pendingWfFormatFileName = name;
+            renderWfFormatContent();
+            showNotification('已接收 ' + ext + ' 文件（原型阶段仅保存标识）', 'warning');
+        }
+        event.target.value = '';
+    };
+    window.previewWfFormat = function() {
+        if (!pendingWfFormatContent) return;
+        const title = '格式骨架预览：' + (pendingWfFormatFileName || '格式骨架');
+        previewTextInWindow(title, pendingWfFormatContent);
+    };
+    window.downloadWfFormat = function() {
+        if (!pendingWfFormatContent) return;
+        downloadTextFile(pendingWfFormatContent, (pendingWfFormatFileName || '格式骨架') + '.txt');
+    };
+    window.reuploadWfFormat = function() {
+        // 重新上传：清空暂存，触发文件选择
+        pendingWfFormatContent = '';
+        pendingWfFormatFileName = '';
+        renderWfFormatContent();
+        setTimeout(() => document.getElementById('wfFormatFileInput').click(), 30);
+    };
+    window.clearWfFormat = function() {
+        // 清除：仅清空弹窗暂存，保存时才落库
+        pendingWfFormatContent = '';
+        pendingWfFormatFileName = '';
+        renderWfFormatContent();
+        showNotification('已清除格式骨架（保存后生效）', 'success');
+    };
+
     // ===== 业务系统切换 =====
     window.switchBusiness = function(type) {
         if (type === currentOrg) return;
@@ -283,6 +396,40 @@
         return 'wf-' + docTypeKey + '-' + Date.now().toString(36);
     }
 
+    // v1.38 (V1.1.2): workflow 文书格式约束（格式骨架）存储
+    // 数据结构：localStorage.adminWorkflowFormats = { [org]: { [workflowId]: { content, fileName, updatedAt } } }
+    function getWfFormatStorage() {
+        try {
+            return JSON.parse(localStorage.getItem('adminWorkflowFormats')) || {};
+        } catch (e) {
+            return {};
+        }
+    }
+    function saveWfFormatStorage(data) {
+        localStorage.setItem('adminWorkflowFormats', JSON.stringify(data));
+    }
+    function getWfFormatOrgData(org) {
+        return getWfFormatStorage()[org] || {};
+    }
+    function setWfFormatOrgData(org, data) {
+        const all = getWfFormatStorage();
+        all[org] = data;
+        saveWfFormatStorage(all);
+    }
+    // 读取指定 workflowId 的格式骨架（合并源：管理后台 adminWorkflowFormats；内置默认无格式骨架）
+    function getWfFormatByWorkflowId(org, workflowId) {
+        if (!workflowId) return null;
+        const orgData = getWfFormatOrgData(org);
+        const f = orgData[workflowId];
+        if (!f || typeof f !== 'object') return null;
+        if (!(f.content || '').trim()) return null;
+        return f;
+    }
+    // 暴露给用户侧 case-files.js 使用（合并源读取入口）
+    window.getAdminWorkflowFormat = function(org, workflowId) {
+        return getWfFormatByWorkflowId(org, workflowId);
+    };
+
     // ===== workflow 新增/编辑弹窗 =====
     let wfEditingDocType = null;    // 当前编辑 workflow 所属的 docTypeKey
     let wfEditingId = null;         // 当前编辑的 workflow id（null=新增）
@@ -290,6 +437,11 @@
     let wfSelectedCauses = new Set();   // v1.32: 选中的匹配案由
     let wfEditingType = 'material';     // E1: 固定一步生成型（'step' 分步型已移除配置入口）
     let wfEditingBuiltin = false;   // 是否编辑内置 workflow（控制 id 下拉只读）
+    // v1.38 (V1.1.2): workflow 文书格式约束 - 弹窗中暂存的格式骨架内容
+    let pendingWfFormatContent = '';
+    let pendingWfFormatFileName = '';
+    // 保存时的目标 workflowId（弹窗打开时根据编辑/新增模式确定；新增模式在 onWfIdChange 时同步）
+    let wfFormatTargetId = '';
 
     // v1.32: 渲染 workflow id 下拉框（数据来自 agentflow 平台 mock 列表）
     function renderWfIdSelect(docTypeKey, selectedId, isBuiltin) {
@@ -317,17 +469,31 @@
     }
 
     // v1.32: workflow id 下拉框选择变化时，自动带出 name
+    // v1.38 (V1.1.2): 新增模式下，id 变化时同步加载该 workflowId 已配置的格式骨架到弹窗暂存
     window.onWfIdChange = function() {
         const select = document.getElementById('wfId');
         const id = select.value;
         const nameInput = document.getElementById('wfName');
         if (!id) {
             nameInput.value = '';
+            // 清空格式骨架暂存（未选 workflow id 时不可配置）
+            pendingWfFormatContent = '';
+            pendingWfFormatFileName = '';
+            wfFormatTargetId = '';
+            renderWfFormatContent();
             return;
         }
         const list = (typeof agentflowWorkflowList !== 'undefined') ? agentflowWorkflowList : [];
         const matched = list.find(item => item.id === id);
         nameInput.value = matched ? matched.name : '';
+        // v1.38: 新增模式下，根据所选 workflowId 加载已存在的格式骨架（允许用户继续编辑）
+        if (!wfEditingId) {
+            wfFormatTargetId = id;
+            const existing = getWfFormatByWorkflowId(currentOrg, id);
+            pendingWfFormatContent = existing ? (existing.content || '') : '';
+            pendingWfFormatFileName = existing ? (existing.fileName || '') : '';
+            renderWfFormatContent();
+        }
     };
 
     window.openAddWfModal = function(docTypeKey) {
@@ -337,6 +503,10 @@
         wfSelectedCauses = new Set();
         wfEditingType = 'material';  // E1: 固定一步生成型，不再支持分步型
         wfEditingBuiltin = false;
+        // v1.38: 新增模式清空格式骨架暂存，待用户选择 workflow id 后再加载（onWfIdChange）
+        pendingWfFormatContent = '';
+        pendingWfFormatFileName = '';
+        wfFormatTargetId = '';
         document.getElementById('wfModalTitle').textContent = '新增 workflow';
         document.getElementById('wfName').value = '';
         // v1.32: 渲染 workflow id 下拉框（新增模式）
@@ -348,6 +518,7 @@
         if (materialRadio) materialRadio.checked = true;
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderCausesPicker(docTypeKey, wfSelectedCauses);
+        renderWfFormatContent();  // v1.38: 渲染格式骨架区（新增模式初始为上传区）
         document.getElementById('wfModal').classList.add('show');
         setTimeout(() => document.getElementById('wfId').focus(), 50);
     };
@@ -374,6 +545,11 @@
         }
         const isBuiltin = !!wf.isBuiltin;
         wfEditingBuiltin = isBuiltin;
+        // v1.38: 编辑模式加载该 workflowId 已配置的格式骨架到弹窗暂存
+        wfFormatTargetId = wf.id || '';
+        const existingFormat = getWfFormatByWorkflowId(currentOrg, wf.id);
+        pendingWfFormatContent = existingFormat ? (existingFormat.content || '') : '';
+        pendingWfFormatFileName = existingFormat ? (existingFormat.fileName || '') : '';
         document.getElementById('wfModalTitle').textContent = isBuiltin ? '编辑内置 workflow（另存为自定义覆盖）' : '编辑 workflow';
         document.getElementById('wfName').value = wf.name || '';
         // v1.32: 渲染 workflow id 下拉框（编辑模式，内置只读）
@@ -385,6 +561,7 @@
         if (materialRadio) materialRadio.checked = true;
         renderCaseWordsPicker(docTypeKey, wfSelectedCaseWords);
         renderCausesPicker(docTypeKey, wfSelectedCauses);
+        renderWfFormatContent();  // v1.38: 渲染格式骨架区（编辑模式回填已有内容或上传区）
         document.getElementById('wfModal').classList.add('show');
     };
 
@@ -396,6 +573,10 @@
         wfSelectedCauses = new Set();
         wfEditingType = 'material';  // E1: 固定一步生成型
         wfEditingBuiltin = false;
+        // v1.38: 清空格式骨架暂存
+        pendingWfFormatContent = '';
+        pendingWfFormatFileName = '';
+        wfFormatTargetId = '';
         const wfIdSelect = document.getElementById('wfId');
         if (wfIdSelect) {
             wfIdSelect.innerHTML = '<option value="">请从 agentflow 平台已编排的 workflow 中选择</option>';
@@ -662,10 +843,39 @@
         }
         setWfOrgData(currentOrg, orgData);
 
+        // v1.38 (V1.1.2): 同步保存该 workflowId 的格式骨架到 adminWorkflowFormats
+        // 规则：workflowId 以 finalWfId 为准；若原 wfEditingId 与 finalWfId 不同（编辑内置覆盖时可能 id 不变），
+        //       且 wfEditingId 原本有格式骨架，将其迁移至 finalWfId
+        saveWfFormatForWorkflow(finalWfId, wfEditingId);
+
         closeWfModal();
         renderTable();
         showNotification(wfEditingId ? 'workflow 已更新' : 'workflow 已新增', 'success');
     };
+
+    // v1.38: 保存当前弹窗中暂存的格式骨架到 adminWorkflowFormats[org][workflowId]
+    // - 若暂存内容非空：写入/更新该 workflowId 的格式骨架
+    // - 若暂存内容为空但原已存在格式骨架：视为用户清除，从存储中删除该 workflowId 的格式骨架
+    // - 若编辑模式且原 workflowId 与 newWfId 不同：将旧 workflowId 的格式骨架迁移至新 workflowId
+    function saveWfFormatForWorkflow(newWfId, oldWfId) {
+        const orgData = getWfFormatOrgData(currentOrg);
+        // 处理 workflowId 变更（编辑模式下 id 应不变，但保留迁移逻辑以兼容边界场景）
+        if (oldWfId && oldWfId !== newWfId && orgData[oldWfId]) {
+            if (!orgData[newWfId]) orgData[newWfId] = orgData[oldWfId];
+            delete orgData[oldWfId];
+        }
+        if (pendingWfFormatContent && pendingWfFormatContent.trim()) {
+            orgData[newWfId] = {
+                content: pendingWfFormatContent,
+                fileName: pendingWfFormatFileName || '',
+                updatedAt: nowTime()
+            };
+        } else {
+            // 用户清除格式骨架：删除存储
+            if (orgData[newWfId]) delete orgData[newWfId];
+        }
+        setWfFormatOrgData(currentOrg, orgData);
+    }
 
     window.deleteWorkflow = function(docTypeKey, wfId) {
         const workflows = getWorkflowsForDocType(currentOrg, docTypeKey);
@@ -697,6 +907,15 @@
                     delete orgData[docTypeKey];
                 }
                 setWfOrgData(currentOrg, orgData);
+            }
+            // v1.38 (V1.1.2): 同步清理该 workflowId 的格式骨架（彻底删除自定义 workflow 时一并清理；
+            // 恢复内置默认时不清理，便于后续重新自定义时复用）
+            if (!isBuiltinWf) {
+                const fmtOrgData = getWfFormatOrgData(currentOrg);
+                if (fmtOrgData[wfId]) {
+                    delete fmtOrgData[wfId];
+                    setWfFormatOrgData(currentOrg, fmtOrgData);
+                }
             }
             renderTable();
             showNotification(isBuiltinWf ? '已恢复内置默认' : 'workflow 已删除', 'success');

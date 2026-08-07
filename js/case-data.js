@@ -554,6 +554,31 @@ function mergeMyDocTemplates(org, system) {
     }
 }
 
+// v1.60 (V1.1.2): 读取管理后台配置的 workflow 文书格式约束（格式骨架）
+// 数据来源：localStorage.adminWorkflowFormats = { [org]: { [workflowId]: { content, fileName, updatedAt } } }
+// 返回 { content, fileName, updatedAt } 或 null（未配置/空内容时）
+// 用户侧 case-files.js 文书生成第二步「套格式骨架」时调用
+function getAdminWorkflowFormat(org, workflowId) {
+    if (!org || !workflowId) return null;
+    try {
+        const allData = JSON.parse(localStorage.getItem('adminWorkflowFormats')) || {};
+        const orgData = allData[org] || {};
+        const f = orgData[workflowId];
+        if (!f || typeof f !== 'object') return null;
+        if (!(f.content || '').trim()) return null;
+        return {
+            content: f.content,
+            fileName: f.fileName || '',
+            updatedAt: f.updatedAt || ''
+        };
+    } catch (e) {
+        console.error('[case-data] getAdminWorkflowFormat 失败:', e);
+        return null;
+    }
+}
+// 暴露为全局，供 case-files.js 直接调用
+window.getAdminWorkflowFormat = getAdminWorkflowFormat;
+
 // v1.21: 合并管理后台自定义文书类型（localStorage.adminDocTypes）
 // 覆盖语义：adminDocTypes[org][key] 整体覆盖 defaultDocTypesByOrg[org][key]
 // v1.9: 不再复制 icon 字段

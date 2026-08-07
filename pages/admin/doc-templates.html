@@ -285,24 +285,16 @@
             </div>
             <div class="form-row">
                 <label class="form-label">模板正文</label>
-                <div class="tpl-upload-area" id="tplUploadArea" onclick="document.getElementById('tplFileInput').click()">
-                    <input type="file" id="tplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleTemplateFileUpload(event)">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <div class="tpl-upload-title">点击或拖拽上传模板文件</div>
-                    <div class="tpl-upload-hint">支持 .txt / .doc / .docx 格式；内容将解析为纯文本并持久化</div>
-                    <div class="tpl-upload-filename" id="tplUploadFilename" style="display:none;"></div>
-                </div>
-                <div class="tpl-file-actions" id="tplFileActions" style="display:none;">
-                    <span class="tpl-content-status" id="tplContentStatus">已上传模板正文</span>
-                    <button type="button" class="btn btn-secondary" onclick="downloadCurrentTemplateContent()"><i class="fas fa-download"></i> 下载当前正文</button>
-                    <button type="button" class="btn btn-secondary" onclick="reuploadTemplateContent()"><i class="fas fa-redo"></i> 重新上传</button>
-                </div>
+                <textarea class="form-textarea" id="tplContent" placeholder="请输入模板内容参考文本，描述文书应包含哪些内容板块/段落（如：原告诉请、被告答辩、争议焦点、事实认定、裁判结果）..." style="min-height:200px;"></textarea>
                 <div class="tpl-example-row">
-                    <span>没有模板文件？</span>
-                    <a href="javascript:void(0)" onclick="downloadTemplateExample()">下载模板示例</a>
-                    <span class="tpl-example-hint">（含常见占位符，如 {{courtName}}、{{caseNumber}} 等）</span>
+                    <a href="javascript:void(0)" onclick="insertTemplateExample()"><i class="fas fa-lightbulb"></i> 插入示例文本</a>
+                    <span class="tpl-example-hint">（参考示例，可在此基础上修改）</span>
+                    <span style="margin:0 12px; color:var(--border-color);">|</span>
+                    <a href="javascript:void(0)" onclick="document.getElementById('tplFileInput').click()"><i class="fas fa-upload"></i> 从文件导入</a>
+                    <span class="tpl-example-hint">（.txt/.doc/.docx，导入后可继续编辑）</span>
+                    <input type="file" id="tplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleTemplateFileUpload(event)">
                 </div>
-                <div class="form-hint">模板正文不支持在线编辑，请通过上传文件确定内容</div>
+                <div class="form-hint">模板正文作为给 AI 的内容参考文本，文书生成时 AI 据此组织文书结构</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
@@ -325,7 +317,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=59"></script>
-    <script src="../../js/admin-doc-templates.js?v=5"></script>
+    <script src="../../js/case-data.js?v=60"></script>
+    <script src="../../js/admin-doc-templates.js?v=8"></script>
 </body>
 </html>

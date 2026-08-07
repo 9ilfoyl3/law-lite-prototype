@@ -3,6 +3,7 @@
 // v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
 // v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑表单提供模板示例下载；③ 卡片列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段；⑥ 修复保存时读取 content 及表单上传区显示逻辑
 // v1.3 模板卡片新增「上传时间」「更新时间」展示：保存时记录 createdAt / updatedAt
+// v1.4 V1.1.2 定位调整：模板 content 语义从「带占位符的格式骨架」改为「给 AI 的内容参考文本」，录入方式从仅文件上传改回大文本框在线编辑为主（可选文件上传导入）；移除独立的「重新上传」操作按钮（合并到编辑）；示例文本改为简短内容参考示例（不再带占位符）；格式骨架约束移至 workflow 子配置
 // 数据持久化：localStorage.myDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeMyDocTemplates 在加载时合并到 system.docTemplates（key 加 my- 前缀）
 
@@ -13,42 +14,54 @@
     let currentOrg = 'court';
     let currentDocTypeFilter = ''; // '' = 全部
     let editingKey = null;         // 当前编辑的 key（null=新增模式）
-    let pendingMyTemplateContent = '';    // v1.2 新增/编辑表单中暂存的模板正文
-    let pendingMyTemplateFileName = '';   // v1.2 上传文件名展示
 
-    // v1.2 模板示例正文
-    const MY_TEMPLATE_EXAMPLE_TEXT = `{{courtName}}
-民事判决书
+    // v1.5 (V1.1.2) 内容参考示例：裁判文书（民事判决书）完整内容结构
+    // 注：分步生成阶段（原告诉请/被告答辩/争议焦点/事实认定等）是辅助法官判断的中间产物，
+    //     不是裁判文书模板内容；真正的文书模板应描述完整判决书的内容结构与各部分格式要求。
+    //     [占位符] 为描述性占位符（给 AI 看的格式要求），由 AI 生成时替换为实际内容；
+    //     与 workflow 格式骨架的 {{占位符}}（程序化套版）语义不同。
+    const MY_TEMPLATE_EXAMPLE_TEXT = `[法院名称：江苏省XX市XX区人民法院]
 
-                                                                       {{caseNumber}}
+民 事 判 决 书
+（[年份]）[案字代字]民初[案号]号
 
-{{plaintiffDefendantInfo}}
-{{proceduralInfo}}
-{{plaintiffClaim}}
-{{foundFacts}}
-{{courtHolds}}
-{{legalProvisionCitation}}
-{{judgmentContent}}
+原告：[原告名称]，住所地：[原告住所地]。
+法定代表人：[法定代表人姓名]，[该公司职位，如该公司员工/该公司执行董事/该公司总经理]
+原告：[原告姓名]，[原告性别]，[XXXX年XX月XX日出生]，[原告民族]，住[原告现住址]，公民身份号码：[原告公民身份号码]。
+委托诉讼代理人：[原告委托诉讼代理人姓名]，[XX律所律师/该公司员工等情况]。
 
-    如不服本判决，可以在判决书送达之日起十五日内，向本院递交上诉状，并按对方当事人的人数或者代表人的人数提出副本，上诉于江苏省苏州市中级人民法院。同时按照国务院《诉讼费用交纳办法》规定向江苏省苏州市中级人民法院预交上诉案件受理费。
+被告：[被告名称]，住所地：[被告住所地]。
+法定代表人：[法定代表人姓名]，[该公司职位，如该公司员工/该公司执行董事/该公司总经理]
+被告：[被告姓名]，[被告性别]，[XXXX年XX月XX日出生]，[被告民族]，住[被告现住址]，公民身份号码：[被告公民身份号码]。
+委托诉讼代理人：[被告委托诉讼代理人姓名]，[XX律所律师/该公司员工等情况]。
 
+[原告XXXXXX（以下简称原告）诉被告XXXXXX（以下简称被告）[、XXX保险公司（以下简称保险公司）][案由]一案，本院于[立案日期XXXX年XX月XX日]立案后，依法适用[适用程序]于[开庭日期XXXX年XX月XX日]由审判员[审判员XXX]公开开庭进行了审理。[原告方到庭情况]，[被告方到庭情况]，本案现已审理终结。]
 
+原告向本院提出诉讼请求，请求判令：[原告诉讼请求，按照1、…；2、…；3、…；4、…等格式输出，按照原文内容输出]。事实与理由：[按照原文内容输出事实与理由，不要总结，不要遗漏。]
 
+被告辩称：[被告答辩内容，引用原文内容，不要遗漏]。[若被告未到庭，按实际情况注明：被告XXX经本院合法传唤，拒不到庭，本院依法缺席审理 / 被告未到庭，亦未向本院提交书面答辩状及证据材料 / 被告XXX缺席未答辩。][若有多被告答辩，请按照不同被告进行分段输出，引用原文输出即可。]
 
+本院经审理查明：[经审理查明的案件事实，按时间顺序或逻辑顺序组织，事实充分、证据明确。]
 
-                                                    审判员 {{judgeName}}
+本院认为：[从法院角度，结合案情事实以及法律法规，引用相关法律法规对本案原告诉讼请求以及被告答辩内容等进行逐一分析并进行采纳或者不采纳，要求先进行分析，后进行采纳或者不采纳认定。要求尽可能丰富全面。]
 
+综上，[结合本案事实及法律法规进行综合、全面且详细的论述然后生成合理、公正的判决]，依照《[相关法律法规及条款]》之规定，判决如下：
+一、[判决主文第一项]。
+二、[判决主文第二项]。
+……
 
+如果未按本判决指定的期间履行金钱给付义务，应当依照《中华人民共和国民事诉讼法》第二百六十四条之规定，加倍支付迟延履行期间的债务利息。
 
+本案案件受理费[XXX]元，由[负担方]负担[XXX]元。
 
+如不服本判决，可在判决书送达之日起十五日内，向本院递交上诉状，并按对方当事人的人数提出副本，上诉于[上级法院名称]。
 
-                                                     {{judgmentDate}}
+本判决书生效后，负有履行义务的当事人应当依法按期履行。逾期未履行的，享有权利的当事人在法律规定的期限内申请执行后，人民法院将依法对被执行人的财产采取查封、扣押、冻结、拍卖、变卖等执行措施，并可对相关当事人采取限制高消费、列入失信名单、罚款、拘留等措施，对构成犯罪的，依法追究刑事责任。
 
-
-
-
-
-书记员 {{clerkName}}`;
+审判员　　[审判员姓名]
+[二○XX年XX月XX日]
+法官助理　　[法官助理姓名]
+书记员　　[书记员姓名]`;
 
     // ===== 存储 =====
     function getStorage() {
@@ -200,7 +213,6 @@
             + '<div class="item-actions">'
             + '<button class="action-btn view"' + viewDisabled + ' onclick="previewMyTemplate(\'' + key + '\')">预览</button>'
             + '<button class="action-btn view"' + viewDisabled + ' onclick="downloadMyTemplate(\'' + key + '\')">下载</button>'
-            + '<button class="action-btn view" onclick="reuploadMyTemplate(\'' + key + '\')">重新上传</button>'
             + '<button class="action-btn edit" onclick="editItem(\'' + key + '\')">编辑</button>'
             + toggleBtn
             + '<button class="action-btn delete" onclick="deleteItem(\'' + key + '\')">删除</button>'
@@ -209,7 +221,7 @@
             + '</div>';
     }
 
-    // v1.2 卡片操作：预览/下载/重新上传
+    // v1.2 卡片操作：预览/下载
     window.previewMyTemplate = function(key) {
         const orgData = getOrgData(currentOrg);
         const t = orgData[key];
@@ -221,13 +233,6 @@
         const t = orgData[key];
         if (!t || !(t.content || '').trim()) return;
         downloadTextFile(t.content, (t.name || '我的模板正文') + '.txt');
-    };
-    window.reuploadMyTemplate = function(key) {
-        editItem(key);
-        setTimeout(() => {
-            reuploadMyTemplateContent();
-            document.getElementById('myTplFileInput').click();
-        }, 80);
     };
 
     // 切换启用/停用状态
@@ -290,11 +295,13 @@
             return;
         }
         editingKey = '__new__';
-        pendingMyTemplateContent = '';
-        pendingMyTemplateFileName = '';
         renderList();
         // 滚动到顶部
         document.getElementById('itemList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+            const ta = document.getElementById('formContent');
+            if (ta) ta.value = '';
+        }, 30);
     };
 
     window.editItem = function(key) {
@@ -303,17 +310,18 @@
             return;
         }
         editingKey = key;
-        const orgData = getOrgData(currentOrg);
-        const t = orgData[key];
-        pendingMyTemplateContent = t ? (t.content || '') : '';
-        pendingMyTemplateFileName = pendingMyTemplateContent ? '已保存的模板正文' : '';
         renderList();
+        // v1.4 表单渲染后将已有 content 回填到 textarea
+        setTimeout(() => {
+            const orgData = getOrgData(currentOrg);
+            const t = orgData[key];
+            const ta = document.getElementById('formContent');
+            if (ta && t) ta.value = t.content || '';
+        }, 30);
     };
 
     window.cancelEdit = function() {
         editingKey = null;
-        pendingMyTemplateContent = '';
-        pendingMyTemplateFileName = '';
         renderList();
     };
 
@@ -324,23 +332,16 @@
             '<option value="' + k + '"' + (t && t.docType === k ? ' selected' : '') + '>' + escapeHtml(cfg.name) + '</option>'
         ).join('');
         const name = (t && t.name) || '';
-        const hasContent = pendingMyTemplateContent.length > 0;
-
-        const uploadArea = '<div class="tpl-upload-area" id="myTplUploadArea" style="display:' + (hasContent ? 'none' : 'block') + ';" onclick="document.getElementById(\'myTplFileInput\').click()">'
-            + '<input type="file" id="myTplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleMyTemplateFileUpload(event)">'
-            + '<i class="fas fa-cloud-upload-alt"></i>'
-            + '<div class="tpl-upload-title">点击上传模板文件</div>'
-            + '<div class="tpl-upload-hint">支持 .txt / .doc / .docx 格式；内容将解析为纯文本并持久化</div>'
-            + '<div class="tpl-upload-filename" id="myTplUploadFilename" style="display:' + (pendingMyTemplateFileName ? 'block' : 'none') + ';">' + (pendingMyTemplateFileName ? '已选择文件：' + escapeHtml(pendingMyTemplateFileName) : '') + '</div>'
-            + '</div>';
-        const fileActions = '<div class="tpl-file-actions" id="myTplFileActions" style="display:' + (hasContent ? 'flex' : 'none') + ';">'
-            + '<span class="tpl-content-status">已上传模板正文</span>'
-            + '<button type="button" class="btn btn-secondary" onclick="downloadCurrentMyTemplateContent()"><i class="fas fa-download"></i> 下载当前正文</button>'
-            + '<button type="button" class="btn btn-secondary" onclick="reuploadMyTemplateContent()"><i class="fas fa-redo"></i> 重新上传</button>'
-            + '</div>';
+        // v1.4 直接以 textarea 为内容主入口，文件上传作为可选导入方式
+        const contentValue = (t && t.content) || '';
         const exampleRow = '<div class="tpl-example-row">'
-            + '<span>没有模板文件？</span><a href="javascript:void(0)" onclick="downloadMyTemplateExample()">下载模板示例</a>'
-            + '<span class="tpl-example-hint">（含常见占位符，如 {{courtName}}、{{caseNumber}} 等）</span></div>';
+            + '<a href="javascript:void(0)" onclick="insertMyTemplateExample()"><i class="fas fa-lightbulb"></i> 插入示例文本</a>'
+            + '<span class="tpl-example-hint">（参考示例，可在此基础上修改）</span>'
+            + '<span style="margin:0 10px; color:var(--border-color);">|</span>'
+            + '<a href="javascript:void(0)" onclick="document.getElementById(\'myTplFileInput\').click()"><i class="fas fa-upload"></i> 从文件导入</a>'
+            + '<span class="tpl-example-hint">（.txt/.doc/.docx，导入后可继续编辑）</span>'
+            + '<input type="file" id="myTplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleMyTemplateFileUpload(event)">'
+            + '</div>';
 
         return '<div class="item-card editing">'
             + '<div class="form-group">'
@@ -353,9 +354,9 @@
             + '</div>'
             + '<div class="form-group">'
             + '<label class="form-label">模板正文</label>'
-            + fileActions + uploadArea
+            + '<textarea class="form-textarea" id="formContent" placeholder="请输入模板内容参考文本，描述文书应包含哪些内容板块/段落..." style="min-height:180px;">' + escapeHtml(contentValue) + '</textarea>'
             + exampleRow
-            + '<div class="form-hint">模板正文不支持在线编辑，请通过上传文件确定内容</div>'
+            + '<div class="form-hint">模板正文作为给 AI 的内容参考文本，文书生成时 AI 据此组织文书结构</div>'
             + '</div>'
             + '<div class="form-actions">'
             + '<button class="btn btn-primary" onclick="saveItem(\'' + (isNew ? '' : key) + '\')">保存</button>'
@@ -367,7 +368,8 @@
     window.saveItem = function(existingKey) {
         const name = document.getElementById('formName').value.trim();
         const docType = document.getElementById('formDocType').value;
-        const content = pendingMyTemplateContent;
+        // v1.4 直接从 textarea 读取内容
+        const content = document.getElementById('formContent').value;
 
         if (!name) {
             showToast('请填写模板名', 'error');
@@ -402,14 +404,13 @@
         setOrgData(currentOrg, orgData);
 
         editingKey = null;
-        pendingMyTemplateContent = '';
-        pendingMyTemplateFileName = '';
         renderLeft();
         renderList();
         showToast(existingKey ? '模板已更新' : '模板已新增', 'success');
     };
 
-    // v1.2 模板文件上传处理（原型阶段仅解析 .txt；doc/docx 提示需配套解析能力）
+    // v1.4 模板文件导入处理（可选）：将文件内容写入 textarea，便于继续编辑
+    // 原型阶段仅解析 .txt；doc/docx 提示需配套解析能力
     window.handleMyTemplateFileUpload = function(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
@@ -420,13 +421,13 @@
             event.target.value = '';
             return;
         }
+        const ta = document.getElementById('formContent');
+        if (!ta) return;
         if (ext === 'txt') {
             const reader = new FileReader();
             reader.onload = function(e) {
-                pendingMyTemplateContent = (e.target.result || '').toString();
-                pendingMyTemplateFileName = name;
-                renderList();
-                showToast('模板正文已读取', 'success');
+                ta.value = (e.target.result || '').toString();
+                showToast('模板正文已导入到文本框，可继续编辑', 'success');
             };
             reader.onerror = function() {
                 showToast('文件读取失败', 'error');
@@ -434,31 +435,23 @@
             reader.readAsText(file, 'utf-8');
         } else {
             // doc/docx 原型阶段用 mock 解析提示：仅取文件名作为占位
-            pendingMyTemplateContent = '// 文件：' + name + '\n// 注：doc/docx 格式需配套文档解析服务，原型阶段仅保存文件名标识。';
-            pendingMyTemplateFileName = name;
-            renderList();
+            ta.value = '// 文件：' + name + '\n// 注：doc/docx 格式需配套文档解析服务，原型阶段仅保存文件名标识。';
             showToast('已接收 ' + ext + ' 文件（原型阶段仅保存标识）', 'success');
         }
         event.target.value = '';
     };
 
-    // v1.2 下载模板示例
+    // v1.4 插入示例文本到 textarea
+    window.insertMyTemplateExample = function() {
+        const ta = document.getElementById('formContent');
+        if (!ta) return;
+        ta.value = MY_TEMPLATE_EXAMPLE_TEXT;
+        showToast('已插入示例文本，可在此基础上修改', 'success');
+    };
+
+    // v1.4 下载模板示例（保留便捷入口）
     window.downloadMyTemplateExample = function() {
-        downloadTextFile(MY_TEMPLATE_EXAMPLE_TEXT, '民事判决书模板示例.txt');
-    };
-
-    // v1.2 下载当前弹窗/表单中的模板正文
-    window.downloadCurrentMyTemplateContent = function() {
-        if (!pendingMyTemplateContent) return;
-        const title = (document.getElementById('formName') && document.getElementById('formName').value.trim()) || '我的模板正文';
-        downloadTextFile(pendingMyTemplateContent, title + '.txt');
-    };
-
-    // v1.2 重新上传：清空当前内容，恢复上传区
-    window.reuploadMyTemplateContent = function() {
-        pendingMyTemplateContent = '';
-        pendingMyTemplateFileName = '';
-        renderList();
+        downloadTextFile(MY_TEMPLATE_EXAMPLE_TEXT, '文书模板内容参考示例.txt');
     };
 
     // ===== 删除 =====
