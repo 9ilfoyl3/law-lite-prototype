@@ -407,25 +407,62 @@ function matchWorkflowByCaseWordAndCause(workflows, caseWord, cause) {
 // v1.36: stepConfigsByOrg 支持按案字分组（对象结构），由 resolveStepsByCaseWord 解析
 //   - entry 为数组时直接返回（兼容旧结构）
 //   - entry 为对象时按 caseWord 精确匹配，未命中取 default，再未命中取第一个非空数组
+// v1.45 链 C: 改为按案件阶段解析（resolveStepsByCaseStage）；本函数保留向后兼容，
+//   内部将 caseWord 转为 caseStage 后委托给 resolveStepsByCaseStage
 function resolveStepsByCaseWord(entry, caseWord) {
     if (Array.isArray(entry)) return entry;
     if (!entry || typeof entry !== 'object') return [];
+    // v1.45: 优先按案件阶段查找（stepConfigsByOrg 新结构 key 为 'first'/'second'）
+    const stage = getCaseStageByCaseWord(caseWord);
+    if (stage && Array.isArray(entry[stage]) && entry[stage].length > 0) {
+        return entry[stage];
+    }
+    // 向后兼容：按案字直接匹配（旧结构 key 为 '民终' 等）
     if (caseWord && Array.isArray(entry[caseWord]) && entry[caseWord].length > 0) {
         return entry[caseWord];
     }
+    // 向后兼容：default key
+    if (Array.isArray(entry.default) && entry.default.length > 0) return entry.default;
+    // v1.45: 兜底优先取 'first'（一审作为默认）
+    if (Array.isArray(entry.first) && entry.first.length > 0) return entry.first;
+    const firstKey = Object.keys(entry).find(k => Array.isArray(entry[k]) && entry[k].length > 0);
+    return firstKey ? entry[firstKey] : [];
+}
+
+// v1.45 链 C: 按案件阶段解析步骤序列
+//   - entry 为数组时直接返回（兼容旧结构）
+//   - entry 为对象时按 caseStage 精确匹配（'first'/'second'/'retrial'）
+//   - v1.46: 'retrial'（再审）暂无步骤配置，返回空数组，不兜底取 first
+//   - 未命中取 'first'（一审作为默认兜底）
+//   - 再未命中取第一个非空数组
+function resolveStepsByCaseStage(entry, caseStage) {
+    if (Array.isArray(entry)) return entry;
+    if (!entry || typeof entry !== 'object') return [];
+    if (caseStage && Array.isArray(entry[caseStage]) && entry[caseStage].length > 0) {
+        return entry[caseStage];
+    }
+    // v1.46 链 D: 再审暂不支持分步生成（无步骤配置），返回空数组，不兜底取 first
+    if (caseStage === 'retrial') return [];
+    // 兜底优先取 'first'（一审作为默认）
+    if (Array.isArray(entry.first) && entry.first.length > 0) return entry.first;
+    // 向后兼容：default key
     if (Array.isArray(entry.default) && entry.default.length > 0) return entry.default;
     const firstKey = Object.keys(entry).find(k => Array.isArray(entry[k]) && entry[k].length > 0);
     return firstKey ? entry[firstKey] : [];
 }
 
-function getStepsConfigForDocType(docTypeKey, caseWord, cause) {
+function getStepsConfigForDocType(docTypeKey, caseWord, cause, caseStage) {
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
     const workflows = getWorkflowsForDocType(org, docTypeKey, 'step');
     if (workflows.length === 0) {
-        // 回退到内置 stepConfigsByOrg（按案字解析）
+        // 回退到内置 stepConfigsByOrg（v1.45 起按案件阶段解析）
         const fallback = (typeof stepConfigsByOrg !== 'undefined'
             && stepConfigsByOrg[org]
             && stepConfigsByOrg[org][docTypeKey]) || [];
+        // v1.45 链 C: 优先按 caseStage 解析，无 caseStage 时回退按 caseWord 解析（向后兼容）
+        if (caseStage && typeof resolveStepsByCaseStage === 'function') {
+            return resolveStepsByCaseStage(fallback, caseStage);
+        }
         return resolveStepsByCaseWord(fallback, caseWord);
     }
     const matched = matchWorkflowByCaseWordAndCause(workflows, caseWord, cause);
@@ -436,6 +473,9 @@ function getStepsConfigForDocType(docTypeKey, caseWord, cause) {
     const fallback = (typeof stepConfigsByOrg !== 'undefined'
         && stepConfigsByOrg[org]
         && stepConfigsByOrg[org][docTypeKey]) || [];
+    if (caseStage && typeof resolveStepsByCaseStage === 'function') {
+        return resolveStepsByCaseStage(fallback, caseStage);
+    }
     return resolveStepsByCaseWord(fallback, caseWord);
 }
 
@@ -493,7 +533,13 @@ function normalizeDocTemplates(org, system) {
         } else if (val && typeof val === 'object') {
             // 兼容对象结构，补全缺失字段
             if (val.name === undefined) val.name = key;
-            if (!val.docType) val.docType = templateToDocType[key] || '';
+            // v1.46 链 D: 内置模板（在反查表中的 key）强制用反查表覆盖 docType，
+            // 确保类型拆分后旧 localStorage 中的错误 docType 被纠正（如 ruling-civil 从 'judgment' 改为 'ruling'）
+            if (templateToDocType[key]) {
+                val.docType = templateToDocType[key];
+            } else if (!val.docType) {
+                val.docType = '';
+            }
             if (val.content === undefined) val.content = '';
             // v1.33: 不再写入 causes 字段；旧数据中的 causes 字段保留不删
         }
@@ -524,6 +570,20 @@ function mergeAdminDocTemplates(org, system) {
                     docType: val.docType || '',
                     content: val.content || ''
                 };
+            }
+        });
+
+        // v1.46 链 D: 合并后用反查表校正内置模板 docType，
+        // 确保 localStorage.adminDocTemplates 中旧错误 docType（如 ruling-civil 的 'judgment'）被纠正
+        const builtinTemplateToDocType = {};
+        Object.entries(defaultDocTypesByOrg[org] || {}).forEach(([typeKey, typeCfg]) => {
+            (typeCfg.templates || []).forEach(tplKey => {
+                builtinTemplateToDocType[tplKey] = typeKey;
+            });
+        });
+        Object.entries(system.docTemplates).forEach(([key, val]) => {
+            if (builtinTemplateToDocType[key] && val && typeof val === 'object') {
+                val.docType = builtinTemplateToDocType[key];
             }
         });
     } catch (e) {
@@ -958,6 +1018,58 @@ function getAllowedCaseWordsForCause(org, cause) {
     return whitelist.slice();
 }
 
+// v1.45 链 C: 案字 → 案件阶段映射（法院场景）
+// 用于生成文书时确定走哪个 workflow + 决定分步步骤序列
+// 返回值: 'first' / 'second' / 'retrial' / '' (空字符串表示无法判定，需用户手选)
+const caseWordToStageMap = {
+    court: {
+        '民初': 'first', '刑初': 'first', '行初': 'first',
+        '民终': 'second', '刑终': 'second', '行终': 'second',
+        '民再': 'retrial', '刑再': 'retrial'
+        // 其他案字（赔/监/执等）兜底处理，返回空，由用户手选
+    },
+    // 检察院/司法局案件阶段取值待定，暂返回空
+    procuratorate: {},
+    justice: {}
+};
+
+// 案件阶段取值集合（按业务系统区分，用于下拉选择）
+const caseStageOptionsByOrg = {
+    court: [
+        { value: 'first', label: '一审' },
+        { value: 'second', label: '二审' },
+        { value: 'retrial', label: '再审' }
+    ],
+    // 检察院/司法局取值待定
+    procuratorate: [],
+    justice: []
+};
+
+// 根据案字判定案件阶段
+// 参数: caseWord - 案件案字（如 '民初'、'民终'）
+//       org - 业务系统（默认 'court'）
+// 返回: 'first' / 'second' / 'retrial' / '' (空字符串表示无法判定)
+function getCaseStageByCaseWord(caseWord, org) {
+    org = org || (typeof currentBusiness !== 'undefined' ? currentBusiness : 'court');
+    if (!caseWord) return '';
+    const map = caseWordToStageMap[org] || {};
+    return map[caseWord] || '';
+}
+
+// 获取当前业务系统的案件阶段可选列表
+function getCaseStageOptions(org) {
+    org = org || (typeof currentBusiness !== 'undefined' ? currentBusiness : 'court');
+    return (caseStageOptionsByOrg[org] || []).slice();
+}
+
+// 案件阶段 value → label 转换
+function getCaseStageLabel(stageValue, org) {
+    org = org || (typeof currentBusiness !== 'undefined' ? currentBusiness : 'court');
+    const options = caseStageOptionsByOrg[org] || [];
+    const found = options.find(o => o.value === stageValue);
+    return found ? found.label : '';
+}
+
 // ===== 数据版本与迁移 =====
 const DATA_VERSION = '1.19'; // v1.42: case7 新增 demoOverflow 标记，ensureConstructionCaseDemoFiles 强制刷新 36 个演示材料
 
@@ -965,7 +1077,10 @@ const DATA_VERSION = '1.19'; // v1.42: case7 新增 demoOverflow 标记，ensure
 // v1.9: 移除文书类型 icon 字段
 const defaultDocTypesByOrg = {
     court: {
-        judgment: { name: '裁判文书', templates: ['judgment-civil-1st', 'judgment-civil-simple', 'ruling-civil', 'mediation-civil'] },
+        // v1.46 链 D: 「裁判文书」拆分为判决书/裁定书/调解书 3 个独立类型，确保"文书类型只出现对应模板"
+        judgment: { name: '判决书', templates: ['judgment-civil-1st', 'judgment-civil-simple'] },
+        ruling: { name: '裁定书', templates: ['ruling-civil'] },
+        mediation: { name: '调解书', templates: ['mediation-civil'] },
         trial: { name: '庭审提纲', templates: ['trial-outline', 'court-investigation-outline'] },
         execution: { name: '执行文书', templates: ['execution-notice', 'property-report', 'service-notice'] },
         materialSummary: { name: '材料总结', templates: [] }
@@ -1454,7 +1569,10 @@ let businessSystems = {
         label: '审判业务',
         partiesLabels: ['原告', '被告'],
         docTypes: {
-            judgment: { name: '裁判文书', templates: ['judgment-civil-1st', 'judgment-civil-simple', 'ruling-civil', 'mediation-civil'] },
+            // v1.46 链 D: 「裁判文书」拆分为判决书/裁定书/调解书 3 个独立类型
+            judgment: { name: '判决书', templates: ['judgment-civil-1st', 'judgment-civil-simple'] },
+            ruling: { name: '裁定书', templates: ['ruling-civil'] },
+            mediation: { name: '调解书', templates: ['mediation-civil'] },
             trial: { name: '庭审提纲', templates: ['trial-outline', 'court-investigation-outline'] },
             execution: { name: '执行文书', templates: ['execution-notice', 'property-report', 'service-notice'] },
             materialSummary: { name: '材料总结', templates: [] }

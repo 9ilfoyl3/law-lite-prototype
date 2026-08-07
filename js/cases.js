@@ -13,7 +13,7 @@
 
 // ===== 状态 =====
 let selectedCaseIds = new Set();
-let quickState = { caseId: '', model: '', docType: '', template: '', requirement: '', document: null, materialsCount: 3 };
+let quickState = { caseId: '', model: '', docType: '', template: '', requirement: '', document: null, materialsCount: 3, caseStage: '' };
 let batchState = { docType: '', template: '', results: [], totalElapsed: 0, timerInterval: null, completedCount: 0, failedCount: 0, ocrStrategy: 'skip' };
 let refineState = { caseId: '', docId: '', messages: [], originalContent: '', revisedContent: '', activeTab: 'original' };
 let documentsCaseId = '';
@@ -905,32 +905,15 @@ function renderGenModalBody() {
 
     updateGenModalFooter(false);
     updateGenContextHint();
+    // v1.45 链 C: 案件阶段行渲染后刷新「开始生成」按钮状态
+    updateGenModalStartBtnState();
 
     try { renderReqTemplates('genReqTemplates', quickState.docType, 'genRequirement'); } catch (e) {}
 }
 
 function buildGenElementHintHtml(caseItem) {
-    try {
-        if (!caseItem) return '';
-        if (typeof getAllElementPresets !== 'function') return '';
-        // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入，其他文书类型不显示要件提示
-        if (quickState.docType !== 'judgment') return '';
-        const _org = localStorage.getItem('currentBusiness') || 'court';
-        const _cw = parseCaseWord(caseItem.caseNumber, _org);
-        const allPresets = getAllElementPresets(caseItem.cause, _org, _cw);
-        const standardCount = (allPresets.standard || []).length;
-        const mineCount = (allPresets.mine || []).length;
-        const totalCount = standardCount + mineCount;
-        if (totalCount === 0) return '';
-        return `
-            <div class="gen-element-hint">
-                <i class="fas fa-puzzle-piece"></i>
-                <span>检测到该案由存在 <strong>${totalCount}</strong> 个可用要件（标准 ${standardCount} / 我的 ${mineCount}），开始生成后将自动引入全部要件辅助生成。</span>
-            </div>
-        `;
-    } catch (e) {
-        return '';
-    }
+    // v1.47: 列表页弹框不再显示要件提示条，要件确认统一在详情页弹框完成
+    return '';
 }
 
 function buildGenConfigHtml() {
@@ -958,6 +941,9 @@ function buildGenConfigHtml() {
         templateSelectHtml = `<option value="">暂无可用模板</option>`;
     }
 
+    // v1.45 链 C: 案件阶段选择项（仅裁判文书类型显示，能自动判定时隐藏，无法判定时显示）
+    const caseStageRowHtml = buildGenCaseStageRowHtml();
+
     return `
         <div class="gen-form-group">
             <label class="gen-form-label">文书类型</label>
@@ -965,6 +951,8 @@ function buildGenConfigHtml() {
                 ${docTypeOptions}
             </select>
         </div>
+
+        ${caseStageRowHtml}
 
         <div class="gen-form-group">
             <label class="gen-form-label">文书模板</label>
@@ -981,6 +969,71 @@ function buildGenConfigHtml() {
                       onchange="quickState.requirement=this.value"></textarea>
         </div>
     `;
+}
+
+// v1.45 链 C: 构建案件列表页弹框的案件阶段选择行 HTML
+// 规则：仅裁判文书(judgment)类型显示；能按案字自动判定时隐藏整行；无法判定时显示让用户选
+function buildGenCaseStageRowHtml() {
+    // 仅裁判文书类型才显示
+    if (quickState.docType !== 'judgment') return '';
+    const c = getCurrentCases().find(x => x.id === quickState.caseId);
+    if (!c) return '';
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    const caseWord = (typeof parseCaseWord === 'function') ? parseCaseWord(c.caseNumber, org) : '';
+    const autoStage = (typeof getCaseStageByCaseWord === 'function') ? getCaseStageByCaseWord(caseWord, org) : '';
+    // 能自动判定：隐藏整行（不渲染），但记录到 quickState 供传递
+    if (autoStage) {
+        quickState.caseStage = autoStage;
+        return '';
+    }
+    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+    // 检察院/司法局无选项：隐藏整行，不阻塞
+    if (options.length === 0) {
+        quickState.caseStage = '';
+        return '';
+    }
+    // 无法判定：渲染选择项
+    quickState.caseStage = '';
+    const optsHtml = '<option value="">请选择案件阶段</option>' +
+        options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    const hintText = caseWord
+        ? `案字「${caseWord}」无法判定阶段，请选择`
+        : '本案无案字，请选择';
+    return `
+        <div class="gen-form-group" id="genCaseStageGroup">
+            <label class="gen-form-label">案件阶段</label>
+            <select class="gen-form-select" id="genCaseStage" onchange="onGenCaseStageChange(this.value)">
+                ${optsHtml}
+            </select>
+            <div class="gen-form-hint" style="display:block;margin-top:6px;font-size:12px;color:var(--text-muted);font-style:italic;">${hintText}</div>
+        </div>
+    `;
+}
+
+// v1.45 链 C: 案件列表页弹框 - 案件阶段选择变更
+function onGenCaseStageChange(stage) {
+    quickState.caseStage = stage;
+    updateGenModalStartBtnState();
+}
+
+// v1.45 链 C: 案件列表页弹框 - 更新「开始生成」按钮状态
+function updateGenModalStartBtnState() {
+    const btn = document.getElementById('genModalStartBtn');
+    if (!btn) return;
+    // 仅裁判文书类型才校验案件阶段
+    if (quickState.docType !== 'judgment') {
+        btn.disabled = false;
+        return;
+    }
+    // 检察院/司法局无选项时不校验
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+    if (options.length === 0) {
+        btn.disabled = false;
+        return;
+    }
+    const stage = quickState.caseStage || '';
+    btn.disabled = !stage;
 }
 
 function updateGenModalFooter(exceeded) {
@@ -1002,6 +1055,15 @@ function startQuickGen() {
     }
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     if (!c) return;
+    // v1.45 链 C: 裁判文书类型校验案件阶段
+    if (quickState.docType === 'judgment') {
+        const org = localStorage.getItem('currentBusiness') || 'court';
+        const stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+        if (stageOptions.length > 0 && !quickState.caseStage) {
+            showNotification('请先选择案件阶段', 'warning');
+            return;
+        }
+    }
     // v2.23 (任务 8.2): 移除 Token 超限前置判断，直接跳转详情页生成
 
     // 跳转案件详情页，默认使用全部材料并自动触发生成，与详情页配置生成文书的体验统一
@@ -1013,7 +1075,9 @@ function startQuickGen() {
         template: quickState.template,
         requirement: quickState.requirement || '',
         autoGen: true,
-        autoIntroduceElements: quickState.docType === 'judgment'
+        autoIntroduceElements: quickState.docType === 'judgment',
+        // v1.45 链 C: 案件阶段传递给详情页
+        caseStage: quickState.caseStage || ''
     };
     sessionStorage.setItem('listGenConfig', JSON.stringify(genConfig));
     window.location.href = `case-files.html?caseId=${encodeURIComponent(quickState.caseId)}`;

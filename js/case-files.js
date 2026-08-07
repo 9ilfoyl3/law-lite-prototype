@@ -30,7 +30,7 @@ let stepStates = [];                        // 每步状态: waiting/current/don
 let stepsConfig = [];                       // 步骤配置
 let expandedStepIndex = 0;                  // 当前展开的分步面板索引
 let isGenerating = false;                   // 是否正在生成中
-let stepGenerationStarted = false;          // 分步生成是否已开始（控制提示/步骤列表显示）
+// v1.46 链 D: 移除 stepGenerationStarted 状态——分步生成视图直接展示步骤序列，无「开始生成」按钮
 let resultContent = '';                     // 右栏结果内容HTML
 let resultEditContent = '';                 // 右栏编辑模式内容
 let lastSavedVersionId = '';                // 最近保存的文书版本ID（用于精修跳转）
@@ -77,14 +77,15 @@ const stepMaterialHints = {
 //   - source: 'material'=该步已选材料 / 'prev_step'=前序步骤输出 / 'case_context'=案件上下文
 //   - manualOnly: true 表示仅支持直接输入（合规要求，不调用 AI 生成）
 //   - V1.1 分步生成仅裁判文书（judgment），其他文书类型不展示分步生成 Tab
-//   - judgment 按案字分组：default=民初（一审，5 步），民终=二审（6 步）
-//     由 case-data.js 的 resolveStepsByCaseWord(entry, caseWord) 解析
+//   - judgment 按案件阶段分组：first=一审（5 步），second=二审（6 步）
+//     由 case-data.js 的 resolveStepsByCaseStage(entry, caseStage) 解析
+//     v1.45 链 C: 由"按案字判断"改为"按案件阶段判断"，案件阶段来源：有案字时按案字→阶段映射，无案字时用户在生成配置区选择
 const stepConfigsByOrg = {
     court: {
-        // 裁判文书分步生成（按案字区分一审/二审）
+        // 裁判文书分步生成（按案件阶段区分一审/二审）
         judgment: {
-            // 民初（一审）：5 步
-            default: [
+            // 一审（民初/刑初/行初）：5 步
+            'first': [
                 {
                     id: 'plaintiff', name: '原告诉请', apiId: 'wf-step-plaintiff',
                     inputs: [
@@ -123,8 +124,8 @@ const stepConfigsByOrg = {
                     inputs: []
                 }
             ],
-            // 民终（二审）：6 步
-            '民终': [
+            // 二审（民终/刑终/行终）：6 步
+            'second': [
                 {
                     id: 'originalReview', name: '原审查明认定', apiId: 'wf-step-original-review',
                     inputs: [
@@ -210,11 +211,10 @@ function applyReadOnlyMode() {
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
 
-    // 隐藏生成视图的「生成文书」「开始生成」「确认并编译文书」按钮
+    // 隐藏生成视图的「生成文书」「确认并编译文书」按钮
     const matGenerateBtn = document.getElementById('matGenerateBtn');
     if (matGenerateBtn) matGenerateBtn.style.display = 'none';
-    const startStepsBtn = document.getElementById('startStepsBtn');
-    if (startStepsBtn) startStepsBtn.style.display = 'none';
+    // v1.46 链 D: startStepsBtn 已移除
     const compileStepsBtn = document.getElementById('compileStepsBtn');
     if (compileStepsBtn) compileStepsBtn.style.display = 'none';
 
@@ -444,6 +444,13 @@ function applyListGenConfig(cfg) {
     const requirementTextarea = document.getElementById('matRequirement');
     if (requirementTextarea && cfg.requirement) {
         requirementTextarea.value = cfg.requirement;
+    }
+    // v1.45 链 C: 若列表页已传 caseStage，则设置到生成配置区（详情页能自动判定时忽略列表页值，由详情页自动判定）
+    if (cfg.caseStage) {
+        const matCaseStageSel = document.getElementById('matCaseStage');
+        if (matCaseStageSel) matCaseStageSel.value = cfg.caseStage;
+        const stepCaseStageSel = document.getElementById('stepCaseStage');
+        if (stepCaseStageSel) stepCaseStageSel.value = cfg.caseStage;
     }
     syncStepConfigFromMaterial();
     // 自动定位到一步生成 Tab（默认已在一步生成，确保激活）
@@ -734,6 +741,17 @@ function updateMatGenerateButtonState() {
         btn.title = '无可用材料，请先上传并解析文件';
         return;
     }
+    // v1.45 链 C: 案件阶段未选时置灰（仅裁判文书类型校验，有选项且未选时）
+    if (docType === 'judgment') {
+        const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+        const stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+        const currentStage = getCurrentCaseStage();
+        if (stageOptions.length > 0 && !currentStage) {
+            btn.disabled = true;
+            btn.title = '请先选择案件阶段';
+            return;
+        }
+    }
     const canGenerate = availableCount > 0 && docType !== '';
     btn.disabled = !canGenerate;
     btn.title = canGenerate ? '' : (availableCount === 0 ? '请先在左侧勾选材料' : '请选择文书类型');
@@ -894,6 +912,9 @@ function switchToStepView(options = {}) {
     // v2.25: 分步生成 tab 隐藏顶部"核心材料"提示条（分步生成每步独立选材料，与材料树全局勾选无关）
     const coreAlert = document.getElementById('coreMaterialsAlert');
     if (coreAlert) coreAlert.style.display = 'none';
+    // v1.45 链 C: 进入分步视图时刷新案件阶段行显隐 + 「开始生成」按钮状态
+    updateCaseStageRowVisibility();
+    updateStartStepsButtonState();
 }
 
 // 获取某步骤实际生效的关联材料（与核心材料表的交集，过滤已删除文件）
@@ -947,6 +968,8 @@ function backToMainView() {
     // v2.25: 恢复显示顶部"核心材料"提示条
     const coreAlert = document.getElementById('coreMaterialsAlert');
     if (coreAlert) coreAlert.style.display = '';
+    // v1.45 链 C: 返回一步生成视图时更新【生成文书】按钮状态
+    updateMatGenerateButtonState();
 }
 
 function toggleMaterialCol() {
@@ -1018,8 +1041,7 @@ function reconfigWithLatestSnapshot() {
     // 4. 生成方式：若原为分步生成，切换到分步生成视图
     if (latest.genMethod === 'step') {
         switchToStepView({ auto: false });
-        // 重置分步生成流程状态，让用户重新走【开始生成】
-        stepGenerationStarted = false;
+        // v1.46 链 D: 移除 stepGenerationStarted，分步生成视图自动展示步骤
         stepStates = stepsConfig.map(() => 'waiting');
         stepData = {};
         resetStepFlowUI();
@@ -1137,6 +1159,8 @@ function switchGenMethod(method) {
 
 // ===== 方法1 - 材料生成 =====
 function initMaterialGen() {
+    // v1.45 链 C: 先初始化案件阶段选择项
+    initCaseStageSelect();
     const docTypes = getCurrentDocTypes();
     const docTypeSelect = document.getElementById('matDocType');
     docTypeSelect.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
@@ -1152,6 +1176,101 @@ function initMaterialGen() {
         renderMatReqTemplates('');
     }
     syncStepConfigFromMaterial();
+}
+
+// v1.45 链 C: 初始化案件阶段选择项
+// 仅裁判文书(judgment)类型才显示案件阶段行；有案字能自动判定时隐藏整行，无法判定时才显示让用户选
+function initCaseStageSelect() {
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+    // 一步生成视图与分步生成视图共用同一逻辑
+    ['matCaseStage', 'stepCaseStage'].forEach(selectId => {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        // 构建选项
+        let html = '<option value="">请选择案件阶段</option>';
+        options.forEach(o => {
+            html += `<option value="${o.value}">${o.label}</option>`;
+        });
+        sel.innerHTML = html;
+        sel.value = '';
+        sel.disabled = false;
+    });
+    // 初始按当前文书类型刷新显隐
+    updateCaseStageRowVisibility();
+}
+
+// v1.45 链 C: 更新案件阶段行的显隐与值
+// 规则：仅裁判文书(judgment)类型显示；能按案字自动判定时隐藏整行（值已设置）；无法判定时显示让用户选
+function updateCaseStageRowVisibility() {
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+    const caseWord = extractCaseWordFromCaseNumber();
+    const autoStage = caseWord && typeof getCaseStageByCaseWord === 'function'
+        ? getCaseStageByCaseWord(caseWord) : '';
+
+    // 一步生成视图与分步生成视图共用同一逻辑
+    [
+        { rowId: 'matCaseStageRow', selectId: 'matCaseStage', hintId: 'matCaseStageHint' },
+        { rowId: 'stepCaseStageRow', selectId: 'stepCaseStage', hintId: 'stepCaseStageHint' }
+    ].forEach(({ rowId, selectId, hintId }) => {
+        const row = document.getElementById(rowId);
+        const sel = document.getElementById(selectId);
+        const hintEl = document.getElementById(hintId);
+        if (!row || !sel) return;
+
+        // 当前文书类型（一步生成用 matDocType，分步生成用 stepDocType）
+        const isStepsView = selectId === 'stepCaseStage';
+        const docTypeKey = isStepsView
+            ? (typeof stepDocType !== 'undefined' ? stepDocType : '')
+            : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
+        const isJudgment = docTypeKey === 'judgment';
+
+        if (!isJudgment) {
+            // 非裁判文书：隐藏整行，清空值
+            row.style.display = 'none';
+            sel.value = '';
+            if (hintEl) hintEl.style.display = 'none';
+            return;
+        }
+
+        // 裁判文书类型
+        if (autoStage) {
+            // 能自动判定：隐藏整行，值已设置
+            row.style.display = 'none';
+            sel.value = autoStage;
+            if (hintEl) hintEl.style.display = 'none';
+        } else if (options.length === 0) {
+            // 检察院/司法局取值待定，无选项可显示：隐藏整行（不阻塞生成）
+            row.style.display = 'none';
+            sel.value = '';
+            if (hintEl) hintEl.style.display = 'none';
+        } else {
+            // 无法自动判定且有选项：显示让用户选
+            row.style.display = '';
+            sel.value = '';
+            if (hintEl) {
+                hintEl.textContent = caseWord
+                    ? `案字「${caseWord}」无法判定阶段，请选择`
+                    : '本案无案字，请选择';
+                hintEl.style.display = 'inline-block';
+            }
+        }
+    });
+}
+
+// v1.45 链 C: 案件阶段选择变更
+function onCaseStageChange() {
+    // 切换案件阶段后需重新解析分步步骤序列
+    refreshStepsConfig();
+    renderSteps();
+    updateMatGenerateButtonState();
+    updateStartStepsButtonState();
+}
+
+// v1.46 链 D: 「开始生成」按钮已移除，此函数保留为空操作避免调用点报错
+function updateStartStepsButtonState() {
+    // 无操作——分步生成视图直接展示步骤序列，案件阶段校验由各步骤的「生成本步」按钮承担
 }
 
 // v1.24: 构建模板下拉 HTML，按来源分组（标准 / 我的）
@@ -1189,6 +1308,8 @@ function onMatDocTypeChange(shouldSync = true) {
     refreshStepsConfig();
     // v1.28: 材料生成 tab 切换文书类型时，同步匹配材料型 workflow（用户侧不感知）
     refreshMaterialWorkflow();
+    // v1.45 链 C: 切换文书类型后刷新案件阶段行显隐
+    updateCaseStageRowVisibility();
     updateMatGenerateButtonState();
     if (shouldSync) syncStepConfigFromMaterial();
 }
@@ -1318,6 +1439,9 @@ function onStepDocTypeChange(docTypeKey) {
     stepTemplate = templateKeys[0] || '';
     if (stepTemplate) templateSelect.value = stepTemplate;
     refreshStepsConfig();
+    // v1.45 链 C: 切换文书类型后刷新案件阶段行显隐 + 「开始生成」按钮状态
+    updateCaseStageRowVisibility();
+    updateStartStepsButtonState();
     renderSteps();
 }
 
@@ -1327,6 +1451,17 @@ function onStepTemplateChange(templateKey) {
 
 function generateByMaterial() {
     if (guardReadOnly('generateByMaterial')) return;
+    // v1.45 链 C: 校验案件阶段已选（仅裁判文书类型校验，防止 UI 禁用被绕过）
+    const _matDocType0 = document.getElementById('matDocType')?.value || '';
+    if (_matDocType0 === 'judgment') {
+        const _org0 = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+        const _stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(_org0) : [];
+        const _currentStage = getCurrentCaseStage();
+        if (_stageOptions.length > 0 && !_currentStage) {
+            showNotification('请先选择案件阶段', 'warning');
+            return;
+        }
+    }
     // v2.22: 全部文件异常时阻止生成
     const stats = getCaseParseStats(caseItem);
     if (stats.total > 0 && stats.success === 0) {
@@ -1351,17 +1486,16 @@ function generateByMaterial() {
     const _matDocType = document.getElementById('matDocType')?.value || '';
     const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (_matDocType === 'judgment' && _hasElements) {
-        // v2.28: 已做过 AI 总结则默认直接引入，不弹框
-        if (hasExistingElementAnswers()) {
-            const elementAnswers = collectExistingElementAnswers();
-            showNotification(`已引入 ${elementAnswers.length} 个案由要件辅助生成`, 'info');
-            doGenerateByMaterial(elementAnswers);
-        } else {
-            showPreElementConfirmModal(allPresets, () => {
-                doGenerateByMaterial(null);
-            }, (elementAnswers) => {
+        // v1.48: 有答案→大文本框确认；无答案→恢复原有两个弹框（确认引入→选择要件→答案确认）
+        if (hasAnyElementAnswer(allPresets)) {
+            showElementContextModal(allPresets, (elementAnswers) => {
                 doGenerateByMaterial(elementAnswers);
             });
+        } else {
+            showPreElementConfirmModal(allPresets,
+                () => { doGenerateByMaterial(null); },
+                (answers) => { doGenerateByMaterial(answers); }
+            );
         }
     } else {
         doGenerateByMaterial(null);
@@ -1393,32 +1527,18 @@ function autoGenerateWithAllElements() {
     const _autoDocType = document.getElementById('matDocType')?.value || getUrlParam('docType') || '';
 
     if (_autoDocType === 'judgment' && hasPresets) {
-        const elementAnswers = [];
-        (allPresets.standard || []).forEach(p => {
-            elementAnswers.push({
-                name: p.name,
-                desc: p.desc,
-                question: p.question,
-                answer: generateMockElementAnswer(p, caseItem)
-            });
-        });
-        (allPresets.mine || []).forEach(p => {
-            elementAnswers.push({
-                name: p.name,
-                desc: p.desc,
-                question: p.question,
-                answer: generateMockElementAnswer(p, caseItem)
-            });
-        });
-        (allPresets.case || []).forEach(p => {
-            elementAnswers.push({
-                name: p.name,
-                desc: p.desc,
-                question: p.question,
-                answer: generateMockElementAnswer(p, caseItem)
-            });
-        });
-        showNotification(`已自动引入 ${elementAnswers.length} 个案由要件辅助生成`, 'info');
+        // v1.48: 列表页直接引入所有可用要件，不弹框确认
+        const all = [
+            ...((allPresets.standard || []).map(p => ({ ...p, source: 'standard' }))),
+            ...((allPresets.mine || []).map(p => ({ ...p, source: 'mine' }))),
+            ...((allPresets.case || []).map(p => ({ ...p, source: 'case' })))
+        ];
+        const elementAnswers = all.map(p => ({
+            name: p.name,
+            desc: p.desc,
+            question: p.question,
+            answer: (caseElementsAnswers[p.name] || '').trim() || generateMockElementAnswer(p, caseItem)
+        }));
         doGenerateByMaterial(elementAnswers);
     } else {
         doGenerateByMaterial(null);
@@ -1861,16 +1981,16 @@ function initStepsGen() {
     renderStepGenConfig();
     resetStepFlowUI();
     renderSteps();
+    // v1.45 链 C: 分步生成视图初始化后刷新案件阶段行显隐 + 「开始生成」按钮状态
+    updateCaseStageRowVisibility();
+    updateStartStepsButtonState();
 }
 
 // 重置分步生成流程 UI（切换 tab/文书类型时调用）
 function resetStepFlowUI() {
-    stepGenerationStarted = false;
-    const flowArea = document.getElementById('stepFlowArea');
-    const startBtn = document.getElementById('startStepsBtn');
+    // v1.46 链 D: 移除 stepGenerationStarted 与 startStepsBtn 控制
+    // 分步生成视图直接展示 stepFlowArea，仅重置底部 nextArea
     const nextArea = document.getElementById('stepNextActionArea');
-    if (flowArea) flowArea.style.display = 'none';
-    if (startBtn) startBtn.style.display = 'inline-flex';
     if (nextArea) nextArea.style.display = 'none';
 }
 
@@ -1880,11 +2000,22 @@ function refreshStepsConfig() {
         : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
     const caseWord = extractCaseWordFromCaseNumber();
     const cause = extractCauseFromCase();
+    // v1.45 链 C: 获取当前案件阶段，按案件阶段解析步骤序列
+    const caseStage = getCurrentCaseStage();
     // v1.22: 渲染步骤方案下拉（多 workflow 时显示），并按选中 workflow 取步骤
     // v1.28: 仅匹配分步型 workflow（材料型由材料生成 tab 单独处理）
     // v1.32: 匹配维度升级为案字+案由
     renderStepPlanSelect(docTypeKey, caseWord, cause);
-    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, currentStepPlanId);
+    // v1.46 链 D: 判决书类型案件阶段未明确时（无案字且用户未选）不展示步骤序列
+    // 等用户选了案件阶段后才展示对应的 5步/6步序列
+    // v1.46: 再审暂不支持分步生成，同样置空步骤序列
+    if (docTypeKey === 'judgment' && (!caseStage || caseStage === 'retrial')) {
+        stepsConfig = [];
+        stepStates = [];
+        stepData = {};
+        return;
+    }
+    stepsConfig = getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, currentStepPlanId, caseStage);
     stepStates = stepsConfig.map(() => 'waiting');
     stepData = {};
 }
@@ -1923,7 +2054,9 @@ function onStepPlanChange(wfId) {
     currentStepPlanId = wfId;
     const caseWord = extractCaseWordFromCaseNumber();
     const cause = extractCauseFromCase();
-    stepsConfig = getStepsConfigForDocTypeWithFallback(stepDocType, caseWord, cause, currentStepPlanId);
+    // v1.45 链 C: 获取当前案件阶段
+    const caseStage = getCurrentCaseStage();
+    stepsConfig = getStepsConfigForDocTypeWithFallback(stepDocType, caseWord, cause, currentStepPlanId, caseStage);
     stepStates = stepsConfig.map(() => 'waiting');
     stepData = {};
     expandedStepIndex = -1;
@@ -1970,6 +2103,27 @@ function extractCaseWordFromCaseNumber() {
     return '';
 }
 
+// v1.45 链 C: 获取当前案件阶段
+// 优先级：1. 生成配置区的案件阶段选择项值（用户手选，无案字时必选）
+//        2. 按案字映射自动判定（有案字时）
+// 返回: 'first' / 'second' / 'retrial' / '' (空表示未确定，无案字且用户未选)
+function getCurrentCaseStage() {
+    // 1. 优先从生成配置区选择项获取
+    const stageSelect = currentGenMethod === 'steps'
+        ? document.getElementById('stepCaseStage')
+        : document.getElementById('matCaseStage');
+    if (stageSelect) {
+        const selected = stageSelect.value;
+        if (selected) return selected;
+    }
+    // 2. 按案字映射
+    const caseWord = extractCaseWordFromCaseNumber();
+    if (caseWord && typeof getCaseStageByCaseWord === 'function') {
+        return getCaseStageByCaseWord(caseWord);
+    }
+    return '';
+}
+
 // v1.32: 从当前案件提取案由（用于 workflow 双维度匹配）
 function extractCauseFromCase() {
     try {
@@ -1986,8 +2140,9 @@ function extractCauseFromCase() {
 // v1.22: 优先走 case-data.js 的 getStepsConfigForDocType（按案字匹配 workflow）
 // v1.28: 仅匹配分步型 workflow（type='step'）
 // v1.32: 匹配维度升级为案字+案由
+// v1.45 链 C: 增加 caseStage 参数，优先按案件阶段解析步骤序列
 // 保留原有 fallback 逻辑：未匹配到 workflow 时回退到内置 stepConfigsByOrg
-function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepPlanId) {
+function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepPlanId, caseStage) {
     // 1. 优先用 case-data.js 的全局函数（读 localStorage.adminWorkflows）
     if (typeof getWorkflowsForDocType === 'function' && docTypeKey) {
         const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
@@ -2001,21 +2156,29 @@ function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepP
                     return selected.steps;
                 }
             }
-            // 否则按案字+案由匹配
+            // 否则按案字+案由+案件阶段匹配
             if (typeof getStepsConfigForDocType === 'function') {
-                const steps = getStepsConfigForDocType(docTypeKey, caseWord, cause);
+                const steps = getStepsConfigForDocType(docTypeKey, caseWord, cause, caseStage);
                 if (steps && steps.length > 0) return steps;
             }
         }
     }
-    // 2. fallback：内置 stepConfigsByOrg + fallbackMap（按案字解析）
+    // 2. fallback：内置 stepConfigsByOrg + fallbackMap（v1.45 起按案件阶段解析）
     const orgConfigs = (typeof stepConfigsByOrg !== 'undefined')
         ? (stepConfigsByOrg[org] || stepConfigsByOrg.court)
         : {};
+    // v1.45 链 C: 优先用 resolveStepsByCaseStage（按案件阶段），无 caseStage 时回退 resolveStepsByCaseWord
+    const resolveFn = (entry) => {
+        if (caseStage && typeof resolveStepsByCaseStage === 'function') {
+            return resolveStepsByCaseStage(entry, caseStage);
+        }
+        if (typeof resolveStepsByCaseWord === 'function') {
+            return resolveStepsByCaseWord(entry, caseWord);
+        }
+        return entry;
+    };
     if (docTypeKey && orgConfigs[docTypeKey]) {
-        return (typeof resolveStepsByCaseWord === 'function')
-            ? resolveStepsByCaseWord(orgConfigs[docTypeKey], caseWord)
-            : orgConfigs[docTypeKey];
+        return resolveFn(orgConfigs[docTypeKey]);
     }
 
     const fallbackMap = {
@@ -2025,22 +2188,16 @@ function getStepsConfigForDocTypeWithFallback(docTypeKey, caseWord, cause, stepP
     };
     const key = fallbackMap[docTypeKey];
     if (key && orgConfigs[key]) {
-        return (typeof resolveStepsByCaseWord === 'function')
-            ? resolveStepsByCaseWord(orgConfigs[key], caseWord)
-            : orgConfigs[key];
+        return resolveFn(orgConfigs[key]);
     }
 
     const firstDocType = Object.keys(getCurrentDocTypes())[0];
     if (firstDocType && orgConfigs[firstDocType]) {
-        return (typeof resolveStepsByCaseWord === 'function')
-            ? resolveStepsByCaseWord(orgConfigs[firstDocType], caseWord)
-            : orgConfigs[firstDocType];
+        return resolveFn(orgConfigs[firstDocType]);
     }
 
     const firstEntry = Object.values(orgConfigs)[0] || [];
-    return (typeof resolveStepsByCaseWord === 'function')
-        ? resolveStepsByCaseWord(firstEntry, caseWord)
-        : firstEntry;
+    return resolveFn(firstEntry);
 }
 
 // v2.21: 构建步骤依赖提示 HTML
@@ -2105,10 +2262,30 @@ function buildStepDependencyHintHtml(stepIdx) {
 
 function renderSteps() {
     const list = document.getElementById('stepsList');
+    // v1.46 链 D: step-view-hint 显隐控制
+    const viewHint = document.getElementById('stepViewHint');
     if (!stepsConfig.length) {
-        list.innerHTML = '<div style="color:var(--text-muted);padding:20px;">暂无步骤配置</div>';
+        // v1.46 链 D: 案件阶段未明确时给出友好提示，并隐藏 step-view-hint
+        const docTypeKey = (typeof stepDocType !== 'undefined') ? stepDocType : '';
+        const isJudgment = docTypeKey === 'judgment';
+        const stage = (typeof getCurrentCaseStage === 'function') ? getCurrentCaseStage() : '';
+        const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+        const stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
+        let hint = '暂无步骤配置';
+        let hideHint = false;
+        if (isJudgment && stage === 'retrial') {
+            // v1.46: 再审暂不支持分步生成
+            hint = '再审案件暂不支持分步生成，请使用一步生成';
+            hideHint = true;
+        } else if (isJudgment && stageOptions.length > 0 && !stage) {
+            hint = '请先选择案件阶段，系统将按案件阶段展示对应步骤序列（一审 5 步 / 二审 6 步）';
+            hideHint = true;
+        }
+        list.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">${hint}</div>`;
+        if (viewHint) viewHint.style.display = hideHint ? 'none' : '';
         return;
     }
+    if (viewHint) viewHint.style.display = '';
 
     // 确保每一步都有 material Set；未初始化时默认为空，由用户手动选择
     stepsConfig.forEach(s => {
@@ -2125,17 +2302,28 @@ function renderSteps() {
         if (state === 'current' && isGenerating) {
             contentHtml = '<div class="step-skeleton"><div class="step-skeleton-line" style="width:90%"></div><div class="step-skeleton-line" style="width:70%"></div><div class="step-skeleton-line" style="width:80%"></div></div>';
         } else if (state === 'done' && data) {
-            contentHtml = (data.items || []).map((item, idx) =>
-                `<div class="step-content-item"><span class="step-content-item-num">${idx + 1}.</span>${item}</div>`
-            ).join('');
-            // v2.24: 追问历史渲染
-            if (data.followUps && data.followUps.length > 0) {
-                contentHtml += data.followUps.map(f => `
+            // v1.48 链 G: 上方大文本框展示最新正式答案（可编辑），下方折叠展示优化问答历史
+            const latestAnswer = (data.items || []).join('\n');
+            contentHtml = `<textarea class="step-edit-textarea step-content-answer" id="stepAnswer_${i}" placeholder="正式答案...">${escapeHtmlForStreaming(latestAnswer)}</textarea>`;
+
+            // 优化问答历史折叠展示（除最后一轮外），每条带回填+删除按钮
+            if (data.followUps && data.followUps.length > 1) {
+                const historyItems = data.followUps.slice(0, -1).map((f, idx) => `
                     <div class="step-followup-item">
-                        <div class="step-followup-q"><i class="fas fa-question-circle"></i> ${escapeHtmlForStreaming(f.q)}</div>
+                        <div class="step-followup-q"><i class="fas fa-question-circle"></i> 第 ${idx + 1} 轮：${escapeHtmlForStreaming(f.q)}</div>
                         <div class="step-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForStreaming(f.a)}</div>
+                        <div class="step-followup-actions">
+                            <button class="step-action-btn" onclick="backfillStepOptimization(${i}, ${idx})"><i class="fas fa-undo"></i> 回填</button>
+                            <button class="step-action-btn danger" onclick="deleteStepOptimization(${i}, ${idx})"><i class="fas fa-trash-alt"></i> 删除</button>
+                        </div>
                     </div>
                 `).join('');
+                contentHtml += `
+                    <details class="step-optimization-history">
+                        <summary>优化历史（${data.followUps.length - 1} 轮）</summary>
+                        ${historyItems}
+                    </details>
+                `;
             }
         }
 
@@ -2207,7 +2395,7 @@ function renderSteps() {
                             <button class="step-action-btn" onclick="editStep(${i})"><i class="fas fa-edit"></i> 编辑</button>
                             ${showGenerate ? `
                                 <button class="step-action-btn" onclick="regenerateStep(${i})"><i class="fas fa-redo"></i> 重新生成</button>
-                                <button class="step-action-btn" onclick="followUpStep(${i})"><i class="fas fa-comments"></i> 追问</button>
+                                <button class="step-action-btn" onclick="contentOptimizeStep(${i})" ${((stepData[s.id].followUps || []).length >= 3) ? 'disabled title="已达到最大优化轮次（3 轮）"' : ''}><i class="fas fa-magic-wand-sparkles"></i> 内容优化${((stepData[s.id].followUps || []).length > 0) ? `（${(stepData[s.id].followUps || []).length}/3）` : ''}</button>
                             ` : ''}
                         </div>
                     ` : (state === 'waiting' && !isGenerating ? `
@@ -2467,6 +2655,12 @@ async function generateSingleStep(stepIndex, options = {}) {
     const step = stepsConfig[stepIndex];
     if (!step) return false;
 
+    // v1.46: manualOnly 步骤（裁判结果）不允许 AI 生成，应走直接输入
+    if (step.manualOnly) {
+        if (!options.silent) showNotification('裁判结果需由法官手动输入，不支持 AI 生成', 'warning');
+        return false;
+    }
+
     const stepId = step.id;
     const stepTitle = step.name;  // v2.21: 字段从 title 改为 name
     const mats = getEffectiveStepMaterials(stepId);
@@ -2479,57 +2673,48 @@ async function generateSingleStep(stepIndex, options = {}) {
     isGenerating = true;
     updateStepGenerationButtons();
 
-    stepStates[stepIndex] = 'current';
-    renderSteps();
-    const el = document.getElementById(`step_${stepIndex}`);
-    if (el) el.classList.add('expanded');
+    try {
+        stepStates[stepIndex] = 'current';
+        renderSteps();
+        const el = document.getElementById(`step_${stepIndex}`);
+        if (el) el.classList.add('expanded');
 
-    await sleep(2000);
+        await sleep(2000);
 
-    const selectedMats = caseItem.files.filter(f => mats.has(f.id));
-    stepData[stepId].items = generateStepContent(stepId, caseItem, org, selectedMats);
-    stepStates[stepIndex] = 'done';
-    renderSteps();
-    const elDone = document.getElementById(`step_${stepIndex}`);
-    if (elDone) elDone.classList.add('expanded');
+        const selectedMats = caseItem.files.filter(f => mats.has(f.id));
+        stepData[stepId].items = generateStepContent(stepId, caseItem, org, selectedMats);
+        stepStates[stepIndex] = 'done';
+        renderSteps();
+        const elDone = document.getElementById(`step_${stepIndex}`);
+        if (elDone) elDone.classList.add('expanded');
 
-    isGenerating = false;
-    updateStepGenerationButtons();
-    return true;
+        return true;
+    } catch (err) {
+        console.error('[generateSingleStep] 生成失败:', err);
+        if (!options.silent) showNotification('生成失败，请重试', 'error');
+        stepStates[stepIndex] = 'waiting';
+        renderSteps();
+        return false;
+    } finally {
+        isGenerating = false;
+        renderSteps();  // 修复：isGenerating 重置后需重新渲染，确保 manualOnly 步骤输入框恢复
+        updateStepGenerationButtons();
+    }
 }
 
 function updateStepGenerationButtons() {
-    const startBtn = document.getElementById('startStepsBtn');
+    // v1.46 链 D: 移除 startStepsBtn 处理（按钮已删除），仅保留底部 nextArea 控制
     const compileBtn = document.getElementById('compileStepsBtn');
     const nextArea = document.getElementById('stepNextActionArea');
     const nextBtn = document.getElementById('stepNextBtn');
 
-    // 兼容旧版 DOM（若页面未升级则保持原逻辑）
+    // 兼容旧版 DOM（compileStepsBtn 已废弃，保留兜底）
     if (compileBtn) {
         const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
         compileBtn.style.display = allDone ? 'inline-flex' : 'none';
     }
 
-    if (!startBtn || !nextArea || !nextBtn) {
-        // 旧版页面兜底
-        if (startBtn) {
-            const allDone = stepsConfig.every((s, i) => stepStates[i] === 'done');
-            startBtn.style.display = isGenerating || allDone ? 'none' : 'inline-flex';
-            startBtn.innerHTML = '<i class="fas fa-play"></i> 开始生成';
-        }
-        return;
-    }
-
-    // 新交互：未点击【开始生成】前只显示 startBtn
-    if (!stepGenerationStarted) {
-        startBtn.style.display = 'inline-flex';
-        startBtn.innerHTML = '<i class="fas fa-play"></i> 开始生成';
-        nextArea.style.display = 'none';
-        return;
-    }
-
-    // 已开始：隐藏顶部开始按钮
-    startBtn.style.display = 'none';
+    if (!nextArea || !nextBtn) return;
 
     // 生成中不显示底部按钮
     if (isGenerating) {
@@ -2549,23 +2734,10 @@ function updateStepGenerationButtons() {
     }
 }
 
+// v1.46 链 D: startStepGeneration 已废弃——「开始生成」按钮已移除，分步生成视图进入即展示步骤序列
+// 保留空函数避免外部调用报错
 async function startStepGeneration() {
-    if (guardReadOnly('startStepGeneration')) return;
-    if (isGenerating) return;
-
-    // v2.24: 不再强制校验所有步骤材料，用户可在步骤列表中逐步选择材料后手动点击"生成本步"
-    stepGenerationStarted = true;
-    const flowArea = document.getElementById('stepFlowArea');
-    if (flowArea) flowArea.style.display = 'block';
-
-    // 展开第一步引导用户操作
-    if (stepsConfig.length > 0) {
-        expandedStepIndex = 0;
-    }
-    renderSteps();
-    updateStepGenerationButtons();
-
-    // 不再自动生成第一步，由用户手动点击"生成本步"或"直接输入"
+    // 无操作
 }
 
 // 校验所有未生成步骤的材料
@@ -2579,16 +2751,9 @@ function validateStepMaterials() {
         const mats = getEffectiveStepMaterials(stepId);
         if (mats.size === 0) {
             showNotification(`请为「${stepTitle}」至少选择 1 件材料`, 'warning');
-            // 若流程区域已显示则展开对应步骤
+            // v1.46 链 D: stepFlowArea 默认展示，直接展开对应步骤
             const flowArea = document.getElementById('stepFlowArea');
             if (flowArea && flowArea.style.display !== 'none') {
-                const el = document.getElementById(`step_${i}`);
-                if (el) el.classList.add('expanded');
-            } else if (flowArea) {
-                // 未开始时先显示流程区域让用户选择材料
-                stepGenerationStarted = true;
-                flowArea.style.display = 'block';
-                renderSteps();
                 const el = document.getElementById(`step_${i}`);
                 if (el) el.classList.add('expanded');
             }
@@ -2798,8 +2963,18 @@ function saveDirectInput(index) {
 }
 
 // v2.24: 追问 —— 在已完成步骤下方 toggle 追问输入区，支持多轮对话
-function followUpStep(index) {
-    if (guardReadOnly('followUpStep')) return;
+// v1.48 链 G: 内容优化（原追问改名+轮次限制+展示方式调整）
+function contentOptimizeStep(index) {
+    if (guardReadOnly('contentOptimizeStep')) return;
+
+    // 轮次限制：最多 3 轮
+    const stepId = stepsConfig[index].id;
+    const followUpCount = (stepData[stepId].followUps || []).length;
+    if (followUpCount >= 3) {
+        showNotification('已达到最大优化轮次（3 轮）', 'warning');
+        return;
+    }
+
     const existing = document.getElementById(`stepFollowUpArea_${index}`);
     if (existing) {
         existing.remove();
@@ -2810,8 +2985,8 @@ function followUpStep(index) {
     contentEl.insertAdjacentHTML('beforeend', `
         <div class="step-followup-area" id="stepFollowUpArea_${index}">
             <div class="step-followup-input-row">
-                <input type="text" id="stepFollowUpInput_${index}" placeholder="输入追问问题，按 Enter 发送..." class="step-followup-text">
-                <button class="step-action-btn primary" onclick="submitFollowUp(${index})"><i class="fas fa-paper-plane"></i> 发送</button>
+                <input type="text" id="stepFollowUpInput_${index}" placeholder="输入优化要求，按 Enter 发送..." class="step-followup-text">
+                <button class="step-action-btn primary" onclick="submitContentOptimize(${index})"><i class="fas fa-paper-plane"></i> 发送</button>
             </div>
         </div>
     `);
@@ -2819,19 +2994,32 @@ function followUpStep(index) {
     if (input) {
         input.focus();
         input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); submitFollowUp(index); }
+            if (e.key === 'Enter') { e.preventDefault(); submitContentOptimize(index); }
         });
     }
 }
 
-// v2.24: 提交追问，模拟 AI 回答并持久化到 stepData
-function submitFollowUp(index) {
+// v1.48 链 G: 提交内容优化，模拟 AI 回答并持久化到 stepData
+function submitContentOptimize(index) {
     const stepId = stepsConfig[index].id;
     const input = document.getElementById(`stepFollowUpInput_${index}`);
     if (!input || !input.value.trim()) return;
 
+    // 轮次限制校验
+    const followUpCount = (stepData[stepId].followUps || []).length;
+    if (followUpCount >= 3) {
+        showNotification('已达到最大优化轮次（3 轮）', 'warning');
+        return;
+    }
+
     const q = input.value.trim();
     if (!stepData[stepId].followUps) stepData[stepId].followUps = [];
+
+    // 先保存文本框中的当前正式答案
+    const answerTa = document.getElementById(`stepAnswer_${index}`);
+    if (answerTa) {
+        stepData[stepId].items = answerTa.value.split('\n').filter(l => l.trim());
+    }
 
     // 原型 mock：基于步骤类型返回模拟回答
     const stepName = stepsConfig[index].name || '';
@@ -2843,11 +3031,43 @@ function submitFollowUp(index) {
     const a = mockAnswers[stepData[stepId].followUps.length % mockAnswers.length];
 
     stepData[stepId].followUps.push({ q, a });
+
+    // 优化后更新正式答案（模拟：将优化回答追加到 items）
+    stepData[stepId].items = [a];
+
     renderSteps();
     const el = document.getElementById(`step_${index}`);
     if (el) el.classList.add('expanded');
-    // 重新展开追问输入框
-    setTimeout(() => followUpStep(index), 0);
+
+    // 若未达 3 轮上限，重新展开优化输入框
+    if (stepData[stepId].followUps.length < 3) {
+        setTimeout(() => contentOptimizeStep(index), 0);
+    }
+}
+
+// v1.48 链 G: 回填优化历史答案到正式答案文本框
+function backfillStepOptimization(stepIndex, followUpIdx) {
+    const stepId = stepsConfig[stepIndex].id;
+    const data = stepData[stepId];
+    if (!data || !data.followUps || followUpIdx >= data.followUps.length) return;
+    const answer = data.followUps[followUpIdx].a;
+    stepData[stepId].items = [answer];
+    renderSteps();
+    const el = document.getElementById(`step_${stepIndex}`);
+    if (el) el.classList.add('expanded');
+    showNotification('已回填第 ' + (followUpIdx + 1) + ' 轮优化答案', 'success');
+}
+
+// v1.48 链 G: 删除优化历史记录
+function deleteStepOptimization(stepIndex, followUpIdx) {
+    const stepId = stepsConfig[stepIndex].id;
+    const data = stepData[stepId];
+    if (!data || !data.followUps || followUpIdx >= data.followUps.length) return;
+    data.followUps.splice(followUpIdx, 1);
+    renderSteps();
+    const el = document.getElementById(`step_${stepIndex}`);
+    if (el) el.classList.add('expanded');
+    showNotification('已删除第 ' + (followUpIdx + 1) + ' 轮优化记录', 'info');
 }
 
 function editStep(index) {
@@ -2919,17 +3139,16 @@ function compileSteps() {
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
     const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (stepDocType === 'judgment' && _hasElements3) {
-        // v2.28: 已做过 AI 总结则默认直接引入，不弹框
-        if (hasExistingElementAnswers()) {
-            const elementAnswers = collectExistingElementAnswers();
-            showNotification(`已引入 ${elementAnswers.length} 个案由要件辅助生成`, 'info');
-            doCompileSteps(elementAnswers);
-        } else {
-            showPreElementConfirmModal(allPresets, () => {
-                doCompileSteps(null);
-            }, (elementAnswers) => {
+        // v1.48: 有答案→大文本框确认；无答案→恢复原有两个弹框（确认引入→选择要件→答案确认）
+        if (hasAnyElementAnswer(allPresets)) {
+            showElementContextModal(allPresets, (elementAnswers) => {
                 doCompileSteps(elementAnswers);
             });
+        } else {
+            showPreElementConfirmModal(allPresets,
+                () => { doCompileSteps(null); },
+                (answers) => { doCompileSteps(answers); }
+            );
         }
     } else {
         doCompileSteps(null);
@@ -2973,6 +3192,135 @@ function doCompileSteps(elementAnswers) {
     startStreamingOutput(content, title);
 }
 
+// ===== v1.47: 案由要件上下文确认弹框（简化版大文本框）=====
+let pendingElementContextCallback = null;
+// v1.50: 标记大文本框弹框是否由「无答案→选完要件」路径触发（用于关闭时一并清理选择弹框 state）
+let elementContextHasPrevious = false;
+
+// v1.48: 判断当前案件可用要件中是否已有答案
+function hasAnyElementAnswer(allPresets) {
+    if (!allPresets) return false;
+    const all = [
+        ...(allPresets.standard || []),
+        ...(allPresets.mine || []),
+        ...(allPresets.case || [])
+    ];
+    return all.some(p => {
+        const ans = (caseElementsAnswers[p.name] || '').trim();
+        return ans.length > 0;
+    });
+}
+
+// v1.48: 从已有答案构建 elementAnswers 数组（仅含有答案的要件）
+function buildElementAnswersFromExisting(allPresets) {
+    if (!allPresets) return null;
+    const all = [
+        ...((allPresets.standard || []).map(p => ({ ...p, source: 'standard' }))),
+        ...((allPresets.mine || []).map(p => ({ ...p, source: 'mine' }))),
+        ...((allPresets.case || []).map(p => ({ ...p, source: 'case' })))
+    ];
+    const result = all.filter(p => {
+        const ans = (caseElementsAnswers[p.name] || '').trim();
+        return ans.length > 0;
+    }).map(p => ({
+        name: p.name,
+        desc: p.desc,
+        question: p.question,
+        answer: caseElementsAnswers[p.name]
+    }));
+    return result.length > 0 ? result : null;
+}
+
+function showElementContextModal(presets, callback, opts) {
+    pendingElementContextCallback = callback;
+    const hasPrevious = !!(opts && opts.hasPrevious);
+    elementContextHasPrevious = hasPrevious;
+
+    const all = [
+        ...((presets && presets.standard) || []).map(p => ({ ...p, source: 'standard' })),
+        ...((presets && presets.mine) || []).map(p => ({ ...p, source: 'mine' })),
+        ...((presets && presets.case) || []).map(p => ({ ...p, source: 'case' }))
+    ];
+
+    if (all.length === 0) {
+        if (typeof callback === 'function') callback(null);
+        return;
+    }
+
+    // 构建上下文文本：已有答案优先用已有答案，否则用 mock 答案
+    let contextText = '';
+    all.forEach((p, i) => {
+        const existingAns = (caseElementsAnswers[p.name] || '').trim();
+        const answer = existingAns || generateMockElementAnswer(p, caseItem);
+        contextText += `【${p.name}】\n问题：${p.question || ''}\n答案：${answer}`;
+        if (i < all.length - 1) contextText += '\n\n';
+    });
+
+    const ta = document.getElementById('elementContextTextarea');
+    if (ta) ta.value = contextText;
+
+    // v1.50: 按入口切换按钮组——有答案直接弹框（简化版）维持三按钮；无答案路径第三步仅显示「上一步」+「确认生成」
+    const cancelBtn = document.getElementById('elementContextCancelBtn');
+    const skipBtn = document.getElementById('elementContextSkipBtn');
+    const backBtn = document.getElementById('elementContextBackBtn');
+    if (cancelBtn) cancelBtn.style.display = hasPrevious ? 'none' : '';
+    if (skipBtn) skipBtn.style.display = hasPrevious ? 'none' : '';
+    if (backBtn) backBtn.style.display = hasPrevious ? '' : 'none';
+
+    document.getElementById('elementContextOverlay').classList.add('show');
+    document.getElementById('elementContextModal').classList.add('show');
+}
+
+function closeElementContextModal() {
+    document.getElementById('elementContextOverlay').classList.remove('show');
+    document.getElementById('elementContextModal').classList.remove('show');
+    pendingElementContextCallback = null;
+    // v1.50: 若由「无答案→选完要件」路径触发，且未走「上一步」返回，则一并清理选择弹框 state 避免泄漏
+    if (elementContextHasPrevious) {
+        elementContextHasPrevious = false;
+        pendingElementAll = { standard: [], mine: [], case: [] };
+        pendingElementSelections = new Set();
+        pendingElementConfirmCallback = null;
+    }
+}
+
+function skipElementContext() {
+    const cb = pendingElementContextCallback;
+    closeElementContextModal();
+    if (typeof cb === 'function') cb(null);
+}
+
+function confirmElementContextModal() {
+    const text = (document.getElementById('elementContextTextarea')?.value || '').trim();
+    // v1.50: 先捕获 callback 再关闭弹框（closeElementContextModal 会置空 pendingElementContextCallback）
+    const cb = pendingElementContextCallback;
+    if (!text) {
+        // 用户清空了内容，等同于不引入要件
+        closeElementContextModal();
+        if (typeof cb === 'function') cb(null);
+        return;
+    }
+
+    // 解析大文本框内容，按 【要件名】 分块提取问题与答案
+    const elementAnswers = [];
+    const blocks = text.split(/(?=【)/);
+    blocks.forEach(block => {
+        const nameMatch = block.match(/^【(.+?)】/);
+        if (!nameMatch) return;
+        const name = nameMatch[1].trim();
+        const qMatch = block.match(/问题：([\s\S]*?)(?=\n答案：)/);
+        const aMatch = block.match(/答案：([\s\S]*)/);
+        elementAnswers.push({
+            name: name,
+            question: qMatch ? qMatch[1].trim() : '',
+            answer: aMatch ? aMatch[1].trim() : ''
+        });
+    });
+
+    closeElementContextModal();
+    if (typeof cb === 'function') cb(elementAnswers);
+}
+
 // ===== 引入案由要件弹窗 =====
 let pendingElementPresets = { standard: [], mine: [], case: [] };
 let pendingElementDirectCallback = null;
@@ -3010,6 +3358,18 @@ function chooseDirectGenerate() {
 function chooseIntroduceElements() {
     closePreElementConfirmModal();
     showElementConfirmModal(pendingElementPresets, pendingElementConfirmCallback);
+}
+
+// v1.50: 选择要件弹框「上一步」——返回第一个弹框（确认是否引入），保留第一个弹框的 state
+function backToPreElementConfirm() {
+    // 仅隐藏选择弹框 UI + 清理本弹框本地 state，不动 pendingElementPresets/Direct/Confirm（第一个弹框共享）
+    document.getElementById('elementConfirmOverlay').classList.remove('show');
+    document.getElementById('elementConfirmModal').classList.remove('show');
+    pendingElementAll = { standard: [], mine: [], case: [] };
+    pendingElementSelections = new Set();
+    // 重新显示第一个弹框（state 未清理，直接复用）
+    document.getElementById('preElementConfirmOverlay').classList.add('show');
+    document.getElementById('preElementConfirmModal').classList.add('show');
 }
 
 function showElementConfirmModal(presets, callback) {
@@ -3115,9 +3475,33 @@ function showElementConfirmAnswerStep() {
         showNotification('请先勾选要引入的要件', 'warning');
         return;
     }
-    renderElementConfirmAnswers();
-    document.getElementById('elementConfirmStep1').classList.remove('active');
-    document.getElementById('elementConfirmStep2').classList.add('active');
+    // v1.48: 选完要件后切换到大文本框确认弹框展示所有已选要件问题及参考答案
+    // v1.50: 不调 closeElementConfirmModal（会清状态），仅隐藏 UI 以支持「上一步」返回并保留已勾选
+    const selected = getSelectedElements();
+    const callback = pendingElementConfirmCallback;
+    document.getElementById('elementConfirmOverlay').classList.remove('show');
+    document.getElementById('elementConfirmModal').classList.remove('show');
+    // 构造只含已选要件的 presets，传入大文本框弹框
+    const filteredPresets = {
+        standard: selected.filter(p => p.source === 'standard'),
+        mine: selected.filter(p => p.source === 'mine'),
+        case: selected.filter(p => p.source === 'case')
+    };
+    showElementContextModal(filteredPresets, callback, { hasPrevious: true });
+}
+
+// v1.50: 大文本框弹框「上一步」——返回要件选择弹框（保留已勾选状态）
+function backToElementConfirmSelect() {
+    // 关闭大文本框弹框
+    document.getElementById('elementContextOverlay').classList.remove('show');
+    document.getElementById('elementContextModal').classList.remove('show');
+    pendingElementContextCallback = null;
+    // 重新渲染选择列表（state 未清理，已勾选状态保留）并显示
+    renderElementConfirmSelectList();
+    updateElementSelectedCount();
+    showElementConfirmSelectStep();
+    document.getElementById('elementConfirmOverlay').classList.add('show');
+    document.getElementById('elementConfirmModal').classList.add('show');
 }
 
 function getSelectedElements() {
@@ -3493,7 +3877,9 @@ function saveResult() {
             modelId: getCurrentModelId(),
             materialIds: [...selectedMaterialIds],
             materialTokens: (typeof getSelectedMaterialTokens === 'function') ? getSelectedMaterialTokens() : 0,
-            stepsSnapshot
+            stepsSnapshot,
+            // v1.45 链 C: 案件阶段作为字段记录，用于传递给 workflow 走分支
+            caseStage: getCurrentCaseStage()
         }
     });
 
@@ -4210,24 +4596,35 @@ function renderElementsGroup(title, items, source) {
         const delBtn = source === 'case'
             ? `<button type="button" class="case-elements-item-del-btn" onclick="deleteCaseElement('${escapeJsString(p.name)}')" title="删除该个案要件"><i class="fas fa-trash-alt"></i></button>`
             : '';
-        // 已答状态直接在要件项下方展示答案内容；操作按钮参考分步生成（编辑/重新生成/追问）
+        // 已答状态直接在要件项下方展示答案内容；操作按钮参考分步生成（编辑/重新生成/内容优化）
         let answerHtml = '';
         if (answered) {
             const followUps = (caseElementsFollowUps[p.name] || []);
-            const followUpsHtml = followUps.length > 0
-                ? followUps.map(f => `
-                    <div class="case-elements-followup-item">
-                        <div class="case-elements-followup-q"><i class="fas fa-question-circle"></i> ${escapeHtmlForElements(f.q)}</div>
-                        <div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(f.a)}</div>
-                    </div>
-                `).join('')
+            const optimizeCount = followUps.length;
+            const optimizeDisabled = optimizeCount >= 3 ? 'disabled title="已达到最大优化轮次（3 轮）"' : '';
+            const optimizeLabel = optimizeCount > 0 ? `内容优化（${optimizeCount}/3）` : '内容优化';
+            // v1.48 链 G: 优化历史折叠展示（除最后一轮外），每条带回填+删除按钮
+            const followUpsHtml = followUps.length > 1
+                ? `<details class="case-elements-optimization-history">
+                    <summary>优化历史（${followUps.length - 1} 轮）</summary>
+                    ${followUps.slice(0, -1).map((f, idx) => `
+                        <div class="case-elements-followup-item">
+                            <div class="case-elements-followup-q"><i class="fas fa-question-circle"></i> 第 ${idx + 1} 轮：${escapeHtmlForElements(f.q)}</div>
+                            <div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(f.a)}</div>
+                            <div class="case-elements-followup-actions">
+                                <button type="button" class="case-elements-item-edit-btn" onclick="backfillElementOptimization('${escapeJsString(p.name)}', ${idx})"><i class="fas fa-undo"></i> 回填</button>
+                                <button type="button" class="case-elements-item-edit-btn" onclick="deleteElementOptimization('${escapeJsString(p.name)}', ${idx})"><i class="fas fa-trash-alt"></i> 删除</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </details>`
                 : '';
             answerHtml = `<div class="case-elements-item-answer">
                    <div class="answer-text">${escapeHtmlForElements(answer)}</div>
                    <div class="case-elements-item-actions">
                        <button type="button" class="case-elements-item-edit-btn" onclick="editElementAnswerInline('${escapeJsString(p.name)}')"><i class="fas fa-edit"></i> 编辑</button>
                        <button type="button" class="case-elements-item-edit-btn" onclick="regenerateElementAnswer('${escapeJsString(p.name)}')"><i class="fas fa-redo"></i> 重新生成</button>
-                       <button type="button" class="case-elements-item-edit-btn" onclick="followUpElement('${escapeJsString(p.name)}')"><i class="fas fa-comments"></i> 追问</button>
+                       <button type="button" class="case-elements-item-edit-btn" onclick="contentOptimizeElement('${escapeJsString(p.name)}')" ${optimizeDisabled}><i class="fas fa-magic-wand-sparkles"></i> ${optimizeLabel}</button>
                    </div>
                    <div class="case-elements-followup-list">${followUpsHtml}</div>
                </div>`;
@@ -4323,9 +4720,17 @@ function regenerateElementAnswer(name) {
     showNotification('答案已重新生成', 'success');
 }
 
-// 追问：在要件答案下方 toggle 追问输入区，支持多轮对话
-function followUpElement(name) {
+// v1.48 链 G: 内容优化（原追问改名+轮次限制+展示方式调整）
+function contentOptimizeElement(name) {
     if (!caseItem) return;
+
+    // 轮次限制：最多 3 轮
+    const optimizeCount = (caseElementsFollowUps[name] || []).length;
+    if (optimizeCount >= 3) {
+        showNotification('已达到最大优化轮次（3 轮）', 'warning');
+        return;
+    }
+
     const areaId = `elementFollowUpArea_${name.replace(/\s/g, '_')}`;
     const existing = document.getElementById(areaId);
     if (existing) {
@@ -4348,8 +4753,8 @@ function followUpElement(name) {
     wrap.id = areaId;
     wrap.innerHTML = `
         <div class="case-elements-followup-input-row">
-            <input type="text" placeholder="输入追问问题，按 Enter 发送..." class="case-elements-followup-text">
-            <button type="button" class="case-elements-item-edit-btn primary" onclick="submitElementFollowUp('${escapeJsString(name)}')"><i class="fas fa-paper-plane"></i> 发送</button>
+            <input type="text" placeholder="输入优化要求，按 Enter 发送..." class="case-elements-followup-text">
+            <button type="button" class="case-elements-item-edit-btn primary" onclick="submitElementOptimize('${escapeJsString(name)}')"><i class="fas fa-paper-plane"></i> 发送</button>
         </div>
     `;
     followupList.insertAdjacentElement('afterend', wrap);
@@ -4357,18 +4762,26 @@ function followUpElement(name) {
     if (input) {
         input.focus();
         input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); submitElementFollowUp(name); }
+            if (e.key === 'Enter') { e.preventDefault(); submitElementOptimize(name); }
         });
     }
 }
 
-// 提交追问：模拟 AI 回答并持久化到 caseElementsFollowUps
-function submitElementFollowUp(name) {
+// v1.48 链 G: 提交内容优化，模拟 AI 回答并持久化到 caseElementsFollowUps
+function submitElementOptimize(name) {
     if (!caseItem) return;
     const areaId = `elementFollowUpArea_${name.replace(/\s/g, '_')}`;
     const area = document.getElementById(areaId);
     const input = area ? area.querySelector('.case-elements-followup-text') : null;
     if (!input || !input.value.trim()) return;
+
+    // 轮次限制校验
+    const optimizeCount = (caseElementsFollowUps[name] || []).length;
+    if (optimizeCount >= 3) {
+        showNotification('已达到最大优化轮次（3 轮）', 'warning');
+        return;
+    }
+
     const q = input.value.trim();
     if (!caseElementsFollowUps[name]) caseElementsFollowUps[name] = [];
     // 原型 mock：基于要件名返回模拟回答
@@ -4379,10 +4792,40 @@ function submitElementFollowUp(name) {
     ];
     const a = mockAnswers[caseElementsFollowUps[name].length % mockAnswers.length];
     caseElementsFollowUps[name].push({ q, a });
+
+    // 优化后更新正式答案（模拟：用优化回答覆盖原答案）
+    caseElementsAnswers[name] = a;
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
     saveElementFollowUps(caseItem.id, caseElementsFollowUps);
     renderElementsList();
-    // 重新展开追问输入框
-    setTimeout(() => followUpElement(name), 0);
+
+    // 若未达 3 轮上限，重新展开优化输入框
+    if (caseElementsFollowUps[name].length < 3) {
+        setTimeout(() => contentOptimizeElement(name), 0);
+    }
+}
+
+// v1.48 链 G: 回填要件优化历史答案到正式答案文本框
+function backfillElementOptimization(name, followUpIdx) {
+    if (!caseItem) return;
+    const followUps = caseElementsFollowUps[name] || [];
+    if (followUpIdx >= followUps.length) return;
+    const answer = followUps[followUpIdx].a;
+    caseElementsAnswers[name] = answer;
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    renderElementsList();
+    showNotification('已回填第 ' + (followUpIdx + 1) + ' 轮优化答案', 'success');
+}
+
+// v1.48 链 G: 删除要件优化历史记录
+function deleteElementOptimization(name, followUpIdx) {
+    if (!caseItem) return;
+    const followUps = caseElementsFollowUps[name] || [];
+    if (followUpIdx >= followUps.length) return;
+    followUps.splice(followUpIdx, 1);
+    saveElementFollowUps(caseItem.id, caseElementsFollowUps);
+    renderElementsList();
+    showNotification('已删除第 ' + (followUpIdx + 1) + ' 轮优化记录', 'info');
 }
 
 function sourceLabel(source) {
