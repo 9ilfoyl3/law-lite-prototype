@@ -31,7 +31,7 @@
 <body>
 <div class="widget-card">
   <div class="widget-title">用户操作流转图（V1.1）</div>
-  <div class="widget-sub">法官在案件列表页与详情页之间的动作分支：一步生成/分步生成（仅裁判文书）/批量生成，前端不做 Token 判断</div>
+  <div class="widget-sub">法官在案件列表页与详情页之间的动作分支：一步生成/分步生成（仅判决书）/批量生成，前端不做 Token 判断</div>
   <svg viewBox="0 0 1120 820" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="arrowNav" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
@@ -66,8 +66,8 @@
     <g>
       <rect x="220" y="234" width="200" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
       <text x="320" y="260" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">弹框配置生成参数</text>
-      <text x="320" y="278" text-anchor="middle" fill="#6b7280" font-size="11">文书类型/模板/提示词</text>
-      <text x="320" y="294" text-anchor="middle" fill="#6b7280" font-size="11">模型只读展示（workflow 决定）</text>
+      <text x="320" y="278" text-anchor="middle" fill="#6b7280" font-size="11">文书类型/模板/文书要求</text>
+      <text x="320" y="294" text-anchor="middle" fill="#6b7280" font-size="11">模型不展示（写入版本快照）</text>
       <text x="320" y="308" text-anchor="middle" fill="#6b7280" font-size="11">不展示 Token 预估</text>
     </g>
     <path d="M 320 316 L 320 346" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowNavBrand)"/>
@@ -111,7 +111,7 @@
       <text x="910" y="282" text-anchor="middle" fill="#6b7280" font-size="12">材料树（25%宽，可拖拽）</text>
       <text x="910" y="300" text-anchor="middle" fill="#6b7280" font-size="11">顶部固定条：本案要件入口（蓝/绿/橙 三色）</text>
       <text x="910" y="316" text-anchor="middle" fill="#6b7280" font-size="11">仅展示 parseStatus=success 材料</text>
-      <text x="910" y="330" text-anchor="middle" fill="#6b7280" font-size="11">支持文件问答、历史文书、文书精修</text>
+      <text x="910" y="330" text-anchor="middle" fill="#6b7280" font-size="11">支持历史文书、文书精修</text>
     </g>
 
     <path d="M 910 336 L 910 366" stroke="#6b7280" stroke-width="1.5" fill="none" marker-end="url(#arrowNav)"/>
@@ -128,7 +128,7 @@
     <g>
       <rect x="960" y="370" width="160" height="80" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
       <text x="1040" y="394" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">分步生成 Tab</text>
-      <text x="1040" y="412" text-anchor="middle" fill="#6b7280" font-size="11">仅裁判文书类型展示</text>
+      <text x="1040" y="412" text-anchor="middle" fill="#6b7280" font-size="11">仅判决书类型展示</text>
       <text x="1040" y="428" text-anchor="middle" fill="#6b7280" font-size="11">6步硬编码序列</text>
       <text x="1040" y="442" text-anchor="middle" fill="#6b7280" font-size="11">手动逐步触发</text>
     </g>

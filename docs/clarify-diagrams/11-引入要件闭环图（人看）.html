@@ -159,13 +159,13 @@
       <text x="486" y="424" fill="#1f2937" font-size="11">本案特殊答辩</text>
 
       <text x="570" y="460" text-anchor="middle" fill="#6b7280" font-size="10">N = 已配置要件数</text>
-      <text x="570" y="476" text-anchor="middle" fill="#6b7280" font-size="10">点击「引入要件」打开弹框</text>
+      <text x="570" y="476" text-anchor="middle" fill="#6b7280" font-size="10">点击「引入要件」打开弹框（按答案状态分支）</text>
       <text x="570" y="500" text-anchor="middle" fill="#6b7280" font-size="10">无「管理我的要件」链接（顶部全局导航已有）</text>
-      <text x="570" y="520" text-anchor="middle" fill="#d4a017" font-size="10">无 要件时显示空状态</text>
+      <text x="570" y="520" text-anchor="middle" fill="#d4a017" font-size="10">无案由时标准要件返回空 · 仅显示个案或空状态</text>
 
       <!-- 弹框触发按钮 -->
       <rect x="430" y="556" width="280" height="40" rx="8" fill="#6d5ce7" stroke="#6d5ce7"/>
-      <text x="570" y="580" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">引入要件 → 弹出 elementConfirmModal</text>
+      <text x="570" y="580" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">引入要件 → 按答案状态分支弹框</text>
 
       <!-- 持久化提示 -->
       <text x="570" y="618" text-anchor="middle" fill="#6b7280" font-size="10">持久化：caseCustomElements_${caseId} · caseElements_${caseId}</text>
@@ -183,24 +183,25 @@
       <text x="590" y="724" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">弹框第一步（elementConfirmModal · 选择要件）</text>
 
       <text x="100" y="758" fill="#1f2937" font-size="12" font-weight="500">默认勾选所有可用要件</text>
-      <text x="100" y="778" fill="#d4a017" font-size="11" font-weight="500">个案要件(橙)默认勾选 + 答案预生成（mergeCaseElements）</text>
-      <text x="100" y="796" fill="#6b7280" font-size="11">用户可取消不需要的要件（checkbox 列表）</text>
-      <text x="100" y="814" fill="#6b7280" font-size="11">三种类型混合展示，按蓝/绿/橙标签区分</text>
-      <text x="100" y="832" fill="#6b7280" font-size="11">仅裁判文书 + 案由案字过滤后展示</text>
+      <text x="100" y="776" fill="#d4a017" font-size="11" font-weight="500">有答案→直接弹大文本框确认；无答案→三步弹框流程</text>
+      <text x="100" y="792" fill="#d4a017" font-size="11" font-weight="500">个案要件(橙)默认勾选 + 答案预生成（mergeCaseElements）</text>
+      <text x="100" y="812" fill="#6b7280" font-size="11">用户可取消不需要的要件（checkbox 列表）</text>
+      <text x="100" y="830" fill="#6b7280" font-size="11">三种类型混合展示，按蓝/绿/橙标签区分</text>
+      <text x="100" y="848" fill="#6b7280" font-size="11">仅判决书 + 案由案字过滤后展示</text>
 
       <!-- 提示文案 -->
-      <rect x="500" y="748" width="580" height="56" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
+      <rect x="500" y="748" width="580" height="72" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
       <text x="790" y="770" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="500">提示文案</text>
-      <text x="790" y="788" text-anchor="middle" fill="#1f2937" font-size="11">引入要件后系统将针对每个问题预生成答案</text>
+      <text x="790" y="788" text-anchor="middle" fill="#1f2937" font-size="11">引入要件后系统将针对每个问题预生成答案（路径A：有答案直接弹大文本框；路径B：无答案三步弹框）</text>
       <text x="790" y="802" text-anchor="middle" fill="#1f2937" font-size="11">并整合到文书中，生成时间可能会稍长</text>
 
       <!-- 底部按钮 -->
       <rect x="500" y="820" width="120" height="40" rx="6" fill="#ffffff" stroke="#e5e7eb"/>
       <text x="560" y="844" text-anchor="middle" fill="#6b7280" font-size="12">取消</text>
       <rect x="640" y="820" width="200" height="40" rx="6" fill="#6d5ce7" stroke="#6d5ce7"/>
-      <text x="740" y="844" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">引入要件并生成</text>
+      <text x="740" y="844" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">引入要件</text>
 
-      <text x="870" y="844" fill="#9ca3af" font-size="10">点击触发 AI 预生成</text>
+      <text x="870" y="844" fill="#9ca3af" font-size="10">点击触发系统预生成</text>
     </g>
 
     <!-- 弹框第一步 → 第二步 -->
@@ -211,12 +212,12 @@
       <rect x="80" y="916" width="1020" height="180" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
       <rect x="80" y="916" width="1020" height="32" rx="8" fill="#6d5ce7"/>
       <rect x="80" y="936" width="1020" height="12" fill="#6d5ce7"/>
-      <text x="590" y="936" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">弹框第二步（确认 AI 预生成答案）</text>
+      <text x="590" y="936" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">弹框第二步（确认系统预生成答案）</text>
 
       <text x="100" y="970" fill="#1f2937" font-size="12" font-weight="500">展示每个要件问题及预生成参考答案</text>
       <text x="100" y="990" fill="#6b7280" font-size="11">用户可直接修改或补充（textarea 输入框）</text>
       <text x="100" y="1008" fill="#6b7280" font-size="11">所有调用调同一个 API（调知识库召回）</text>
-      <text x="100" y="1026" fill="#6b7280" font-size="11">AI 预生成 → 用户确认 → 整合到文书</text>
+      <text x="100" y="1026" fill="#6b7280" font-size="11">系统预生成 → 用户确认 → 整合到文书</text>
 
       <!-- 答案展示示例 -->
       <rect x="500" y="960" width="580" height="76" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
@@ -245,7 +246,7 @@
     <g>
       <rect x="380" y="1136" width="740" height="80" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
       <text x="750" y="1162" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">要件结果 → 文书生成入参（可选字段）</text>
-      <text x="750" y="1182" text-anchor="middle" fill="#6b7280" font-size="11">作为可选 plus 上下文传递给 workflow（可 0 个可多个）</text>
+      <text x="750" y="1182" text-anchor="middle" fill="#6b7280" font-size="11">作为可选 plus 辅助依据传递给 workflow（可 0 个可多个）</text>
       <text x="750" y="1196" text-anchor="middle" fill="#6b7280" font-size="11">问答答案持久化到 localStorage.caseElements_${caseId}</text>
       <text x="750" y="1210" text-anchor="middle" fill="#6b7280" font-size="11">下次进入恢复 · 个案要件持久化到 caseCustomElements_${caseId}</text>
     </g>

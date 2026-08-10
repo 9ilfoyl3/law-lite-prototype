@@ -1293,7 +1293,7 @@ function filterElementsByCaseWord(elements, caseWord) {
 
 // v1.25: 要件按案字分组 + 继承查找
 // cause: 案由名；org: 业务系统；caseWord: 案字（可选）
-// 查找顺序：当前案由admin覆盖 → 祖先案由admin覆盖 → 内置 → 通用要件
+// 查找顺序：当前案由admin覆盖 → 祖先案由admin覆盖 → 内置 → 无案由返回空数组
 // 每层都按案字过滤
 function getElementPresets(cause, org, caseWord) {
     // 1. 当前案由的 admin 覆盖
@@ -1317,14 +1317,8 @@ function getElementPresets(cause, org, caseWord) {
     if (cause && elementPresetsByCause[cause]) {
         return filterElementsByCaseWord(elementPresetsByCause[cause], caseWord);
     }
-    // 4. 通用要件
-    return [
-        { name: '主体资格', desc: '相关主体的资格及身份认定', question: '各方主体名称、身份及主体资格情况？' },
-        { name: '事实认定', desc: '案件事实的认定及证据', question: '需要认定的核心事实有哪些？' },
-        { name: '法律适用', desc: '适用的法律法规', question: '本案应适用的法律、法规及具体条款？' },
-        { name: '程序合法', desc: '相关程序是否符合法律规定', question: '已履行的程序有哪些？' },
-        { name: '处理结果', desc: '处理决定的内容及依据', question: '拟作出的处理结果？' }
-    ];
+    // 4. 案件无案由时返回空数组（标准要件绑案由，无案由不展示兜底要件）
+    return [];
 }
 
 const MY_ELEMENTS_STORAGE_KEY = 'myElementPresetsByCause';

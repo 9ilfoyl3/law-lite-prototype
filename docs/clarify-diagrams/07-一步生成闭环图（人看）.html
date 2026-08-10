@@ -72,8 +72,8 @@
     <g>
       <rect x="60" y="124" width="260" height="78" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
       <text x="190" y="148" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">弹框配置生成参数</text>
-      <text x="190" y="166" text-anchor="middle" fill="#6b7280" font-size="11">文书类型 / 模板 / 提示词</text>
-      <text x="190" y="180" text-anchor="middle" fill="#6b7280" font-size="11">模型字段只读（workflow 决定）</text>
+      <text x="190" y="166" text-anchor="middle" fill="#6b7280" font-size="11">文书类型 / 模板 / 文书要求</text>
+      <text x="190" y="180" text-anchor="middle" fill="#6b7280" font-size="11">模型由 workflow 决定（不展示）</text>
       <text x="190" y="194" text-anchor="middle" fill="#6b7280" font-size="11">不展示 Token 预估</text>
     </g>
     <path d="M 190 204 L 190 232" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
@@ -91,8 +91,8 @@
       <rect x="760" y="124" width="260" height="78" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
       <text x="890" y="148" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">选材料 + 配置生成参数</text>
       <text x="890" y="166" text-anchor="middle" fill="#6b7280" font-size="11">左栏材料树勾选（仅 success）</text>
-      <text x="890" y="180" text-anchor="middle" fill="#6b7280" font-size="11">右栏配置文书类型/模板/提示词</text>
-      <text x="890" y="194" text-anchor="middle" fill="#6b7280" font-size="11">模型字段只读展示</text>
+      <text x="890" y="180" text-anchor="middle" fill="#6b7280" font-size="11">右栏配置文书类型/模板/文书要求</text>
+      <text x="890" y="194" text-anchor="middle" fill="#6b7280" font-size="11">模型由 workflow 决定（不展示）</text>
     </g>
 
     <!-- Tab 切换材料清空确认（提示框） -->
@@ -111,7 +111,7 @@
     <g>
       <rect x="380" y="332" width="320" height="60" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="2"/>
       <text x="540" y="358" text-anchor="middle" fill="#1f2937" font-size="14" font-weight="500">配置生成参数（详情页右栏）</text>
-      <text x="540" y="376" text-anchor="middle" fill="#6b7280" font-size="11">材料已选 + 模板/提示词已填</text>
+      <text x="540" y="376" text-anchor="middle" fill="#6b7280" font-size="11">材料已选 + 模板/文书要求已填</text>
       <text x="540" y="388" text-anchor="middle" fill="#6b7280" font-size="11">点击「生成」按钮触发</text>
     </g>
 
@@ -132,23 +132,17 @@
       <text x="355" y="490" text-anchor="middle" fill="#6b7280" font-size="10">optgroup 分组</text>
       <text x="355" y="502" text-anchor="middle" fill="#6b7280" font-size="10">标准 + 我的</text>
 
-      <!-- 提示词 -->
+      <!-- 文书要求 -->
       <rect x="450" y="452" width="170" height="56" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
-      <text x="535" y="472" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">提示词</text>
+      <text x="535" y="472" text-anchor="middle" fill="#6d5ce7" font-size="12" font-weight="500">文书要求</text>
       <text x="535" y="490" text-anchor="middle" fill="#6b7280" font-size="10">标准 + 我的（颜色区分）</text>
       <text x="535" y="502" text-anchor="middle" fill="#6b7280" font-size="10">启用/停用 + 历史版本</text>
 
-      <!-- 模型 -->
-      <rect x="630" y="452" width="160" height="56" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
-      <text x="710" y="472" text-anchor="middle" fill="#9ca3af" font-size="12" font-weight="500">模型（只读）</text>
-      <text x="710" y="490" text-anchor="middle" fill="#6b7280" font-size="10">workflow 决定</text>
-      <text x="710" y="502" text-anchor="middle" fill="#6b7280" font-size="10">不可手动切换</text>
-
       <!-- 要件 -->
-      <rect x="800" y="452" width="180" height="56" rx="6" fill="#fdf6e3" stroke="#d4a017"/>
-      <text x="890" y="472" text-anchor="middle" fill="#d4a017" font-size="12" font-weight="500">要件（可选 Plus）</text>
-      <text x="890" y="490" text-anchor="middle" fill="#6b7280" font-size="10">仅裁判文书 + 案字过滤</text>
-      <text x="890" y="502" text-anchor="middle" fill="#6b7280" font-size="10">0 个或多个</text>
+      <rect x="630" y="452" width="180" height="56" rx="6" fill="#fdf6e3" stroke="#d4a017"/>
+      <text x="720" y="472" text-anchor="middle" fill="#d4a017" font-size="12" font-weight="500">要件（可选 Plus）</text>
+      <text x="720" y="490" text-anchor="middle" fill="#6b7280" font-size="10">按 案由+案字 过滤（无案由返回空）</text>
+      <text x="720" y="502" text-anchor="middle" fill="#6b7280" font-size="10">标准/我的/个案 · 仅判决书引入</text>
     </g>
 
     <path d="M 540 392 L 540 420" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#arrowBrand)"/>
@@ -194,8 +188,8 @@
     <g>
       <rect x="720" y="784" width="280" height="116" rx="8" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
       <text x="860" y="806" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">workflow 返回超限异常</text>
-      <text x="860" y="824" text-anchor="middle" fill="#6b7280" font-size="11">非裁判文书：「材料量过大，当前流程不支持」</text>
-      <text x="860" y="838" text-anchor="middle" fill="#6b7280" font-size="11">裁判文书：「可切换至分步生成」</text>
+      <text x="860" y="824" text-anchor="middle" fill="#6b7280" font-size="11">非判决书：「材料量过大，当前流程不支持」</text>
+      <text x="860" y="838" text-anchor="middle" fill="#6b7280" font-size="11">判决书：「可切换至分步生成」</text>
       <text x="860" y="852" text-anchor="middle" fill="#6b7280" font-size="11">补充：当前材料约 X 万字，建议 Y 万字以内</text>
       <text x="860" y="866" text-anchor="middle" fill="#6b7280" font-size="11">提供「按材料类型筛选」快捷入口</text>
       <text x="860" y="884" text-anchor="middle" fill="#d4a017" font-size="10">弹框 UI 统一 · overlay/dialog + modal-btn</text>

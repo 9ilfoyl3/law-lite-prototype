@@ -2692,7 +2692,7 @@
             background: #1d4ed8;
             color: #fff;
         }
-        /* v2.26: AI总结按钮 - 紫色品牌色，与新增个案要件（蓝色）形成区分 */
+        /* v2.26: 一键生成按钮 - 紫色品牌色，与新增个案要件（蓝色）形成区分 */
         .case-elements-footer-btn.ai-summarize-btn {
             background: #6d5ce7;
             color: #fff;
@@ -2702,6 +2702,20 @@
             background: #5849c4;
             color: #fff;
             opacity: 0.92;
+        }
+        .case-elements-footer-btn.ai-summarize-btn:disabled,
+        .case-elements-footer-btn.ai-summarize-btn.disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+            opacity: 1;
+        }
+        .case-elements-footer-btn.ai-summarize-btn:disabled:hover,
+        .case-elements-footer-btn.ai-summarize-btn.disabled:hover {
+            background: #e5e7eb;
+            color: #9ca3af;
+            opacity: 1;
         }
         .case-elements-footer-link {
             text-align: center;
@@ -3033,15 +3047,15 @@
                             <div class="mat-gen-form">
                                 <div class="mat-gen-info">
                                     <i class="fas fa-info-circle"></i>
-                                    将使用已选材料作为生成上下文
+                                    将使用已选材料作为生成依据
                                 </div>
 
                                 <!-- Smart Recommendation Card -->
                                 <div class="smart-card" id="stepRecommendCard" style="display:none;" onclick="switchToStepView({auto:false})">
                                     <div class="smart-card-icon"><i class="fas fa-list-ol"></i></div>
                                     <div class="smart-card-body">
-                                        <div class="smart-card-title" id="recommendCardTitle">已选材料预估超出当前模型上下文限制</div>
-                                        <div class="smart-card-desc" id="recommendCardDesc">当前已选材料预估约 <strong id="recommendTokenCount">0</strong> tokens，已超过 <span id="modelName">旗舰模型</span> 的安全上限 <span id="materialLimit">102400</span> tokens，请点击使用分步生成。</div>
+                                        <div class="smart-card-title" id="recommendCardTitle">已选材料预估超出系统单次处理上限</div>
+                                        <div class="smart-card-desc" id="recommendCardDesc">当前已选材料预估约 <strong id="recommendTokenCount">0</strong> 字，已超过 <span id="modelName">系统</span> 的安全上限 <span id="materialLimit">102400</span> 字，请点击使用分步生成。</div>
                                     </div>
                                     <button type="button" class="smart-card-action" id="recommendCardAction" onclick="event.stopPropagation();switchToStepView({auto:false})">使用分步生成</button>
                                     <div class="smart-card-arrow"><i class="fas fa-chevron-right"></i></div>
@@ -3098,13 +3112,13 @@
                             </div>
                             <div class="auto-switch-alert" id="autoSwitchAlert">
                                 <i class="fas fa-info-circle"></i>
-                                <span>已选材料预估超出当前模型单次上下文限制，已切换为分步生成，请为每一步手动选择所需材料。</span>
+                                <span>已选材料预估超出系统单次处理上限，已切换为分步生成，请为每一步手动选择所需材料。</span>
                             </div>
                             <!-- v1.46 链 D: 移除「开始生成」按钮，分步生成视图直接展示步骤序列（按案件阶段） -->
                             <div id="stepFlowArea">
                                 <div class="step-view-hint" id="stepViewHint">
                                     <i class="fas fa-lightbulb"></i>
-                                    <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐 step 生成。当前模型安全上下文上限 <strong id="stepHintLimit">102400</strong> tokens。</span>
+                                    <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐步生成。系统单次安全处理上限 <strong id="stepHintLimit">102400</strong> 字。</span>
                                 </div>
                                 <div class="steps-list" id="stepsList"></div>
                                 <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;">
@@ -3125,7 +3139,7 @@
                             <span>生成结果</span>
                         </div>
                         <div class="result-header-right">
-                            <button class="result-refine-btn" id="resultRefineBtn" onclick="refineResult()" title="基于当前文书上下文进行多轮精修"><i class="fas fa-magic"></i> 文书精修</button>
+                            <button class="result-refine-btn" id="resultRefineBtn" onclick="refineResult()" title="基于当前文书内容进行多轮精修"><i class="fas fa-magic"></i> 文书精修</button>
                             <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="重新配置生成参数（默认回填最近一次历史文书快照）"><i class="fas fa-sliders-h"></i> <span>重新配置</span></button>
                         </div>
                     </div>
@@ -3235,7 +3249,7 @@
             <button class="modal-close" onclick="closeElementContextModal()"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-            <div class="element-context-desc">以下为该案由的要件问题及参考答案（已有答案自动填充），请确认或修改后点击「确认生成」。修改后的内容将作为上下文辅助生成文书。</div>
+            <div class="element-context-desc">以下为该案由的要件问题及参考答案（已有答案自动填充），请确认或修改后点击「确认生成」。修改后的内容将作为辅助依据生成文书。</div>
             <textarea class="element-context-textarea" id="elementContextTextarea" placeholder="加载中..."></textarea>
             <div class="element-context-actions">
                 <button class="modal-btn-secondary" id="elementContextCancelBtn" onclick="closeElementContextModal()">取消</button>
@@ -3322,8 +3336,8 @@
                 <button type="button" class="case-elements-footer-btn primary" onclick="toggleCaseElementAddForm(true)">
                     <i class="fas fa-plus"></i> 新增个案要件
                 </button>
-                <button type="button" class="case-elements-footer-btn ai-summarize-btn" onclick="aiSummarizeElements()">
-                    <i class="fas fa-magic"></i> AI总结
+                <button type="button" id="aiSummarizeBtn" class="case-elements-footer-btn ai-summarize-btn" onclick="aiSummarizeElements()">
+                    <i class="fas fa-magic"></i> 一键生成
                 </button>
             </div>
             <button type="button" class="case-elements-footer-link" onclick="openMyElements()">
@@ -3342,7 +3356,7 @@
         <div class="modal-body">
             <div class="element-qa-source-row" id="elementQaSourceRow"></div>
             <div class="element-qa-question" id="elementQaQuestion"></div>
-            <textarea class="element-qa-textarea" id="elementQaAnswer" placeholder="请输入对该要件问题的回答，作为文书生成的辅助上下文..."></textarea>
+            <textarea class="element-qa-textarea" id="elementQaAnswer" placeholder="请输入对该要件问题的回答，作为文书生成的辅助依据..."></textarea>
             <div class="element-qa-hint">
                 <i class="fas fa-info-circle"></i>
                 <span>保存后答案将持久化到本案件，下次进入本页面会自动恢复。已填写答案的要件在抽屉中显示绿点标识。</span>
@@ -3355,9 +3369,9 @@
     </div>
 
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=64"></script>
+    <script src="../js/case-data.js?v=65"></script>
     <script src="../js/doc-editor.js?v=1"></script>
-    <script src="../js/case-files.js?v=112"></script>
+    <script src="../js/case-files.js?v=115"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

@@ -965,7 +965,7 @@ function buildGenConfigHtml() {
             <label class="gen-form-label">文书要求</label>
             <div id="genReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
             <textarea class="gen-form-textarea" id="genRequirement"
-                      placeholder="可选：描述特殊要求或关注点，帮助 AI 更好理解需求"
+                      placeholder="可选：描述特殊要求或关注点，帮助系统更好理解需求"
                       onchange="quickState.requirement=this.value"></textarea>
         </div>
     `;
@@ -1347,7 +1347,7 @@ function renderBatchConfig() {
                     <label class="drawer-form-label">文书要求</label>
                     <div id="batchReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
                     <textarea class="drawer-form-textarea" id="batchRequirement"
-                              placeholder="可选：描述特殊要求或关注点，帮助 AI 更好理解需求"
+                              placeholder="可选：描述特殊要求或关注点，帮助系统更好理解需求"
                               onchange="batchState.requirement=this.value"></textarea>
                 </div>
             </div>

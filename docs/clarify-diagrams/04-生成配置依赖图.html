@@ -128,20 +128,20 @@
           <span class="step-name">一步生成模式（列表页/详情页）</span>
           <span class="mode-tag brand">默认路径</span>
         </div>
-        <div class="step-desc">全文书类型默认展示一步生成 Tab。用户配置文书类型/模板/提示词后调用 workflow，流式输出文书。模型由 workflow 匹配决定，只读展示。</div>
+        <div class="step-desc">全文书类型默认展示一步生成 Tab。用户配置文书类型/模板/文书要求后调用 workflow，流式输出文书。模型由 workflow 匹配决定，写入版本快照（用户侧不展示）。</div>
         <div class="dep-grid">
           <div class="dep"><span class="dot"></span>文书类型下拉（全量）<small>admin/doc-types</small></div>
           <div class="dep"><span class="dot"></span>标准模板 + 我的模板<small>admin/doc-templates · my-templates</small></div>
           <div class="dep"><span class="dot"></span>模板 optgroup 分组<small>mergeMyDocTemplates</small></div>
-          <div class="dep"><span class="dot"></span>标准提示词 + 我的提示词<small>admin/prompt-templates · my-prompts</small></div>
-          <div class="dep"><span class="dot"></span>提示词颜色区分+启用停用+历史版本<small>my-prompts.js</small></div>
-          <div class="dep warn"><span class="dot"></span>要件（可选 plus，仅裁判文书）<small>admin/element-presets · my-elements</small></div>
-          <div class="dep warn"><span class="dot"></span>要件按案字过滤<small>filterElementsByCaseWord</small></div>
-          <div class="dep warn"><span class="dot"></span>个案要件(橙)默认勾选 + 答案预生成<small>mergeCaseElements (V1.1.4)</small></div>
+          <div class="dep"><span class="dot"></span>标准文书要求 + 我的文书要求<small>admin/prompt-templates · my-prompts</small></div>
+          <div class="dep"><span class="dot"></span>文书要求颜色区分+启用停用+历史版本<small>my-prompts.js</small></div>
+          <div class="dep warn"><span class="dot"></span>要件（可选 plus，仅判决书）<small>admin/element-presets · my-elements</small></div>
+          <div class="dep warn"><span class="dot"></span>要件按案字过滤 · 无案由返回空<small>filterElementsByCaseWord · getElementPresets</small></div>
+          <div class="dep warn"><span class="dot"></span>个案要件(橙)默认勾选 + 答案系统预生成<small>mergeCaseElements (V1.1.4)</small></div>
           <div class="dep new"><span class="dot"></span>案字白名单过滤<small>getAllowedCaseWordsForCause (V1.1.3)</small></div>
           <div class="dep"><span class="dot"></span>启用/停用过滤<small>case-data.js merge 函数</small></div>
           <div class="dep"><span class="dot"></span>workflow 匹配（5级优先级）<small>getWorkflowByCaseWord</small></div>
-          <div class="dep"><span class="dot"></span>模型只读展示<small>workflow.modelId</small></div>
+          <div class="dep"><span class="dot"></span>模型不展示（写入版本快照）<small>workflow.modelId</small></div>
           <div class="dep"><span class="dot"></span>流式输出渲染区<small>case-files.js</small></div>
           <div class="dep warn"><span class="dot"></span>workflow 超限异常提示<small>case-files.js</small></div>
           <div class="dep warn"><span class="dot"></span>弹框 UI 统一（overlay/dialog 分离）<small>showWorkflowOverflowModal (V1.1.4)</small></div>
@@ -154,10 +154,10 @@
       <div class="step-num">5</div>
       <div class="step-card">
         <div class="step-head">
-          <span class="step-name">分步生成模式（仅裁判文书 · 详情页）</span>
-          <span class="mode-tag alt">仅裁判文书</span>
+          <span class="step-name">分步生成模式（仅判决书 · 详情页）</span>
+          <span class="mode-tag alt">仅判决书</span>
         </div>
-        <div class="step-desc">仅裁判文书类型展示分步生成 Tab。6 步硬编码序列，手动逐步触发，步骤间依赖校验，片段拼接产出完整文书。</div>
+        <div class="step-desc">仅判决书类型展示分步生成 Tab。按案件阶段判断步骤序列（一审5步/二审6步），手动逐步触发，步骤间依赖校验，片段拼接产出完整文书。</div>
         <div class="dep-grid">
           <div class="dep"><span class="dot"></span>分步 Tab 可见性判断<small>updateStepsTabVisibility</small></div>
           <div class="dep"><span class="dot"></span>6步硬编码序列<small>stepConfigsByOrg (court)</small></div>
@@ -169,7 +169,7 @@
           <div class="dep"><span class="dot"></span>手动逐步触发（不自动）<small>case-files.js</small></div>
           <div class="dep"><span class="dot"></span>片段拼接产出<small>case-files.js</small></div>
           <div class="dep"><span class="dot"></span>标准模板 + 我的模板<small>admin/doc-templates · my-templates</small></div>
-          <div class="dep"><span class="dot"></span>标准提示词 + 我的提示词<small>admin/prompt-templates · my-prompts</small></div>
+          <div class="dep"><span class="dot"></span>标准文书要求 + 我的文书要求<small>admin/prompt-templates · my-prompts</small></div>
           <div class="dep warn"><span class="dot"></span>要件（可选 plus）<small>admin/element-presets · my-elements</small></div>
           <div class="dep"><span class="dot"></span>启用/停用过滤<small>case-data.js merge 函数</small></div>
         </div>

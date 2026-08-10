@@ -3,7 +3,7 @@
 // v2.29 本案要件内联编辑与生成联动优化：1)内联编辑区移除"修改答案"文字标签与 placeholder，仅保留文本框与保存/取消按钮；2)新增 hasExistingElementAnswers/collectExistingElementAnswers 辅助函数；3)generateByMaterial（一步生成）、compileSteps（分步生成编译）新增"已 AI 总结则默认引入"逻辑——caseElementsAnswers 存在任意要件答案时不再弹框，直接引入已生成要件答案并直接生成，友好提示告知；未做过 AI 总结时维持原弹框询问逻辑；4)compileSteps 要件范围同步用 mergeCaseElements 合并个案要件（与 generateByMaterial 一致）
 // v2.28 本案要件答案操作升级（对齐分步生成步骤操作模式）：1)原"修改"按钮更名为"编辑"；2)新增"重新生成"按钮（regenerateElementAnswer，覆盖原答案）；3)新增"追问"按钮（followUpElement/submitElementFollowUp，多轮对话式追问，历史持久化到 caseElementsFollowUps/localStorage.caseElementsFollowUps_${caseId}）；4)移除答案区"AI 生成答案"文字标签，仅展示答案正文；5)三个操作按钮仅在已生成答案后出现
 // v2.27 本案要件交互重构：1)删除要件项"问答/已答·查看"按钮；2)AI总结改为批量总结全部要件（无需勾选，自动全选并生成答案）；3)已答状态直接在要件项下方展示答案内容（绿色卡片 + AI生成答案标签 + 修改按钮）；4)新增 editElementAnswerInline/saveElementAnswerInline 内联编辑功能（替代原 openElementQaModal 弹窗）；5)清理 .case-elements-item-qa-btn CSS，新增 .case-elements-item-answer/.inline-edit-textarea 样式
-// v2.26 本案要件抽屉优化：1)抽屉宽度 380px → 50vw（min-width 380px 兜底）；2)删除底部"关闭"按钮（头部 × 与遮罩点击仍可关闭）；3)新增"AI总结"按钮（紫色品牌色区分），对已勾选要件批量生成答案，用户可在问答弹窗中修改（复用 generateMockElementAnswer，与生成文书弹框引入要件逻辑一致）
+// v2.26 本案要件抽屉优化：1)抽屉宽度 380px → 50vw（min-width 380px 兜底）；2)删除底部"关闭"按钮（头部 × 与遮罩点击仍可关闭）；3)新增"一键生成"按钮（紫色品牌色区分，原名"AI总结"V1.1.9 改名去技术术语），对已勾选要件批量生成答案，用户可在问答弹窗中修改（复用 generateMockElementAnswer，与生成文书弹框引入要件逻辑一致）
 // v2.25 分步生成 tab 隐藏顶部"核心材料"提示条（分步每步独立选材料，与材料树全局勾选无关）
 // v2.24 分步生成交互优化：1)一步生成"生成文书"按钮移到配置卡片外部（.step-start-actions）；2)选择材料后不再自动生成，由用户手动点击"生成本步"；3)waiting 状态步骤始终展示"直接输入"+"生成本步"按钮（去 stepGenerationStarted 限制）；4)新增 directInputStep/saveDirectInput 直接输入功能（手动输入内容保存为 done）；5)done 状态新增"追问"按钮（followUpStep/submitFollowUp），支持多轮对话式追问，历史持久化到 stepData.followUps；6)startStepGeneration 不再强制校验材料和自动生成第一步
 // v2.23 UI 优化：一步生成配置区改为卡片样式（与分步生成一致，满宽）；移除一步生成"当前模型"展示及 step-view-header 标题；steps-list/steps-bottom-actions/step-start-actions 去 max-width 改 width:100%，与配置区同宽；refreshModelFromWorkflow 不再调用（HTML 已删除 modelSelect 元素，函数保留为 no-op 防报错）
@@ -827,7 +827,7 @@ function refreshModelFromWorkflow() {
         const m = getModelById(DEFAULT_MODEL_ID);
         modelSelect.innerHTML = `<option value="${m.id}" selected>${m.name}（${formatNumber(m.limit)}）</option>`;
         modelSelect.disabled = true;
-        modelSelect.title = '模型由 workflow 配置决定，不可手动修改';
+        modelSelect.title = '系统由流程配置决定，不可手动修改';
         localStorage.setItem('ai_current_model', m.id);
         updateContextUsageHint();
         checkMaterialLimit();
@@ -901,7 +901,7 @@ function switchToStepView(options = {}) {
 
     const autoAlert = document.getElementById('autoSwitchAlert');
     if (autoAlert) {
-        autoAlert.querySelector('span').textContent = '已选材料预估超出当前模型单次上下文限制，已切换为分步生成，请为每一步手动选择所需材料。';
+        autoAlert.querySelector('span').textContent = '已选材料预估超出系统单次处理上限，已切换为分步生成，请为每一步手动选择所需材料。';
         autoAlert.classList.toggle('show', !!options.auto);
     }
 
@@ -2434,7 +2434,7 @@ async function generateSingleStepManually(index) {
     const step = stepsConfig[index];
     // 合规例外：manualOnly 步骤（裁判结果）不允许 AI 生成，UI 已隐藏按钮，此处防御性拦截
     if (step.manualOnly) {
-        showNotification('该步骤仅支持直接输入，不支持 AI 生成', 'warning');
+        showNotification('该步骤仅支持直接输入，不支持系统生成', 'warning');
         return;
     }
 
@@ -2657,7 +2657,7 @@ async function generateSingleStep(stepIndex, options = {}) {
 
     // v1.46: manualOnly 步骤（裁判结果）不允许 AI 生成，应走直接输入
     if (step.manualOnly) {
-        if (!options.silent) showNotification('裁判结果需由法官手动输入，不支持 AI 生成', 'warning');
+        if (!options.silent) showNotification('裁判结果需由法官手动输入，不支持系统生成', 'warning');
         return false;
     }
 
@@ -4577,6 +4577,7 @@ function renderElementsList() {
                 <div style="font-size:11px;margin-top:6px;">可在下方新增个案要件，或前往"管理我的要件"维护</div>
             </div>
         `;
+        updateAiSummarizeBtnState(0);
         return;
     }
 
@@ -4585,6 +4586,22 @@ function renderElementsList() {
     if (mine.length > 0) html += renderElementsGroup('我的要件', mine, 'mine');
     if (caseC.length > 0) html += renderElementsGroup('个案要件', caseC, 'case');
     body.innerHTML = html;
+    updateAiSummarizeBtnState(standard.length + mine.length + caseC.length);
+}
+
+// v2.29: 一键生成按钮可用性控制——无可用要件时置灰并提示
+function updateAiSummarizeBtnState(totalCount) {
+    const btn = document.getElementById('aiSummarizeBtn');
+    if (!btn) return;
+    if (totalCount > 0) {
+        btn.disabled = false;
+        btn.classList.remove('disabled');
+        btn.title = '';
+    } else {
+        btn.disabled = true;
+        btn.classList.add('disabled');
+        btn.title = '暂无要件可生成，请先新增或维护要件';
+    }
 }
 
 function renderElementsGroup(title, items, source) {
@@ -4942,7 +4959,7 @@ function deleteCaseElement(name) {
     showNotification('个案要件已删除', 'success');
 }
 
-// v2.27: AI总结 —— 对全部要件批量生成答案，无需勾选，用户可直接在列表中修改
+// v2.27: 一键生成（原名"AI总结"，V1.1.9 改名去技术术语）—— 对全部要件批量生成答案，无需勾选，用户可直接在列表中修改
 // 复用 generateMockElementAnswer（与"生成文书弹框中引入要件"保持一致逻辑）
 function aiSummarizeElements() {
     if (!caseItem) {
@@ -4955,7 +4972,8 @@ function aiSummarizeElements() {
         ...(caseElementsCache.case || []).map(p => ({ ...p, source: 'case' }))
     ];
     if (all.length === 0) {
-        showNotification('暂无要件可总结，请先新增或维护要件', 'warning');
+        // v2.29: 无可用要件时按钮应已被置灰；此处为防御性兜底，避免绕过 UI 调用
+        showNotification('暂无要件可生成，请先新增或维护要件', 'warning');
         return;
     }
     let count = 0;

@@ -394,7 +394,7 @@
             <div class="form-row" id="wfFormatRow">
                 <div class="wf-format-section">
                     <div class="wf-format-section-title"><i class="fas fa-file-contract"></i>文书格式约束（格式骨架）</div>
-                    <div class="wf-format-section-hint">为该 workflow 配置一个文书格式骨架（带占位符，如 {{courtName}}、{{caseNumber}} 等）。文书生成第二步将按此骨架套版填充占位符。不配置则直接输出 AI 生成内容。仅管理后台可见。</div>
+                    <div class="wf-format-section-hint">为该 workflow 配置一个文书格式骨架（带占位符，如 {{courtName}}、{{caseNumber}} 等）。文书生成第二步将按此骨架套版填充占位符。不配置则直接输出系统生成内容。仅管理后台可见。</div>
                     <div id="wfFormatContent">
                         <!-- 由 JS 渲染：未配置时显示上传区；已配置时显示文件操作 -->
                     </div>
@@ -410,7 +410,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=64"></script>
+    <script src="../../js/case-data.js?v=65"></script>
     <script src="../../js/admin-doc-types.js?v=12"></script>
 </body>
 </html>

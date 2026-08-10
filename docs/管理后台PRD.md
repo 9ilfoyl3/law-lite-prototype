@@ -1375,7 +1375,7 @@ case-files.js checkMaterialLimit() → 超过阈值时切换分步生成
 
 - 存储 Key：`localStorage.adminElementPresets`（按业务系统 × 案由分组）
 - 置顶列表 Key：`localStorage.adminPinnedCauses`（按业务系统分组）
-- 内置兜底数据：`case-data.js` 的 `elementPresetsByCause` 常量；案由不在内置表中时回退到通用要件（主体资格/事实认定/法律适用/程序合法/处理结果）
+- 内置兜底数据：`case-data.js` 的 `elementPresetsByCause` 常量；案件无案由时返回空数组 `[]`（标准要件绑案由，无案由不展示兜底要件）
 
 ### 4.10.6 用户侧联动
 
@@ -1383,7 +1383,7 @@ case-files.js checkMaterialLimit() → 超过阈值时切换分步生成
 
 1. 若 `adminElementPresets[org][cause]` 存在 → 返回该自定义数组
 2. 否则若 `elementPresetsByCause[cause]` 存在 → 返回内置
-3. 否则返回通用要件兜底
+3. 案件无案由（cause 为空）→ 返回空数组 `[]`（标准要件绑案由，无案由不展示兜底要件）
 
 `getAllElementPresets(cause, org)` 透传 org，在标准要件基础上合并用户侧「我的要件」。调用方（`cases.js`、`case-files.js`）从 `localStorage.getItem('currentBusiness') || 'court'` 取 org 后传入。
 
