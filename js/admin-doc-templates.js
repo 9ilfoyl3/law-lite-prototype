@@ -1,10 +1,10 @@
 // ============ Admin Doc Templates Management ============
-// v1.0 文书模板管理：维护各业务系统模板，关联文书类型
-// v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
-// v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑弹窗提供模板示例下载；③ 列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段
-// v1.3 内置模板预置默认正文：内置模板 content 赋予 TEMPLATE_EXAMPLE_TEXT，使预览/下载按钮默认可用（自定义模板未上传正文时仍置灰）
-// v1.4 模板表格新增「上传时间」「更新时间」两列：保存时记录 createdAt / updatedAt（新增两者相同，编辑/重新上传仅更新 updatedAt）；内置模板无持久化时间显示为空
-// v1.5 V1.1.2 定位调整：模板 content 语义从「带占位符的格式骨架」改为「给 AI 的内容参考文本」，录入方式从仅文件上传改回大文本框在线编辑为主（可选文件上传导入）；移除独立的「重新上传」操作按钮（合并到编辑）；内置模板默认 content 改为简短内容参考示例（不再强约束占位符）；格式骨架约束移至 workflow 子配置
+// v1.0 文书示例管理：维护各业务系统示例，关联文书类型
+// v1.1 移除「关联案由」字段：示例作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
+// v1.2 示例正文交互改造：① 示例正文从 textarea 在线编辑改为文件上传；② 新增/编辑弹窗提供示例下载；③ 列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段
+// v1.3 内置示例预置默认正文：内置示例 content 赋予 TEMPLATE_EXAMPLE_TEXT，使预览/下载按钮默认可用（自定义示例未上传正文时仍置灰）
+// v1.4 示例表格新增「上传时间」「更新时间」两列：保存时记录 createdAt / updatedAt（新增两者相同，编辑/重新上传仅更新 updatedAt）；内置示例无持久化时间显示为空
+// v1.5 V1.1.2 定位调整：示例 content 语义从「带占位符的格式骨架」改为「给 AI 的内容参考文本」，录入方式从仅文件上传改回大文本框在线编辑为主（可选文件上传导入）；移除独立的「重新上传」操作按钮（合并到编辑）；内置示例默认 content 改为简短内容参考示例（不再强约束占位符）；格式骨架约束移至 workflow 子配置
 // 数据持久化：localStorage.adminDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTemplates 在加载时合并到 system.docTemplates
 
@@ -14,13 +14,13 @@
     // ===== 状态 =====
     let currentOrg = 'court';
     let currentDocTypeFilter = ''; // '' = 全部
-    let editingKey = null;        // 当前编辑的模板 key（编辑模式时非空）
-    let editingIsBuiltin = false; // 编辑的是内置模板（编辑后转为自定义）
+    let editingKey = null;        // 当前编辑的示例 key（编辑模式时非空）
+    let editingIsBuiltin = false; // 编辑的是内置示例（编辑后转为自定义）
     let pendingConfirmAction = null;
 
     // v1.6 (V1.1.2) 内容参考示例：裁判文书（民事判决书）完整内容结构
     // 注：分步生成阶段（原告诉请/被告答辩/争议焦点/事实认定等）是辅助法官判断的中间产物，
-    //     不是裁判文书模板内容；真正的文书模板应描述完整判决书的内容结构与各部分格式要求。
+    //     不是裁判文书示例内容；真正的文书示例应描述完整判决书的内容结构与各部分格式要求。
     //     [占位符] 为描述性占位符（给 AI 看的格式要求），由 AI 生成时替换为实际内容；
     //     与 workflow 格式骨架的 {{占位符}}（程序化套版）语义不同。
     const TEMPLATE_EXAMPLE_TEXT = `[法院名称：江苏省XX市XX区人民法院]
@@ -92,12 +92,12 @@
         return getAdminDocTypes(org) || {};
     }
 
-    // 获取当前业务系统的内置模板（来自 defaultDocTemplatesByOrg，字符串映射）
+    // 获取当前业务系统的内置示例（来自 defaultDocTemplatesByOrg，字符串映射）
     function getBuiltinTemplates(org) {
         return defaultDocTemplatesByOrg[org] || {};
     }
 
-    // 获取当前业务系统下被停用的内置模板 key 列表
+    // 获取当前业务系统下被停用的内置示例 key 列表
     // 存于 adminDocTemplates[org].__builtinDisabled__ 数组中
     function getBuiltinDisabled(org) {
         const orgData = getOrgData(org);
@@ -109,7 +109,7 @@
         setOrgData(org, orgData);
     }
 
-    // 获取当前业务系统的全部模板（内置 + 自定义）
+    // 获取当前业务系统的全部示例（内置 + 自定义）
     // 返回统一对象结构：{key: {name, docType, content, isBuiltin, enabled}}
     function getAllTemplates(org) {
         const docTypes = getDocTypes(org);
@@ -117,7 +117,7 @@
         const customs = getOrgData(org);
         const builtinDisabled = getBuiltinDisabled(org);
 
-        // 反查表：模板 key → 文书类型 key
+        // 反查表：示例 key → 文书类型 key
         const tplToDocType = {};
         Object.entries(docTypes).forEach(([typeKey, typeCfg]) => {
             (typeCfg.templates || []).forEach(tplKey => {
@@ -126,8 +126,8 @@
         });
 
         const result = {};
-        // 内置模板（字符串）
-        // v1.5 内置模板 content 赋予简短内容参考示例（不再强约束占位符格式骨架）
+        // 内置示例（字符串）
+        // v1.5 内置示例 content 赋予简短内容参考示例（不再强约束占位符格式骨架）
         Object.entries(builtins).forEach(([key, name]) => {
             result[key] = {
                 name: name,
@@ -137,7 +137,7 @@
                 enabled: !builtinDisabled.includes(key)
             };
         });
-        // 自定义模板（对象，覆盖同名内置）
+        // 自定义示例（对象，覆盖同名内置）
         Object.entries(customs).forEach(([key, val]) => {
             if (key === '__builtinDisabled__') return; // 跳过内置停用列表
             if (val && typeof val === 'object') {
@@ -245,9 +245,9 @@
         const allTemplates = getAllTemplates(currentOrg);
         const rightTitle = document.getElementById('rightTitle');
         if (currentDocTypeFilter) {
-            rightTitle.textContent = (docTypes[currentDocTypeFilter] || {}).name || '模板列表';
+            rightTitle.textContent = (docTypes[currentDocTypeFilter] || {}).name || '示例列表';
         } else {
-            rightTitle.textContent = '全部模板';
+            rightTitle.textContent = '全部示例';
         }
 
         const list = Object.entries(allTemplates).filter(([key, t]) => {
@@ -287,7 +287,7 @@
                   + '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
                   + toggleBtn
                   + '<button class="action-btn delete" onclick="deleteTemplate(\'' + key + '\')">删除</button>';
-            // v1.4 上传时间/更新时间（内置模板无持久化时间，显示为空）
+            // v1.4 上传时间/更新时间（内置示例无持久化时间，显示为空）
             const createdAt = t.createdAt || '';
             const updatedAt = t.updatedAt || '';
             return '<tr>'
@@ -321,7 +321,7 @@
     window.openAddModal = function() {
         editingKey = null;
         editingIsBuiltin = false;
-        document.getElementById('modalTitle').textContent = '新增模板';
+        document.getElementById('modalTitle').textContent = '新增示例';
         document.getElementById('tplName').value = '';
         fillDocTypeSelect('');
         document.getElementById('tplDocType').disabled = false;
@@ -336,17 +336,17 @@
         if (!t) return;
         editingKey = key;
         editingIsBuiltin = !!t.isBuiltin;
-        document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置模板（另存为自定义）' : '编辑模板';
+        document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置示例（另存为自定义）' : '编辑示例';
         document.getElementById('tplName').value = t.name;
         fillDocTypeSelect(t.docType);
         // 编辑内置时禁用文书类型切换，避免逻辑歧义（内置只能在原类型上覆盖）
         document.getElementById('tplDocType').disabled = editingIsBuiltin;
-        // v1.5 将已有 content 回填到 textarea（内置模板回填默认示例文本，用户可基于此修改）
+        // v1.5 将已有 content 回填到 textarea（内置示例回填默认示例文本，用户可基于此修改）
         document.getElementById('tplContent').value = t.content || '';
         document.getElementById('tplModal').classList.add('show');
     };
 
-    // v1.5 模板文件导入处理（可选）：将文件内容写入 textarea，便于继续编辑
+    // v1.5 示例文件导入处理（可选）：将文件内容写入 textarea，便于继续编辑
     // 原型阶段仅解析 .txt；doc/docx 提示需配套解析能力
     window.handleTemplateFileUpload = function(event) {
         const file = event.target.files && event.target.files[0];
@@ -363,7 +363,7 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 ta.value = (e.target.result || '').toString();
-                showNotification('模板正文已导入到文本框，可继续编辑', 'success');
+                showNotification('示例正文已导入到文本框，可继续编辑', 'success');
             };
             reader.onerror = function() {
                 showNotification('文件读取失败', 'error');
@@ -404,7 +404,7 @@
         const content = document.getElementById('tplContent').value;
 
         if (!name) {
-            showNotification('请填写模板名', 'error');
+            showNotification('请填写示例名', 'error');
             document.getElementById('tplName').focus();
             return;
         }
@@ -418,10 +418,10 @@
         // 决定 key
         let key;
         if (editingKey && !editingIsBuiltin) {
-            // 编辑自定义模板：保留原 key
+            // 编辑自定义示例：保留原 key
             key = editingKey;
         } else if (editingKey && editingIsBuiltin) {
-            // 编辑内置模板：使用内置 key 作为自定义覆盖（用户侧 mergeAdminDocTemplates 会覆盖）
+            // 编辑内置示例：使用内置 key 作为自定义覆盖（用户侧 mergeAdminDocTemplates 会覆盖）
             key = editingKey;
         } else {
             // 新增：生成新 key（确保不与内置 key 冲突）
@@ -451,7 +451,7 @@
             updatedAt: now
         };
 
-        // 编辑内置模板后，该 key 变为自定义；从 __builtinDisabled__ 清理冗余 key
+        // 编辑内置示例后，该 key 变为自定义；从 __builtinDisabled__ 清理冗余 key
         if (editingKey && editingIsBuiltin) {
             let arr = getBuiltinDisabled(currentOrg);
             if (arr.includes(editingKey)) {
@@ -464,23 +464,23 @@
         closeModal();
         renderLeft();
         renderRight();
-        showNotification(editingKey ? '模板已更新' : '模板已新增', 'success');
+        showNotification(editingKey ? '示例已更新' : '示例已新增', 'success');
     };
 
-    // v1.2 列表操作：预览模板正文
+    // v1.2 列表操作：预览示例正文
     window.previewTemplateContent = function(key) {
         const all = getAllTemplates(currentOrg);
         const t = all[key];
         if (!t || !(t.content || '').trim()) return;
-        previewTextInWindow('模板预览：' + t.name, t.content);
+        previewTextInWindow('示例预览：' + t.name, t.content);
     };
 
-    // v1.2 列表操作：下载模板正文
+    // v1.2 列表操作：下载示例正文
     window.downloadTemplateByKey = function(key) {
         const all = getAllTemplates(currentOrg);
         const t = all[key];
         if (!t || !(t.content || '').trim()) return;
-        downloadTextFile(t.content, (t.name || '模板正文') + '.txt');
+        downloadTextFile(t.content, (t.name || '示例正文') + '.txt');
     };
 
     // ===== 启用/停用切换 =====
@@ -490,7 +490,7 @@
         if (!t) return;
         const newEnabled = t.enabled === false; // 反转：当前停用→启用；当前启用→停用
         if (t.isBuiltin) {
-            // 内置模板：操作 __builtinDisabled__ 数组
+            // 内置示例：操作 __builtinDisabled__ 数组
             let arr = getBuiltinDisabled(currentOrg);
             if (newEnabled) {
                 arr = arr.filter(k => k !== key);
@@ -499,7 +499,7 @@
             }
             setBuiltinDisabled(currentOrg, arr);
         } else {
-            // 自定义模板：直接修改 enabled 字段
+            // 自定义示例：直接修改 enabled 字段
             const orgData = getOrgData(currentOrg);
             if (orgData[key] && typeof orgData[key] === 'object') {
                 orgData[key].enabled = newEnabled;
@@ -507,7 +507,7 @@
             }
         }
         renderRight();
-        showNotification(newEnabled ? '模板已启用' : '模板已停用', 'success');
+        showNotification(newEnabled ? '示例已启用' : '示例已停用', 'success');
     };
 
     // ===== 删除 =====
@@ -516,16 +516,16 @@
         const t = all[key];
         if (!t) return;
         if (t.isBuiltin) {
-            showNotification('内置模板不可删除', 'warning');
+            showNotification('内置示例不可删除', 'warning');
             return;
         }
-        showConfirm('删除模板', '确定删除模板「' + t.name + '」吗？此操作不可恢复。', () => {
+        showConfirm('删除示例', '确定删除示例「' + t.name + '」吗？此操作不可恢复。', () => {
             const orgData = getOrgData(currentOrg);
             delete orgData[key];
             setOrgData(currentOrg, orgData);
             renderLeft();
             renderRight();
-            showNotification('模板已删除', 'success');
+            showNotification('示例已删除', 'success');
         });
     };
 

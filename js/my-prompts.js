@@ -1,5 +1,5 @@
-// ============ My Prompts (用户侧自定义文书要求) ============
-// v1.0 个人文书要求维护，按文书类型分组
+// ============ My Prompts (用户侧自定义指令) ============
+// v1.0 个人指令维护，按文书类型分组
 // 数据持久化：localStorage.myPromptTemplates（按业务系统×文书类型分组）
 // 用户侧联动：case-data.js getReqTemplates 在返回时追加 my 数据（标记 source='mine'）
 // v1.2: 新增历史版本记录（与 admin-prompt-templates.js 同步，最多 10 条，支持一键恢复）
@@ -96,7 +96,7 @@
         renderList();
     };
 
-    // 渲染单个文书要求卡片（非编辑态）
+    // 渲染单个指令卡片（非编辑态）
     function renderCard(docType, index, item, docTypeName) {
         const name = (item && item.name) || '';
         const text = (item && item.text) || '';
@@ -151,8 +151,8 @@
         const orgData = getOrgData(currentOrg);
         const contentTitle = document.getElementById('contentTitle');
         contentTitle.textContent = currentDocTypeFilter
-            ? ((docTypes[currentDocTypeFilter] || {}).name || '文书要求列表')
-            : '全部我的文书要求';
+            ? ((docTypes[currentDocTypeFilter] || {}).name || '指令列表')
+            : '全部我的指令';
 
         // 收集需要展示的项：[{ docType, index, item }]
         const items = [];
@@ -238,9 +238,9 @@
             + '<input type="text" class="form-input" id="formName" value="' + escapeHtml(name) + '" placeholder="如：我的支持诉请">'
             + '</div>'
             + '<div class="form-group">'
-            + '<label class="form-label">文书要求正文 <span class="required">*</span></label>'
-            + '<textarea class="form-textarea" id="formText" placeholder="点击标签后填入「文书要求」文本框的内容，支持多行">' + escapeHtml(text) + '</textarea>'
-            + '<div class="form-hint">点击标签后内容将覆盖「文书要求」文本框</div>'
+            + '<label class="form-label">指令正文 <span class="required">*</span></label>'
+            + '<textarea class="form-textarea" id="formText" placeholder="点击标签后填入「指令」文本框的内容，支持多行">' + escapeHtml(text) + '</textarea>'
+            + '<div class="form-hint">点击标签后内容将覆盖「指令」文本框</div>'
             + '</div>'
             + '<div class="form-actions">'
             + '<button class="btn btn-primary" onclick="saveItem()">保存</button>'
@@ -265,7 +265,7 @@
             return;
         }
         if (!newText) {
-            showToast('请填写文书要求正文', 'error');
+            showToast('请填写指令正文', 'error');
             document.getElementById('formText').focus();
             return;
         }
@@ -321,7 +321,7 @@
         editingState = null;
         renderLeft();
         renderList();
-        showToast(oldIndex === -1 ? '文书要求已新增' : '文书要求已更新', 'success');
+        showToast(oldIndex === -1 ? '指令已新增' : '指令已更新', 'success');
     };
 
     // ===== v1.2 历史版本管理 =====
@@ -341,7 +341,7 @@
         if (!item) return;
         const history = Array.isArray(item.history) ? item.history : [];
         if (history.length === 0) {
-            showToast('该文书要求暂无历史版本', 'error');
+            showToast('该指令暂无历史版本', 'error');
             return;
         }
         historyContext = { docType: docType, index: index };
@@ -415,13 +415,13 @@
         if (!Array.isArray(orgData[docType])) return;
         const item = orgData[docType][index];
         if (!item) return;
-        if (!confirm('确定删除文书要求「' + (item.name || '') + '」吗？此操作不可恢复。')) return;
+        if (!confirm('确定删除指令「' + (item.name || '') + '」吗？此操作不可恢复。')) return;
         orgData[docType].splice(index, 1);
         setOrgData(currentOrg, orgData);
         editingState = null;
         renderLeft();
         renderList();
-        showToast('文书要求已删除', 'success');
+        showToast('指令已删除', 'success');
     };
 
     // ===== 初始化 =====

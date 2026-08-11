@@ -1,5 +1,5 @@
 // ============ Admin Doc Types Management ============
-// v1.0 文书类型管理：维护各业务系统文书类型（模板/文书要求的父级分类）
+// v1.0 文书类型管理：维护各业务系统文书类型（模板/指令的父级分类）
 // v1.28/v1.29 workflow 新增 type 字段（'step'=展示型 | 'material'=不展示型），弹窗加类型 radio，子表格加类型列
 // v1.29: 类型命名简化为展示型/不展示型（内部仍用 'step'/'material'）
 // v1.32: workflow 配置调整——id 改为下拉框（数据来自 agentflow 平台 mock）；类型命名改为分步生成型/直接生成型；
@@ -71,20 +71,20 @@
         return count;
     }
 
-    // 统计某类型下的文书要求数（内置 + admin + my）
+    // 统计某类型下的指令数（内置 + admin + my）
     function countPrompts(org, typeKey) {
         let count = 0;
-        // admin 文书要求
+        // admin 指令
         const adminPrompts = JSON.parse(localStorage.getItem('adminPromptTemplates') || '{}');
         const orgAdminPrompts = adminPrompts[org] || {};
         if (Array.isArray(orgAdminPrompts[typeKey])) {
             count += orgAdminPrompts[typeKey].length;
         } else {
-            // 内置文书要求
+            // 内置指令
             const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][typeKey]) || [];
             count += defaults.length;
         }
-        // 用户侧文书要求
+        // 用户侧指令
         const myPrompts = JSON.parse(localStorage.getItem('myPromptTemplates') || '{}');
         const orgMyPrompts = myPrompts[org] || {};
         if (Array.isArray(orgMyPrompts[typeKey])) {
@@ -928,7 +928,7 @@
         editingIsBuiltin = false;
         document.getElementById('modalTitle').textContent = '新增类型';
         document.getElementById('tplName').value = '';
-        document.getElementById('nameHint').textContent = '用于模板和文书要求的分类，不可与现有类型重名';
+        document.getElementById('nameHint').textContent = '用于模板和指令的分类，不可与现有类型重名';
         document.getElementById('nameHint').style.color = '';
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
@@ -944,7 +944,7 @@
         document.getElementById('tplName').value = t.name;
         document.getElementById('nameHint').textContent = editingIsBuiltin
             ? '修改后将覆盖内置配置；删除自定义覆盖可恢复内置默认'
-            : '用于模板和文书要求的分类，不可与现有类型重名';
+            : '用于模板和指令的分类，不可与现有类型重名';
         document.getElementById('nameHint').style.color = '';
         document.getElementById('tplModal').classList.add('show');
     };
@@ -1045,14 +1045,14 @@
         const t = docTypes[key];
         if (!t) return;
 
-        // 删除前校验：是否被模板/文书要求引用
+        // 删除前校验：是否被模板/指令引用
         const tplCount = countTemplates(currentOrg, key);
         const promptCount = countPrompts(currentOrg, key);
 
         if (tplCount > 0 || promptCount > 0) {
             const reasons = [];
             if (tplCount > 0) reasons.push(tplCount + ' 个模板');
-            if (promptCount > 0) reasons.push(promptCount + ' 条文书要求');
+            if (promptCount > 0) reasons.push(promptCount + ' 条指令');
             showNotification('该类型下仍存在 ' + reasons.join('、') + '，请先迁移或删除后再删除类型', 'warning');
             return;
         }

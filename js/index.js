@@ -24,13 +24,13 @@ const publicKBData = [
     { id: 'kb3', name: '行政法知识库', desc: '行政法规及规章汇编', type: 'public' },
     { id: 'kb4', name: '最高法指导案例', desc: '最高人民法院指导性案例', type: 'public' },
     { id: 'kb5', name: '地方法规库', desc: '各省市地方性法规汇编', type: 'public' },
-    { id: 'kb6', name: '法律文书模板库', desc: '常用法律文书模板', type: 'public' }
+    { id: 'kb6', name: '法律文书示例库', desc: '常用法律文书示例', type: 'public' }
 ];
 
 // 个人知识库数据
 const personalKBData = [
-    { id: 'personal-kb6', name: '我的起诉状模板', desc: '我的模板 · 12个文档', type: 'personal' },
-    { id: 'personal-kb7', name: '我的答辩状模板', desc: '我的模板 · 8个文档', type: 'personal' }
+    { id: 'personal-kb6', name: '我的起诉状示例', desc: '我的示例 · 12个文档', type: 'personal' },
+    { id: 'personal-kb7', name: '我的答辩状示例', desc: '我的示例 · 8个文档', type: 'personal' }
 ];
 
 // 合并所有知识库数据

@@ -72,7 +72,7 @@ function getSafeContextLimit(modelId) {
     return Math.floor(getModelContextLimit(modelId) * getSafetyRatio());
 }
 
-// v1.35: 估算文本 token 数（用于模板正文与文书要求）
+// v1.35: 估算文本 token 数（用于模板正文与指令）
 // 中文文本近似 1 字符 ≈ 1.5 tokens，英文 1 单词 ≈ 1.3 tokens；这里取简化值 1.5
 function estimateTextTokens(text) {
     if (!text) return 0;
@@ -680,9 +680,9 @@ function getTemplateName(tpl) {
     return tpl.name || '';
 }
 
-// v1.13: 获取「文书要求」文书要求模板
+// v1.13: 获取「指令」模板
 // 优先级：管理后台 adminPromptTemplates（为空回退默认） + 用户侧 myPromptTemplates（追加，标记 source='mine'）
-// v1.23: 过滤掉 enabled === false 的项；内置文书要求停用记录于 __builtinDisabled__ 字典
+// v1.23: 过滤掉 enabled === false 的项；内置指令停用记录于 __builtinDisabled__ 字典
 function getReqTemplates(org, docTypeKey) {
     // 基础数据：admin 或默认
     let base = [];
@@ -703,7 +703,7 @@ function getReqTemplates(org, docTypeKey) {
     if (useDefault) {
         const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
         base = defaults.slice();
-        // 内置文书要求停用：读取 __builtinDisabled__ 字典，过滤对应 index
+        // 内置指令停用：读取 __builtinDisabled__ 字典，过滤对应 index
         try {
             const adminData = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
             const orgData = adminData[org] || {};
@@ -1342,7 +1342,7 @@ function getAllElementPresets(cause, org, caseWord) {
     return { standard, mine };
 }
 
-// 文书要求内置模板，按业务系统 × 文书类型分组
+// 指令内置模板，按业务系统 × 文书类型分组
 const defaultRequirementTemplates = {
     court: {
         judgment: [

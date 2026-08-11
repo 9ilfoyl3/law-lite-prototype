@@ -87,10 +87,10 @@ const knowledgeBaseData = [
     },
     {
         id: 'kb8',
-        name: '民事判决书模板',
+        name: '民事判决书示例',
         category: 'template',
-        description: '各类民事判决书标准模板，包括一审、二审、再审等程序模板。',
-        tags: ['模板', '判决书', '民事'],
+        description: '各类民事判决书标准示例，包括一审、二审、再审等程序示例。',
+        tags: ['示例', '判决书', '民事'],
         icon: 'purple',
         iconClass: 'fa-file-signature',
         documentCount: 45,
@@ -98,10 +98,10 @@ const knowledgeBaseData = [
     },
     {
         id: 'kb9',
-        name: '裁定书与调解书模板',
+        name: '裁定书与调解书示例',
         category: 'template',
-        description: '各类裁定书、调解书标准模板，涵盖财产保全、先予执行、调解协议等。',
-        tags: ['模板', '裁定书', '调解书'],
+        description: '各类裁定书、调解书标准示例，涵盖财产保全、先予执行、调解协议等。',
+        tags: ['示例', '裁定书', '调解书'],
         icon: 'purple',
         iconClass: 'fa-file-alt',
         documentCount: 38,
@@ -157,14 +157,14 @@ const knowledgeBaseData = [
 let publicCategories = [
     { id: 'law', name: '法律法规', icon: 'green', iconClass: 'fa-gavel', count: 6 },
     { id: 'case', name: '案例库', icon: 'orange', iconClass: 'fa-balance-scale', count: 3 },
-    { id: 'template', name: '文书模板', icon: 'purple', iconClass: 'fa-file-alt', count: 2 },
+    { id: 'template', name: '文书示例', icon: 'purple', iconClass: 'fa-file-alt', count: 2 },
     { id: 'local', name: '地方法规', icon: 'cyan', iconClass: 'fa-map-marker-alt', count: 1 }
 ];
 
 // Personal categories data (动态分类)
 let personalCategories = [
     { id: 'my-favorites', name: '我的收藏', icon: 'pink', iconClass: 'fa-star', count: 5 },
-    { id: 'my-templates', name: '我的模板', icon: 'teal', iconClass: 'fa-file-code', count: 3 },
+    { id: 'my-templates', name: '我的示例', icon: 'teal', iconClass: 'fa-file-code', count: 3 },
     { id: 'my-notes', name: '我的笔记', icon: 'purple', iconClass: 'fa-sticky-note', count: 4 }
 ];
 
@@ -242,10 +242,10 @@ const personalKnowledgeBaseData = [
     },
     {
         id: 'personal-kb6',
-        name: '民事判决书模板',
+        name: '民事判决书示例',
         category: 'my-templates',
-        description: '各类民事判决书模板，包含一审、二审、再审等程序模板。',
-        tags: ['模板', '判决书', '民事'],
+        description: '各类民事判决书示例，包含一审、二审、再审等程序示例。',
+        tags: ['示例', '判决书', '民事'],
         icon: 'teal',
         iconClass: 'fa-file-signature',
         documentCount: 15,
@@ -254,10 +254,10 @@ const personalKnowledgeBaseData = [
     },
     {
         id: 'personal-kb7',
-        name: '庭审笔录模板',
+        name: '庭审笔录示例',
         category: 'my-templates',
-        description: '各类庭审笔录模板，适用于普通程序、简易程序、听证等场景。',
-        tags: ['模板', '庭审笔录', '开庭'],
+        description: '各类庭审笔录示例，适用于普通程序、简易程序、听证等场景。',
+        tags: ['示例', '庭审笔录', '开庭'],
         icon: 'teal',
         iconClass: 'fa-clipboard-list',
         documentCount: 8,
@@ -266,10 +266,10 @@ const personalKnowledgeBaseData = [
     },
     {
         id: 'personal-kb8',
-        name: '裁定书与调解书模板',
+        name: '裁定书与调解书示例',
         category: 'my-templates',
-        description: '各类裁定书、调解书模板，涵盖财产保全、先予执行、调解协议等。',
-        tags: ['模板', '裁定书', '调解书'],
+        description: '各类裁定书、调解书示例，涵盖财产保全、先予执行、调解协议等。',
+        tags: ['示例', '裁定书', '调解书'],
         icon: 'teal',
         iconClass: 'fa-file-alt',
         documentCount: 12,
@@ -356,12 +356,12 @@ const kbFilesData = {
         { id: 'f10c', name: '广东高院典型案例2024.pdf', size: '6.2 MB', updateTime: '2024-12-08', type: 'pdf' },
     ],
     'kb8': [
-        { id: 'f11', name: '民事判决书模板（一审）.docx', size: '45 KB', updateTime: '2024-12-05', type: 'docx' },
-        { id: 'f12', name: '民事判决书模板（二审）.docx', size: '48 KB', updateTime: '2024-12-05', type: 'docx' },
+        { id: 'f11', name: '民事判决书示例（一审）.docx', size: '45 KB', updateTime: '2024-12-05', type: 'docx' },
+        { id: 'f12', name: '民事判决书示例（二审）.docx', size: '48 KB', updateTime: '2024-12-05', type: 'docx' },
     ],
     'kb9': [
-        { id: 'f13', name: '财产保全裁定书模板.doc', size: '32 KB', updateTime: '2024-12-01', type: 'doc' },
-        { id: 'f14', name: '调解书模板.docx', size: '28 KB', updateTime: '2024-12-01', type: 'docx' },
+        { id: 'f13', name: '财产保全裁定书示例.doc', size: '32 KB', updateTime: '2024-12-01', type: 'doc' },
+        { id: 'f14', name: '调解书示例.docx', size: '28 KB', updateTime: '2024-12-01', type: 'docx' },
     ],
     'kb10': [
         { id: 'f16', name: '广东省地方性法规汇编2024.pdf', size: '8.5 MB', updateTime: '2024-11-20', type: 'pdf' },
@@ -377,21 +377,21 @@ const kbFilesData = {
         { id: 'f20', name: '建筑法及配套法规.pdf', size: '4.1 MB', updateTime: '2024-11-05', type: 'pdf' },
     ],
     'personal-kb6': [
-        { id: 't1', name: '民事判决书模板（一审普通程序）.docx', size: '52 KB', updateTime: '2024-12-24', type: 'docx' },
-        { id: 't2', name: '民事判决书模板（二审）.docx', size: '48 KB', updateTime: '2024-12-24', type: 'docx' },
-        { id: 't3', name: '民事判决书模板（简易程序）.docx', size: '45 KB', updateTime: '2024-12-22', type: 'docx' },
-        { id: 't4', name: '民事判决书模板（再审）.docx', size: '50 KB', updateTime: '2024-12-20', type: 'docx' },
+        { id: 't1', name: '民事判决书示例（一审普通程序）.docx', size: '52 KB', updateTime: '2024-12-24', type: 'docx' },
+        { id: 't2', name: '民事判决书示例（二审）.docx', size: '48 KB', updateTime: '2024-12-24', type: 'docx' },
+        { id: 't3', name: '民事判决书示例（简易程序）.docx', size: '45 KB', updateTime: '2024-12-22', type: 'docx' },
+        { id: 't4', name: '民事判决书示例（再审）.docx', size: '50 KB', updateTime: '2024-12-20', type: 'docx' },
     ],
     'personal-kb7': [
-        { id: 't5', name: '庭审笔录模板（普通程序）.docx', size: '38 KB', updateTime: '2024-12-20', type: 'docx' },
-        { id: 't6', name: '庭审笔录模板（简易程序）.docx', size: '32 KB', updateTime: '2024-12-20', type: 'docx' },
-        { id: 't7', name: '听证笔录模板.docx', size: '35 KB', updateTime: '2024-12-18', type: 'docx' },
+        { id: 't5', name: '庭审笔录示例（普通程序）.docx', size: '38 KB', updateTime: '2024-12-20', type: 'docx' },
+        { id: 't6', name: '庭审笔录示例（简易程序）.docx', size: '32 KB', updateTime: '2024-12-20', type: 'docx' },
+        { id: 't7', name: '听证笔录示例.docx', size: '35 KB', updateTime: '2024-12-18', type: 'docx' },
     ],
     'personal-kb8': [
-        { id: 't8', name: '财产保全裁定书模板.doc', size: '28 KB', updateTime: '2024-12-18', type: 'doc' },
-        { id: 't9', name: '先予执行裁定书模板.docx', size: '26 KB', updateTime: '2024-12-18', type: 'docx' },
-        { id: 't10', name: '民事调解书模板.docx', size: '30 KB', updateTime: '2024-12-15', type: 'docx' },
-        { id: 't11', name: '撤诉裁定书模板.docx', size: '25 KB', updateTime: '2024-12-15', type: 'docx' },
+        { id: 't8', name: '财产保全裁定书示例.doc', size: '28 KB', updateTime: '2024-12-18', type: 'doc' },
+        { id: 't9', name: '先予执行裁定书示例.docx', size: '26 KB', updateTime: '2024-12-18', type: 'docx' },
+        { id: 't10', name: '民事调解书示例.docx', size: '30 KB', updateTime: '2024-12-15', type: 'docx' },
+        { id: 't11', name: '撤诉裁定书示例.docx', size: '25 KB', updateTime: '2024-12-15', type: 'docx' },
     ],
     'personal-kb9': [
         { id: 'n1', name: '2024年办案心得总结.docx', size: '125 KB', updateTime: '2024-12-26', type: 'docx' },
@@ -502,7 +502,7 @@ function renderPersonalCategories() {
         const categoryClass = isMyFavorites ? 'kb-category no-actions' : 'kb-category';
         
         // 确定数量单位
-        let countLabel = '模板';
+        let countLabel = '示例';
         if (cat.id === 'my-favorites' || cat.id.includes('favorite')) {
             countLabel = '收藏';
         } else if (cat.id === 'my-notes') {
@@ -1721,7 +1721,7 @@ function updateSidebarCounts() {
             cat.count = count;
             const element = document.querySelector(`.kb-category[data-category="${cat.id}"] .kb-category-count`);
             if (element) {
-                element.textContent = `${count}个模板`;
+                element.textContent = `${count}个示例`;
             }
         }
     });

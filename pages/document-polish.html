@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>文书精修 - AI辅助办案系统</title>
+    <title>文书精修 - 智能办案系统</title>
     <link href="../libs/font-awesome-all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/common.css">
     <style>
@@ -345,6 +345,450 @@
         .polish-context-item i { color: var(--text-muted); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
         .polish-context-label { color: var(--text-muted); flex-shrink: 0; }
         .polish-context-value { color: var(--text-secondary); word-break: break-all; }
+
+        /* ===== AI 改写浮动工具条 ===== */
+        .ai-rewrite-toolbar {
+            position: absolute;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+        }
+        .ai-rewrite-toolbar.visible { display: flex; }
+        .ai-rewrite-toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+        .ai-rewrite-toolbar-btn:hover { background: var(--bg-secondary); }
+        .ai-rewrite-toolbar-btn i { color: var(--accent-primary); font-size: 11px; }
+
+        /* ===== AI 改写卡片弹窗 ===== */
+        .ai-rewrite-card {
+            position: absolute;
+            z-index: 101;
+            display: none;
+            width: 420px;
+            max-width: calc(100vw - 40px);
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+            overflow: hidden;
+        }
+        .ai-rewrite-card.visible { display: block; }
+        .ai-rewrite-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            background: #f9fafb;
+        }
+        .ai-rewrite-card-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .ai-rewrite-card-title i { color: var(--accent-primary); }
+        .ai-rewrite-card-close {
+            width: 24px; height: 24px;
+            border: none;
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .ai-rewrite-card-close:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .ai-rewrite-card-body {
+            padding: 14px;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        .ai-rewrite-section { margin-bottom: 14px; }
+        .ai-rewrite-section:last-child { margin-bottom: 0; }
+        .ai-rewrite-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .ai-rewrite-hint {
+            padding: 10px 12px;
+            background: #fffbeb;
+            border: 1px dashed #fbbf24;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #92400e;
+            line-height: 1.6;
+        }
+        .ai-rewrite-original {
+            padding: 10px 12px;
+            background: #f3f4f6;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-height: 90px;
+            overflow-y: auto;
+        }
+        .ai-rewrite-reason {
+            padding: 8px 12px;
+            background: #eff6ff;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #2563eb;
+            line-height: 1.5;
+        }
+        .ai-rewrite-result {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .ai-rewrite-result:focus { border-color: var(--accent-primary); }
+        .ai-rewrite-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 10px 14px;
+            border-top: 1px solid var(--border-color);
+            background: #f9fafb;
+        }
+        .ai-rewrite-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: #fff;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .ai-rewrite-action-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .ai-rewrite-action-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .ai-rewrite-action-btn.primary:hover { background: #1d4ed8; }
+        .ai-rewrite-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ai-rewrite-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-top: 1px solid var(--border-color);
+            background: #fff;
+        }
+        .ai-rewrite-footer input {
+            flex: 1;
+            padding: 7px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+        }
+        .ai-rewrite-footer input:focus { border-color: var(--accent-primary); }
+        .ai-rewrite-send {
+            width: 32px; height: 32px;
+            border: none;
+            border-radius: 6px;
+            background: var(--accent-primary);
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .ai-rewrite-send:hover { background: #1d4ed8; }
+        .ai-rewrite-empty {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .ai-rewrite-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .ai-rewrite-loading::after {
+            content: '';
+            width: 14px; height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: aiRewriteSpin 0.8s linear infinite;
+        }
+        @keyframes aiRewriteSpin { to { transform: rotate(360deg); } }
+
+        /* ===== 上下文卡片（三卡片） ===== */
+        .polish-context-cards { display: flex; flex-direction: column; gap: 6px; }
+        .polish-context-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .polish-context-card-icon {
+            width: 28px; height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .polish-context-card-icon.doc { background: #eff6ff; color: #2563eb; }
+        .polish-context-card-icon.kb { background: #f0fdf4; color: #10b981; }
+        .polish-context-card-icon.struct { background: #fef3c7; color: #d97706; }
+        .polish-context-card-body { flex: 1; min-width: 0; }
+        .polish-context-card-title { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+        .polish-context-card-value { font-size: 12px; color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .polish-context-card-tag {
+            padding: 2px 6px;
+            background: #f3f4f6;
+            color: var(--text-muted);
+            border-radius: 3px;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+        .polish-context-card-tag.auto { background: #d1fae5; color: #065f46; }
+        .polish-context-card-tag.source { background: #eff6ff; color: #2563eb; }
+        .polish-context-card.disabled .polish-context-card-value { color: var(--text-muted); }
+
+        /* ===== 结构化审查消息 ===== */
+        .polish-msg.assistant.review .polish-msg-bubble {
+            background: transparent;
+            padding: 0;
+            max-width: 100%;
+            width: 100%;
+        }
+        .review-analysis {
+            background: #f9fafb;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .review-analysis-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            user-select: none;
+        }
+        .review-analysis-header i.check { color: #10b981; font-size: 14px; }
+        .review-analysis-header i.spinner {
+            color: var(--text-muted);
+            font-size: 12px;
+            animation: aiRewriteSpin 0.8s linear infinite;
+        }
+        .review-analysis-toggle {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .review-analysis.collapsed .review-analysis-toggle { transform: rotate(-90deg); }
+        .review-analysis-body { padding: 0 14px 12px; }
+        .review-analysis.collapsed .review-analysis-body { display: none; }
+        .review-step { margin-bottom: 10px; }
+        .review-step:last-child { margin-bottom: 0; }
+        .review-step-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .review-step-content {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            padding-left: 12px;
+            border-left: 2px solid var(--border-color);
+        }
+
+        /* 审查意见列表 */
+        .review-list { margin-top: 8px; }
+        .review-list-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px 8px 0 0;
+        }
+        .review-list-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .review-list-actions { display: flex; gap: 6px; }
+        .review-list-action-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: #fff;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .review-list-action-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .review-list-action-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .review-list-action-btn.primary:hover { background: #1d4ed8; }
+        .review-list-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 修改建议点卡片 */
+        .review-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            padding: 14px;
+            transition: all 0.2s;
+        }
+        .review-card:last-child { border-radius: 0 0 8px 8px; }
+        .review-card.applied { border-color: #10b981; background: #f0fdf4; }
+        .review-card.ignored { opacity: 0.5; }
+        .review-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .review-card-status {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+        .review-card-status.applied { background: #d1fae5; color: #065f46; }
+        .review-card-status.ignored { background: #f3f4f6; color: var(--text-muted); }
+        .review-card-section { margin-bottom: 10px; }
+        .review-card-section:last-child { margin-bottom: 0; }
+        .review-card-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .review-card-risk { font-size: 12px; color: #dc2626; line-height: 1.5; }
+        .review-card-solution { font-size: 12px; color: #2563eb; line-height: 1.5; }
+        .review-card-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+        .review-card-tab {
+            padding: 3px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: #fff;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .review-card-tab.active {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .review-card-content {
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            padding: 8px 10px;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+        .review-card-content ins { background: #d1fae5; text-decoration: none; color: #065f46; }
+        .review-card-content del { background: #fee2e2; color: #991b1b; }
+        .review-card-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .review-card-action-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: #fff;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .review-card-action-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .review-card-action-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .review-card-action-btn.primary:hover { background: #1d4ed8; }
+        .review-card-action-btn.danger { color: #dc2626; border-color: #fecaca; }
+        .review-card-action-btn.danger:hover { background: #fef2f2; }
+        .review-card-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .review-empty {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+        }
+
+        /* 上传文书按钮（暂隐藏，功能代码保留，待场景闭环后开放） */
+        .polish-action-btn.upload { display: none; }
     </style>
 </head>
 <body>
@@ -360,6 +804,10 @@
             </div>
         </div>
         <div class="polish-header-right">
+            <button class="polish-action-btn upload" onclick="triggerUploadDocument()" title="上传本地文书进入精修">
+                <i class="fas fa-upload"></i> 上传文书
+            </button>
+            <input type="file" id="uploadDocInput" accept=".html,.htm,.txt" style="display:none;" onchange="handleUploadDocument(event)">
             <button class="polish-action-btn" onclick="undoLastEdit()" title="撤销上一步精修" id="undoBtn" disabled>
                 <i class="fas fa-undo"></i> 撤销
             </button>
@@ -386,6 +834,49 @@
             <div class="polish-doc-content" id="docEditorRoot">
                 <!-- 文档编辑器由 document-polish.js 初始化 -->
             </div>
+
+            <!-- AI 改写浮动工具条 -->
+            <div class="ai-rewrite-toolbar" id="aiRewriteToolbar">
+                <button class="ai-rewrite-toolbar-btn" onclick="openAiRewriteCard()">
+                    <i class="fas fa-sparkles"></i> 系统改写
+                </button>
+            </div>
+
+            <!-- AI 改写卡片弹窗 -->
+            <div class="ai-rewrite-card" id="aiRewriteCard">
+                <div class="ai-rewrite-card-header">
+                    <div class="ai-rewrite-card-title">
+                        <i class="fas fa-sparkles"></i>
+                        <span>系统改写</span>
+                    </div>
+                    <button class="ai-rewrite-card-close" onclick="closeAiRewriteCard()" title="关闭">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="ai-rewrite-card-body" id="aiRewriteCardBody">
+                    <!-- 动态填充 -->
+                </div>
+                <div class="ai-rewrite-actions" id="aiRewriteActions" style="display:none;">
+                    <button class="ai-rewrite-action-btn" onclick="regenerateAiRewrite()">
+                        <i class="fas fa-rotate-right"></i> 重新生成
+                    </button>
+                    <button class="ai-rewrite-action-btn" onclick="copyAiRewriteResult()">
+                        <i class="fas fa-copy"></i> 复制
+                    </button>
+                    <button class="ai-rewrite-action-btn" onclick="insertAiRewriteResult()">
+                        <i class="fas fa-arrow-down"></i> 插入
+                    </button>
+                    <button class="ai-rewrite-action-btn primary" onclick="replaceAiRewriteOriginal()">
+                        <i class="fas fa-check"></i> 替换原文
+                    </button>
+                </div>
+                <div class="ai-rewrite-footer" id="aiRewriteFooter" style="display:none;">
+                    <input type="text" id="aiRewriteInstruction" placeholder="输入优化指令，例如：更正式一些" onkeydown="handleAiRewriteKeydown(event)">
+                    <button class="ai-rewrite-send" onclick="sendAiRewriteInstruction()" title="按优化指令重新生成">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Resizer（可拖动分隔条） -->
@@ -403,12 +894,12 @@
             <div class="polish-chat-messages" id="chatMessages">
                 <div class="polish-chat-empty">
                     <i class="fas fa-comment-dots"></i>
-                    <div>输入精修指令开始优化文书</div>
-                    <div style="margin-top:6px;font-size:12px;">例如：精简事实认定部分、补充法条引用、调整语气</div>
+                    <div>输入修改需求，系统将定位原文并给出修改建议</div>
+                    <div style="margin-top:6px;font-size:12px;">例如：重写本院认为部分、补充法条引用、检查格式问题</div>
                 </div>
             </div>
             <div class="polish-chat-input-area">
-                <textarea class="polish-chat-input" id="chatInput" placeholder="输入精修指令..." rows="1" onkeydown="handleChatKeydown(event)"></textarea>
+                <textarea class="polish-chat-input" id="chatInput" placeholder="描述要修改的内容..." rows="1" onkeydown="handleChatKeydown(event)"></textarea>
                 <button class="polish-send-btn" id="sendBtn" onclick="sendPolishMessage()">
                     <i class="fas fa-paper-plane"></i>
                 </button>
@@ -418,7 +909,7 @@
 
     <script src="../js/common.js?v=30"></script>
     <script src="../js/case-data.js?v=65"></script>
-    <script src="../js/doc-editor.js?v=1"></script>
-    <script src="../js/document-polish.js?v=5"></script>
+    <script src="../js/doc-editor.js?v=3"></script>
+    <script src="../js/document-polish.js?v=7"></script>
 </body>
 </html>

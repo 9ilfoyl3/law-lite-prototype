@@ -121,7 +121,7 @@ function useTemplate(templateType) {
         'notice': '开庭通知书'
     };
     
-    showNotification(`正在使用${templateNames[templateType]}模板……`, 'success');
+    showNotification(`正在使用${templateNames[templateType]}示例……`, 'success');
     setTimeout(() => {
         window.location.href = '../index.html';
     }, 500);

@@ -726,7 +726,7 @@
         }
         .req-template-tag:hover { background: #fde68a; border-color: #f59e0b; }
         .req-template-tag.active { background: #f59e0b; color: #fff; border-color: #d97706; }
-        /* v2.15: 用户侧自定义文书要求标签（绿色，区别于系统/管理后台的黄色） */
+        /* v2.15: 用户侧自定义指令标签（绿色，区别于系统/管理后台的黄色） */
         .req-template-tag.mine { color: #065f46; background: #d1fae5; border-color: #6ee7b7; }
         .req-template-tag.mine:hover { background: #a7f3d0; border-color: #34d399; }
         .req-template-tag.mine.active { background: #10b981; color: #fff; border-color: #059669; }
@@ -3076,7 +3076,7 @@
                                         <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial()"></select>
                                     </div>
                                     <div class="gen-form-row">
-                                        <label class="gen-form-label">文书要求</label>
+                                        <label class="gen-form-label">指令</label>
                                         <div class="req-template-tags" id="matReqTemplates"></div>
                                         <textarea class="gen-form-textarea" id="matRequirement" placeholder="可选：描述特殊要求或关注点" oninput="syncStepConfigFromMaterial()"></textarea>
                                     </div>
@@ -3118,7 +3118,7 @@
                             <div id="stepFlowArea">
                                 <div class="step-view-hint" id="stepViewHint">
                                     <i class="fas fa-lightbulb"></i>
-                                    <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐步生成。系统单次安全处理上限 <strong id="stepHintLimit">102400</strong> 字。</span>
+                                    <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐步生成。</span>
                                 </div>
                                 <div class="steps-list" id="stepsList"></div>
                                 <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;">
@@ -3371,7 +3371,7 @@
     <script src="../js/common.js?v=16"></script>
     <script src="../js/case-data.js?v=65"></script>
     <script src="../js/doc-editor.js?v=1"></script>
-    <script src="../js/case-files.js?v=115"></script>
+    <script src="../js/case-files.js?v=116"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

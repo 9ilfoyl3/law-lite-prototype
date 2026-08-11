@@ -1,9 +1,9 @@
-// ============ My Templates (用户侧自定义文书模板) ============
-// v1.0 个人文书模板维护，关联文书类型
-// v1.1 移除「关联案由」字段：模板作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
-// v1.2 模板正文交互改造：① 模板正文从 textarea 在线编辑改为文件上传；② 新增/编辑表单提供模板示例下载；③ 卡片列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段；⑥ 修复保存时读取 content 及表单上传区显示逻辑
-// v1.3 模板卡片新增「上传时间」「更新时间」展示：保存时记录 createdAt / updatedAt
-// v1.4 V1.1.2 定位调整：模板 content 语义从「带占位符的格式骨架」改为「给 AI 的内容参考文本」，录入方式从仅文件上传改回大文本框在线编辑为主（可选文件上传导入）；移除独立的「重新上传」操作按钮（合并到编辑）；示例文本改为简短内容参考示例（不再带占位符）；格式骨架约束移至 workflow 子配置
+// ============ My Templates (用户侧自定义文书示例) ============
+// v1.0 个人文书示例维护，关联文书类型
+// v1.1 移除「关联案由」字段：示例作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
+// v1.2 示例正文交互改造：① 示例正文从 textarea 在线编辑改为文件上传；② 新增/编辑表单提供示例下载；③ 卡片列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段；⑥ 修复保存时读取 content 及表单上传区显示逻辑
+// v1.3 示例卡片新增「上传时间」「更新时间」展示：保存时记录 createdAt / updatedAt
+// v1.4 V1.1.2 定位调整：示例 content 语义从「带占位符的格式骨架」改为「给 AI 的内容参考文本」，录入方式从仅文件上传改回大文本框在线编辑为主（可选文件上传导入）；移除独立的「重新上传」操作按钮（合并到编辑）；示例文本改为简短内容参考示例（不再带占位符）；格式骨架约束移至 workflow 子配置
 // 数据持久化：localStorage.myDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeMyDocTemplates 在加载时合并到 system.docTemplates（key 加 my- 前缀）
 
@@ -17,7 +17,7 @@
 
     // v1.5 (V1.1.2) 内容参考示例：裁判文书（民事判决书）完整内容结构
     // 注：分步生成阶段（原告诉请/被告答辩/争议焦点/事实认定等）是辅助法官判断的中间产物，
-    //     不是裁判文书模板内容；真正的文书模板应描述完整判决书的内容结构与各部分格式要求。
+    //     不是裁判文书示例内容；真正的文书示例应描述完整判决书的内容结构与各部分格式要求。
     //     [占位符] 为描述性占位符（给 AI 看的格式要求），由 AI 生成时替换为实际内容；
     //     与 workflow 格式骨架的 {{占位符}}（程序化套版）语义不同。
     const MY_TEMPLATE_EXAMPLE_TEXT = `[法院名称：江苏省XX市XX区人民法院]
@@ -179,7 +179,7 @@
         renderList();
     };
 
-    // 渲染单个模板卡片（非编辑态）
+    // 渲染单个示例卡片（非编辑态）
     function renderCard(key, t, docTypes) {
         const docTypeName = (docTypes[t.docType] || {}).name || '-';
         const isEnabled = t.enabled !== false; // 缺省视为 true
@@ -226,13 +226,13 @@
         const orgData = getOrgData(currentOrg);
         const t = orgData[key];
         if (!t || !(t.content || '').trim()) return;
-        previewTextInWindow('模板预览：' + t.name, t.content);
+        previewTextInWindow('示例预览：' + t.name, t.content);
     };
     window.downloadMyTemplate = function(key) {
         const orgData = getOrgData(currentOrg);
         const t = orgData[key];
         if (!t || !(t.content || '').trim()) return;
-        downloadTextFile(t.content, (t.name || '我的模板正文') + '.txt');
+        downloadTextFile(t.content, (t.name || '我的示例正文') + '.txt');
     };
 
     // 切换启用/停用状态
@@ -253,8 +253,8 @@
         const orgData = getOrgData(currentOrg);
         const contentTitle = document.getElementById('contentTitle');
         contentTitle.textContent = currentDocTypeFilter
-            ? ((docTypes[currentDocTypeFilter] || {}).name || '模板列表')
-            : '全部我的模板';
+            ? ((docTypes[currentDocTypeFilter] || {}).name || '示例列表')
+            : '全部我的示例';
 
         const list = Object.entries(orgData).filter(([k, v]) => {
             return !currentDocTypeFilter || v.docType === currentDocTypeFilter;
@@ -345,18 +345,18 @@
 
         return '<div class="item-card editing">'
             + '<div class="form-group">'
-            + '<label class="form-label">模板名 <span class="required">*</span></label>'
-            + '<input type="text" class="form-input" id="formName" value="' + escapeHtml(name) + '" placeholder="如：我的民事判决书模板">'
+            + '<label class="form-label">示例名 <span class="required">*</span></label>'
+            + '<input type="text" class="form-input" id="formName" value="' + escapeHtml(name) + '" placeholder="如：我的民事判决书示例">'
             + '</div>'
             + '<div class="form-group">'
             + '<label class="form-label">所属文书类型 <span class="required">*</span></label>'
             + '<select class="form-select" id="formDocType">' + docTypeOptions + '</select>'
             + '</div>'
             + '<div class="form-group">'
-            + '<label class="form-label">模板正文</label>'
-            + '<textarea class="form-textarea" id="formContent" placeholder="请输入模板内容参考文本，描述文书应包含哪些内容板块/段落..." style="min-height:180px;">' + escapeHtml(contentValue) + '</textarea>'
+            + '<label class="form-label">示例正文</label>'
+            + '<textarea class="form-textarea" id="formContent" placeholder="请输入示例内容参考文本，描述文书应包含哪些内容板块/段落..." style="min-height:180px;">' + escapeHtml(contentValue) + '</textarea>'
             + exampleRow
-            + '<div class="form-hint">模板正文作为给 AI 的内容参考文本，文书生成时 AI 据此组织文书结构</div>'
+            + '<div class="form-hint">示例正文作为给 AI 的内容参考文本，文书生成时 AI 据此组织文书结构</div>'
             + '</div>'
             + '<div class="form-actions">'
             + '<button class="btn btn-primary" onclick="saveItem(\'' + (isNew ? '' : key) + '\')">保存</button>'
@@ -372,7 +372,7 @@
         const content = document.getElementById('formContent').value;
 
         if (!name) {
-            showToast('请填写模板名', 'error');
+            showToast('请填写示例名', 'error');
             document.getElementById('formName').focus();
             return;
         }
@@ -406,10 +406,10 @@
         editingKey = null;
         renderLeft();
         renderList();
-        showToast(existingKey ? '模板已更新' : '模板已新增', 'success');
+        showToast(existingKey ? '示例已更新' : '示例已新增', 'success');
     };
 
-    // v1.4 模板文件导入处理（可选）：将文件内容写入 textarea，便于继续编辑
+    // v1.4 示例文件导入处理（可选）：将文件内容写入 textarea，便于继续编辑
     // 原型阶段仅解析 .txt；doc/docx 提示需配套解析能力
     window.handleMyTemplateFileUpload = function(event) {
         const file = event.target.files && event.target.files[0];
@@ -427,7 +427,7 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 ta.value = (e.target.result || '').toString();
-                showToast('模板正文已导入到文本框，可继续编辑', 'success');
+                showToast('示例正文已导入到文本框，可继续编辑', 'success');
             };
             reader.onerror = function() {
                 showToast('文件读取失败', 'error');
@@ -449,9 +449,9 @@
         showToast('已插入示例文本，可在此基础上修改', 'success');
     };
 
-    // v1.4 下载模板示例（保留便捷入口）
+    // v1.4 下载示例（保留便捷入口）
     window.downloadMyTemplateExample = function() {
-        downloadTextFile(MY_TEMPLATE_EXAMPLE_TEXT, '文书模板内容参考示例.txt');
+        downloadTextFile(MY_TEMPLATE_EXAMPLE_TEXT, '文书示例内容参考示例.txt');
     };
 
     // ===== 删除 =====
@@ -459,12 +459,12 @@
         const orgData = getOrgData(currentOrg);
         const t = orgData[key];
         if (!t) return;
-        if (!confirm('确定删除模板「' + (t.name || key) + '」吗？此操作不可恢复。')) return;
+        if (!confirm('确定删除示例「' + (t.name || key) + '」吗？此操作不可恢复。')) return;
         delete orgData[key];
         setOrgData(currentOrg, orgData);
         renderLeft();
         renderList();
-        showToast('模板已删除', 'success');
+        showToast('示例已删除', 'success');
     };
 
     // ===== 初始化 =====

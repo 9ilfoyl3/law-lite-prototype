@@ -10,11 +10,11 @@
 // v2.22 材料解析状态展示（PRD 10章）：renderMaterialTree 仅展示 parseStatus==='success' 的文件；存在解析中/异常文件时顶部显示解析进度概览"共N个，已解析M个，异常K个"；监听 case-file-parse-updated 事件自动刷新材料树
 // v2.21 V1.1 分步生成步骤序列硬编码：stepConfigsByOrg.court.judgment 改为 6 步固定清单（案件信息/原告诉请/被告答辩/争议焦点/事实认定/裁判结果），新增 inputs 依赖定义（source=material/prev_step/case_context，步骤4 争议焦点依赖前3步为选填）；同步将 step.title 字段引用改为 step.name；新增 updateStepsTabVisibility 仅裁判文书类型展示分步生成 Tab；renderStepGenConfig 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型；新增 buildStepDependencyHintHtml 在步骤 body 顶部展示依赖状态提示条（无依赖/必填未完成红色阻止/可选未完成黄色警告/全部已完成蓝色信息）；必填依赖未完成时生成本步按钮置灰并在 generateSingleStepManually 入口加双保险校验
 // v2.20 模型改为只读展示：模型由 workflow 的 modelId 决定（agentflow 平台镜像），新增 refreshModelFromWorkflow 在文书类型/生成方式/初始化/重新配置等时机刷新；onModelChange 置为 no-op；applyListGenParams/applyRegenerateConfig/reconfigWithLatestSnapshot 不再从 URL 或历史文书恢复模型
-// v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/文书要求/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
+// v2.19 案件详情页分步生成与重新配置交互调整：① 去除【生成剩余步骤】按钮，新增每步【生成本步】按钮；② 新增 reconfigWithLatestSnapshot，重新配置默认回填最近一次历史文书快照（模型/类型/模板/指令/已选材料/生成方式）；③ regenerateStep 加 PRD 注释，登记递归重置之前步骤的逻辑（暂不实现）
 // v2.18 workflow 匹配维度升级为案字+案由：getWorkflowByCaseWord/getMaterialWorkflowByCaseWord/getStepsConfigForDocType 调用补 cause 参数
 // v2.17 workflow 区分分步型/材料型：分步生成 tab 仅匹配 step 型，材料生成 tab 新增 refreshMaterialWorkflow 匹配 material 型（用户侧不感知）
-// v2.16 移除「我的模板」「我的文书要求」入口（迁移至案件列表页 cases.js）；清理 applyReadOnlyMode 中对应隐藏逻辑
-// v2.14 文书要求标签优先读管理后台 adminPromptTemplates；模板渲染兼容对象结构
+// v2.16 移除「我的模板」「我的指令」入口（迁移至案件列表页 cases.js）；清理 applyReadOnlyMode 中对应隐藏逻辑
+// v2.14 指令标签优先读管理后台 adminPromptTemplates；模板渲染兼容对象结构
 // v2.13 支持管理后台只读模式（?readonly=1）：隐藏编辑/删除/生成按钮
 // v2.12 材料生成【生成文书】按钮在未选材料或未选文书类型时置灰禁用
 
@@ -42,7 +42,7 @@ let pendingElementConfirmCallback = null;   // 要素确认回调
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
 let stepDocType = '';                       // 分步生成视图中的文书类型
 let stepTemplate = '';                      // 分步生成视图中的文书模板
-let stepRequirement = '';                   // 分步生成视图中的文书要求
+let stepRequirement = '';                   // 分步生成视图中的指令
 
 // ===== 每步材料选择建议（写死） =====
 const stepMaterialHints = {
@@ -218,7 +218,7 @@ function applyReadOnlyMode() {
     const compileStepsBtn = document.getElementById('compileStepsBtn');
     if (compileStepsBtn) compileStepsBtn.style.display = 'none';
 
-    // 禁用模型选择器、文书类型/模板下拉、文书要求 textarea
+    // 禁用模型选择器、文书类型/模板下拉、指令 textarea
     const modelSelect = document.getElementById('modelSelect');
     if (modelSelect) modelSelect.disabled = true;
     const docTypeSelect = document.getElementById('docTypeSelect');
@@ -895,10 +895,6 @@ function switchToStepView(options = {}) {
     // 更新顶部 Tab 激活状态
     document.querySelectorAll('.gen-tab').forEach(t => t.classList.toggle('active', t.dataset.method === 'steps'));
 
-    // v2.24 (任务 8.2): 移除前端 Token 限制展示，不再展示安全上限数字
-    const hintLimit = document.getElementById('stepHintLimit');
-    if (hintLimit) hintLimit.textContent = '--';
-
     const autoAlert = document.getElementById('autoSwitchAlert');
     if (autoAlert) {
         autoAlert.querySelector('span').textContent = '已选材料预估超出系统单次处理上限，已切换为分步生成，请为每一步手动选择所需材料。';
@@ -988,7 +984,7 @@ function setLayoutState(state) {
 
 // v2.19/v1.37: 重新配置——默认回填最近一次历史文书的快照数据
 // v1.37: 改用 getAllDocumentVersions 取最新版本，从 version.config 回填（任务 4.4）
-// 回填内容：文书类型 / 模板 / 文书要求 / 已选材料集合 / 生成方式
+// 回填内容：文书类型 / 模板 / 指令 / 已选材料集合 / 生成方式
 // 模型由 workflow 决定（v2.20 不恢复），回填 docType 后由 refreshModelFromWorkflow 自动刷新
 function reconfigWithLatestSnapshot() {
     if (guardReadOnly('reconfigWithLatestSnapshot')) return;
@@ -1008,7 +1004,7 @@ function reconfigWithLatestSnapshot() {
 
     // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 refreshModelFromWorkflow 自动刷新）
 
-    // 2. 文书类型 / 模板 / 文书要求（材料生成视图）
+    // 2. 文书类型 / 模板 / 指令（材料生成视图）
     if (cfg.docType) {
         const matDocTypeEl = document.getElementById('matDocType');
         if (matDocTypeEl) {
@@ -2985,7 +2981,7 @@ function contentOptimizeStep(index) {
     contentEl.insertAdjacentHTML('beforeend', `
         <div class="step-followup-area" id="stepFollowUpArea_${index}">
             <div class="step-followup-input-row">
-                <input type="text" id="stepFollowUpInput_${index}" placeholder="输入优化要求，按 Enter 发送..." class="step-followup-text">
+                <input type="text" id="stepFollowUpInput_${index}" placeholder="输入优化要求，按回车发送" class="step-followup-text">
                 <button class="step-action-btn primary" onclick="submitContentOptimize(${index})"><i class="fas fa-paper-plane"></i> 发送</button>
             </div>
         </div>
@@ -4770,7 +4766,7 @@ function contentOptimizeElement(name) {
     wrap.id = areaId;
     wrap.innerHTML = `
         <div class="case-elements-followup-input-row">
-            <input type="text" placeholder="输入优化要求，按 Enter 发送..." class="case-elements-followup-text">
+            <input type="text" placeholder="输入优化要求，按回车发送" class="case-elements-followup-text">
             <button type="button" class="case-elements-item-edit-btn primary" onclick="submitElementOptimize('${escapeJsString(name)}')"><i class="fas fa-paper-plane"></i> 发送</button>
         </div>
     `;

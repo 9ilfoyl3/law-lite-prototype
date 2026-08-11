@@ -194,7 +194,7 @@ const sourceData = {
         typeName: '格式类',
         content: '广东省广州市中级人民法院',
         origins: [
-            { name: '民事判决书模板', file: '模板库/民事判决书-标准格式.docx', page: 1, excerpt: '文书抬头应载明：<mark>XX省XX市中级人民法院</mark>' }
+            { name: '民事判决书示例', file: '示例库/民事判决书-标准格式.docx', page: 1, excerpt: '文书抬头应载明：<mark>XX省XX市中级人民法院</mark>' }
         ]
     },
     'format-2': {
@@ -202,7 +202,7 @@ const sourceData = {
         typeName: '格式类',
         content: '民事判决书',
         origins: [
-            { name: '民事判决书模板', file: '模板库/民事判决书-标准格式.docx', page: 1, excerpt: '文书类型：<mark>民事判决书</mark>' }
+            { name: '民事判决书示例', file: '示例库/民事判决书-标准格式.docx', page: 1, excerpt: '文书类型：<mark>民事判决书</mark>' }
         ]
     },
     'format-opinion': {
@@ -210,7 +210,7 @@ const sourceData = {
         typeName: '格式类',
         content: '本院认为',
         origins: [
-            { name: '裁判文书规范', file: '模板库/裁判文书写作规范.pdf', page: 15, excerpt: '裁判理由部分以"<mark>本院认为</mark>"开头' }
+            { name: '裁判文书规范', file: '示例库/裁判文书写作规范.pdf', page: 15, excerpt: '裁判理由部分以"<mark>本院认为</mark>"开头' }
         ]
     },
     'format-judgment': {
@@ -218,7 +218,7 @@ const sourceData = {
         typeName: '格式类',
         content: '判决如下',
         origins: [
-            { name: '裁判文书规范', file: '模板库/裁判文书写作规范.pdf', page: 18, excerpt: '判决主文以"<mark>判决如下</mark>"引出' }
+            { name: '裁判文书规范', file: '示例库/裁判文书写作规范.pdf', page: 18, excerpt: '判决主文以"<mark>判决如下</mark>"引出' }
         ]
     },
     'format-procedure1': {
@@ -226,7 +226,7 @@ const sourceData = {
         typeName: '格式类',
         content: '如不服本判决，可在判决书送达之日起十五日内……',
         origins: [
-            { name: '民事判决书模板', file: '模板库/民事判决书-标准格式.docx', page: 3, excerpt: '上诉权告知：<mark>如不服本判决，可在判决书送达之日起十五日内</mark>' }
+            { name: '民事判决书示例', file: '示例库/民事判决书-标准格式.docx', page: 3, excerpt: '上诉权告知：<mark>如不服本判决，可在判决书送达之日起十五日内</mark>' }
         ]
     },
     'reasoning-valid': {
@@ -281,7 +281,7 @@ const sourceData = {
         typeName: '格式类',
         content: '庭审提纲',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 1, excerpt: '文书类型：<mark>庭审提纲</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 1, excerpt: '文书类型：<mark>庭审提纲</mark>' }
         ]
     },
     'trial-cause': {
@@ -305,7 +305,7 @@ const sourceData = {
         typeName: '格式类',
         content: '案件基本信息',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 1, excerpt: '一、<mark>案件基本信息</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 1, excerpt: '一、<mark>案件基本信息</mark>' }
         ]
     },
     'trial-cause-detail': {
@@ -348,7 +348,7 @@ const sourceData = {
         typeName: '格式类',
         content: '争议焦点',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 2, excerpt: '二、<mark>争议焦点</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 2, excerpt: '二、<mark>争议焦点</mark>' }
         ]
     },
     'trial-focus-1': {
@@ -374,7 +374,7 @@ const sourceData = {
         typeName: '格式类',
         content: '开庭准备',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 3, excerpt: '三、<mark>开庭准备</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 3, excerpt: '三、<mark>开庭准备</mark>' }
         ]
     },
     'trial-format-investigate': {
@@ -382,7 +382,7 @@ const sourceData = {
         typeName: '格式类',
         content: '法庭调查',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 4, excerpt: '四、<mark>法庭调查</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 4, excerpt: '四、<mark>法庭调查</mark>' }
         ]
     },
     'trial-claim': {
@@ -449,7 +449,7 @@ const sourceData = {
         typeName: '格式类',
         content: '法庭辩论',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 5, excerpt: '五、<mark>法庭辩论</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 5, excerpt: '五、<mark>法庭辩论</mark>' }
         ]
     },
     'trial-format-statement': {
@@ -457,7 +457,7 @@ const sourceData = {
         typeName: '格式类',
         content: '最后陈述',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 6, excerpt: '六、<mark>最后陈述</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 6, excerpt: '六、<mark>最后陈述</mark>' }
         ]
     },
     'trial-format-mediation': {
@@ -465,7 +465,7 @@ const sourceData = {
         typeName: '格式类',
         content: '调解',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 7, excerpt: '七、<mark>调解</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 7, excerpt: '七、<mark>调解</mark>' }
         ]
     },
     'trial-format-close': {
@@ -473,7 +473,7 @@ const sourceData = {
         typeName: '格式类',
         content: '休庭注意事项',
         origins: [
-            { name: '庭审提纲模板', file: '模板库/庭审提纲-标准格式.docx', page: 8, excerpt: '八、<mark>休庭注意事项</mark>' }
+            { name: '庭审提纲示例', file: '示例库/庭审提纲-标准格式.docx', page: 8, excerpt: '八、<mark>休庭注意事项</mark>' }
         ]
     }
 };
@@ -541,7 +541,7 @@ function showSourcePopup(sourceId, element) {
 
     const originTitles = {
         'fact': '卷宗材料来源',
-        'format': '模板文件来源',
+        'format': '示例文件来源',
         'reasoning': '类案参考来源',
         'law': '法条适用来源'
     };

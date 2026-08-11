@@ -5,8 +5,8 @@
 // v1.24 模型改为只读：quick gen 弹框与批量生成均按 workflow 的 modelId 推导模型（agentflow 平台镜像），新增 resolveWorkflowModelForCase 工具方法；onGenModelChange 置为 no-op；startQuickGen 不再向 URL 传 model 参数
 // v1.23 色系统一：批量栏/批量生成全屏面板/队列当前项改为蓝色系，仅保留行内「生成文书」按钮橙色单点强调（cases.html 内联样式与 CSS 改动，本文件无逻辑变更）
 // v1.22 列配置面板改为锚定按钮下方的下拉面板（去 fixed）；案件名称追加常驻外链图标 + hover 下划线，增强可点击性
-// v1.21 新增「我的模板」「我的文书要求」入口（openMyTemplates/openMyPrompts），从 case-files.html 迁移至案件列表页头部
-// v1.20 文书要求标签优先读管理后台 adminPromptTemplates；文书模板渲染兼容对象结构；修复 applyReqTemplate 同步状态 bug
+// v1.21 新增「我的模板」「我的指令」入口（openMyTemplates/openMyPrompts），从 case-files.html 迁移至案件列表页头部
+// v1.20 指令标签优先读管理后台 adminPromptTemplates；文书模板渲染兼容对象结构；修复 applyReqTemplate 同步状态 bug
 // v1.19 批量生成超限案件改为自动跳过并记录失败原因，不再弹窗选择；完成页失败项增加「去处理」跳转入口
 // v1.18 补充上传支持一次选择多个文件；列表页生成文书弹框按模型上下文分支；批量生成自动判断
 // 数据与配置统一来自 ../js/case-data.js
@@ -34,7 +34,7 @@ function getFirstTemplate(docTypeKey) {
     return Object.keys(templates)[0] || '';
 }
 
-// 渲染文书要求内置模板标签（快速生成 / 批量生成共用）
+// 渲染指令内置模板标签（快速生成 / 批量生成共用）
 function renderReqTemplates(containerId, docTypeKey, textareaId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -962,7 +962,7 @@ function buildGenConfigHtml() {
         </div>
 
         <div class="gen-form-group">
-            <label class="gen-form-label">文书要求</label>
+            <label class="gen-form-label">指令</label>
             <div id="genReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
             <textarea class="gen-form-textarea" id="genRequirement"
                       placeholder="可选：描述特殊要求或关注点，帮助系统更好理解需求"
@@ -1344,7 +1344,7 @@ function renderBatchConfig() {
                     <span>批量生成使用一步生成方式。若某案件材料量过大导致 Workflow 超限，该案件将标记为失败，可在批量任务面板点击"进入详情页处理"改用分步生成。</span>
                 </div>
                 <div class="full">
-                    <label class="drawer-form-label">文书要求</label>
+                    <label class="drawer-form-label">指令</label>
                     <div id="batchReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
                     <textarea class="drawer-form-textarea" id="batchRequirement"
                               placeholder="可选：描述特殊要求或关注点，帮助系统更好理解需求"
@@ -1362,14 +1362,14 @@ function renderBatchConfig() {
         </div>
     `;
 
-    // 渲染文书要求内置模板标签
+    // 渲染指令内置模板标签
     renderReqTemplates('batchReqTemplates', batchState.docType, 'batchRequirement');
 }
 
 function onBatchDocTypeChange(docType) {
     batchState.docType = docType;
     batchState.template = getFirstTemplate(docType);
-    batchState.requirement = '';  // 切换文书类型时清空文书要求
+    batchState.requirement = '';  // 切换文书类型时清空指令
     renderBatchConfig();
 }
 
@@ -3012,7 +3012,7 @@ function renderRefinePreview() {
 // ===== 全部文书面板 =====
 let docsPanelSearch = '';
 
-// v1.21: 打开「我的模板」「我的文书要求」页面，URL 携带当前业务系统参数
+// v1.21: 打开「我的模板」「我的指令」页面，URL 携带当前业务系统参数
 function openMyTemplates() {
     const orgParam = encodeURIComponent(localStorage.getItem('currentBusiness') || 'court');
     window.open('my-templates.html?org=' + orgParam, '_blank');

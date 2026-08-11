@@ -1,5 +1,5 @@
 // ============ Admin Prompt Templates Management ============
-// v1.0 文书要求管理：维护各文书类型的「文书要求」文书要求
+// v1.0 指令管理：维护各文书类型的指令
 // 数据持久化：localStorage.adminPromptTemplates（按业务系统×文书类型分组）
 // 用户侧联动：case-data.js getReqTemplates 优先读此 key，为空回退到 defaultRequirementTemplates
 // v1.2: 移除全局「恢复默认」按钮；新增单条历史版本记录（最多 10 条快照，支持一键恢复）
@@ -12,7 +12,7 @@
     let currentDocTypeFilter = ''; // '' = 全部
     let editingDocType = null;    // 编辑模式下当前所属文书类型 key
     let editingIndex = -1;        // 编辑模式下数组下标
-    let editingIsBuiltin = false; // 编辑的是内置文书要求
+    let editingIsBuiltin = false; // 编辑的是内置指令
     let pendingConfirmAction = null;
 
     // ===== 存储 =====
@@ -41,14 +41,14 @@
         return getAdminDocTypes(org) || {};
     }
 
-    // 获取当前业务系统下被停用的内置文书要求索引字典
+    // 获取当前业务系统下被停用的内置指令索引字典
     // 存于 adminPromptTemplates[org].__builtinDisabled__，结构：{ docTypeKey: [index1, index2] }
     function getBuiltinDisabledMap(org) {
         const orgData = getOrgData(org);
         return (orgData.__builtinDisabled__ && typeof orgData.__builtinDisabled__ === 'object') ? orgData.__builtinDisabled__ : {};
     }
 
-    // 获取当前业务系统+文书类型下的文书要求列表（内置 + 自定义）
+    // 获取当前业务系统+文书类型下的指令列表（内置 + 自定义）
     // 返回统一结构：[{name, text, isBuiltin, index, enabled, history}]
     function getAllPrompts(org, docTypeKey) {
         const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
@@ -136,9 +136,9 @@
         const docTypes = getDocTypes(currentOrg);
         const rightTitle = document.getElementById('rightTitle');
         if (currentDocTypeFilter) {
-            rightTitle.textContent = (docTypes[currentDocTypeFilter] || {}).name || '文书要求列表';
+            rightTitle.textContent = (docTypes[currentDocTypeFilter] || {}).name || '指令列表';
         } else {
-            rightTitle.textContent = '全部文书要求';
+            rightTitle.textContent = '全部指令';
         }
 
         const list = document.getElementById('ptList');
@@ -192,7 +192,7 @@
                 html += '<div class="pt-item">'
                     + '<div class="pt-item-tag ' + tagClass + '">' + tagText + '</div>'
                     + '<div class="pt-item-body">'
-                    + '<div class="pt-item-text' + (needCollapse ? ' collapsed' : '') + '">' + (escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空文书要求）</span>') + '</div>'
+                    + '<div class="pt-item-text' + (needCollapse ? ' collapsed' : '') + '">' + (escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空指令）</span>') + '</div>'
                     + '<div class="pt-item-meta"><span>标签：' + escapeHtml(item.name) + '</span>' + statusBadge + '</div>'
                     + '</div>'
                     + '<div class="pt-item-actions">' + actions + '</div>'
@@ -207,7 +207,7 @@
         editingDocType = null;
         editingIndex = -1;
         editingIsBuiltin = false;
-        document.getElementById('modalTitle').textContent = '新增文书要求';
+        document.getElementById('modalTitle').textContent = '新增指令';
         document.getElementById('ptName').value = '';
         document.getElementById('ptText').value = '';
         fillDocTypeSelect(currentDocTypeFilter || '');
@@ -223,7 +223,7 @@
         editingDocType = docTypeKey;
         editingIndex = index;
         editingIsBuiltin = !!item.isBuiltin;
-        document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置文书要求（另存为自定义）' : '编辑文书要求';
+        document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置指令（另存为自定义）' : '编辑指令';
         document.getElementById('ptName').value = item.name;
         document.getElementById('ptText').value = item.text;
         fillDocTypeSelect(docTypeKey);
@@ -262,7 +262,7 @@
             return;
         }
         // text 允许为空（用于「其他自定义」这类清空需求的标签），但需提示
-        if (!text && !confirm('文书要求正文为空，用户点击该标签会清空文书要求输入框。确认保存？')) {
+        if (!text && !confirm('指令正文为空，用户点击该标签会清空指令输入框。确认保存？')) {
             return;
         }
 
@@ -281,7 +281,7 @@
             return arr;
         }
 
-        // 编辑内置文书要求：把内置数据全部拷贝为自定义，再修改对应项
+        // 编辑内置指令：把内置数据全部拷贝为自定义，再修改对应项
         if (editingIsBuiltin && editingDocType === docType) {
             const defaults = (defaultRequirementTemplates[currentOrg] && defaultRequirementTemplates[currentOrg][docType]) || [];
             const disabledArr = getBuiltinDisabledMap(currentOrg)[docType] || [];
@@ -310,7 +310,7 @@
                 delete orgData.__builtinDisabled__[docType];
             }
         } else if (editingDocType !== null && !editingIsBuiltin && editingDocType === docType) {
-            // 编辑自定义文书要求（同文书类型）：保留原 enabled；v1.2 编辑前内容入栈 history
+            // 编辑自定义指令（同文书类型）：保留原 enabled；v1.2 编辑前内容入栈 history
             const origItem = orgData[docType][editingIndex];
             const origEnabled = (origItem && origItem.enabled !== false);
             const origHistory = (origItem && Array.isArray(origItem.history)) ? origItem.history : [];
@@ -321,7 +321,7 @@
             });
             orgData[docType][editingIndex] = { name: name, text: text, enabled: origEnabled, history: newHistory };
         } else if (editingDocType !== null && !editingIsBuiltin && editingDocType !== docType) {
-            // 编辑自定义文书要求但改了文书类型：先从原数组移除，再追加到新数组（保留 enabled）
+            // 编辑自定义指令但改了文书类型：先从原数组移除，再追加到新数组（保留 enabled）
             const oldArr = orgData[editingDocType] || [];
             const origItem = oldArr[editingIndex];
             const origEnabled = (origItem && origItem.enabled !== false);
@@ -344,7 +344,7 @@
         closeModal();
         renderLeft();
         renderRight();
-        showNotification(editingDocType !== null ? '文书要求已更新' : '文书要求已新增', 'success');
+        showNotification(editingDocType !== null ? '指令已更新' : '指令已新增', 'success');
     };
 
     // ===== 启用/停用切换 =====
@@ -354,7 +354,7 @@
         if (!item) return;
         const newEnabled = item.enabled === false; // 反转
         if (item.isBuiltin) {
-            // 内置文书要求：操作 __builtinDisabled__ 字典
+            // 内置指令：操作 __builtinDisabled__ 字典
             const orgData = getOrgData(currentOrg);
             if (!orgData.__builtinDisabled__ || typeof orgData.__builtinDisabled__ !== 'object') {
                 orgData.__builtinDisabled__ = {};
@@ -373,7 +373,7 @@
             }
             setOrgData(currentOrg, orgData);
         } else {
-            // 自定义文书要求：直接修改 enabled 字段
+            // 自定义指令：直接修改 enabled 字段
             const orgData = getOrgData(currentOrg);
             if (Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey][index]) {
                 orgData[docTypeKey][index].enabled = newEnabled;
@@ -381,7 +381,7 @@
             }
         }
         renderRight();
-        showNotification(newEnabled ? '文书要求已启用' : '文书要求已停用', 'success');
+        showNotification(newEnabled ? '指令已启用' : '指令已停用', 'success');
     };
 
     // ===== 删除 =====
@@ -390,10 +390,10 @@
         const item = items[index];
         if (!item) return;
         if (item.isBuiltin) {
-            showNotification('内置文书要求不可删除', 'warning');
+            showNotification('内置指令不可删除', 'warning');
             return;
         }
-        showConfirm('删除文书要求', '确定删除标签「' + item.name + '」吗？此操作不可恢复。', () => {
+        showConfirm('删除指令', '确定删除标签「' + item.name + '」吗？此操作不可恢复。', () => {
             const orgData = getOrgData(currentOrg);
             if (Array.isArray(orgData[docTypeKey])) {
                 orgData[docTypeKey].splice(index, 1);
@@ -402,7 +402,7 @@
             }
             renderLeft();
             renderRight();
-            showNotification('文书要求已删除', 'success');
+            showNotification('指令已删除', 'success');
         });
     };
 
@@ -422,7 +422,7 @@
         if (!item) return;
         const history = Array.isArray(item.history) ? item.history : [];
         if (history.length === 0) {
-            showNotification('该文书要求暂无历史版本', 'warning');
+            showNotification('该指令暂无历史版本', 'warning');
             return;
         }
         historyContext = { docTypeKey: docTypeKey, index: index };

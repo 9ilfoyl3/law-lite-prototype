@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文书要求管理 - AI法官助理管理后台</title>
+    <title>指令管理 - AI法官助理管理后台</title>
     <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -172,7 +172,7 @@
                     <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
                     <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
-                    <a href="prompt-templates.html" class="nav-item active"><i class="fas fa-comment-dots"></i><span>文书要求管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item active"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item" style="display:none;"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
@@ -190,7 +190,7 @@
                 <div class="breadcrumb">
                     <a href="dashboard.html">首页</a>
                     <i class="fas fa-chevron-right breadcrumb-separator"></i>
-                    <span>文书要求管理</span>
+                    <span>指令管理</span>
                 </div>
                 <div class="header-right">
                     <div class="user-menu">
@@ -206,8 +206,8 @@
             <div class="content">
                 <div class="page-header">
                     <div class="page-title-wrap">
-                        <h1>文书要求管理</h1>
-                        <p>维护各文书类型的文书要求</p>
+                        <h1>指令管理</h1>
+                        <p>维护各文书类型的指令</p>
                     </div>
                     <div class="page-header-right">
                         <div class="business-switch">
@@ -223,15 +223,15 @@
                     <div class="pt-left" id="ptLeft"></div>
                     <div class="pt-right">
                         <div class="pt-toolbar">
-                            <span class="title" id="rightTitle">全部文书要求</span>
+                            <span class="title" id="rightTitle">全部指令</span>
                             <button class="btn btn-primary" onclick="openAddModal()">
-                                <i class="fas fa-plus"></i> 新增文书要求
+                                <i class="fas fa-plus"></i> 新增指令
                             </button>
                         </div>
                         <div class="pt-list" id="ptList"></div>
                         <div id="emptyState" class="empty-state" style="display:none;">
                             <i class="fas fa-comment-dots"></i>
-                            <p>暂无文书要求，点击「新增文书要求」创建</p>
+                            <p>暂无指令，点击「新增指令」创建</p>
                         </div>
                     </div>
                 </div>
@@ -242,7 +242,7 @@
     <!-- 新增/编辑弹窗 -->
     <div class="modal-mask" id="ptModal">
         <div class="modal-box">
-            <h3 id="modalTitle">新增文书要求</h3>
+            <h3 id="modalTitle">新增指令</h3>
             <div class="form-row">
                 <label class="form-label">所属文书类型 <span class="required">*</span></label>
                 <select class="form-select" id="ptDocType"></select>
@@ -252,9 +252,9 @@
                 <input type="text" class="form-input" id="ptName" placeholder="如：支持原告全部诉请">
             </div>
             <div class="form-row">
-                <label class="form-label">文书要求正文 <span class="required">*</span></label>
-                <textarea class="form-textarea" id="ptText" placeholder="支持换行；用户点击标签后会自动填入「文书要求」输入框"></textarea>
-                <div class="form-hint">支持 \\n 换行；空文书要求的标签点击后清空文书要求</div>
+                <label class="form-label">指令正文 <span class="required">*</span></label>
+                <textarea class="form-textarea" id="ptText" placeholder="支持换行；用户点击标签后会自动填入「指令」输入框"></textarea>
+                <div class="form-hint">支持 \\n 换行；空指令的标签点击后清空指令</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
