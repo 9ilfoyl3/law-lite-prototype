@@ -22,11 +22,19 @@ let isUploadMode = false;      // 是否为上传文书模式（无案件）
 let aiRewriteRange = null;             // 当前选区 Range 克隆
 let aiRewriteOriginalText = '';        // 选中的原文
 let aiRewriteCurrentResult = '';       // 当前改写结果
+let aiRewriteCurrentInstruction = '';  // 当前改写指令（用于重新生成）
 let aiRewriteLoading = false;          // 是否正在生成
 
 // 结构化审查消息状态
 // 结构：{ [msgId]: { reviews: [...], snapshotBeforeApply: 'html'|null, appliedReviewIds: [] } }
 let reviewMessages = {};
+
+// ===== 法条链接 Ctrl+点击查看：常量（须在 initPolishPage 调用前声明，避免 TDZ） =====
+// 内部法规库跳转地址（占位，产品化时替换为实际内部法规库 URL）
+const LAW_LIB_BASE_URL = 'https://law-lib.internal.example.com/search';
+// 法条识别正则：匹配 《法律法规名》第x条 / 《法律法规名》第x条第x款 等
+// 支持中文数字（一二三四...百千）和阿拉伯数字
+const LAW_REF_REGEX = /《([^》]{2,40})》(第[一二三四五六七八九十百千零\d]+条(?:第[一二三四五六七八九十\d]+款)?)(?:、第([一二三四五六七八九十百千零\d]+条))?/g;
 
 // ===== 初始化 =====
 function initPolishPage() {
@@ -119,8 +127,11 @@ function initDocEditor(content) {
     }
     if (docEditor) docEditor.destroy();
 
+    // 原型阶段：加载文书时内置法条识别渲染
+    const enhancedContent = enhanceLawReferences(content);
+
     docEditor = new DocEditor(root, {
-        content: content,
+        content: enhancedContent,
         placeholder: '暂无内容',
         showToolbar: true,
         readonly: false,
@@ -158,10 +169,14 @@ function initDocEditor(content) {
         hideAiRewriteToolbar();
         hideAiRewriteCard();
     });
+
+    // 法条链接：Ctrl+点击跳转 + 右键菜单
+    bindLawRefLinkEvents(paper);
 }
 
-// 渲染上下文信息（三卡片：文书来源 / 知识库 / 结构化数据）
+// 渲染上下文信息（v1.50 起 UI 不再展示三卡片，上下文数据仍在 JS 内部读取供精修使用）
 function renderContextInfo(ctx) {
+    return;
     const cfg = polishVersion?.config || {};
     const caseName = ctx?.caseName || polishCaseItem?.caseName || '';
     const caseNumber = ctx?.caseNumber || polishCaseItem?.caseNumber || '';
@@ -274,13 +289,14 @@ function showAiRewriteToolbar(range) {
     const root = document.getElementById('docEditorRoot');
     const rootRect = root.getBoundingClientRect();
 
-    // 默认显示在选区上方居中
-    let top = rect.top - rootRect.top - toolbar.offsetHeight - 8;
+    // 默认显示在选区下方居中
+    let top = rect.bottom - rootRect.top + 8;
     let left = rect.left - rootRect.left + (rect.width - toolbar.offsetWidth) / 2;
 
-    // 若上方空间不足，显示在选区下方
-    if (top < 0) {
-        top = rect.bottom - rootRect.top + 8;
+    // 若下方空间不足，显示在选区上方
+    const toolbarH = toolbar.offsetHeight || 32;
+    if (top + toolbarH > rootRect.height - 8) {
+        top = rect.top - rootRect.top - toolbarH - 8;
     }
     // 边界约束
     if (left < 8) left = 8;
@@ -298,7 +314,8 @@ function hideAiRewriteToolbar() {
 }
 
 // ===== AI 改写：卡片弹窗 =====
-// 流程：选中段落 → 点系统改写 → 显示原文 + 指令输入框 → 用户输入指令 → 点发送开始生成 → 展示结果
+// 流程：选中段落 → 点系统改写 → 显示指令输入框 → 用户输入指令 → 点发送开始生成 → 展示结果
+// v1.52：按示例图重新设计 UI
 function openAiRewriteCard() {
     if (!docEditor || aiRewriteLoading) return;
     const range = docEditor.getSelectionRange();
@@ -311,35 +328,28 @@ function openAiRewriteCard() {
     // 克隆 range 用于后续替换
     aiRewriteRange = range.cloneRange();
     aiRewriteOriginalText = text;
+    aiRewriteCurrentInstruction = '';
+    aiRewriteCurrentResult = '';
 
     const card = document.getElementById('aiRewriteCard');
     const body = document.getElementById('aiRewriteCardBody');
     const actions = document.getElementById('aiRewriteActions');
-    const footer = document.getElementById('aiRewriteFooter');
+    const footer = document.getElementById('aiRewriteFooterCompact');
+    const titleEl = document.getElementById('aiRewriteCardTitle');
 
-    // 初始状态：显示原文 + 指令输入框，不自动生成
-    body.innerHTML = `
-        <div class="ai-rewrite-section">
-            <div class="ai-rewrite-label">原文</div>
-            <div class="ai-rewrite-original">${escapeHtml(aiRewriteOriginalText)}</div>
-        </div>
-        <div class="ai-rewrite-section">
-            <div class="ai-rewrite-label">改写指令</div>
-            <div class="ai-rewrite-hint">请输入改写要求，例如：更正式一些、补充法条引用、精简表述</div>
-        </div>
-    `;
+    // 初始输入态：body 为空，标题为空，显示底部紧凑输入框
+    body.innerHTML = '';
+    if (titleEl) titleEl.textContent = '';
     actions.style.display = 'none';
-    // 显示底部指令输入框，用户输入后点发送开始生成
     footer.style.display = 'flex';
     const instructionInput = document.getElementById('aiRewriteInstruction');
     if (instructionInput) {
         instructionInput.value = '';
-        instructionInput.placeholder = '输入改写指令后点击发送开始生成';
         instructionInput.focus();
     }
 
     positionAiRewriteCard(range);
-    card.classList.add('visible');
+    card.classList.add('visible', 'input-mode');
     hideAiRewriteToolbar();
 }
 
@@ -370,7 +380,7 @@ function positionAiRewriteCard(range) {
 
 function hideAiRewriteCard() {
     const card = document.getElementById('aiRewriteCard');
-    if (card) card.classList.remove('visible');
+    if (card) card.classList.remove('visible', 'input-mode');
     aiRewriteRange = null;
     aiRewriteOriginalText = '';
     aiRewriteCurrentResult = '';
@@ -385,31 +395,25 @@ function generateAiRewriteResult(originalText, instruction) {
     aiRewriteLoading = true;
     const body = document.getElementById('aiRewriteCardBody');
     const actions = document.getElementById('aiRewriteActions');
-    const footer = document.getElementById('aiRewriteFooter');
+    const footer = document.getElementById('aiRewriteFooterCompact');
+    const titleEl = document.getElementById('aiRewriteCardTitle');
 
     setTimeout(() => {
         aiRewriteLoading = false;
         const result = mockRewrite(originalText, instruction);
         aiRewriteCurrentResult = result.text;
+        aiRewriteCurrentInstruction = instruction || '';
 
+        // 标题改为用户输入的改写指令
+        if (titleEl) titleEl.textContent = instruction || '系统改写';
+
+        // 结果态：直接展示改写结果文本 + 系统生成提示
         body.innerHTML = `
-            <div class="ai-rewrite-section">
-                <div class="ai-rewrite-label">原文</div>
-                <div class="ai-rewrite-original">${escapeHtml(aiRewriteOriginalText)}</div>
-            </div>
-            <div class="ai-rewrite-section">
-                <div class="ai-rewrite-label">修改说明</div>
-                <div class="ai-rewrite-reason">${escapeHtml(result.reason)}</div>
-            </div>
-            <div class="ai-rewrite-section">
-                <div class="ai-rewrite-label">修改结果</div>
-                <textarea class="ai-rewrite-result" id="aiRewriteResultText">${escapeHtml(result.text)}</textarea>
-            </div>
+            <div class="ai-rewrite-result-text">${escapeHtml(result.text)}</div>
+            <div class="ai-rewrite-result-hint">内容由系统生成，仅供参考</div>
         `;
         actions.style.display = 'flex';
-        footer.style.display = 'flex';
-        document.getElementById('aiRewriteInstruction').value = instruction || '';
-        document.getElementById('aiRewriteInstruction').focus();
+        footer.style.display = 'none';
     }, 700);
 }
 
@@ -469,34 +473,59 @@ function sendAiRewriteInstruction() {
         if (input) input.focus();
         return;
     }
+    const card = document.getElementById('aiRewriteCard');
     const body = document.getElementById('aiRewriteCardBody');
+    const titleEl = document.getElementById('aiRewriteCardTitle');
+
+    // 切换为结果态：显示标题栏，标题为用户输入的指令
+    card.classList.remove('input-mode');
+    if (titleEl) titleEl.textContent = instruction;
     body.innerHTML = `
         <div class="ai-rewrite-loading">
             <span>系统正在按指令改写</span>
         </div>
     `;
     document.getElementById('aiRewriteActions').style.display = 'none';
-    document.getElementById('aiRewriteFooter').style.display = 'none';
+    document.getElementById('aiRewriteFooterCompact').style.display = 'none';
     generateAiRewriteResult(aiRewriteOriginalText, instruction);
 }
 
 function regenerateAiRewrite() {
     if (aiRewriteLoading || !aiRewriteOriginalText) return;
-    const instruction = document.getElementById('aiRewriteInstruction')?.value.trim() || '';
+    // v1.52：重新生成沿用当前指令
+    const instruction = aiRewriteCurrentInstruction || '';
     const body = document.getElementById('aiRewriteCardBody');
     body.innerHTML = `
         <div class="ai-rewrite-loading">
-            <span>系统正在重新生成</span>
+            <span>系统正在重写</span>
         </div>
     `;
     document.getElementById('aiRewriteActions').style.display = 'none';
-    document.getElementById('aiRewriteFooter').style.display = 'none';
+    document.getElementById('aiRewriteFooterCompact').style.display = 'none';
     generateAiRewriteResult(aiRewriteOriginalText, instruction);
 }
 
 function getAiRewriteResultText() {
-    const el = document.getElementById('aiRewriteResultText');
-    return el ? el.value.trim() : aiRewriteCurrentResult;
+    const el = document.querySelector('.ai-rewrite-result-text');
+    return el ? el.textContent.trim() : aiRewriteCurrentResult;
+}
+
+function copySelectedText() {
+    const text = docEditor ? docEditor.getSelectedText() : '';
+    if (!text) {
+        showNotification('没有选中的文本', 'info');
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('已复制到剪贴板', 'success');
+        }).catch(() => {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+    hideAiRewriteToolbar();
 }
 
 function copyAiRewriteResult() {
@@ -1242,7 +1271,6 @@ function handleUploadDocument(event) {
         document.getElementById('polishCaseName').textContent = '上传文书（无关联案件）';
         document.getElementById('versionTag').textContent = '上传';
         document.getElementById('editHint').textContent = '描述要修改的内容...';
-        document.getElementById('undoBtn').disabled = true;
 
         // 保存按钮改为"下载文书"
         const saveBtn = document.getElementById('saveBtn');
@@ -1302,9 +1330,6 @@ function undoLastEdit() {
     }
     currentContent = editHistory.pop();
     if (docEditor) docEditor.setContent(currentContent);
-    if (editHistory.length === 0) {
-        document.getElementById('undoBtn').disabled = true;
-    }
     hasUnsavedChanges = editHistory.length > 0;
     if (!hasUnsavedChanges) {
         document.getElementById('editHint').textContent = '精修指令将在此区域生效';
@@ -1472,3 +1497,169 @@ document.addEventListener('mousedown', (e) => {
         } catch (e) { /* ignore */ }
     });
 })();
+
+// ===== 法条链接 Ctrl+点击查看 =====
+// 原型阶段：精修页内置法条识别渲染
+// 产品化阶段：由文书生成阶段统一识别并渲染为 <a class="law-ref-link"> 标签
+
+// 对文书 HTML 内容进行法条识别，将纯文本法条引用渲染为链接
+// 注意：只处理文本节点，不处理已有 HTML 标签内部的内容
+function enhanceLawReferences(html) {
+    if (!html) return html;
+
+    // 用临时 DOM 解析，只遍历文本节点
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+
+    const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    let node;
+    while (node = walker.nextNode()) {
+        // 跳过已在 <a> 标签内的文本
+        if (node.parentElement && node.parentElement.tagName === 'A') continue;
+        // 跳过 script/style 内的文本
+        const parentTag = node.parentElement?.tagName;
+        if (parentTag === 'SCRIPT' || parentTag === 'STYLE') continue;
+        textNodes.push(node);
+    }
+
+    textNodes.forEach(textNode => {
+        const text = textNode.nodeValue;
+        if (!text || !LAW_REF_REGEX.test(text)) return;
+        LAW_REF_REGEX.lastIndex = 0;
+
+        const frag = document.createDocumentFragment();
+        let lastIdx = 0;
+        let match;
+        let hasMatch = false;
+
+        while ((match = LAW_REF_REGEX.exec(text)) !== null) {
+            hasMatch = true;
+            const [fullMatch, lawName, article, secondArticle] = match;
+            const start = match.index;
+
+            // 添加匹配前的普通文本
+            if (start > lastIdx) {
+                frag.appendChild(document.createTextNode(text.slice(lastIdx, start)));
+            }
+
+            // 创建法条链接
+            const link = document.createElement('a');
+            link.className = 'law-ref-link';
+            link.href = '#';
+            link.setAttribute('data-law-name', lawName);
+            link.setAttribute('data-law-article', article);
+            link.textContent = fullMatch;
+            // tooltip 通过 data-law-tooltip 属性 + CSS ::after 实现
+            const tipText = secondArticle
+                ? `查看法规：《${lawName}》${article}、第${secondArticle}条详情`
+                : `查看法规：《${lawName}》${article}详情`;
+            link.setAttribute('data-law-tooltip', tipText);
+            frag.appendChild(link);
+
+            lastIdx = start + fullMatch.length;
+        }
+
+        // 添加末尾普通文本
+        if (hasMatch) {
+            if (lastIdx < text.length) {
+                frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+            }
+            textNode.parentNode.replaceChild(frag, textNode);
+        }
+    });
+
+    return tmp.innerHTML;
+}
+
+// 绑定法条链接的 Ctrl+点击 和 右键菜单事件
+function bindLawRefLinkEvents(paper) {
+    if (!paper) return;
+
+    // Ctrl+点击跳转
+    paper.addEventListener('click', (e) => {
+        const link = e.target.closest('.law-ref-link');
+        if (!link) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.ctrlKey || e.metaKey) {
+            openLawRefDetail(link);
+        }
+    });
+
+    // 右键菜单
+    paper.addEventListener('contextmenu', (e) => {
+        const link = e.target.closest('.law-ref-link');
+        if (!link) return;
+
+        e.preventDefault();
+        showLawRefContextMenu(e, link);
+    });
+}
+
+// 在新标签页打开内部法规库详情页
+function openLawRefDetail(link) {
+    const lawName = link.getAttribute('data-law-name') || '';
+    const article = link.getAttribute('data-law-article') || '';
+    const articleNum = (article.match(/第([一二三四五六七八九十百千零\d]+)条/) || [])[1] || '';
+    const url = `${LAW_LIB_BASE_URL}?q=${encodeURIComponent(lawName)}&article=${encodeURIComponent(articleNum)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    showNotification(`正在打开法规详情：《${lawName}》${article}`, 'info');
+}
+
+// 显示法条链接右键菜单
+function showLawRefContextMenu(e, link) {
+    // 移除已有菜单
+    hideLawRefContextMenu();
+
+    const menu = document.createElement('div');
+    menu.id = 'lawRefContextMenu';
+    menu.className = 'law-ref-context-menu';
+    menu.innerHTML = `
+        <div class="law-ref-menu-item" id="lawRefMenuView">
+            <i class="fas fa-external-link-alt"></i>
+            <span>查看法条详情</span>
+        </div>
+    `;
+    document.body.appendChild(menu);
+
+    // 定位菜单
+    const menuWidth = 180;
+    const menuHeight = 40;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.display = 'block';
+
+    // 绑定点击事件
+    const viewItem = document.getElementById('lawRefMenuView');
+    if (viewItem) {
+        viewItem.addEventListener('click', () => {
+            openLawRefDetail(link);
+            hideLawRefContextMenu();
+        });
+    }
+
+    // 点击其他位置关闭菜单
+    setTimeout(() => {
+        document.addEventListener('mousedown', hideLawRefContextMenuOnOutside, true);
+    }, 0);
+}
+
+function hideLawRefContextMenu() {
+    const menu = document.getElementById('lawRefContextMenu');
+    if (menu) menu.remove();
+    document.removeEventListener('mousedown', hideLawRefContextMenuOnOutside, true);
+}
+
+function hideLawRefContextMenuOnOutside(e) {
+    const menu = document.getElementById('lawRefContextMenu');
+    if (menu && !menu.contains(e.target)) {
+        hideLawRefContextMenu();
+    }
+}
