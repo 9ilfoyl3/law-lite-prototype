@@ -3195,6 +3195,23 @@ let pendingElementContextCallback = null;
 // v1.50: 标记大文本框弹框是否由「无答案→选完要件」路径触发（用于关闭时一并清理选择弹框 state）
 let elementContextHasPrevious = false;
 
+// v1.51: 案由要件答案生成加载态——管理 timer 与 UI 重置
+let elementContextLoadingTimer = null;
+function resetElementContextLoading() {
+    if (elementContextLoadingTimer) {
+        clearTimeout(elementContextLoadingTimer);
+        elementContextLoadingTimer = null;
+    }
+    const loadingEl = document.getElementById('elementContextLoading');
+    const ta = document.getElementById('elementContextTextarea');
+    const backBtn = document.getElementById('elementContextBackBtn');
+    const confirmBtn = document.getElementById('elementContextConfirmBtn');
+    if (loadingEl) loadingEl.classList.add('hidden');
+    if (ta) ta.classList.remove('loading-hidden');
+    if (backBtn) backBtn.disabled = false;
+    if (confirmBtn) confirmBtn.disabled = false;
+}
+
 // v1.48: 判断当前案件可用要件中是否已有答案
 function hasAnyElementAnswer(allPresets) {
     if (!allPresets) return false;
@@ -3255,21 +3272,47 @@ function showElementContextModal(presets, callback, opts) {
     });
 
     const ta = document.getElementById('elementContextTextarea');
-    if (ta) ta.value = contextText;
-
-    // v1.50: 按入口切换按钮组——有答案直接弹框（简化版）维持三按钮；无答案路径第三步仅显示「上一步」+「确认生成」
+    const loadingEl = document.getElementById('elementContextLoading');
     const cancelBtn = document.getElementById('elementContextCancelBtn');
     const skipBtn = document.getElementById('elementContextSkipBtn');
     const backBtn = document.getElementById('elementContextBackBtn');
+    const confirmBtn = document.getElementById('elementContextConfirmBtn');
+
+    // v1.50: 按入口切换按钮组——有答案直接弹框（简化版）维持三按钮；无答案路径第三步仅显示「上一步」+「确认生成」
     if (cancelBtn) cancelBtn.style.display = hasPrevious ? 'none' : '';
     if (skipBtn) skipBtn.style.display = hasPrevious ? 'none' : '';
     if (backBtn) backBtn.style.display = hasPrevious ? '' : 'none';
 
+    // v1.51: 先清理上一次加载态残留
+    resetElementContextLoading();
+
     document.getElementById('elementContextOverlay').classList.add('show');
     document.getElementById('elementContextModal').classList.add('show');
+
+    // v1.51: 无答案路径（选完要件后进入）先显示加载态，模拟答案生成过程
+    if (hasPrevious) {
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (ta) { ta.classList.add('loading-hidden'); ta.value = ''; }
+        if (backBtn) backBtn.disabled = true;
+        if (confirmBtn) confirmBtn.disabled = true;
+        // 原型演示加速：1.5s 后填充答案并恢复（实际约 1 分钟）
+        elementContextLoadingTimer = setTimeout(() => {
+            elementContextLoadingTimer = null;
+            if (ta) ta.value = contextText;
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (ta) ta.classList.remove('loading-hidden');
+            if (backBtn) backBtn.disabled = false;
+            if (confirmBtn) confirmBtn.disabled = false;
+        }, 1500);
+    } else {
+        // 有答案直接弹框：直接填充
+        if (ta) ta.value = contextText;
+    }
 }
 
 function closeElementContextModal() {
+    // v1.51: 清理加载态 timer 与 UI
+    resetElementContextLoading();
     document.getElementById('elementContextOverlay').classList.remove('show');
     document.getElementById('elementContextModal').classList.remove('show');
     pendingElementContextCallback = null;
@@ -3490,6 +3533,8 @@ function showElementConfirmAnswerStep() {
 
 // v1.50: 大文本框弹框「上一步」——返回要件选择弹框（保留已勾选状态）
 function backToElementConfirmSelect() {
+    // v1.51: 清理加载态 timer 与 UI
+    resetElementContextLoading();
     // 关闭大文本框弹框
     document.getElementById('elementContextOverlay').classList.remove('show');
     document.getElementById('elementContextModal').classList.remove('show');
@@ -4542,6 +4587,8 @@ function openElementsDrawer() {
     caseElementsDrawerOpen = true;
 }
 function closeElementsDrawer() {
+    // v1.51: 清理一键生成加载态
+    resetAiSummarizeLoading();
     document.getElementById('caseElementsOverlay').classList.remove('show');
     document.getElementById('caseElementsDrawer').classList.remove('show');
     caseElementsDrawerOpen = false;
@@ -4556,6 +4603,9 @@ function renderElementsList() {
     const standard = data.standard || [];
     const mine = data.mine || [];
     const caseC = data.case || [];
+
+    // v1.51: 保存加载态 DOM 引用，innerHTML 赋值后重新 append（避免被清掉）
+    const loadingEl = document.getElementById('caseElementsLoading');
 
     // 统计条
     const statsEl = document.getElementById('caseElementsStats');
@@ -4575,6 +4625,7 @@ function renderElementsList() {
                 <div style="font-size:11px;margin-top:6px;">可在下方新增个案要件，或前往"管理我的要件"维护</div>
             </div>
         `;
+        if (loadingEl) body.appendChild(loadingEl);
         updateAiSummarizeBtnState(0);
         return;
     }
@@ -4584,6 +4635,7 @@ function renderElementsList() {
     if (mine.length > 0) html += renderElementsGroup('我的要件', mine, 'mine');
     if (caseC.length > 0) html += renderElementsGroup('个案要件', caseC, 'case');
     body.innerHTML = html;
+    if (loadingEl) body.appendChild(loadingEl);
     updateAiSummarizeBtnState(standard.length + mine.length + caseC.length);
 }
 
@@ -4959,6 +5011,8 @@ function deleteCaseElement(name) {
 
 // v2.27: 一键生成（原名"AI总结"，V1.1.9 改名去技术术语）—— 对全部要件批量生成答案，无需勾选，用户可直接在列表中修改
 // 复用 generateMockElementAnswer（与"生成文书弹框中引入要件"保持一致逻辑）
+// v1.51: 新增加载态——点击后先显示加载态覆盖要件列表区域，禁用底部按钮，1.5s 后填充答案（原型演示加速，实际约 1 分钟）
+let aiSummarizeLoadingTimer = null;
 function aiSummarizeElements() {
     if (!caseItem) {
         showNotification('请先选择案件', 'warning');
@@ -4974,17 +5028,46 @@ function aiSummarizeElements() {
         showNotification('暂无要件可生成，请先新增或维护要件', 'warning');
         return;
     }
-    let count = 0;
-    all.forEach(p => {
-        const answer = generateMockElementAnswer(p, caseItem);
-        caseElementsAnswers[p.name] = answer;
-        caseElementsSelection.add(p.name);  // 自动勾选已生成答案的要件
-        count++;
-    });
-    saveElementAnswers(caseItem.id, caseElementsAnswers);
-    saveElementSelection(caseItem.id, caseElementsSelection);
-    renderElementsList();
-    showNotification(`已为 ${count} 项要件生成答案，可直接在列表中修改`, 'success');
+    // v1.51: 显示加载态，禁用底部按钮
+    const loadingEl = document.getElementById('caseElementsLoading');
+    const aiBtn = document.getElementById('aiSummarizeBtn');
+    const addBtn = document.getElementById('addCaseElementBtn');
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (aiBtn) aiBtn.disabled = true;
+    if (addBtn) addBtn.disabled = true;
+
+    // 原型演示加速：1.5s 后填充答案并恢复（实际约 1 分钟）
+    aiSummarizeLoadingTimer = setTimeout(() => {
+        aiSummarizeLoadingTimer = null;
+        let count = 0;
+        all.forEach(p => {
+            const answer = generateMockElementAnswer(p, caseItem);
+            caseElementsAnswers[p.name] = answer;
+            caseElementsSelection.add(p.name);  // 自动勾选已生成答案的要件
+            count++;
+        });
+        saveElementAnswers(caseItem.id, caseElementsAnswers);
+        saveElementSelection(caseItem.id, caseElementsSelection);
+        renderElementsList();
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (aiBtn) aiBtn.disabled = false;
+        if (addBtn) addBtn.disabled = false;
+        showNotification(`已为 ${count} 项要件生成答案，可直接在列表中修改`, 'success');
+    }, 1500);
+}
+
+// v1.51: 抽屉关闭时清理一键生成加载态
+function resetAiSummarizeLoading() {
+    if (aiSummarizeLoadingTimer) {
+        clearTimeout(aiSummarizeLoadingTimer);
+        aiSummarizeLoadingTimer = null;
+    }
+    const loadingEl = document.getElementById('caseElementsLoading');
+    const aiBtn = document.getElementById('aiSummarizeBtn');
+    const addBtn = document.getElementById('addCaseElementBtn');
+    if (loadingEl) loadingEl.classList.add('hidden');
+    if (aiBtn) aiBtn.disabled = false;
+    if (addBtn) addBtn.disabled = false;
 }
 
 // ---- 字符串转义辅助 ----
