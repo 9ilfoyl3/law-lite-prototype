@@ -1,9 +1,18 @@
 # 文书精修 Agent 编写方案
 
-> 版本：v1.0  ·  适用范围：文书精修页（`document-polish.html`）底层 Agent 实现
-> 关联原型：`pages/document-polish.html`、`js/document-polish.js`
+> 版本：v1.1  ·  适用范围：文书精修页（`document-polish.html`）底层 Agent 实现
+> 关联原型：`pages/document-polish.html`、`js/document-polish.js`、`js/doc-editor.js`
 > 关联 PRD：`docs/V1.1版本PRD（人看）.md` 功能7「文书精修」
+> 关联测试集：`docs/文书评查黄金测试集.md`（见第 16 节）
 > 编写依据：原型现有数据结构、上下文来源、两类精修模式交互
+
+> **v1.1 修订说明**（2026-08-13，依据产品评审 12 条决策答复）：
+> 1. 新增「文书评查」能力：预置检查项驱动的全文评查（第 5.4 节）；**明确不做格式类、语气类检查**——格式由文书生成阶段定义，精修只调内容；公文写作语气不作要求
+> 2. 文书类型适配走"评查 Agent/Workflow 灵活调整"路线：不建代码内置规则库、不建后台规则配置（第 5.5 节）
+> 3. 不做精修程度档位（light/medium/deep 方案废弃）
+> 4. ~~修正第 13/15 节~~（已撤销）：v1.1 修订时误读到旧版 `document-polish.js`（404 行旧文件），曾将第 13/15 节改为"mock 函数不存在"。经对**新版**（1665 行，含 `mockReviewMessage` / `streamAnalysisSteps` / `streamReviewCards` / `mockRewrite` / `reviewMessages` / `applyReview` 等全套实现）复核，v1.0 的函数引用**准确无误**，第 13/15 节已恢复 v1.0 内容，仅叠加 checkItems 与评查入口的新增说明
+> 5. 二期/暂缓项：后置实体校验（二期）、长文书分段（暂缓）、用户自定义规则（本版不涉及）、兜底策略增强（暂缓）、建议续扫（暂缓）——汇总见第 17 节
+> 6. 待定项：`reason` 修改理由展示、多轮会话记忆——Schema 预留字段，见第 9 节与第 17 节
 
 ---
 
@@ -12,14 +21,16 @@
 本文档面向**后端 / 算法工程师**，定义文书精修场景下 Agent 的：
 - 角色边界与能力清单
 - 上下文组装规则（精修三卡片数据如何拼装为 Agent 输入）
-- 两类精修模式的 Agent 编排逻辑
+- 两类精修模式 + 文书评查能力的 Agent 编排逻辑
+- 文书评查预置检查项定义（第 5.4 节）
 - 工具 / 函数调用清单
 - SSE 事件流协议（替代现有 setTimeout mock）
 - 状态机与异常熔断
 - 模型选型与参数
 - 具体Prompt 模板与输出 JSON Schema
+- 质量评估与黄金测试集（第 16 节）
 
-**不包含**：法条链接识别（该能力在文书生成阶段完成，精修页仅做查看跳转）、文书生成 、要件总结。
+**不包含**：法条链接识别（该能力在文书生成阶段完成，精修页仅做查看跳转）、文书生成 、要件总结、**文书格式调整（格式由生成阶段定义，精修不动格式）**。
 
 ---
 
@@ -37,14 +48,15 @@
 
 ### 1.2 能力清单
 
-Agent 支持两类精修模式，对应两个独立的子 Agent：
+Agent 支持两类精修模式，对应两个独立的子 Agent；其中结构化审查 Agent 支持两种触发方式（指令审查 / 文书评查）：
 
 | 子 Agent | 触发入口 | 输入特征 | 输出形态 |
 |---------|---------|---------|---------|
 | **A. 单点改写 Agent**（`rewrite`） | 选中段落 → 点【系统改写】→ 输入指令 → 发送 | 局部原文片段（`selectedText`）+ 用户改写指令 | 单段改写结果文本 |
-| **B. 结构化审查 Agent**（`review`） | 右侧对话框输入精修指令 → 发送 | 文书全文 + 用户精修指令 | 分析过程 + N 条结构化修改建议 |
+| **B. 结构化审查 Agent**（`review`）· 指令审查 | 右侧对话框输入精修指令 → 发送 | 文书全文 + 用户精修指令 | 分析过程 + N 条结构化修改建议 |
+| **B. 结构化审查 Agent**（`review`）· 文书评查 | 点【文书评查】按钮（可勾选检查项） | 文书全文 + 预置检查项列表（`checkItems`），无用户指令 | 按检查项归类的分析过程 + N 条结构化修改建议 |
 
-两个子 Agent 共享上下文组装逻辑（见第 3 节），但 Prompt、输出 Schema、流式协议不同。
+两个子 Agent 共享上下文组装逻辑（见第 3 节），但 Prompt、输出 Schema、流式协议不同。文书评查与指令审查复用同一子 Agent 与 SSE 协议，仅输入与 Prompt 不同（见 5.4）。
 
 ---
 
@@ -96,6 +108,7 @@ Agent 支持两类精修模式，对应两个独立的子 Agent：
   "caseId": "case1",
   "versionId": "v1_xxx",
   "instruction": "增加被告电话：12345678909",
+  "checkItems": ["typo", "wording", "logic", "facts", "law_ref", "structure", "placeholder", "brevity"],
   "selectedText": "被告二：张三，男，1985年出生。",
   "documentContent": "<div>...全文HTML...</div>",
   "caseContext": {
@@ -134,6 +147,7 @@ Agent 支持两类精修模式，对应两个独立的子 Agent：
 
 **字段说明**：
 - `mode`：必填，决定走哪个子 Agent
+- `checkItems`：仅 `mode=review` 的文书评查触发时必带（预置检查项 ID 数组，见 5.4）；指令审查时为空数组或缺省。`checkItems` 非空时 `instruction` 可为空
 - `selectedText`：仅 `mode=rewrite` 时必填，`mode=review` 可空
 - `documentContent`：`mode=review` 必带全文；`mode=rewrite` 推荐带全文（满足"关联全案上下文"约束），超时可降级为仅带选中段落所在章节
 - `materials`：后端按 `cfg.materialIds` + `stepsSnapshot[].materialIds` 合并去重后拉取，前端只传 ID 列表，内容由后端填充
@@ -208,6 +222,45 @@ Agent 支持两类精修模式，对应两个独立的子 Agent：
 - `originalAnchor` 必须是文书中**真实存在**的连续文本片段（≥10 字），用于前端 `findText` 定位
 - `revisedText` 用 `<del>` 标记删除、`<ins>` 标记新增
 - `cleanText` 是修订后的纯净文本（无 `<del>/<ins>` 标签），用于直接替换原文
+
+### 5.4 文书评查模式（预置检查项，v1.1 新增）
+
+#### 触发与交互
+
+- 入口：右侧对话区上方【文书评查】按钮；点击后展开检查项勾选面板（默认全选），确认后发起 `mode=review` 请求，`checkItems` 携带勾选项，`instruction` 为空
+- SSE 协议、卡片渲染、应用/撤销等交互与指令审查完全一致，前端无需新增渲染逻辑
+- 评查结果按检查项归类展示：每条 `review_card` 携带 `checkItem` 字段（见 9.2），前端在卡片上显示检查项标签（如"错别字""法条引用"）
+
+#### 预置检查项（默认 8 项）
+
+> 产品决策：评查**不检查格式**（格式由文书生成阶段定义）、**不检查语气**（公文写作语气不作要求）。以下检查项为建议默认集，具体措辞与增删待产品最终确认后锁定。
+
+| 检查项 ID | 名称 | 检查内容 |
+|-----------|------|---------|
+| `typo` | 错别字与标点 | 错别字、多字漏字、标点误用（如"借货"应为"借贷"） |
+| `wording` | 法律用语规范 | 术语误用、称谓前后不一（原告/被告/上诉人混用）、口语化表述 |
+| `facts` | 事实要素一致性 | 人名、金额、日期、案号等关键要素在全文前后是否一致（如查明段转账金额与借条金额矛盾） |
+| `logic` | 逻辑自洽性 | 说理与结论是否脱节、论证链条是否完整、前后认定是否矛盾 |
+| `law_ref` | 法条引用完整性 | 实体论证是否有法条支撑、引用条文与案由是否匹配、条文号是否存疑 |
+| `structure` | 结构要素完整性 | 按 docType 通行结构检查必备板块与要素（如判决书：诉请逐项回应、主文与诉请对应、诉讼费负担、上诉告知） |
+| `placeholder` | 残留占位符检测 | `[待补充]`、`[XX]`、`XXX` 等未填充占位符残留 |
+| `brevity` | 语句精简 | 重复冗余表述、可合并的重复信息 |
+
+#### 评查专属输出要求（在 8.2 Prompt 基础上叠加）
+
+- 分析过程步骤标题按检查项动态生成（如"通读全文校对错字"→"核对事实要素一致性"→"检查法条引用"→"汇总评查建议"）
+- 每条建议必须标注 `checkItem`，且不得输出所选检查项之外的建议
+- **严禁输出格式类建议**（标题层级、对齐、缩进、字体等）与语气风格类建议
+- 未发现问题时返回 `review_done`（total=0），不得为凑数输出低质量建议
+- 建议数量上限仍为 5 条；超出时按风险优先级排序（事实错误 > 法条缺失 > 结构缺项 > 文字问题）
+
+### 5.5 文书类型适配策略（v1.1 决策）
+
+管理后台已维护文书类型（裁判文书、庭审提纲等），但**不维护类型规则**。适配不走"代码内置规则库"（太重），也不走"后台规则配置"（太累），而是：
+
+- 评查/审查 Agent 的 System Prompt 中声明：根据输入的 `docType` + `template`，按该类法律文书的**通行写作规范与必备结构**自行调整评查重点（如裁判文书重说理与主文对应，庭审提纲重争议焦点与调查重点）
+- Prompt 与 workflow 编排（分析步骤、检查项执行顺序）作为 Agent 配置独立维护，调优时改 Prompt/编排即可，不动代码与后台
+- 若某类型评查效果不佳，优先通过 Few-shot 示例（8.3）补充该类型样例解决
 
 ---
 
@@ -358,6 +411,9 @@ data: {"msgId":"msg-1234567890","index":0,"review":{"id":"r1","title":"被告信
 5. cleanText 是修订后的纯净文本，可直接替换原文
 6. 修改建议数量 1-5 条，聚焦关键问题，不要追求面面俱到
 7. 保留原文段落格式，仅修改文本内容
+8. 【文书类型适配】根据 docType/template 按该类法律文书的通行规范与必备结构审查：裁判文书重点审查说理充分性、诉请与主文对应、法条适用；庭审提纲重点审查争议焦点归纳与调查重点完备性；其他类型按通行规范处理
+9. 【禁区】不得输出格式类建议（标题层级、对齐、缩进、字体、行距等——格式由生成阶段定义，不属于精修范围），不得输出语气风格类建议
+10. 【评查模式】当输入中 checkItems 非空（无用户指令）时，按所选检查项逐项评查，每条建议标注所属 checkItem；未发现问题时诚实返回 0 条建议，不得凑数
 
 【分析过程要求】
 1. 输出 4-6 个分析步骤，每步含 title 和 content
@@ -393,6 +449,9 @@ data: {"msgId":"msg-1234567890","index":0,"review":{"id":"r1","title":"被告信
 【精修指令】
 {instruction}
 
+【评查检查项】（仅文书评查触发时提供，此时【精修指令】为空）
+{checkItems 对应的检查项名称与检查内容列表}
+
 【案件上下文】
 案由：{caseContext.cause}
 案号：{caseContext.caseNumber}
@@ -411,7 +470,7 @@ data: {"msgId":"msg-1234567890","index":0,"review":{"id":"r1","title":"被告信
 【文书全文】
 {documentContent}
 
-请按精修指令对文书进行结构化审查，按 SSE 事件流格式输出分析过程和修改建议。
+请按精修指令（或评查检查项）对文书进行结构化审查，按 SSE 事件流格式输出分析过程和修改建议。
 ```
 
 ### 8.3 Few-shot 示例（结构化审查）
@@ -460,6 +519,10 @@ review_card 1:
     "text": {
       "type": "string",
       "description": "改写后的文本，可直接替换原文"
+    },
+    "reason": {
+      "type": "string",
+      "description": "【预留·待定】一句话改写理由（≤50字）。产品决策待定，当前版本后端不返回、前端不展示；若后续启用，前端结果态折叠展示"
     }
   },
   "required": ["text"]
@@ -501,6 +564,11 @@ review_card 1:
     "cleanText": {
       "type": "string",
       "description": "清洁版，无标签，可直接替换原文"
+    },
+    "checkItem": {
+      "type": "string",
+      "enum": ["typo", "wording", "facts", "logic", "law_ref", "structure", "placeholder", "brevity"],
+      "description": "【v1.1 新增】建议所属检查项 ID，仅文书评查触发时必填；指令审查时可空。前端用于在卡片上展示检查项标签"
     }
   },
   "required": ["id", "title", "risk", "solution", "originalAnchor", "revisedText", "cleanText"]
@@ -614,9 +682,21 @@ review_card 1:
 - Agent 调用失败**不自动重试**，直接返回错误并提示用户
 - 连续 3 次失败时，前端禁用发送按钮 30s，提示"系统繁忙，请稍后重试"
 
+### 12.3 本期明确不做的防护（v1.1 决策，含风险记录）
+
+| 事项 | 决策 | 风险记录 |
+|------|------|---------|
+| 后置实体校验（金额/日期/人名/法条号 diff 比对） | **二期再做** | 本期依赖 Prompt 约束（8.1 原则 4/5），存在模型误改关键实体的低概率风险；上线前需用黄金测试集 T13 验证 |
+| 长文书（全文 >128K）分段审查 | **暂不考虑** | 超长文书会触发 `CONTEXT_TOO_LONG`，用户需自行圈选局部审查；原型阶段文书量级暂可接受 |
+| anchor 失效兜底增强（改为"仅提示不落盘"） | **暂不考虑**，保留"插入光标处"现行行为 | 存在插错位置隐患，已在文案上提示用户（"原文位置已变化，已插入到光标处"），二期再优化 |
+| 建议"继续扫描"入口（突破 5 条上限） | **暂不考虑** | 评查建议以高风险优先排序（5.4），5 条外的问题本期不触达 |
+| 信息缺失时 clarify 反问（替代 `[待补充]` 占位） | **暂不考虑**，保留占位符行为 | 占位符可被 `placeholder` 检查项在评查中兜底检出，风险可控 |
+
 ---
 
 ## 13. 前端接入改造清单
+
+> 本节函数引用已对**新版** `document-polish.js`（1665 行）复核确认存在：`mockReviewMessage`、`streamAnalysisSteps`、`streamReviewCards`、`mockRewrite`、`generateAiRewriteResult`、`reviewMessages`、`applyReview`/`applyAllReviews`/`undoReview`/`undoAllReviews`/`ignoreReview`/`locateReview`，DocEditor 实例化（第 133 行）。
 
 ### 13.1 需替换的函数
 
@@ -632,13 +712,14 @@ review_card 1:
 
 ```js
 // 组装上下文 JSON
-function buildPolishContext(mode, instruction, selectedText) {
+function buildPolishContext(mode, instruction, selectedText, checkItems) {
     const cfg = polishVersion?.config || {};
     return {
         mode,
         caseId: polishCaseId,
         versionId: polishVersionId,
-        instruction,
+        instruction: instruction || '',
+        checkItems: checkItems || [],          // v1.1：文书评查预置检查项
         selectedText: selectedText || '',
         documentContent: docEditor ? docEditor.getContent() : currentContent,
         caseContext: {
@@ -662,7 +743,7 @@ function buildPolishContext(mode, instruction, selectedText) {
     };
 }
 
-// 调用结构化审查 Agent（SSE）
+// 调用结构化审查 / 文书评查 Agent（SSE）
 function callReviewAgent(contextJson) {
     return new EventSource('/api/polish/review', { method: 'POST', body: JSON.stringify(contextJson) });
 }
@@ -673,6 +754,12 @@ function callRewriteAgent(contextJson) {
 }
 ```
 
+另需新增（v1.1 文书评查入口）：
+
+| 类别 | 函数 / UI | 说明 |
+|------|------|------|
+| 评查入口 | 【文书评查】按钮 + 检查项勾选面板 | 新建 UI（对话区上方），确认后调 `callReviewAgent`（checkItems 非空、instruction 为空）；复用现有 review 卡片渲染，仅新增卡片上的检查项标签 |
+
 ### 13.3 需保留的现有逻辑
 
 - `reviewMessages[msgId]` 状态管理（reviews / snapshotBeforeApply / appliedReviewIds）
@@ -680,6 +767,11 @@ function callRewriteAgent(contextJson) {
 - `docEditor.findText` / `docEditor.replaceTextPreserveFormat` / `docEditor.insertTextAtCursor`
 - 改写卡片的两态切换（输入态 / 结果态）
 - 工具条显示/隐藏逻辑
+
+### 13.4 需要后端配合的事项
+
+- `/api/polish/review`、`/api/polish/rewrite`、`/api/polish/cancel` 三个接口（见 7.1）
+- 后端按 `materialIds` + `stepsSnapshot[].materialIds` 合并去重拉取材料原文填充 `materials` 字段
 
 ---
 
@@ -701,6 +793,11 @@ function callRewriteAgent(contextJson) {
 | AC-12 | 异常熔断：模型超时返回 error 事件，前端提示并启用发送按钮 | 模拟超时 |
 | AC-13 | 异常熔断：连续 3 次失败禁用发送按钮 30s | 模拟失败 |
 | AC-14 | 拒绝策略：指令"重新写一份判决书"返回 REJECT，前端提示去文书生成页 | 手动测试 |
+| AC-15 | 文书评查：点【文书评查】→ 默认全选检查项 → 流式输出分析过程与建议卡片，每条卡片带检查项标签 | 手动测试 |
+| AC-16 | 文书评查禁区：评查结果中不出现格式类、语气类建议 | 手动测试 + 黄金测试集 |
+| AC-17 | 文书类型适配：对裁判文书（judgment）与庭审提纲分别评查，评查重点随 docType 变化 | 黄金测试集 T05 + D3 |
+| AC-18 | 无问题文书：评查返回 0 条建议，不凑数 | 黄金测试集 T09 |
+| AC-19 | 黄金测试集回归：15 条用例通过率 ≥ 90%，且 T08/T13 必须通过 | 按《文书评查黄金测试集》第 5 节执行 |
 
 ---
 
@@ -708,12 +805,48 @@ function callRewriteAgent(contextJson) {
 
 | 原型 mock（document-polish.js） | 真实 Agent 替换 |
 |--------------------------------|----------------|
-| `mockRewrite(text, instruction)` 返回 `{text, reason}` | `callRewriteAgent(context)` SSE 流，`reason` 字段废弃 |
+| `mockRewrite(text, instruction)` 返回 `{text, reason}` | `callRewriteAgent(context)` SSE 流；`reason` 字段当前不返回（v1.1 列为待定项，Schema 已预留，见 9.1 / 17.1） |
 | `mockReviewMessage(instruction)` 返回 `{type, analysis, reviews}` | `callReviewAgent(context)` SSE 流，分片返回 analysis 和 reviews |
 | `mockRewriteTemplate` / `mockFormatTemplate` / `mockSupplementTemplate` / `mockGenericTemplate` | 由 Agent 根据指令动态生成，不再走模板分发 |
 | `streamAnalysisSteps` 用 setTimeout 800ms + 600ms | 监听 `analysis_step` 事件，由后端控制节奏 |
 | `streamReviewCards` 用 setTimeout 300ms | 监听 `review_card` 事件，由后端控制节奏 |
 | `generateAiRewriteResult` 用 setTimeout 700ms | 监听 `rewrite_done` 事件 |
+
+---
+
+## 16. 质量评估与黄金测试集（v1.1 新增）
+
+精修效果不能只看功能可用性，需建立质量评估机制：
+
+| 机制 | 内容 | 阶段 |
+|------|------|------|
+| 黄金测试集回归 | `docs/文书评查黄金测试集.md`：15 条用例（评查 9 条、改写 5 条、边界 1 条），含 8 处预埋缺陷的判决书样本 D1、无缺陷对照版 D2、庭审提纲样本 D3；Prompt/模型/检查项变更时执行，通过率 ≥ 90%，安全用例 T08/T13 必过 | 本版启用 |
+| 建议采纳率统计 | 前端埋点记录 `applyReview` / `ignoreReview` 行为，后端按 msgId 汇总采纳率，作为 Prompt 调优依据 | 本版埋点，数据积累后使用 |
+| 人工抽检 | 上线初期每周抽样 10 条精修结果人工评分（修改准确性 / 原意保持 / 可替换性） | 运营动作 |
+
+---
+
+## 17. 待定项与二期项汇总（v1.1 决策记录）
+
+### 17.1 待定项（需产品后续决策）
+
+| 项 | 现状 | 待决策内容 |
+|----|------|-----------|
+| 单点改写 `reason` 修改理由 | Schema 已预留可选字段（9.1），后端不返回、前端不展示 | 是否启用；启用后的展示形态（折叠面板 / hover） |
+| 多轮会话记忆 `sessionHistory` | 上下文 JSON 预留扩展位，未实现 | 作用域（页面期间 / 跨会话）；已忽略建议是否回传 |
+| 评查检查项清单 | 默认 8 项（5.4），已排除格式与语气 | 各项具体措辞、是否增删 |
+
+### 17.2 二期 / 暂缓项
+
+| 项 | 决策 |
+|----|------|
+| 后置实体校验（金额/日期/人名/法条号 diff） | 二期 |
+| 长文书（>128K）分段审查 | 暂缓，超长走 CONTEXT_TOO_LONG 提示 |
+| 用户/机构自定义规则库 | 本版不涉及 |
+| anchor 失效兜底增强（仅提示不落盘） | 暂缓，保留插入光标处 + 提示 |
+| 建议"继续扫描"入口 | 暂缓 |
+| clarify 反问机制（替代 [待补充]） | 暂缓 |
+| 精修程度档位（light/medium/deep） | 废弃，不做 |
 
 ---
 
