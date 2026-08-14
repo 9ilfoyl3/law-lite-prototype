@@ -3796,6 +3796,7 @@ function startStreamingContent(fullContent, title, contentEl, statsEl, fillEl) {
 function setResultActionButtonsDisabled(disabled) {
     const refineBtn = document.getElementById('resultRefineBtn');
     const reconfigBtn = document.getElementById('resultReconfigBtn');
+    const saveBtn = document.getElementById('resultEditorSaveBtn');
     if (refineBtn) {
         refineBtn.disabled = disabled;
         refineBtn.style.opacity = disabled ? '0.5' : '';
@@ -3807,6 +3808,13 @@ function setResultActionButtonsDisabled(disabled) {
         reconfigBtn.style.opacity = disabled ? '0.5' : '';
         reconfigBtn.style.cursor = disabled ? 'not-allowed' : '';
         reconfigBtn.title = disabled ? '生成中，请稍候' : '重新配置生成参数（默认回填最近一次历史文书快照）';
+    }
+    // v2.31: 同步编辑器内保存按钮状态
+    if (saveBtn) {
+        saveBtn.disabled = disabled;
+        saveBtn.style.opacity = disabled ? '0.5' : '';
+        saveBtn.style.cursor = disabled ? 'not-allowed' : '';
+        saveBtn.title = disabled ? '生成中，请稍候' : '保存到历史文书';
     }
 }
 
@@ -3859,6 +3867,23 @@ function showResult(html, title) {
                 resultContent = content;
             }
         });
+        // v2.31: 在编辑器工具栏追加【保存】按钮，点击保存到历史文书
+        if (resultDocEditor.toolbar) {
+            const sep = document.createElement('div');
+            sep.className = 'doc-editor-toolbar-sep';
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'doc-editor-toolbar-btn result-editor-save-btn';
+            saveBtn.id = 'resultEditorSaveBtn';
+            saveBtn.title = '保存到历史文书';
+            saveBtn.innerHTML = '<i class="fas fa-save"></i><span class="btn-label">保存</span>';
+            saveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                saveResult();
+            });
+            resultDocEditor.toolbar.appendChild(sep);
+            resultDocEditor.toolbar.appendChild(saveBtn);
+        }
     } else {
         body.innerHTML = `<div class="fade-in">${resultContent}</div>`;
     }
@@ -3892,6 +3917,21 @@ function saveResult() {
     const template = templateEl ? templateEl.value : '';
     const requirement = requirementEl ? requirementEl.value : '';
 
+    // v2.31: 保存策略
+    // - 首次保存（无 lastSavedVersionId）：调用 addDocumentVersion 追加新版本
+    // - 后续保存（有 lastSavedVersionId）：调用 updateDocumentVersionContent 覆盖当前版本内容，不新增版本
+    if (lastSavedVersionId && typeof updateDocumentVersionContent === 'function') {
+        // 覆盖当前版本内容
+        const ok = updateDocumentVersionContent(caseItem.id, lastSavedVersionId, resultContent);
+        if (ok) {
+            showNotification('文书内容已更新', 'success');
+            updateHistoryDocsBtnState();
+        } else {
+            showNotification('保存失败，请重试', 'error');
+        }
+        return;
+    }
+
     // v1.37: 构建分步生成的步骤快照（任务 4.2）
     let stepsSnapshot = null;
     if (isStep && typeof stepsConfig !== 'undefined' && typeof stepData !== 'undefined') {
@@ -3906,7 +3946,7 @@ function saveResult() {
         });
     }
 
-    // v1.37: 调用统一版本管理工具，按 docType 合并追加新版本（任务 4.2）
+    // v1.37: 首次保存——调用统一版本管理工具，按 docType 合并追加新版本（任务 4.2）
     const savedVersion = addDocumentVersion(caseItem.id, {
         type: 'original',
         genMethod: currentGenMethod,
@@ -3928,7 +3968,7 @@ function saveResult() {
 
     if (savedVersion) {
         lastSavedVersionId = savedVersion.versionId || '';
-        showNotification('文书已保存到历史文书（新版本）', 'success');
+        showNotification('文书已保存到历史文书', 'success');
         // v1.37: 刷新历史文书按钮状态（任务 4.3）
         updateHistoryDocsBtnState();
     } else {

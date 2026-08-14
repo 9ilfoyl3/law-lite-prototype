@@ -2318,6 +2318,37 @@ function deleteDocumentVersion(caseId, versionId) {
     return false;
 }
 
+/**
+ * 更新指定版本的 content（覆盖，不新增版本）
+ * v2.31: 案件详情页生成结果编辑器【保存】按钮使用，覆盖当前版本内容
+ * @param {string} caseId
+ * @param {string} versionId
+ * @param {string} content 新的文书内容
+ * @returns {boolean} 是否更新成功
+ */
+function updateDocumentVersionContent(caseId, versionId, content) {
+    const result = findCaseById(caseId);
+    if (!result) {
+        console.warn('[updateDocumentVersionContent] case not found:', caseId);
+        return false;
+    }
+    const caseItem = result.caseItem;
+    if (!Array.isArray(caseItem.documents)) return false;
+    for (const doc of caseItem.documents) {
+        if (!Array.isArray(doc.versions)) continue;
+        const v = doc.versions.find(x => x.versionId === versionId);
+        if (v) {
+            v.content = content;
+            v.updatedAt = new Date().toISOString();
+            caseItem.updatedAt = new Date().toISOString().split('T')[0];
+            saveBusinessSystems();
+            return true;
+        }
+    }
+    console.warn('[updateDocumentVersionContent] version not found:', versionId);
+    return false;
+}
+
 // 初始化数据：先填充默认值，再尝试从 localStorage 加载
 // 加载后执行 migrateDataIfNeeded 与 initCaseData，确保版本升级后默认案件材料可自动补齐
 initCaseData();

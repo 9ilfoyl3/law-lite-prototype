@@ -1,0 +1,171 @@
+<div data-dynamic-ui-widget data-template="node-flow">
+<style>
+:root {
+  --surface: #ffffff;
+  --surface-muted: #f5f7fb;
+  --surface-brand: #eef1ff;
+  --border: #dfe5ef;
+  --text-primary: #1a1c2e;
+  --text-secondary: #54607a;
+  --text-muted: #9099ad;
+  --brand: #6d5ce7;
+  --brand-strong: #5543db;
+  --chart-series-1: #3b82f6;
+  --chart-series-2: #14b8a6;
+  --chart-series-3: #f59e0b;
+  --spacer-4: 4px; --spacer-8: 8px; --spacer-12: 12px; --spacer-16: 16px;
+  --spacer-20: 20px; --spacer-24: 24px;
+  --radius: 8px; --radius-card: 12px; --radius-full: 999px;
+  --text-caption: 12px/18px "Noto Sans SC", -apple-system, system-ui, sans-serif;
+  --text-body: 14px/20px "Noto Sans SC", -apple-system, system-ui, sans-serif;
+  --text-title: 16px/24px "Noto Sans SC", -apple-system, system-ui, sans-serif;
+  --weight-medium: 500; --weight-strong: 600;
+}
+:root[data-widget-theme="dark"] {
+  --surface: #181a26; --surface-muted: #212438; --surface-brand: #2a2648;
+  --border: #313552; --text-primary: #e6e8f0; --text-secondary: #aab1c5; --text-muted: #70768d;
+}
+.widget-root { padding: var(--spacer-16); background: var(--surface); }
+.widget-title { font: var(--weight-strong) var(--text-title); color: var(--text-primary); margin-bottom: var(--spacer-4); }
+.widget-subtitle { font: var(--text-caption); color: var(--text-secondary); margin-bottom: var(--spacer-16); }
+.arch-svg { width: 100%; height: auto; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--spacer-12); margin-top: var(--spacer-16); font: var(--text-caption); color: var(--text-secondary); }
+.legend-item { display: inline-flex; align-items: center; gap: var(--spacer-8); }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
+.legend-swatch.brand { background: var(--surface-brand); border-color: var(--brand); }
+.legend-swatch.s1 { background: #dbeafe; border-color: var(--chart-series-1); }
+.legend-swatch.s2 { background: #ccfbf1; border-color: var(--chart-series-2); }
+.legend-swatch.s3 { background: #fef3c7; border-color: var(--chart-series-3); }
+</style>
+  <div class="widget-title">Lite 产品架构总览</div>
+  <div class="widget-subtitle">基于 2026-08-03 产品规划讨论白板与文字稿整理</div>
+  <svg class="arch-svg" viewBox="0 0 720 560" xmlns="http://www.w3.org/2000/svg" font-family="'Noto Sans SC', -apple-system, system-ui, sans-serif" font-size="14" fill="none">
+    <defs>
+      <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#9099ad"/>
+      </marker>
+      <marker id="arrow-brand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7"/>
+      </marker>
+    </defs>
+
+    <!-- 第一层：业务本质主链路 -->
+    <rect x="40" y="30" width="130" height="60" rx="12" ry="12" fill="var(--surface-muted)" stroke="var(--border)"/>
+    <text x="105" y="58" text-anchor="middle" font-weight="600" fill="var(--text-primary)">材料</text>
+    <text x="105" y="76" text-anchor="middle" font-size="11" fill="var(--text-muted)">卷宗 / 多模态输入</text>
+
+    <rect x="290" y="30" width="130" height="60" rx="12" ry="12" fill="var(--surface-brand)" stroke="var(--brand)"/>
+    <text x="355" y="58" text-anchor="middle" font-weight="600" fill="var(--brand-strong)">应用</text>
+    <text x="355" y="76" text-anchor="middle" font-size="11" fill="var(--brand)">Lite 办案工作台</text>
+
+    <rect x="540" y="10" width="150" height="100" rx="12" ry="12" fill="var(--surface-muted)" stroke="var(--border)"/>
+    <text x="615" y="34" text-anchor="middle" font-weight="600" fill="var(--text-primary)">文档</text>
+    <line x1="552" y1="44" x2="678" y2="44" stroke="var(--border)"/>
+    <text x="560" y="62" font-size="12" fill="var(--text-secondary)">一句话</text>
+    <text x="560" y="80" font-size="12" fill="var(--text-secondary)">总结</text>
+    <text x="560" y="98" font-size="12" fill="var(--text-secondary)">格式化拟写</text>
+
+    <!-- 主链路箭头 -->
+    <path d="M170 60 H286" stroke="var(--brand)" stroke-width="2" fill="none" stroke-linecap="round" marker-end="url(#arrow-brand)"/>
+    <path d="M420 60 H536" stroke="var(--brand)" stroke-width="2" fill="none" stroke-linecap="round" marker-end="url(#arrow-brand)"/>
+
+    <!-- 第二层：知识库三大能力 -->
+    <rect x="30" y="130" width="310" height="260" rx="12" ry="12" fill="#fafbff" stroke="var(--chart-series-1)" stroke-dasharray="4 3"/>
+    <text x="46" y="152" font-weight="600" font-size="13" fill="var(--chart-series-1)">知识库三大核心能力</text>
+
+    <rect x="50" y="168" width="130" height="50" rx="8" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="115" y="190" text-anchor="middle" font-weight="500" fill="var(--text-primary)">材料解析</text>
+    <text x="115" y="208" text-anchor="middle" font-size="11" fill="var(--text-muted)">文本 / 图片 / 音视频</text>
+
+    <rect x="50" y="232" width="270" height="76" rx="8" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="66" y="254" font-weight="500" fill="var(--text-primary)">建库</text>
+    <g transform="translate(60,264)">
+      <rect x="0" y="0" width="56" height="34" rx="6" fill="#eff6ff" stroke="#93c5fd"/>
+      <text x="28" y="22" text-anchor="middle" font-size="11" fill="#1d4ed8">结构化</text>
+      <rect x="68" y="0" width="56" height="34" rx="6" fill="#ecfeff" stroke="#67e8f9"/>
+      <text x="96" y="22" text-anchor="middle" font-size="11" fill="#0e7490">文件</text>
+      <rect x="136" y="0" width="56" height="34" rx="6" fill="#f0f9ff" stroke="#7dd3fc"/>
+      <text x="164" y="22" text-anchor="middle" font-size="11" fill="#0369a1">向量</text>
+      <rect x="204" y="0" width="46" height="34" rx="6" fill="#faf5ff" stroke="#d8b4fe"/>
+      <text x="227" y="22" text-anchor="middle" font-size="11" fill="#7e22ce">图谱</text>
+    </g>
+
+    <rect x="50" y="322" width="270" height="54" rx="8" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="66" y="344" font-weight="500" fill="var(--text-primary)">检索 + 排序 + ReAct</text>
+    <text x="66" y="364" font-size="11" fill="var(--text-muted)">子查询优化 · 多路召回 · 反思再检索</text>
+
+    <!-- 材料 → 知识库箭头 -->
+    <path d="M105 90 V126" stroke="#9099ad" stroke-width="1.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+    <!-- 知识库 → 应用 箭头 -->
+    <path d="M340 260 H376" stroke="#9099ad" stroke-width="1.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+    <!-- 第二层：应用层 -->
+    <rect x="380" y="130" width="310" height="260" rx="12" ry="12" fill="#fbfcff" stroke="var(--brand)" stroke-dasharray="4 3"/>
+    <text x="396" y="152" font-weight="600" font-size="13" fill="var(--brand)">使用层</text>
+
+    <rect x="400" y="168" width="270" height="78" rx="8" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="416" y="190" font-weight="500" fill="var(--text-primary)">前台 Frontend</text>
+    <text x="416" y="212" font-size="12" fill="var(--text-secondary)">UI/UX · 交互体验（产品侧扎尾点）</text>
+    <text x="416" y="232" font-size="11" fill="var(--text-muted)">差异层：法院版 / 检察院版前端交互</text>
+
+    <rect x="400" y="260" width="270" height="116" rx="8" fill="var(--surface)" stroke="var(--border)"/>
+    <text x="416" y="282" font-weight="500" fill="var(--text-primary)">后台 Backend（业务实践）</text>
+    <g transform="translate(410,294)">
+      <rect x="0" y="0" width="250" height="36" rx="6" fill="#f9fafb" stroke="var(--border)"/>
+      <text x="12" y="22" font-size="11" fill="var(--text-secondary)">数据库 CRUD</text>
+      <rect x="0" y="44" width="250" height="36" rx="6" fill="#f9fafb" stroke="var(--border)"/>
+      <text x="12" y="66" font-size="11" fill="var(--text-secondary)">业务 API（输入 / 输出）</text>
+    </g>
+    <rect x="410" y="378" width="250" height="28" rx="6" fill="var(--surface-brand)" stroke="var(--brand)"/>
+    <text x="535" y="397" text-anchor="middle" font-size="11" font-weight="500" fill="var(--brand-strong)">agentflow 编排（可优化·可个性化·低成本）</text>
+
+    <!-- 第三层：模式 / 定位 / 计算器 / 对话 -->
+    <rect x="30" y="412" width="660" height="132" rx="12" ry="12" fill="var(--surface-muted)" stroke="var(--border)"/>
+    <text x="46" y="434" font-weight="600" font-size="13" fill="var(--text-primary)">模式 · 定位 · 对话（产品侧核心决策）</text>
+
+    <!-- 两模式 -->
+    <rect x="50" y="450" width="146" height="80" rx="8" fill="var(--surface)" stroke="var(--chart-series-1)"/>
+    <text x="123" y="472" text-anchor="middle" font-weight="500" fill="var(--text-primary)">文书生成两模式</text>
+    <g transform="translate(58,484)">
+      <rect x="0" y="0" width="62" height="36" rx="6" fill="#dbeafe"/>
+      <text x="31" y="23" text-anchor="middle" font-size="12" font-weight="500" fill="#1d4ed8">一步法</text>
+      <rect x="72" y="0" width="62" height="36" rx="6" fill="#ccfbf1"/>
+      <text x="103" y="23" text-anchor="middle" font-size="12" font-weight="500" fill="#0f766e">分步</text>
+    </g>
+    <text x="123" y="522" text-anchor="middle" font-size="10" fill="var(--text-muted)">区别=是否需中间介入（非文字多少）</text>
+
+    <!-- 要件定位 -->
+    <rect x="210" y="450" width="146" height="80" rx="8" fill="var(--surface)" stroke="var(--chart-series-2)"/>
+    <text x="283" y="472" text-anchor="middle" font-weight="500" fill="var(--text-primary)">要件新定位</text>
+    <text x="283" y="494" text-anchor="middle" font-size="11" fill="var(--text-secondary)">可选上限 · 问题清单</text>
+    <text x="283" y="512" text-anchor="middle" font-size="10" fill="var(--text-muted)">0 ~ N 条 · 用户自维护</text>
+    <text x="283" y="526" text-anchor="middle" font-size="10" fill="var(--chart-series-2)">主线：材料 + 五步法通路 60 分</text>
+
+    <!-- 计算器 -->
+    <rect x="370" y="450" width="146" height="80" rx="8" fill="var(--surface)" stroke="var(--chart-series-3)"/>
+    <text x="443" y="472" text-anchor="middle" font-weight="500" fill="var(--text-primary)">计算器（后续）</text>
+    <text x="443" y="494" text-anchor="middle" font-size="11" fill="var(--text-secondary)">因子（要件） + 公式</text>
+    <text x="443" y="512" text-anchor="middle" font-size="10" fill="var(--text-muted)">让模型算 · 非结构化输出</text>
+    <text x="443" y="526" text-anchor="middle" font-size="10" fill="var(--chart-series-3)">非 V1.1 范围</text>
+
+    <!-- 对话两层 -->
+    <rect x="530" y="450" width="146" height="80" rx="8" fill="var(--surface)" stroke="var(--brand)"/>
+    <text x="603" y="472" text-anchor="middle" font-weight="500" fill="var(--text-primary)">对话两层</text>
+    <g transform="translate(538,484)">
+      <rect x="0" y="0" width="130" height="16" rx="4" fill="var(--surface-brand)"/>
+      <text x="65" y="12" text-anchor="middle" font-size="10" fill="var(--brand-strong)">① 问答 · 知识库检索纠错</text>
+      <rect x="0" y="22" width="130" height="16" rx="4" fill="var(--surface-brand)"/>
+      <text x="65" y="34" text-anchor="middle" font-size="10" fill="var(--brand-strong)">② 快速任务 · 个性化 agentflow</text>
+    </g>
+    <text x="603" y="528" text-anchor="middle" font-size="10" fill="var(--text-muted)">深度交互（文编+对话）暂不做</text>
+
+  </svg>
+
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch brand"></span>核心链路 / 产品决策</span>
+    <span class="legend-item"><span class="legend-swatch s1"></span>知识库底座</span>
+    <span class="legend-item"><span class="legend-swatch s2"></span>通路增量项</span>
+    <span class="legend-item"><span class="legend-swatch s3"></span>后续版本方向</span>
+  </div>
+</div>
