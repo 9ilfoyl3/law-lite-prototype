@@ -537,6 +537,75 @@
             flex-shrink: 0;
         }
 
+        /* v1.53: 顶部水平 Stepper（取代手风琴堆叠，单步视图） */
+        .step-stepper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow-x: auto;
+        }
+        .step-node {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1.5px solid var(--border-color);
+            background: var(--bg-primary);
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            cursor: default;
+            flex-shrink: 0;
+        }
+        .step-node .sn-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 600;
+            background: #f3f4f6;
+            color: var(--text-muted);
+        }
+        .step-node.done { border-color: #d1fae5; background: #ecfdf5; color: #059669; cursor: pointer; }
+        .step-node.done .sn-num { background: #059669; color: #fff; }
+        .step-node.done:hover { background: #d1fae5; }
+        .step-node.current { border-color: var(--accent-primary); background: var(--accent-light); color: var(--accent-primary); font-weight: 600; outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+        .step-node.current .sn-num { background: var(--accent-primary); color: #fff; }
+        .step-node.waiting { cursor: pointer; }
+        .step-node.waiting:hover { border-color: var(--text-muted); color: var(--text-primary); }
+        .step-line { flex: 1; min-width: 12px; height: 2px; background: var(--border-color); border-radius: 1px; }
+        .step-line.done { background: #059669; }
+
+        /* v1.57: 子内容块卡片（done 状态拆分展示，仅展示；整步编辑走步骤级编辑按钮） */
+        .step-blocks { display: flex; flex-direction: column; gap: 8px; }
+        .step-block-card {
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--accent-primary);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+        .step-block-body { padding: 10px 14px 12px; }
+        .step-block-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .step-block-text { font-size: 13px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap; }
+        .step-block-text .stream-cursor { display: inline-block; width: 6px; height: 13px; background: var(--accent-primary); vertical-align: -2px; margin-left: 2px; animation: stream-blink 1s steps(2) infinite; }
+        @keyframes stream-blink { 50% { opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .step-block-text .stream-cursor { animation: none; } }
+
         /* Selected Core Materials Alert */
         .core-materials-alert {
             display: flex;
@@ -759,6 +828,7 @@
         .gen-start-btn:disabled { background: #9ca3af; opacity: 0.7; cursor: not-allowed; }
 
         /* Method 2: Six-Step Generation */
+        /* v1.58: 恢复自然高度布局（撤回 v1.56 撑满拉伸链），生成时块内容才渲染、卡片随内容自然撑开 */
         .steps-list { width: 100%; }
         .step-accordion {
             background: var(--bg-secondary);
@@ -1132,6 +1202,7 @@
             color: var(--text-primary);
             min-height: 60px;
         }
+        .step-content-area:empty { display: none; min-height: 0; }  /* v1.57: waiting 态隐藏空白底色盒 */
         .step-content-area.editing {
             padding: 0;
             background: transparent;
@@ -1179,6 +1250,30 @@
             gap: 8px;
             margin-top: 10px;
         }
+        /* v1.58: 底部上一步/下一步导航（与 Stepper 点击双导航） */
+        .step-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .step-nav:empty { display: none; margin: 0; }
+        .step-nav-btn {
+            font-size: 13px;
+            padding: 7px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .step-nav-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .step-nav-btn.primary { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+        .step-nav-btn.primary:hover { color: #fff; opacity: 0.9; }
         .step-action-btn {
             padding: 4px 12px;
             border: 1px solid var(--border-color);
@@ -3222,7 +3317,12 @@
                                     <i class="fas fa-lightbulb"></i>
                                     <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐步生成。</span>
                                 </div>
+                                <!-- v1.53: 顶部水平 Stepper（取代手风琴堆叠） -->
+                                <div class="step-stepper" id="stepStepper"></div>
+                                <!-- v1.53: 仅渲染当前选中步骤（单步视图） -->
                                 <div class="steps-list" id="stepsList"></div>
+                                <!-- v1.58: 底部上一步/下一步导航（与 Stepper 点击双导航） -->
+                                <div class="step-nav" id="stepNav"></div>
                                 <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;">
                                     <button class="gen-start-btn" id="stepNextBtn" onclick="continueStepGeneration()">
                                         <i class="fas fa-file-alt"></i> 生成文书
@@ -3486,7 +3586,7 @@
     <script src="../js/common.js?v=16"></script>
     <script src="../js/case-data.js?v=65"></script>
     <script src="../js/doc-editor.js?v=1"></script>
-    <script src="../js/case-files.js?v=119"></script>
+    <script src="../js/case-files.js?v=133"></script>
     <script>
         function toggleUserDropdown() {
             document.getElementById('userDropdown').classList.toggle('show');

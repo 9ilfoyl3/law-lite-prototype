@@ -94,7 +94,7 @@ const stepConfigsByOrg = {
                     ]
                 },
                 {
-                    id: 'defendant', name: '被告答辩', apiId: 'wf-step-defendant',
+                    id: 'defendant', name: '被告抗辩', apiId: 'wf-step-defendant',
                     inputs: [
                         { field: 'materials', required: true, source: 'material' },
                         { field: 'caseContext', required: true, source: 'case_context' }
@@ -2209,9 +2209,8 @@ function buildStepDependencyHintHtml(stepIdx) {
     if (!step || !Array.isArray(step.inputs)) return '';
 
     const prevDeps = step.inputs.filter(inp => inp.source === 'prev_step' && inp.fromStep);
-    if (prevDeps.length === 0) {
-        return `<div class="step-dependency-hint info"><i class="fas fa-info-circle"></i><span>本步无前置依赖</span></div>`;
-    }
+    // v1.60: 无前置依赖的步骤（如第一步）不显示依赖提示条，直接返回空串
+    if (prevDeps.length === 0) return '';
 
     // 解析依赖项的完成状态
     const depStatuses = prevDeps.map(dep => {
@@ -2292,7 +2291,38 @@ function renderSteps() {
         }
     });
 
-    list.innerHTML = stepsConfig.map((s, i) => {
+    // v1.55: 单步视图——计算当前查看步骤索引
+    // 仅生成中（isGenerating）时强制聚焦 current 步骤；非生成中允许用户自由切换查看任意步骤
+    const viewIdx = (function() {
+        if (isGenerating) {
+            const genIdx = stepStates.findIndex(st => st === 'current');
+            if (genIdx >= 0) { expandedStepIndex = genIdx; return genIdx; }
+        }
+        if (expandedStepIndex >= 0 && expandedStepIndex < stepsConfig.length) return expandedStepIndex;
+        const firstUndone = stepStates.findIndex(st => st !== 'done');
+        const idx = firstUndone >= 0 ? firstUndone : stepsConfig.length - 1;
+        expandedStepIndex = idx;
+        return idx;
+    })();
+
+    // v1.53: 渲染顶部水平 Stepper（取代手风琴堆叠）
+    const stepperEl = document.getElementById('stepStepper');
+    if (stepperEl) {
+        stepperEl.innerHTML = stepsConfig.map((ss, ii) => {
+            const st = stepStates[ii];
+            // v1.55: 当前查看步骤（viewIdx）显示 current 高亮（主题色+outline），其他按 stepStates 显示 done/waiting
+            const cls = ii === viewIdx ? 'current' : (st === 'done' ? 'done' : 'waiting');
+            const numContent = st === 'done' ? '<i class="fas fa-check"></i>' : (ii + 1);
+            const lineCls = st === 'done' ? 'done' : '';
+            const line = ii < stepsConfig.length - 1 ? `<span class="step-line ${lineCls}"></span>` : '';
+            return `<div class="step-node ${cls}" onclick="selectStep(${ii})" style="cursor:pointer" title="${escapeHtmlForStreaming(ss.name)}"><span class="sn-num">${numContent}</span><span>${escapeHtmlForStreaming(ss.name)}</span></div>${line}`;
+        }).join('');
+    }
+
+    // v1.53: 单步视图——仅渲染当前查看步骤
+    list.innerHTML = (() => {
+        const i = viewIdx;
+        const s = stepsConfig[i];
         const state = stepStates[i];
         const data = stepData[s.id];
         let contentHtml = '';
@@ -2300,25 +2330,71 @@ function renderSteps() {
         if (state === 'current' && isGenerating) {
             contentHtml = '<div class="step-skeleton"><div class="step-skeleton-line" style="width:90%"></div><div class="step-skeleton-line" style="width:70%"></div><div class="step-skeleton-line" style="width:80%"></div></div>';
         } else if (state === 'done' && data) {
-            // v1.48 链 G: 上方大文本框展示最新正式答案（可编辑），下方折叠展示优化问答历史
-            const latestAnswer = (data.items || []).join('\n');
-            contentHtml = `<textarea class="step-edit-textarea step-content-answer" id="stepAnswer_${i}" placeholder="正式答案...">${escapeHtmlForStreaming(latestAnswer)}</textarea>`;
+            // v1.53: done 状态按"子内容块"拆分为独立只读卡片展示
+            // 数据源 stepData[stepId].items 数组，每项一个子块；文本前缀"子块名："即子块标题
+            // 至少一项有冒号前缀→多块拆分；全部无冒号→单块（如事实认定沿用单块不拆，块名=步骤名）
+            const items = data.items || [];
+            const hasColonPrefix = items.some(it => typeof it === 'string' && it.indexOf('：') > 0);
+            if (hasColonPrefix) {
+                const blocksHtml = items.map((item, bIdx) => {
+                    let blockName = s.name;
+                    let blockText = item;
+                    const colonIdx = item.indexOf('：');
+                    if (colonIdx > 0) {
+                        blockName = item.substring(0, colonIdx);
+                        blockText = item.substring(colonIdx + 1);
+                    }
+                    return `
+                        <div class="step-block-card" id="stepBlock_${i}_${bIdx}">
+                            <div class="step-block-body" id="stepBlockBody_${i}_${bIdx}">
+                                <div class="step-block-name">${escapeHtmlForStreaming(blockName)}</div>
+                                <div class="step-block-text">${escapeHtmlForStreaming(blockText)}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                contentHtml = `<div class="step-blocks">${blocksHtml}</div>`;
+            } else {
+                // v1.59: 单块（事实认定等）不套卡片包装，直接展示纯文本（继承 .step-content-area 排版）
+                const singleText = items.join('\n');
+                contentHtml = `<div style="white-space:pre-wrap">${escapeHtmlForStreaming(singleText)}</div>`;
+            }
 
-            // 优化问答历史折叠展示（除最后一轮外），每条带回填+删除按钮
-            if (data.followUps && data.followUps.length > 1) {
-                const historyItems = data.followUps.slice(0, -1).map((f, idx) => `
+            // v1.61: 优化记录（含「优化前原始内容」回填入口；历史各轮回填恢复该轮结束时的完整内容）
+            if (data.followUps && data.followUps.length > 0 && data.originalItems) {
+                const originalPreview = (data.originalItems.join(' ') || '').replace(/\s+/g, ' ');
+                const originalEntry = `
+                    <div class="step-followup-item">
+                        <div class="step-followup-q"><i class="fas fa-file-alt"></i> 优化前原始内容</div>
+                        <div class="step-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForStreaming(originalPreview.length > 60 ? originalPreview.substring(0, 60) + '…' : originalPreview)}</div>
+                        <div class="step-followup-actions">
+                            <button class="step-action-btn" onclick="restoreStepOriginal(${i})"><i class="fas fa-undo"></i> 回填</button>
+                        </div>
+                    </div>
+                `;
+                const historyItems = data.followUps.slice(0, -1).map((f, idx) => {
+                    // v1.62: 该轮的"生成内容"展示=该轮优化前的块内容记录（而非 mock 答案文本）
+                    // 解析链：f.beforeItems（新数据）→ idx=0 用 originalItems → idx>0 用上一轮 appliedItems → 兜底 f.a
+                    let beforeArr = f.beforeItems;
+                    if (!beforeArr && idx === 0 && data.originalItems) beforeArr = data.originalItems;
+                    if (!beforeArr && idx > 0 && data.followUps[idx - 1] && data.followUps[idx - 1].appliedItems) beforeArr = data.followUps[idx - 1].appliedItems;
+                    const answerHtml = beforeArr
+                        ? `<div class="step-followup-a" style="white-space:pre-wrap"><i class="fas fa-comment-dots"></i> ${escapeHtmlForStreaming(beforeArr.map(it => { const t = (it || '').replace(/\s+/g, ' ').trim(); return '· ' + (t.length > 60 ? t.substring(0, 60) + '…' : t); }).join('\n'))}</div>`
+                        : `<div class="step-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForStreaming(f.a)}</div>`;
+                    return `
                     <div class="step-followup-item">
                         <div class="step-followup-q"><i class="fas fa-question-circle"></i> 第 ${idx + 1} 轮：${escapeHtmlForStreaming(f.q)}</div>
-                        <div class="step-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForStreaming(f.a)}</div>
+                        ${answerHtml}
                         <div class="step-followup-actions">
                             <button class="step-action-btn" onclick="backfillStepOptimization(${i}, ${idx})"><i class="fas fa-undo"></i> 回填</button>
                             <button class="step-action-btn danger" onclick="deleteStepOptimization(${i}, ${idx})"><i class="fas fa-trash-alt"></i> 删除</button>
                         </div>
                     </div>
-                `).join('');
+                `;}).join('');
                 contentHtml += `
                     <details class="step-optimization-history">
-                        <summary>优化历史（${data.followUps.length - 1} 轮）</summary>
+                        <summary>优化记录（已优化 ${data.followUps.length} 轮，可回填历史状态）</summary>
+                        ${originalEntry}
                         ${historyItems}
                     </details>
                 `;
@@ -2417,7 +2493,15 @@ function renderSteps() {
                 </div>
             </div>
         `;
-    }).join('');
+    })();
+
+    // v1.58: 恢复底部上一步/下一步导航（与 Stepper 节点点击双导航，提升可发现性）
+    const navEl = document.getElementById('stepNav');
+    if (navEl) {
+        const prev = viewIdx > 0 ? `<button class="step-nav-btn" onclick="selectStep(${viewIdx - 1})"><i class="fas fa-chevron-left"></i> 上一步</button>` : `<span></span>`;
+        const next = viewIdx < stepsConfig.length - 1 ? `<button class="step-nav-btn primary" onclick="selectStep(${viewIdx + 1})">下一步 <i class="fas fa-chevron-right"></i></button>` : `<span></span>`;
+        navEl.innerHTML = prev + next;
+    }
 
     updateStepGenerationButtons();
 }
@@ -2639,12 +2723,22 @@ function updateMaterialSelectorCount() {
     if (confirmBtn) confirmBtn.disabled = false;
 }
 
+// v1.53: Stepper 切换查看某一步（单步视图）
+function selectStep(index) {
+    if (index < 0 || index >= stepsConfig.length) return;
+    if (isGenerating) return;  // 生成中不允许切换，避免打断
+    expandedStepIndex = index;
+    renderSteps();
+    const el = document.getElementById('stepsList');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function toggleStep(index) {
     if (isGenerating) return;
     expandedStepIndex = index;
-    document.querySelectorAll('.step-accordion').forEach((el, i) => {
-        el.classList.toggle('expanded', i === index);
-    });
+    // v1.53: 单步视图下仅切换当前步折叠/展开
+    const el = document.getElementById(`step_${index}`);
+    if (el) el.classList.toggle('expanded');
 }
 
 async function generateSingleStep(stepIndex, options = {}) {
@@ -2795,25 +2889,26 @@ function generateStepContent(stepId, caseData, orgType, selectedMaterials) {
     const generators = {
         plaintiff: () => {
             if (cause.includes('借贷')) return [
-                '请求判令被告偿还借款本金及逾期利息',
-                '请求判令被告承担本案全部诉讼费用',
-                '请求查封被告名下相应价值财产'
+                `案件信息：${partyA} 诉 ${partyB} ${cause}一案，基本信息已录入系统。`,
+                `诉请内容：请求判令被告偿还借款本金及逾期利息，承担本案全部诉讼费用。`,
+                `诉请分析：借贷关系成立，本金及利息计算依据明确，诉请方向合理。`,
+                `证据分析：借条、转账记录等证据与诉请事实关联性强。`
             ];
             return [
-                `请求判令${partyB}承担相应法律责任`,
-                '请求判令被告承担本案诉讼费用',
-                '请求依法保护原告合法权益'
+                `案件信息：${partyA} 诉 ${partyB} ${cause || '纠纷'}一案，基本信息已录入系统。`,
+                `诉请内容：请求判令${partyB}承担相应法律责任，承担本案诉讼费用。`,
+                `诉请分析：原告诉请事实基础与法律依据初步分析，诉请方向明确。`,
+                `证据分析：原告提交的证据材料与诉请事实的关联性分析。`
             ];
         },
         defendant: () => [
-            '被告对部分事实不予认可，请求法院依法审查',
-            '被告主张已部分履行义务，请求扣减相应金额',
-            '被告因经济困难，请求分期履行或酌情减免'
+            '抗辩内容：被告对部分事实不予认可，请求法院依法审查。',
+            '抗辩分析：被告抗辩理由的事实与法律依据分析。',
+            '证据分析：被告提交的证据材料与抗辩主张的关联性分析。'
         ],
         dispute: () => [
-            '核心事实的认定及证据充分性',
-            '法律关系的性质及法律适用问题',
-            '责任承担方式及数额计算的合理性'
+            '争议焦点及分析：核心事实的认定及证据充分性、法律关系的性质及法律适用问题、责任承担方式及数额计算的合理性。',
+            '庭审调查建议：重点询问的事实问题、需审查的证据材料清单。'
         ],
         facts: () => [
             '经审理查明，当事人之间存在明确的法律关系',
@@ -2829,19 +2924,19 @@ function generateStepContent(stepId, caseData, orgType, selectedMaterials) {
         ],
         // 民终（二审）专属步骤
         originalReview: () => [
-            `原审诉请：${partyA} 诉 ${partyB} ${cause || '纠纷'}一案，原审原告提出相应诉讼请求`,
-            `原审查明事实：原审法院经审理认定了双方当事人的基本法律关系及主要事实`,
-            `原审法院认为：原审法院根据查明的事实和证据，对案件性质及责任承担作出认定，并据此作出原审判决`
+            `原审诉讼请求：${partyA} 诉 ${partyB} ${cause || '纠纷'}一案，原审原告提出相应诉讼请求。`,
+            `原审查明事实：原审法院经审理认定了双方当事人的基本法律关系及主要事实。`,
+            `原审法院认为：原审法院根据查明的事实和证据，对案件性质及责任承担作出认定，并据此作出原审判决。`
         ],
         appellant: () => [
-            '上诉人诉请内容：上诉人不服原审判决，请求二审法院依法改判或发回重审',
-            '上诉人诉请分析：上诉人认为原审在事实认定、法律适用或程序上存在错误',
-            '上诉人证据分析：上诉人提交了新证据或对原审证据提出新的质证意见'
+            '上诉人诉请内容：上诉人不服原审判决，请求二审法院依法改判或发回重审。',
+            '上诉人诉请分析：上诉人认为原审在事实认定、法律适用或程序上存在错误。',
+            '上诉人证据分析：上诉人提交了新证据或对原审证据提出新的质证意见。'
         ],
         appellee: () => [
-            '被上诉人抗辩内容：被上诉人认为原审判决认定事实清楚、适用法律正确，请求驳回上诉',
-            '被上诉人诉请分析：被上诉人对上诉人主张的事实及理由逐项予以反驳',
-            '被上诉人证据分析：被上诉人坚持原审证据的证明力，并对上诉人新证据的关联性提出异议'
+            '被上诉人抗辩内容：被上诉人认为原审判决认定事实清楚、适用法律正确，请求驳回上诉、维持原判。',
+            '被上诉人抗辩分析：被上诉人对上诉人主张的事实及理由逐项予以反驳。',
+            '被上诉人证据分析：被上诉人坚持原审证据的证明力，并对上诉人新证据的关联性提出异议。'
         ],
         // 检察院
         crimeFacts: () => [
@@ -3013,11 +3108,14 @@ function submitContentOptimize(index) {
     const q = input.value.trim();
     if (!stepData[stepId].followUps) stepData[stepId].followUps = [];
 
-    // 先保存文本框中的当前正式答案
-    const answerTa = document.getElementById(`stepAnswer_${index}`);
-    if (answerTa) {
-        stepData[stepId].items = answerTa.value.split('\n').filter(l => l.trim());
+    // v1.61: 首次优化前快照原始内容，供「优化前原始内容」回填（restoreStepOriginal）
+    if (stepData[stepId].followUps.length === 0) {
+        stepData[stepId].originalItems = [...(stepData[stepId].items && stepData[stepId].items.length ? stepData[stepId].items : [''])];
     }
+
+    // v1.53: 直接以 stepData[stepId].items 为数据源（done 状态不再常驻单一 stepAnswer textarea，
+    //         整步编辑由 editStep 写回 items；功能语义不变）
+    // （原从 DOM stepAnswer_${index} textarea 读取的逻辑已废弃）
 
     // 原型 mock：基于步骤类型返回模拟回答
     const stepName = stepsConfig[index].name || '';
@@ -3028,10 +3126,16 @@ function submitContentOptimize(index) {
     ];
     const a = mockAnswers[stepData[stepId].followUps.length % mockAnswers.length];
 
-    stepData[stepId].followUps.push({ q, a });
+    // v1.62: push 时快照该轮优化前的块内容（beforeItems），供优化记录展示"该轮优化前的块记录"
+    const oldItems = (Array.isArray(stepData[stepId].items) && stepData[stepId].items.length > 0)
+        ? [...stepData[stepId].items] : [''];
+    stepData[stepId].followUps.push({ q, a, beforeItems: oldItems });
 
-    // 优化后更新正式答案（模拟：将优化回答追加到 items）
-    stepData[stepId].items = [a];
+    // v1.65: 原型 mock 不改写正式内容（用户要求"已按「…」优化"提示不写入内容）
+    // 真实系统接入后：此处将 items 替换为流程返回的改写后全文（无痕迹行）；快照链照常记录该轮状态
+
+    // v1.61: 该轮优化应用后快照完整内容，供历史回填恢复该轮结束时的状态
+    stepData[stepId].followUps[stepData[stepId].followUps.length - 1].appliedItems = [...stepData[stepId].items];
 
     renderSteps();
     const el = document.getElementById(`step_${index}`);
@@ -3049,11 +3153,37 @@ function backfillStepOptimization(stepIndex, followUpIdx) {
     const data = stepData[stepId];
     if (!data || !data.followUps || followUpIdx >= data.followUps.length) return;
     const answer = data.followUps[followUpIdx].a;
-    stepData[stepId].items = [answer];
+    // v1.61: 回填=恢复该轮结束时的完整内容快照（v1.60 的追加写法会把已应用过的答案重复追加一遍）
+    if (data.followUps[followUpIdx].appliedItems) {
+        stepData[stepId].items = [...data.followUps[followUpIdx].appliedItems];
+    } else {
+        // 兜底（无快照的旧数据）：沿用 v1.60 追加逻辑
+        const oldItems = (Array.isArray(stepData[stepId].items) && stepData[stepId].items.length > 0)
+            ? stepData[stepId].items : [''];
+        stepData[stepId].items = oldItems.map((it, idx) => {
+            const isLast = idx === oldItems.length - 1;
+            const colonIdx = it.indexOf('：');
+            const prefix = colonIdx > 0 ? it.substring(0, colonIdx + 1) : '';
+            const body = colonIdx > 0 ? it.substring(colonIdx + 1) : it;
+            return prefix + (isLast ? (body ? body + '\n' : '') + answer : body);
+        });
+    }
     renderSteps();
     const el = document.getElementById(`step_${stepIndex}`);
     if (el) el.classList.add('expanded');
     showNotification('已回填第 ' + (followUpIdx + 1) + ' 轮优化答案', 'success');
+}
+
+// v1.61: 回填优化前的原始内容（首次优化前的快照）
+function restoreStepOriginal(stepIndex) {
+    const stepId = stepsConfig[stepIndex].id;
+    const data = stepData[stepId];
+    if (!data || !data.originalItems) return;
+    data.items = [...data.originalItems];
+    renderSteps();
+    const el = document.getElementById(`step_${stepIndex}`);
+    if (el) el.classList.add('expanded');
+    showNotification('已恢复优化前的原始内容', 'success');
 }
 
 // v1.48 链 G: 删除优化历史记录
@@ -4710,20 +4840,36 @@ function renderElementsGroup(title, items, source) {
             const optimizeCount = followUps.length;
             const optimizeDisabled = optimizeCount >= 3 ? 'disabled title="已达到最大优化轮次（3 轮）"' : '';
             const optimizeLabel = optimizeCount > 0 ? `内容优化（${optimizeCount}/3）` : '内容优化';
-            // v1.48 链 G: 优化历史折叠展示（除最后一轮外），每条带回填+删除按钮
-            const followUpsHtml = followUps.length > 1
+            // v1.63: 优化记录（与分步生成 v1.61/v1.62 逻辑一致）——置顶「优化前原始内容」可回填；
+            // 每轮下行展示该轮优化前内容（beforeAnswer → 上一轮 appliedAnswer → 兜底 f.a）
+            const pv = s => { const t = (s || '').replace(/\s+/g, ' ').trim(); return t.length > 60 ? t.substring(0, 60) + '…' : t; };
+            const origAnswer = (followUps.length > 0 && followUps[0].beforeAnswer != null) ? followUps[0].beforeAnswer : null;
+            const followUpsHtml = origAnswer != null
                 ? `<details class="case-elements-optimization-history">
-                    <summary>优化历史（${followUps.length - 1} 轮）</summary>
-                    ${followUps.slice(0, -1).map((f, idx) => `
+                    <summary>优化记录（已优化 ${followUps.length} 轮，可回填历史状态）</summary>
+                    <div class="case-elements-followup-item">
+                        <div class="case-elements-followup-q"><i class="fas fa-file-alt"></i> 优化前原始内容</div>
+                        <div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(pv(origAnswer))}</div>
+                        <div class="case-elements-followup-actions">
+                            <button type="button" class="case-elements-item-edit-btn" onclick="restoreElementOriginal('${escapeJsString(p.name)}')"><i class="fas fa-undo"></i> 回填</button>
+                        </div>
+                    </div>
+                    ${followUps.slice(0, -1).map((f, idx) => {
+                        let before = f.beforeAnswer;
+                        if (before == null && idx > 0 && followUps[idx - 1].appliedAnswer != null) before = followUps[idx - 1].appliedAnswer;
+                        const aHtml = before != null
+                            ? `<div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(pv(before))}</div>`
+                            : `<div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(f.a)}</div>`;
+                        return `
                         <div class="case-elements-followup-item">
                             <div class="case-elements-followup-q"><i class="fas fa-question-circle"></i> 第 ${idx + 1} 轮：${escapeHtmlForElements(f.q)}</div>
-                            <div class="case-elements-followup-a"><i class="fas fa-comment-dots"></i> ${escapeHtmlForElements(f.a)}</div>
+                            ${aHtml}
                             <div class="case-elements-followup-actions">
                                 <button type="button" class="case-elements-item-edit-btn" onclick="backfillElementOptimization('${escapeJsString(p.name)}', ${idx})"><i class="fas fa-undo"></i> 回填</button>
                                 <button type="button" class="case-elements-item-edit-btn" onclick="deleteElementOptimization('${escapeJsString(p.name)}', ${idx})"><i class="fas fa-trash-alt"></i> 删除</button>
                             </div>
                         </div>
-                    `).join('')}
+                    `;}).join('')}
                 </details>`
                 : '';
             answerHtml = `<div class="case-elements-item-answer">
@@ -4898,10 +5044,14 @@ function submitElementOptimize(name) {
         `经进一步检索，建议结合相关证据链对「${name}」的结论予以强化。`
     ];
     const a = mockAnswers[caseElementsFollowUps[name].length % mockAnswers.length];
-    caseElementsFollowUps[name].push({ q, a });
+    // v1.63: push 时快照该轮优化前的答案（beforeAnswer），供优化记录展示与「优化前原始内容」回填
+    const before = caseElementsAnswers[name] || '';
+    caseElementsFollowUps[name].push({ q, a, beforeAnswer: before });
 
-    // 优化后更新正式答案（模拟：用优化回答覆盖原答案）
-    caseElementsAnswers[name] = a;
+    // v1.65: 原型 mock 不改写正式答案（优化痕迹不写入内容，与分步生成一致）
+    // 真实系统接入后：此处将答案替换为流程返回的改写后全文；mock 回答 a 仅留存于优化记录
+    // v1.63: 该轮优化应用后快照完整答案（appliedAnswer），供历史回填恢复该轮结束时状态
+    caseElementsFollowUps[name][caseElementsFollowUps[name].length - 1].appliedAnswer = caseElementsAnswers[name];
     saveElementAnswers(caseItem.id, caseElementsAnswers);
     saveElementFollowUps(caseItem.id, caseElementsFollowUps);
     renderElementsList();
@@ -4917,11 +5067,23 @@ function backfillElementOptimization(name, followUpIdx) {
     if (!caseItem) return;
     const followUps = caseElementsFollowUps[name] || [];
     if (followUpIdx >= followUps.length) return;
-    const answer = followUps[followUpIdx].a;
-    caseElementsAnswers[name] = answer;
+    // v1.63: 回填=恢复该轮结束时的完整答案快照（与分步生成 v1.61 逻辑一致）；无快照旧数据兜底用 f.a
+    const fu = followUps[followUpIdx];
+    caseElementsAnswers[name] = (fu.appliedAnswer != null) ? fu.appliedAnswer : fu.a;
     saveElementAnswers(caseItem.id, caseElementsAnswers);
     renderElementsList();
     showNotification('已回填第 ' + (followUpIdx + 1) + ' 轮优化答案', 'success');
+}
+
+// v1.63: 回填要件优化前的原始答案（首轮优化前快照，取自 followUps[0].beforeAnswer）
+function restoreElementOriginal(name) {
+    if (!caseItem) return;
+    const followUps = caseElementsFollowUps[name] || [];
+    if (!followUps.length || followUps[0].beforeAnswer == null) return;
+    caseElementsAnswers[name] = followUps[0].beforeAnswer;
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    renderElementsList();
+    showNotification('已恢复优化前的原始内容', 'success');
 }
 
 // v1.48 链 G: 删除要件优化历史记录
