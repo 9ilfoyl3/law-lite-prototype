@@ -58,7 +58,7 @@
 <body>
 <div class="widget-card">
   <div class="widget-title">文书精修闭环图（V1.1）</div>
-  <div class="widget-sub">独立页 document-polish.html 对话式精修；左文书展示 + 右对话面板；每轮修改保存为新版本不覆盖原文；撤销=撤回上一步精修</div>
+  <div class="widget-sub">独立页 document-polish.html 对话式精修；左文书编辑器（工具栏含保存/下载）+ 右对话面板；首次保存新增精修版，本会话后续保存覆盖当前精修版；回退用编辑器撤销/重做</div>
   <div class="svg-wrap">
   <svg viewBox="0 0 1080 780" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -125,14 +125,14 @@
       <rect x="80" y="328" width="680" height="74" rx="6" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
       <text x="92" y="348" fill="#1f2937" font-size="12" font-weight="500">左侧 · 文书内容展示区</text>
       <text x="92" y="366" fill="#6b7280" font-size="11">渲染原始文书内容 / 精修指令实时叠加展示</text>
-      <text x="92" y="382" fill="#6b7280" font-size="11">「保存为新版本」后更新为新版内容</text>
-      <text x="92" y="396" fill="#d4a017" font-size="11">未保存前可「撤销」回退上一步精修</text>
+      <text x="92" y="382" fill="#6b7280" font-size="11">编辑器工具栏「保存」「下载」；保存后更新为新版内容</text>
+      <text x="92" y="396" fill="#d4a017" font-size="11">回退用编辑器撤销/重做（Ctrl+Z / Ctrl+Y）</text>
 
       <!-- 右侧：对话式精修面板 -->
       <rect x="772" y="328" width="228" height="74" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
       <text x="886" y="348" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="500">右侧 · 对话精修面板</text>
       <text x="886" y="366" text-anchor="middle" fill="#6b7280" font-size="11">多轮对话指令输入 / 历史</text>
-      <text x="886" y="382" text-anchor="middle" fill="#6b7280" font-size="11">「发送」「撤销」「保存为新版本」</text>
+      <text x="886" y="382" text-anchor="middle" fill="#6b7280" font-size="11">「发送」+ 修改建议「确认/撤销修订」</text>
       <text x="886" y="396" text-anchor="middle" fill="#6b7280" font-size="11">结合文书内容调用系统</text>
     </g>
 
@@ -167,8 +167,8 @@
 
     <g>
       <rect x="320" y="690" width="440" height="56" rx="8" fill="#f0edff" stroke="#6d5ce7" stroke-width="2"/>
-      <text x="540" y="713" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">④ 用户点击「保存为新版本」</text>
-      <text x="540" y="731" text-anchor="middle" fill="#6b7280" font-size="11">type='polish' · polishedFrom=原版本 · 追加到版本列表</text>
+      <text x="540" y="713" text-anchor="middle" fill="#1f2937" font-size="13" font-weight="500">④ 用户点击工具栏「保存」</text>
+      <text x="540" y="731" text-anchor="middle" fill="#6b7280" font-size="11">首次：type='polish' 追加精修版；本会话后续：覆盖当前精修版</text>
     </g>
 
     <!-- 循环回环：继续修改下一轮 -->
@@ -179,7 +179,7 @@
     <!-- 撤销回环：回到上一步精修 -->
     <path d="M 320 718 L 200 718 L 200 467 L 380 467" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowInfo)"/>
     <rect x="148" y="585" width="104" height="22" rx="11" fill="#ffffff" stroke="#2563eb"/>
-    <text x="200" y="600" text-anchor="middle" fill="#2563eb" font-size="11">撤销回上一步精修</text>
+    <text x="200" y="600" text-anchor="middle" fill="#2563eb" font-size="11">撤销修订/回退</text>
 
     <!-- 异常分支：workflow 失败 -->
     <path d="M 540 580 L 540 588 L 60 588 L 60 690" stroke="#d4a017" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowWarn)"/>
@@ -195,7 +195,7 @@
 
     <g>
       <rect x="80" y="760" width="920" height="28" rx="8" fill="#6d5ce7" stroke="#6d5ce7"/>
-      <text x="220" y="779" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">① 保存当前精修结果为新版本</text>
+      <text x="220" y="779" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">① 保存当前精修结果为精修版</text>
       <text x="540" y="779" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">② 关闭标签页</text>
       <text x="860" y="779" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">③ 原页面文书徽章数 +1</text>
     </g>

@@ -1,7 +1,8 @@
 // ============ 文书精修页面 ============
 // v1.2 精修独立页面：左侧文书内容展示区 + 右侧对话式精修区
 // 通过 URL 参数 caseId + versionId 加载对应版本
-// 精修结果保存为新版本（type='polish'），不覆盖原版本
+// v1.3 保存策略对齐案件详情页：首次保存新增精修版（type='polish'），本会话内后续保存覆盖当前精修版，不反复加版本
+// v1.3 编辑器工具栏追加【保存】+【下载】按钮，与案件详情页体验统一
 // v1.2 上下文区改为三卡片（文书来源/知识库/结构化数据）
 // v1.2 右侧对话改为结构化修改建议（分析过程 + 修改建议卡片）
 // v1.2 支持上传文书进入精修（无案件模式，按钮暂隐藏）
@@ -11,6 +12,7 @@ let polishVersionId = '';
 let polishCaseItem = null;
 let polishVersion = null;
 let polishDoc = null;
+let polishSavedVersionId = ''; // 本会话首次保存产生的精修版 ID（后续保存覆盖该版本；刷新页面后重置）
 let originalContent = '';      // 原始文书内容（用于撤销）
 let currentContent = '';       // 当前文书内容
 let editHistory = [];          // 精修历史（用于多步撤销）
@@ -141,6 +143,8 @@ function initDocEditor(content) {
                 hasUnsavedChanges = true;
                 document.getElementById('editHint').textContent = '有未保存的精修改动';
             }
+            // 用户手动编辑可能导致建议锚点失效/恢复，重校验全部卡片（v1.70）
+            refreshAllReviewCardsState();
         }
     });
 
@@ -172,6 +176,33 @@ function initDocEditor(content) {
 
     // 法条链接：Ctrl+点击跳转 + 右键菜单
     bindLawRefLinkEvents(paper);
+
+    // v1.3: 编辑器工具栏追加【保存】+【下载】按钮，与案件详情页体验统一
+    // 上传文书模式（无案件）不可保存，仅追加【下载】
+    if (docEditor.toolbar) {
+        const sep = document.createElement('div');
+        sep.className = 'doc-editor-toolbar-sep';
+
+        const makeBtn = (id, title, icon, label, onClick) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'doc-editor-toolbar-btn polish-editor-action-btn';
+            btn.id = id;
+            btn.title = title;
+            btn.innerHTML = `<i class="fas ${icon}"></i><span class="btn-label">${label}</span>`;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                onClick();
+            });
+            return btn;
+        };
+
+        docEditor.toolbar.appendChild(sep);
+        if (!isUploadMode && polishCaseItem) {
+            docEditor.toolbar.appendChild(makeBtn('polishEditorSaveBtn', '保存精修结果', 'fa-save', '保存', saveAsNewVersion));
+        }
+        docEditor.toolbar.appendChild(makeBtn('polishEditorDownloadBtn', '下载文书', 'fa-download', '下载', downloadDocumentFile));
+    }
 }
 
 // 渲染上下文信息（v1.50 起 UI 不再展示三卡片，上下文数据仍在 JS 内部读取供精修使用）
@@ -274,7 +305,6 @@ function showError(msg) {
     const root = document.getElementById('docEditorRoot');
     if (root) root.innerHTML = `<p style="color:#dc2626;text-align:center;padding:40px;">${msg}</p>`;
     document.getElementById('sendBtn').disabled = true;
-    document.getElementById('saveBtn').disabled = true;
 }
 
 // ===== AI 改写：浮动工具条 =====
@@ -595,6 +625,8 @@ function replaceAiRewriteOriginal() {
         const newRange = docEditor.getSelectionRange();
         if (newRange) docEditor.flashRange(newRange, 800);
         markUnsaved();
+        // 替换原文后建议锚点可能失效，重校验（v1.70）
+        refreshAllReviewCardsState();
         showNotification('已替换原文并保留格式', 'success');
         hideAiRewriteCard();
     } else {
@@ -604,7 +636,9 @@ function replaceAiRewriteOriginal() {
 
 function saveEditHistory() {
     editHistory.push(currentContent);
-    document.getElementById('undoBtn').disabled = false;
+    // v1.50 已移除 header 撤销按钮，元素可能不存在，判空跳过
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) undoBtn.disabled = false;
 }
 
 function markUnsaved() {
@@ -765,7 +799,7 @@ function renderReviewList(msgId, reviews) {
             <span class="review-list-title">修改建议（${count} 项）</span>
             <div class="review-list-actions">
                 <button class="review-list-action-btn primary" onclick="applyAllReviews('${msgId}')" id="applyAllBtn-${msgId}">
-                    <i class="fas fa-check-double"></i> 全部插入
+                    <i class="fas fa-check-double"></i> 全部确认
                 </button>
                 <button class="review-list-action-btn" onclick="undoAllReviews('${msgId}')" id="undoAllBtn-${msgId}" disabled>
                     <i class="fas fa-undo"></i> 全部撤销
@@ -798,6 +832,8 @@ function streamReviewCards(msgId, reviews) {
         card.id = `reviewCard-${msgId}-${review.id}`;
         card.innerHTML = renderReviewCardHtml(msgId, review, cardIndex + 1);
         listEl.appendChild(card);
+        // 渲染即校验锚点：失效时置灰【定位原文】/【确认】并显示"原文已变化"标签
+        updateReviewCardStatus(msgId, review.id);
         const container = document.getElementById('chatMessages');
         container.scrollTop = container.scrollHeight;
         cardIndex++;
@@ -813,6 +849,7 @@ function renderReviewCardHtml(msgId, review, index) {
             <span>${index}. ${escapeHtml(review.title)}</span>
             <span class="review-card-status applied" id="status-${msgId}-${review.id}" style="display:none;">已应用</span>
             <span class="review-card-status ignored" id="ignoredStatus-${msgId}-${review.id}" style="display:none;">已忽略</span>
+            <span class="review-card-status anchor-lost" id="anchorLostStatus-${msgId}-${review.id}" style="display:none;" title="原文位置已变化：手动编辑或其他修改替换了锚点段落，本条建议暂无法应用；撤销相关修改后可自动恢复">原文已变化</span>
         </div>
         <div class="review-card-section">
             <div class="review-card-label">风险概述</div>
@@ -843,7 +880,7 @@ function renderReviewCardHtml(msgId, review, index) {
                 <i class="fas fa-times"></i> 忽略
             </button>
             <button class="review-card-action-btn primary" onclick="applyReview('${msgId}', '${review.id}')" id="applyBtn-${msgId}-${review.id}">
-                <i class="fas fa-check"></i> 插入
+                <i class="fas fa-check"></i> 确认
             </button>
         </div>
     `;
@@ -879,13 +916,21 @@ function toggleAnalysis(msgId) {
 
 // ===== 修改建议用户操作 =====
 
-// 单点插入
+// 单点确认（应用单条修改）
 function applyReview(msgId, reviewId) {
     const msgState = reviewMessages[msgId];
     if (!msgState) return;
     const review = msgState.reviews.find(r => r.id === reviewId);
     if (!review || review.applied || review.ignored) return;
     if (!docEditor) { showNotification('编辑器未就绪', 'error'); return; }
+
+    // 先校验原文锚点：失效则拦截，不再提供光标插入兜底（v1.70）
+    const range = docEditor.findText(review.originalAnchor);
+    if (!range) {
+        showNotification('原文位置已变化，无法应用本条建议', 'error');
+        updateReviewCardStatus(msgId, reviewId);
+        return;
+    }
 
     // 记录快照（首次 apply 时）
     if (!msgState.snapshotBeforeApply) {
@@ -895,69 +940,60 @@ function applyReview(msgId, reviewId) {
     // 保存到全局撤销栈
     saveEditHistory();
 
-    // 查找原文锚点
-    const range = docEditor.findText(review.originalAnchor);
-    if (range) {
-        // 替换原文
-        const ok = docEditor.replaceTextPreserveFormat(range, review.cleanText);
-        if (ok) {
-            // 高亮
-            const newRange = docEditor.findText(review.cleanText.substring(0, 20));
-            if (newRange) docEditor.flashRange(newRange, 800);
-        }
-    } else {
-        // 找不到原文，fallback 到光标处插入
-        docEditor.insertTextAtCursor(review.cleanText);
-        showNotification('原文位置已变化，已插入到光标处', 'info');
+    // 替换原文
+    const ok = docEditor.replaceTextPreserveFormat(range, review.cleanText);
+    if (ok) {
+        // 高亮
+        const newRange = docEditor.findText(review.cleanText.substring(0, 20));
+        if (newRange) docEditor.flashRange(newRange, 800);
     }
 
     // 更新状态
     review.applied = true;
     msgState.appliedReviewIds.push(reviewId);
     updateReviewCardStatus(msgId, reviewId);
+    // 应用后正文变化，其他建议卡片锚点可能失效，统一重校验
+    refreshAllReviewCardsState();
     markUnsaved();
     updateReviewListBatchButtons(msgId);
 }
 
-// 全部插入
+// 全部确认（应用所有可定位的修改）
 function applyAllReviews(msgId) {
     const msgState = reviewMessages[msgId];
     if (!msgState) return;
     let success = 0;
-    let failed = 0;
+    let skipped = 0;
     msgState.reviews.forEach(review => {
         if (review.applied || review.ignored) return;
         if (!docEditor) return;
+
+        // 锚点失效的条目直接跳过，不插入到光标处（v1.70）
+        const range = docEditor.findText(review.originalAnchor);
+        if (!range) { skipped++; return; }
 
         if (!msgState.snapshotBeforeApply) {
             msgState.snapshotBeforeApply = docEditor.getContent();
         }
         saveEditHistory();
 
-        const range = docEditor.findText(review.originalAnchor);
-        if (range) {
-            const ok = docEditor.replaceTextPreserveFormat(range, review.cleanText);
-            if (ok) {
-                review.applied = true;
-                msgState.appliedReviewIds.push(review.id);
-                updateReviewCardStatus(msgId, review.id);
-                success++;
-            } else { failed++; }
-        } else {
-            docEditor.insertTextAtCursor(review.cleanText);
+        const ok = docEditor.replaceTextPreserveFormat(range, review.cleanText);
+        if (ok) {
             review.applied = true;
             msgState.appliedReviewIds.push(review.id);
             updateReviewCardStatus(msgId, review.id);
-            failed++;
+            success++;
         }
     });
 
+    // 正文变化后统一重校验（被跳过的条目即时显示"原文已变化"状态）
+    refreshAllReviewCardsState();
     markUnsaved();
     updateReviewListBatchButtons(msgId);
-    if (failed > 0) {
-        showNotification(`${success} 项成功插入，${failed} 项因原文变化已插入到光标处`, 'info');
+    if (skipped > 0) {
+        showNotification(`${success} 项已应用，${skipped} 项原文位置已变化已跳过`, 'info');
     } else {
-        showNotification(`已插入 ${success} 项修改`, 'success');
+        showNotification(`已应用 ${success} 项修改`, 'success');
     }
 }
 
@@ -981,15 +1017,13 @@ function undoReview(msgId, reviewId) {
     if (idx >= 0) msgState.appliedReviewIds.splice(idx, 1);
     review.applied = false;
 
-    // 重新应用其他已应用的 review
+    // 重新应用其他已应用的 review（锚点失效的直接跳过，v1.70）
     msgState.appliedReviewIds.forEach(rid => {
         const r = msgState.reviews.find(x => x.id === rid);
         if (r) {
             const range = docEditor.findText(r.originalAnchor);
             if (range) {
                 docEditor.replaceTextPreserveFormat(range, r.cleanText);
-            } else {
-                docEditor.insertTextAtCursor(r.cleanText);
             }
         }
     });
@@ -999,7 +1033,8 @@ function undoReview(msgId, reviewId) {
         msgState.snapshotBeforeApply = null;
     }
 
-    updateReviewCardStatus(msgId, reviewId);
+    // 快照恢复后正文变化，重校验该条消息全部卡片锚点
+    msgState.reviews.forEach(r => updateReviewCardStatus(msgId, r.id));
     updateReviewListBatchButtons(msgId);
     showNotification('已撤销该修订', 'success');
 }
@@ -1067,8 +1102,9 @@ function updateReviewCardStatus(msgId, reviewId) {
     const locateBtn = document.getElementById(`locateBtn-${msgId}-${reviewId}`);
     const statusEl = document.getElementById(`status-${msgId}-${reviewId}`);
     const ignoredStatusEl = document.getElementById(`ignoredStatus-${msgId}-${reviewId}`);
+    const anchorLostEl = document.getElementById(`anchorLostStatus-${msgId}-${reviewId}`);
 
-    card.classList.remove('applied', 'ignored');
+    card.classList.remove('applied', 'ignored', 'anchor-lost');
 
     if (review.applied) {
         card.classList.add('applied');
@@ -1077,6 +1113,7 @@ function updateReviewCardStatus(msgId, reviewId) {
         if (ignoreBtn) ignoreBtn.disabled = true;
         if (statusEl) statusEl.style.display = 'inline-block';
         if (ignoredStatusEl) ignoredStatusEl.style.display = 'none';
+        if (anchorLostEl) anchorLostEl.style.display = 'none';
     } else if (review.ignored) {
         card.classList.add('ignored');
         if (applyBtn) applyBtn.disabled = true;
@@ -1084,12 +1121,20 @@ function updateReviewCardStatus(msgId, reviewId) {
         if (ignoreBtn) ignoreBtn.disabled = true;
         if (statusEl) statusEl.style.display = 'none';
         if (ignoredStatusEl) ignoredStatusEl.style.display = 'inline-block';
+        if (anchorLostEl) anchorLostEl.style.display = 'none';
     } else {
-        if (applyBtn) applyBtn.disabled = false;
+        // 原文锚点实时校验：失效时【确认】置灰 + 黄色"原文已变化"标签（v1.70）
+        const anchorOk = docEditor ? !!docEditor.findText(review.originalAnchor) : true;
+        if (applyBtn) {
+            applyBtn.disabled = !anchorOk;
+            applyBtn.title = anchorOk ? '应用本条修改到原文' : '原文位置已变化，无法应用本条建议';
+        }
         if (undoBtn) undoBtn.disabled = true;
         if (ignoreBtn) ignoreBtn.disabled = false;
         if (statusEl) statusEl.style.display = 'none';
         if (ignoredStatusEl) ignoredStatusEl.style.display = 'none';
+        if (anchorLostEl) anchorLostEl.style.display = anchorOk ? 'none' : 'inline-block';
+        if (!anchorOk) card.classList.add('anchor-lost');
     }
 
     // 定位原文按钮：实时校验
@@ -1112,6 +1157,15 @@ function updateReviewListBatchButtons(msgId) {
     if (undoAllBtn) undoAllBtn.disabled = !hasApplied;
 }
 
+// 重校验全部修改建议卡片的锚点状态（正文变化后调用，v1.70）
+function refreshAllReviewCardsState() {
+    Object.keys(reviewMessages).forEach(msgId => {
+        const msgState = reviewMessages[msgId];
+        if (!msgState || !msgState.reviews) return;
+        msgState.reviews.forEach(r => updateReviewCardStatus(msgId, r.id));
+    });
+}
+
 // ===== 模拟审查消息生成（原型演示） =====
 function mockReviewMessage(instruction) {
     if (/重写|改写/.test(instruction)) return mockRewriteTemplate(instruction);
@@ -1120,7 +1174,40 @@ function mockReviewMessage(instruction) {
     return mockGenericTemplate(instruction);
 }
 
+// 从编辑器正文挑选真实存在的句子作为原文锚点（v1.70：保证锚点可定位可应用）
+// 优先取包含关键词的句子；未命中取最长的一句；excludes 中的句子不再复用（多条建议锚点互不重复）
+// 实现要点：直接遍历 DOM 文本节点取句（而非 innerText 拼接），句子必为该节点子串，
+// 避免句子跨越 <strong> 等内联标签边界导致 findText（按单文本节点匹配）永远定位失败
+function pickDocAnchorSentence(keyword, excludes) {
+    if (!docEditor || !docEditor.paper) return null;
+    const used = excludes || [];
+    const sentences = [];
+    const walker = document.createTreeWalker(docEditor.paper, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while ((node = walker.nextNode())) {
+        String(node.textContent || '').split(/[。；\n]/).forEach(seg => {
+            const t = seg.trim();
+            if (t.length >= 10 && used.indexOf(t) < 0) sentences.push(t);
+        });
+    }
+    if (!sentences.length) return null;
+    if (keyword) {
+        const hit = sentences.find(s => s.includes(keyword));
+        if (hit) return hit;
+    }
+    return sentences.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
 function mockRewriteTemplate(instruction) {
+    // 锚点取自文书正文真实句子，保证可定位（v1.70）
+    const used = [];
+    const s1 = pickDocAnchorSentence('本院认为', used);
+    if (s1) used.push(s1);
+    const s2 = pickDocAnchorSentence('判决如下', used) || pickDocAnchorSentence('返还', used);
+    const base1 = s1 ? s1.replace(/[。：；]$/, '') : null;
+    const base2 = s2 ? s2.replace(/[。：；]$/, '') : null;
+    const add1 = '上述认定依照《中华人民共和国民法典》第六百七十九条之规定，结合已查明事实与在案证据，本院依法予以确认。';
+    const add2 = '，于本判决生效之日起十日内履行完毕。';
     return {
         type: 'review',
         analysis: [
@@ -1130,7 +1217,17 @@ function mockRewriteTemplate(instruction) {
             { title: '起草与完善', content: '基于案件材料与要件清单，生成 2 处修改建议，重点补充法律依据与说理逻辑。' }
         ],
         reviews: [
-            {
+            s1 ? {
+                id: 'r1',
+                title: '本院认为部分缺少法律依据',
+                risk: '原文"本院认为"段落仅陈述事实，未引用具体法条，说理不充分，可能影响文书说服力。',
+                solution: '补充《中华人民共和国民法典》第六百七十九条引用，增强说理逻辑。',
+                originalAnchor: s1,
+                revisedText: `${escapeHtml(base1)}。<ins>${add1}</ins>`,
+                cleanText: `${base1}。${add1}`,
+                applied: false,
+                ignored: false
+            } : {
                 id: 'r1',
                 title: '本院认为部分缺少法律依据',
                 risk: '原文"本院认为"段落仅陈述事实，未引用具体法条，说理不充分，可能影响文书说服力。',
@@ -1141,7 +1238,17 @@ function mockRewriteTemplate(instruction) {
                 applied: false,
                 ignored: false
             },
-            {
+            s2 ? {
+                id: 'r2',
+                title: '裁判主文表述不够规范',
+                risk: '原裁判主文未明确履行期限，可能导致执行困难。',
+                solution: '补充履行期限表述，明确"于本判决生效之日起十日内"。',
+                originalAnchor: s2,
+                revisedText: `${escapeHtml(base2)}<ins>${add2}</ins>`,
+                cleanText: `${base2}${add2}`,
+                applied: false,
+                ignored: false
+            } : {
                 id: 'r2',
                 title: '裁判主文表述不够规范',
                 risk: '原裁判主文未明确履行期限，可能导致执行困难。',
@@ -1157,15 +1264,30 @@ function mockRewriteTemplate(instruction) {
 }
 
 function mockFormatTemplate(instruction) {
+    // 锚点取自文书正文真实句子，保证可定位（v1.70）
+    const used = [];
+    const s1 = pickDocAnchorSentence(null, used);
+    if (s1) used.push(s1);
+    const s2 = pickDocAnchorSentence(null, used);
     return {
         type: 'review',
         analysis: [
             { title: '读取文书结构', content: '已读取文书全文，识别段落结构、标题层级与编号。' },
             { title: '识别格式异常', content: `按指令"${instruction}"检查，发现 2 处格式问题。` },
-            { title: '生成格式修正建议', content: '针对段落缩进、编号不规范等问题生成修正建议。' }
+            { title: '生成格式修正建议', content: '针对段落缩进、句末标点不规范等问题生成修正建议。' }
         ],
         reviews: [
-            {
+            s1 ? {
+                id: 'r1',
+                title: '段落首行缩进不规范',
+                risk: '该段落未设置首行缩进，不符合法律文书格式规范。',
+                solution: '为该段落添加首行缩进 2 字符。',
+                originalAnchor: s1,
+                revisedText: `<ins>　　</ins>${escapeHtml(s1)}`,
+                cleanText: `　　${s1}`,
+                applied: false,
+                ignored: false
+            } : {
                 id: 'r1',
                 title: '首段缩进不规范',
                 risk: '文书首段未设置首行缩进，不符合法律文书格式规范。',
@@ -1176,7 +1298,17 @@ function mockFormatTemplate(instruction) {
                 applied: false,
                 ignored: false
             },
-            {
+            s2 ? {
+                id: 'r2',
+                title: '语句缺少句末标点',
+                risk: '该语句结尾无标点符号，不符合文书排版规范。',
+                solution: '为该句补全句末句号。',
+                originalAnchor: s2,
+                revisedText: `${escapeHtml(s2)}<ins>。</ins>`,
+                cleanText: `${s2}。`,
+                applied: false,
+                ignored: false
+            } : {
                 id: 'r2',
                 title: '条款编号不连续',
                 risk: '文书第3条后直接跳到第5条，编号不连续。',
@@ -1192,6 +1324,9 @@ function mockFormatTemplate(instruction) {
 }
 
 function mockSupplementTemplate(instruction) {
+    // 锚点取自文书正文真实句子，保证可定位（v1.70）
+    const s1 = pickDocAnchorSentence('经审理查明');
+    const add = '（有原告提交的银行转账凭证在卷佐证，足以认定上述事实）。';
     return {
         type: 'review',
         analysis: [
@@ -1200,7 +1335,17 @@ function mockSupplementTemplate(instruction) {
             { title: '生成补充内容', content: '基于检索结果生成 1 处补充建议。' }
         ],
         reviews: [
-            {
+            s1 ? {
+                id: 'r1',
+                title: '事实认定部分缺少证据佐证',
+                risk: '事实认定段落仅陈述事实，未列明对应证据，可能影响事实认定的客观性。',
+                solution: '补充证据编号与证明内容。',
+                originalAnchor: s1,
+                revisedText: `${escapeHtml(s1)}<ins>${add}</ins>`,
+                cleanText: `${s1}${add}`,
+                applied: false,
+                ignored: false
+            } : {
                 id: 'r1',
                 title: '事实认定部分缺少证据佐证',
                 risk: '事实认定段落仅陈述事实，未列明对应证据，可能影响事实认定的客观性。',
@@ -1216,6 +1361,9 @@ function mockSupplementTemplate(instruction) {
 }
 
 function mockGenericTemplate(instruction) {
+    // 锚点取自文书正文真实句子，保证可定位（v1.70）
+    const s1 = pickDocAnchorSentence(null);
+    const add = '（本院予以确认）。';
     return {
         type: 'review',
         analysis: [
@@ -1224,7 +1372,17 @@ function mockGenericTemplate(instruction) {
             { title: '生成修改建议', content: '生成 1 处通用修改建议。' }
         ],
         reviews: [
-            {
+            s1 ? {
+                id: 'r1',
+                title: '事实表述缺少认定结论',
+                risk: '该处仅陈述事实，未给出法院认定结论，表述完整性可进一步提升。',
+                solution: '在句末补充"（本院予以确认）"的认定表述。',
+                originalAnchor: s1,
+                revisedText: `${escapeHtml(s1)}<ins>${add}</ins>`,
+                cleanText: `${s1}${add}`,
+                applied: false,
+                ignored: false
+            } : {
                 id: 'r1',
                 title: '文书表述可进一步优化',
                 risk: '部分表述口语化，不符合法律文书规范用语。',
@@ -1260,6 +1418,7 @@ function handleUploadDocument(event) {
         polishVersion = null;
         polishCaseId = '';
         polishVersionId = '';
+        polishSavedVersionId = ''; // 无案件模式不可保存，重置会话保存状态
         originalContent = content;
         currentContent = content;
         editHistory = [];
@@ -1272,12 +1431,7 @@ function handleUploadDocument(event) {
         document.getElementById('versionTag').textContent = '上传';
         document.getElementById('editHint').textContent = '描述要修改的内容...';
 
-        // 保存按钮改为"下载文书"
-        const saveBtn = document.getElementById('saveBtn');
-        saveBtn.innerHTML = '<i class="fas fa-download"></i> 下载文书';
-        saveBtn.onclick = downloadDocumentFile;
-
-        // 初始化编辑器
+        // 初始化编辑器（上传模式下工具栏仅追加【下载】按钮，下载入口在工具栏）
         initDocEditor(content);
         renderContextInfo();
 
@@ -1337,7 +1491,8 @@ function undoLastEdit() {
     showNotification('已撤销上一步精修', 'success');
 }
 
-// ===== 保存为新版本（任务 5.3）=====
+// ===== 保存（任务 5.3，v1.3 策略对齐案件详情页）=====
+// 首次保存：addDocumentVersion 新增精修版；本会话内后续保存：覆盖当前精修版，不反复加版本
 function saveAsNewVersion() {
     if (!polishCaseItem) {
         showNotification('案件数据缺失，无法保存', 'error');
@@ -1347,7 +1502,23 @@ function saveAsNewVersion() {
     // 获取编辑区最新内容（支持用户手动编辑）
     const latestContent = docEditor ? docEditor.getContent() : currentContent;
 
-    // 从原版本继承配置
+    // 后续保存：覆盖当前精修版内容
+    if (polishSavedVersionId && typeof updateDocumentVersionContent === 'function') {
+        const ok = updateDocumentVersionContent(polishCaseItem.id, polishSavedVersionId, latestContent);
+        if (ok) {
+            hasUnsavedChanges = false;
+            editHistory = [];
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn) undoBtn.disabled = true;
+            document.getElementById('editHint').textContent = '已保存';
+            showNotification('文书内容已更新', 'success');
+        } else {
+            showNotification('保存失败，请重试', 'error');
+        }
+        return;
+    }
+
+    // 首次保存：从原版本继承配置，新增精修版
     const origCfg = polishVersion?.config || {};
     const versionData = {
         type: 'polish',
@@ -1369,24 +1540,18 @@ function saveAsNewVersion() {
 
     const savedVersion = addDocumentVersion(polishCaseItem.id, versionData);
     if (savedVersion) {
+        polishSavedVersionId = savedVersion.versionId || '';
         hasUnsavedChanges = false;
         editHistory = [];
-        document.getElementById('undoBtn').disabled = true;
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) undoBtn.disabled = true; // v1.50 已移除撤销按钮，元素可能不存在
         document.getElementById('editHint').textContent = '已保存';
 
         // 更新版本标签
         const versions = getAllDocumentVersions(polishCaseItem.id);
         document.getElementById('versionTag').textContent = `精修版（共 ${versions.length} 版）`;
 
-        showNotification('已保存为新版本', 'success');
-        // 提供返回入口
-        const saveBtn = document.getElementById('saveBtn');
-        saveBtn.innerHTML = '<i class="fas fa-check"></i> 已保存';
-        saveBtn.disabled = true;
-        setTimeout(() => {
-            saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存为新版本';
-            saveBtn.disabled = false;
-        }, 2000);
+        showNotification('已保存为精修版', 'success');
     } else {
         showNotification('保存失败，请重试', 'error');
     }

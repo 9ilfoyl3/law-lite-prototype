@@ -1682,11 +1682,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
     const courtName = caseData.courtName || 'XX人民法院';
     const title = templateName || docTypeName || '法律文书';
 
-    let elementHint = '';
-    if (elementAnswers && elementAnswers.length > 0) {
-        const names = elementAnswers.map(p => p.name).join('、');
-        elementHint = `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-puzzle-piece"></i> 已引入案由要件辅助生成：${names}</div>`;
-    }
+    // v1.71: 正文不再包含「已引入案由要件辅助生成」提示条，生成结果即为实际可用文书
 
     // ===== 特殊类型分支：材料总结（保持原有逻辑，不参与两步生成）=====
     if (docTypeName === '材料总结') {
@@ -1695,7 +1691,6 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
             <div class="result-doc-meta">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
             <p>案由：${cause}</p>
             <p>当事人：${partyA} 与 ${partyB}</p>
-            ${elementHint}
             <h3>一、材料清单</h3>
             <p>根据已选材料，整理形成如下材料清单，包含案件基本信息、证据材料、程序性文书等。</p>
             <h3>二、核心事实摘要</h3>
@@ -1748,7 +1743,6 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
     if (isFullDocTemplate) {
         return `<div class="result-doc">
             <div class="result-doc-meta" style="margin-bottom:8px;">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
-            ${elementHint}
             ${bodyHtml}
         </div>`;
     }
@@ -1764,7 +1758,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
     if (formatSkeleton && formatSkeleton.content) {
         return applyFormatSkeleton(formatSkeleton.content, {
             title, caseName, caseNumber, cause, partyA, partyB, courtName,
-            bodyHtml, elementHint, orgType
+            bodyHtml, orgType
         });
     }
 
@@ -1774,7 +1768,6 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
         <div class="result-doc-meta">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
         <p>案由：${cause}</p>
         <p>当事人：${partyA} 与 ${partyB}</p>
-        ${elementHint}
         ${bodyHtml}
         <p style="text-align:right;margin-top:32px;">${getSignerLabel(orgType)}</p>
         <p style="text-align:right;">${new Date().toLocaleDateString('zh-CN')}</p>
@@ -1944,7 +1937,8 @@ function generateSectionContent(title, desc, caseData, orgType) {
 
 // V1.1.2: 按格式骨架套版填充占位符
 // 支持占位符：{{courtName}} {{caseNumber}} {{caseName}} {{cause}} {{partyA}} {{partyB}}
-//             {{title}} {{body}} {{signer}} {{date}} {{elementHint}}
+//             {{title}} {{body}} {{signer}} {{date}}
+// v1.71: {{elementHint}} 不再写入正文，占位符映射保留仅用于兼容历史骨架数据（恒替换为空串）
 function applyFormatSkeleton(skeleton, ctx) {
     let out = skeleton;
     const dateStr = new Date().toLocaleDateString('zh-CN');
@@ -1959,7 +1953,7 @@ function applyFormatSkeleton(skeleton, ctx) {
         '{{body}}': ctx.bodyHtml || '',
         '{{signer}}': getSignerLabel(ctx.orgType),
         '{{date}}': dateStr,
-        '{{elementHint}}': ctx.elementHint || ''
+        '{{elementHint}}': ''
     };
     Object.entries(replacements).forEach(([k, v]) => {
         out = out.split(k).join(v);
@@ -3296,11 +3290,7 @@ function doCompileSteps(elementAnswers) {
         }
     });
 
-    let elementHint = '';
-    if (elementAnswers && elementAnswers.length > 0) {
-        const names = elementAnswers.map(p => p.name).join('、');
-        elementHint = `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-puzzle-piece"></i> 已引入案由要件辅助生成：${names}</div>`;
-    }
+    // v1.71: 正文不再包含「已引入案由要件辅助生成」提示条
 
     const templateName = getTemplateName(getCurrentTemplates()[stepTemplate]);
     const docTypeName = getCurrentDocTypes()[stepDocType]?.name || '法律文书';
@@ -3310,7 +3300,6 @@ function doCompileSteps(elementAnswers) {
         <h2>${title}</h2>
         <div class="result-doc-meta">案件：${caseItem.caseName || caseItem.caseNumber} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
         ${reqHint}
-        ${elementHint}
         ${allItems.join('')}
         <p style="text-align:right;margin-top:32px;">${getSignerLabel(org)}</p>
         <p style="text-align:right;">${new Date().toLocaleDateString('zh-CN')}</p>
@@ -3998,6 +3987,7 @@ function showResult(html, title) {
             }
         });
         // v2.31: 在编辑器工具栏追加【保存】按钮，点击保存到历史文书
+        // v2.32: 追加【下载】按钮，与保存按钮同位置，点击下载文书
         if (resultDocEditor.toolbar) {
             const sep = document.createElement('div');
             sep.className = 'doc-editor-toolbar-sep';
@@ -4011,8 +4001,18 @@ function showResult(html, title) {
                 e.preventDefault();
                 saveResult();
             });
+            const downloadBtn = document.createElement('button');
+            downloadBtn.type = 'button';
+            downloadBtn.className = 'doc-editor-toolbar-btn result-editor-download-btn';
+            downloadBtn.title = '下载文书';
+            downloadBtn.innerHTML = '<i class="fas fa-download"></i><span class="btn-label">下载</span>';
+            downloadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                downloadResult();
+            });
             resultDocEditor.toolbar.appendChild(sep);
             resultDocEditor.toolbar.appendChild(saveBtn);
+            resultDocEditor.toolbar.appendChild(downloadBtn);
         }
     } else {
         body.innerHTML = `<div class="fade-in">${resultContent}</div>`;
