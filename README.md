@@ -1,18 +1,19 @@
 # AI辅助办案系统 - 产品原型
 
-> 面向基层检法司办案人员的 AI 辅助办案工作台原型，运行在政法专网内。围绕"案件管理 → 材料组织 → 文书生成 → 个人配置"主链路，将 AI 能力以表单化、图形化方式嵌入法官/检察官/司法局工作人员的日常案头工作。
+> 面向基层检法司办案人员的 AI 辅助办案工作台原型，运行在政法专网内。围绕"案件管理 → 材料组织 → 文书生成 → 文书精修"主链路，将 AI 能力以表单化、图形化方式嵌入法官/检察官/司法局工作人员的日常案头工作。
 
 ---
 
 ## 核心用户场景
 
-1. **案件管理**：案件列表、新建/编辑/删除、文件上传、解析状态查看、生成文书入口、批量生成
-2. **材料组织**：案件文件页按分类管理材料、材料树操作
-3. **文书生成**：一步生成（材料生成）+ 分步生成（仅裁判文书，6 步硬编码）两种模式，引入案由要件作为可选增强
-4. **文书流转**：文书详情查看、下载打印、文书精修（多轮对话）、历史文书版本管理
-5. **个人配置**：我的要件、我的示例、我的指令，与系统/管理后台数据分层合并展示
+1. **AI 对话工作台（系统默认首页）**：登录后默认进入对话页；左侧新版导航栏提供「新建对话（Ctrl+K）」「知识库」「案件」「文书（我的文书示例/我的指令/我的要件/全部文书）」入口、案件对话历史（点击案件名展开查看该案件的会话记录）、最近的对话（含"查看全部"）以及底部用户信息（头像/姓名/职位/个人设置）
+2. **案件管理**：案件列表、新建/编辑/删除、文件上传、解析状态查看、生成文书入口、批量生成
+3. **材料组织**：案件文件页按分类管理材料、材料树操作
+4. **文书生成**：一步生成（材料生成）+ 分步生成（仅裁判文书）两种模式，引入案由要件作为可选增强
+5. **文书流转**：文书详情查看、下载打印、文书精修、历史文书版本管理
+6. **个人配置**：我的要件、我的模版、我的指令，与系统/管理后台数据分层合并展示
 
-> 原型说明：业务系统通过顶部切换按钮（法院 / 检察院 / 司法局）切换，切换后案由树、案字、文书类型/示例、要件、示例案件随之联动。
+> 原型说明：业务系统通过顶部切换按钮（法院 / 检察院 / 司法局）切换，切换后案由树、案字、文书类型/模板、要件、模板案件随之联动。
 
 ---
 
@@ -24,16 +25,16 @@
 
 | 页面 | 文件路径 | 功能简述 |
 |------|----------|----------|
-| 登录页 | [pages/login.html](pages/login.html) | 系统入口，支持普通用户/管理员（超级管理员/法院管理员）身份切换登录 |
+| 登录页 | [pages/login.html](pages/login.html) | 系统入口，普通用户登录后默认进入对话页（chat.html），管理员进入管理后台 |
+| AI 对话（默认首页） | [pages/chat.html](pages/chat.html) | 系统默认首页；左侧新版导航栏（新建对话/知识库/案件/文书分组/案件对话历史/最近的对话/用户信息）+ 对话工作区（任务发起、处理状态可视化、文档预览） |
 | 案件管理 | [pages/cases.html](pages/cases.html) | 案件列表、状态追踪、文件解析状态、生成文书、批量生成（异步队列） |
 | 案件文件 | [pages/case-files.html](pages/case-files.html) | 三栏布局：左材料树 + 中/右文书生成配置区/文书展示区；一步生成/分步生成、引入要件、文书精修 |
 | 文书详情 | [pages/document-detail.html](pages/document-detail.html) | 文书查看、下载、打印、精修跳转 |
 | 文书精修 | [pages/document-polish.html](pages/document-polish.html) | 独立页面：左侧文书内容 + 右侧对话式精修，保存为新版本 |
-| 我的要求件 | [pages/my-elements.html](pages/my-elements.html) | 按案由维护用户自定义要件（含案字白名单约束） |
-| 我的示例 | [pages/my-templates.html](pages/my-templates.html) | 用户侧个人文书示例维护，关联文书类型 |
+| 我的要件 | [pages/my-elements.html](pages/my-elements.html) | 按案由维护用户自定义要件（含案字白名单约束） |
+| 我的模板 | [pages/my-templates.html](pages/my-templates.html) | 用户侧个人文书模板维护，关联文书类型 |
 | 我的指令 | [pages/my-prompts.html](pages/my-prompts.html) | 用户侧个人指令维护（含历史版本管理） |
-| AI 聊天 | [pages/chat.html](pages/chat.html) | 自然语言交互入口（演示性质，未来以浮窗形式整合） |
-| 历史任务 | [pages/tasks.html](pages/tasks.html) | 按任务类型展示历史任务记录 |
+| 历史任务 | [pages/tasks.html](pages/tasks.html) | 按任务类型展示历史任务记录；对话页左侧栏"最近对话-查看全部"入口跳转至此 |
 | 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理（待开发） |
 | 个人设置 | [pages/settings.html](pages/settings.html) | 账户信息、全员公开库管理（管理员权限） |
 
@@ -52,7 +53,7 @@
 | 案由管理 | [pages/admin/cause-management.html](pages/admin/cause-management.html) | 三级案由层级结构维护，上线/下线管理 |
 | 文书类型管理 | [pages/admin/doc-types.html](pages/admin/doc-types.html) | 文书类型 CRUD + workflow 子配置（仅一步生成型，移除使用模型字段） |
 | 要件管理 | [pages/admin/element-presets.html](pages/admin/element-presets.html) | 标准要件维护（含案字白名单约束、启用/停用） |
-| 文书示例管理 | [pages/admin/doc-templates.html](pages/admin/doc-templates.html) | 文书示例 CRUD（移除案由关联、启用/停用） |
+| 文书模板管理 | [pages/admin/doc-templates.html](pages/admin/doc-templates.html) | 文书模板 CRUD（移除案由关联、启用/停用） |
 | 指令管理 | [pages/admin/prompt-templates.html](pages/admin/prompt-templates.html) | 指令 CRUD（含历史版本管理、启用/停用） |
 | 风控与审计 | [pages/admin/risk-audit.html](pages/admin/risk-audit.html) | 敏感词库、审计日志（含拦截记录），支持导出 PDF |
 | 系统初始化配置 | [pages/admin/settings.html](pages/admin/settings.html) | 部署时一次性配置（含批量文书队列允许个数） |

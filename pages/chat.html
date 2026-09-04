@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7,11 +7,353 @@
     <link href="../libs/font-awesome-all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/common.css">
     <style>
+        /* ===== 新版左侧导航栏（v1.18）===== */
+        .app-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 264px;
+            background: #f9fafb;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .as-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 16px 12px;
+            flex-shrink: 0;
+        }
+
+        .as-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+        .as-logo-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        .as-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px 12px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .as-body::-webkit-scrollbar { width: 4px; }
+        .as-body::-webkit-scrollbar-thumb { background: #dfe3e8; border-radius: 2px; }
+
+        /* 新建对话按钮 */
+        .as-new-chat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        .as-new-chat:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+
+        .as-new-chat i { font-size: 12px; color: var(--text-secondary); }
+
+        .as-shortcut {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 1px 6px;
+            background: #f9fafb;
+            white-space: nowrap;
+        }
+
+        /* 导航项 */
+        .as-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 14px;
+            flex-shrink: 0;
+        }
+
+        .as-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            border-radius: 8px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.15s;
+        }
+
+        .as-nav-item:hover { background: #eef0f3; }
+
+        .as-nav-item i {
+            width: 18px;
+            text-align: center;
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+
+        /* 分组标签 */
+        .as-section-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 16px 10px 6px;
+            flex-shrink: 0;
+        }
+
+        /* 案件对话历史 */
+        .as-case-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            flex-shrink: 0;
+        }
+
+        .as-case-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-primary);
+            transition: background 0.15s;
+            user-select: none;
+        }
+
+        .as-case-row:hover { background: #eef0f3; }
+
+        .as-case-row i.fa-folder {
+            font-size: 13px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .as-case-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .as-case-arrow {
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        .as-case-item.expanded .as-case-arrow { transform: rotate(90deg); }
+
+        .as-case-records {
+            display: none;
+            padding: 2px 0 4px 30px;
+        }
+
+        .as-case-item.expanded .as-case-records { display: block; }
+
+        .as-case-record {
+            padding: 6px 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .as-case-record:hover { background: #eef0f3; color: var(--text-primary); }
+
+        .as-case-record.active {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        /* 最近的对话 */
+        .as-recent {
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .as-recent-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 2px 6px;
+        }
+
+        .as-recent-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .as-recent-title i {
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+
+        .as-recent.collapsed .as-recent-title i { transform: rotate(-90deg); }
+        .as-recent.collapsed .as-recent-list { display: none; }
+
+        .as-view-all {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 2px 8px;
+            border-radius: 6px;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .as-view-all:hover { background: #f3f4f6; color: var(--text-primary); }
+
+        .as-recent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .as-recent-item {
+            padding: 7px 10px;
+            font-size: 13px;
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+
+        .as-recent-item:hover { background: #eef0f3; }
+
+        .as-recent-item.active {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        /* 底部用户信息 */
+        .as-footer {
+            flex-shrink: 0;
+            border-top: 1px solid var(--border-color);
+            padding: 12px 16px;
+            background: #f9fafb;
+        }
+
+        .as-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .as-user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .as-user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .as-user-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .as-user-role {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .as-user-settings {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+
+        .as-user-settings:hover {
+            background: #eef0f3;
+            color: var(--text-primary);
+        }
+
         /* Chat Page Styles */
         .chat-page {
             position: fixed;
             top: 0;
-            left: 64px;
+            left: 264px;
             right: 0;
             bottom: 0;
             background: var(--bg-primary);
@@ -35,24 +377,6 @@
             display: flex;
             align-items: center;
             gap: 16px;
-        }
-
-        .history-toggle-btn {
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--border-color);
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .history-toggle-btn:hover {
-            background: var(--nav-active-bg);
         }
 
         .chat-page-title {
@@ -1702,275 +2026,6 @@
             color: var(--text-muted);
         }
 
-        /* History Sidebar Styles for Chat Page */
-        .history-sidebar {
-            position: fixed;
-            top: 0;
-            left: 64px;
-            width: 300px;
-            height: 100vh;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-            z-index: 90;
-            box-shadow: 2px 0 12px rgba(0,0,0,0.08);
-        }
-
-        .history-sidebar.show {
-            transform: translateX(0);
-        }
-
-        .history-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.3);
-            z-index: 85;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .history-overlay.show {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .history-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .history-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .new-chat-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 12px;
-            background: var(--accent-primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
-            font-family: inherit;
-        }
-
-        .new-chat-btn:hover {
-            background: #1d4ed8;
-        }
-
-        .history-search {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .history-search input {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: inherit;
-            outline: none;
-            transition: border-color 0.2s;
-            background: var(--bg-primary);
-        }
-
-        .history-search input:focus {
-            border-color: var(--accent-primary);
-        }
-
-        .history-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px;
-        }
-
-        .history-date-group {
-            margin-bottom: 16px;
-        }
-
-        .history-date-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            padding: 8px 12px;
-            font-weight: 500;
-        }
-
-        .history-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.15s;
-            margin-bottom: 4px;
-        }
-
-        .history-item:hover {
-            background: var(--nav-active-bg);
-        }
-
-        .history-item.active {
-            background: var(--accent-light);
-        }
-
-        .history-item-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--bg-primary);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            color: var(--text-muted);
-            font-size: 14px;
-        }
-
-        .history-item.active .history-item-icon {
-            background: var(--accent-primary);
-            color: white;
-        }
-
-        .history-item-content {
-            flex: 1;
-            min-width: 0;
-            position: relative;
-        }
-
-        .history-item-title-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 4px;
-        }
-
-        .history-item-title {
-            font-size: 14px;
-            color: var(--text-primary);
-            font-weight: 500;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            flex: 1;
-        }
-
-        .history-item-preview {
-            font-size: 12px;
-            color: var(--text-muted);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        /* History Item Menu Button */
-        .history-item-menu-btn {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: none;
-            background: transparent;
-            color: var(--text-muted);
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            opacity: 0;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-
-        .history-item:hover .history-item-menu-btn {
-            opacity: 1;
-        }
-
-        .history-item.active .history-item-menu-btn {
-            opacity: 1;
-        }
-
-        .history-item-menu-btn:hover {
-            background: var(--nav-active-bg);
-            color: var(--text-primary);
-        }
-
-        /* History Item Menu Dropdown */
-        .history-item-menu {
-            position: absolute;
-            top: 28px;
-            right: 0;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-            min-width: 120px;
-            z-index: 100;
-            display: none;
-            overflow: hidden;
-        }
-
-        .history-item-menu.show {
-            display: block;
-        }
-
-        .history-menu-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 14px;
-            font-size: 13px;
-            color: var(--text-primary);
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .history-menu-item:hover {
-            background: var(--nav-active-bg);
-        }
-
-        .history-menu-item.delete {
-            color: #ef4444;
-        }
-
-        .history-menu-item.delete:hover {
-            background: #fef2f2;
-        }
-
-        .history-menu-item i {
-            font-size: 12px;
-            width: 16px;
-            text-align: center;
-        }
-
-        /* History Footer Tip */
-        .history-footer-tip {
-            text-align: center;
-            padding: 16px 12px;
-            font-size: 12px;
-            color: var(--text-muted);
-            border-top: 1px solid var(--border-color);
-            margin-top: 8px;
-        }
-
         /* Welcome Page Styles */
         .welcome-input-container {
             width: 100%;
@@ -2690,7 +2745,6 @@
             .source-image-panel,
             .chat-image-panel { display: none !important; }
             .chat-left { border-right: none; min-width: auto; }
-            .history-sidebar { left: 56px; width: 260px; }
             .chat-page-body.three-column-layout .chat-left {
                 flex: 1 !important;
                 order: 1;
@@ -2703,7 +2757,8 @@
         }
 
         @media (max-width: 600px) {
-            .chat-page { left: 56px; }
+            .app-sidebar { width: 220px; }
+            .chat-page { left: 220px; }
             .chat-page-header { padding: 0 16px; }
             .new-task-btn span { display: none; }
             .new-task-btn { padding: 8px 12px; }
@@ -2799,9 +2854,6 @@
 <body>
     <!-- Backdrop -->
     <div class="menu-backdrop" id="menuBackdrop"></div>
-
-    <!-- History Overlay -->
-    <div class="history-overlay" id="historyOverlay"></div>
 
     <!-- Task Type Selector Modal -->
     <div class="selector-modal" id="taskSelectorModal">
@@ -3150,45 +3202,79 @@
         </div>
     </div>
 
-    <!-- History Sidebar -->
-    <div class="history-sidebar" id="historySidebar">
-        <div class="history-header">
-            <span class="history-title">历史会话</span>
-            <button class="new-chat-btn" id="newChatBtn">
+    <!-- 新版左侧导航栏（v1.18） -->
+    <nav class="app-sidebar" id="appSidebar">
+        <div class="as-header">
+            <div class="as-logo"><i class="fas fa-scale-balanced"></i></div>
+            <span class="as-logo-name">法律智能体</span>
+        </div>
+        <div class="as-body">
+            <button class="as-new-chat" id="newChatBtn" title="新建对话（Ctrl+K）">
                 <i class="fas fa-plus"></i>
-                新建会话
+                <span>新建对话</span>
+                <span class="as-shortcut">Ctrl K</span>
             </button>
-        </div>
-        <div class="history-search">
-            <input type="text" placeholder="搜索历史会话" id="historySearchInput">
-        </div>
-        <div class="history-list" id="historyList">
-            <!-- History items will be populated -->
-        </div>
-    </div>
 
-    <!-- Sidebar -->
-    <nav class="sidebar">
-        <div class="sidebar-logo">
-            <i class="fas fa-cube"></i>
+            <div class="as-nav">
+                <a href="knowledge.html" class="as-nav-item">
+                    <i class="fas fa-book"></i>
+                    <span>知识库</span>
+                </a>
+                <a href="cases.html" class="as-nav-item">
+                    <i class="fas fa-folder-open"></i>
+                    <span>案件</span>
+                </a>
+            </div>
+
+            <div class="as-section-label">文书</div>
+            <div class="as-nav">
+                <a href="my-templates.html" class="as-nav-item">
+                    <i class="fas fa-file-lines"></i>
+                    <span>我的文书示例</span>
+                </a>
+                <a href="my-prompts.html" class="as-nav-item">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span>我的指令</span>
+                </a>
+                <a href="my-elements.html" class="as-nav-item">
+                    <i class="fas fa-user-gear"></i>
+                    <span>我的要件</span>
+                </a>
+                <a href="documents.html" class="as-nav-item">
+                    <i class="fas fa-file-contract"></i>
+                    <span>全部文书</span>
+                </a>
+            </div>
+
+            <div class="as-section-label">案件</div>
+            <div class="as-case-list" id="asCaseList">
+                <!-- 案件对话历史将由 JavaScript 动态渲染 -->
+            </div>
+
+            <div class="as-recent" id="asRecent">
+                <div class="as-recent-header">
+                    <div class="as-recent-title" id="asRecentToggle">
+                        <i class="fas fa-chevron-down"></i>
+                        <span>最近的对话</span>
+                    </div>
+                    <a href="tasks.html" class="as-view-all">查看全部</a>
+                </div>
+                <div class="as-recent-list" id="asRecentList">
+                    <!-- 最近的对话将由 JavaScript 动态渲染 -->
+                </div>
+            </div>
         </div>
-        <div class="nav-items">
-            <a href="chat.html" class="nav-item active">
-                <i class="fas fa-comments"></i>
-                <span>聊天</span>
-            </a>
-            <a href="tasks.html" class="nav-item" id="allTasksNavItem">
-                <i class="fas fa-list-check"></i>
-                <span>全部</span>
-            </a>
-            <a href="cases.html" class="nav-item">
-                <i class="fas fa-folder"></i>
-                <span>案件</span>
-            </a>
-            <a href="knowledge.html" class="nav-item">
-                <i class="fas fa-book"></i>
-                <span>知识库</span>
-            </a>
+        <div class="as-footer">
+            <div class="as-user">
+                <div class="as-user-avatar">洪</div>
+                <div class="as-user-info">
+                    <div class="as-user-name">洪虹</div>
+                    <div class="as-user-role">法院管理员</div>
+                </div>
+                <a href="settings.html" class="as-user-settings" title="个人设置">
+                    <i class="fas fa-gear"></i>
+                </a>
+            </div>
         </div>
     </nav>
 
@@ -3196,9 +3282,6 @@
     <div class="chat-page">
         <div class="chat-page-header">
             <div class="chat-page-header-left">
-                <button class="sidebar-toggle-btn" id="historyToggleBtn" title="历史会话">
-                    <i class="fas fa-columns"></i>
-                </button>
                 <span class="chat-page-title" id="chatPageTitle" contenteditable="true" title="点击编辑标题" style="cursor: text; border-bottom: 1px dashed var(--primary-color); outline: none;">新会话</span>
             </div>
             <div class="chat-page-header-right">
@@ -8343,35 +8426,32 @@
             document.getElementById('closeSourcePanel').addEventListener('click', hideImagePanels);
             document.getElementById('closeChatPanel').addEventListener('click', hideImagePanels);
 
-            // 历史会话切换按钮
-            const historyToggleBtn = document.getElementById('historyToggleBtn');
-            const historySidebar = document.getElementById('historySidebar');
-            const historyOverlay = document.getElementById('historyOverlay');
-
-            if (historyToggleBtn && historySidebar) {
-                historyToggleBtn.addEventListener('click', function() {
-                    historySidebar.classList.toggle('show');
-                    historyOverlay.classList.toggle('show');
-                    this.classList.toggle('active');
-                });
-
-                historyOverlay.addEventListener('click', function() {
-                    historySidebar.classList.remove('show');
-                    historyOverlay.classList.remove('show');
-                    historyToggleBtn.classList.remove('active');
-                });
-            }
-
-            // 新建会话按钮
+            // 新建对话按钮：回到欢迎页并清除侧栏选中状态
             document.getElementById('newChatBtn').addEventListener('click', function() {
                 showWelcomePage();
-                document.getElementById('historySidebar').classList.remove('show');
-                document.getElementById('historyOverlay').classList.remove('show');
-                document.getElementById('historyToggleBtn').classList.remove('active');
+                clearSidebarActiveState();
             });
 
-            // 加载历史会话列表
-            loadHistoryList();
+            // Ctrl+K 快捷键：新建对话
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+                    e.preventDefault();
+                    showWelcomePage();
+                    clearSidebarActiveState();
+                }
+            });
+
+            // 初始化左侧导航栏：案件对话历史 + 最近的对话
+            renderSidebarCases();
+            renderRecentConversations();
+
+            // 「最近的对话」标题点击：展开/收起会话列表
+            const asRecentToggle = document.getElementById('asRecentToggle');
+            if (asRecentToggle) {
+                asRecentToggle.addEventListener('click', function() {
+                    document.getElementById('asRecent').classList.toggle('collapsed');
+                });
+            }
 
             window.addEventListener('beforeunload', function(e) {
                 var hasInput = document.getElementById('inputField') && document.getElementById('inputField').value.trim() !== '';
@@ -9159,50 +9239,148 @@
             }
         }
 
-        // 加载历史会话列表
-        function loadHistoryList() {
-            const historyList = document.getElementById('historyList');
-            if (!historyList) return;
-            
-            // 使用全局的 historyData（来自 js/common.js）
-            if (typeof historyData === 'undefined' || historyData.length === 0) {
-                historyList.innerHTML = '<div class="history-footer-tip">暂无会话记录</div>';
-                return;
+        // ==================== 新版左侧导航栏（v1.18）====================
+
+        // 案件对话历史（演示数据）
+        const sidebarCaseData = [
+            {
+                id: 'asc1',
+                name: '(2025)粤0106民初2212号',
+                expanded: false,
+                records: [
+                    { id: 'ascr1', title: '本案被告的答辩意见内容' },
+                    { id: 'ascr2', title: '生成判决书' }
+                ]
+            },
+            {
+                id: 'asc2',
+                name: '(2026)苏05民终5555号',
+                expanded: false,
+                records: [
+                    { id: 'ascr3', title: '请使用卷宗材料生成一份判决书' },
+                    { id: 'ascr4', title: '归纳本案争议焦点' }
+                ]
+            },
+            {
+                id: 'asc3',
+                name: '测试案件',
+                expanded: false,
+                records: [
+                    { id: 'ascr5', title: '本案被告的答辩意见内容' },
+                    { id: 'ascr6', title: '生成判决书' }
+                ]
+            },
+            {
+                id: 'asc4',
+                name: '(2026)苏01民初0003号',
+                expanded: false,
+                records: [
+                    { id: 'ascr7', title: '本案被告的答辩意见内容' },
+                    { id: 'ascr8', title: '生成判决书' }
+                ]
             }
+        ];
 
-            historyList.innerHTML = '';
-            historyData.forEach(group => {
-                const groupEl = document.createElement('div');
-                groupEl.className = 'history-date-group';
+        // 最近的对话（演示数据）
+        const sidebarRecentData = [
+            { id: 'asrc1', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' },
+            { id: 'asrc2', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' },
+            { id: 'asrc3', title: '请使用卷宗材料生成一份判决书', preview: '请使用卷宗材料生成一份判决书' },
+            { id: 'asrc4', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' }
+        ];
 
-                const dateLabel = document.createElement('div');
-                dateLabel.className = 'history-date-label';
-                dateLabel.textContent = group.date;
-                groupEl.appendChild(dateLabel);
+        // 清除左侧导航栏所有选中状态
+        function clearSidebarActiveState() {
+            document.querySelectorAll('.as-recent-item, .as-case-record').forEach(el => {
+                el.classList.remove('active');
+            });
+        }
 
-                group.items.forEach(item => {
-                    const itemEl = document.createElement('div');
-                    itemEl.className = 'history-item' + (item.active ? ' active' : '');
-                    itemEl.setAttribute('data-id', item.id);
-                    itemEl.innerHTML = `
-                        <div class="history-item-icon"><i class="fas fa-comment-dots"></i></div>
-                        <div class="history-item-content">
-                            <div class="history-item-title">${item.title}</div>
-                            <div class="history-item-preview">${item.preview}</div>
-                        </div>
-                    `;
-                    itemEl.addEventListener('click', function() {
-                        // 移除所有active状态
-                        document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
-                        // 添加当前active状态
-                        this.classList.add('active');
-                        // 加载对话详情
-                        loadConversationDetail(item.id);
-                    });
-                    groupEl.appendChild(itemEl);
+        // 标记左侧导航栏某项为选中（互斥）
+        function setSidebarActive(target) {
+            clearSidebarActiveState();
+            if (target) target.classList.add('active');
+        }
+
+        // 渲染「案件对话历史」列表
+        function renderSidebarCases() {
+            const caseList = document.getElementById('asCaseList');
+            if (!caseList) return;
+
+            caseList.innerHTML = '';
+
+            sidebarCaseData.forEach(caseItem => {
+                const caseEl = document.createElement('div');
+                caseEl.className = 'as-case-item' + (caseItem.expanded ? ' expanded' : '');
+                caseEl.setAttribute('data-id', caseItem.id);
+
+                const rowEl = document.createElement('div');
+                rowEl.className = 'as-case-row';
+                rowEl.title = caseItem.name;
+                rowEl.innerHTML = `
+                    <i class="fas fa-folder"></i>
+                    <span class="as-case-name">${caseItem.name}</span>
+                    <i class="fas fa-chevron-right as-case-arrow"></i>
+                `;
+
+                // 点击案件名：展开/收起该案件的会话记录
+                rowEl.addEventListener('click', function() {
+                    caseItem.expanded = !caseItem.expanded;
+                    caseEl.classList.toggle('expanded', caseItem.expanded);
                 });
 
-                historyList.appendChild(groupEl);
+                caseEl.appendChild(rowEl);
+
+                const recordsEl = document.createElement('div');
+                recordsEl.className = 'as-case-records';
+
+                caseItem.records.forEach(record => {
+                    const recordEl = document.createElement('div');
+                    recordEl.className = 'as-case-record';
+                    recordEl.textContent = record.title;
+                    recordEl.title = record.title;
+
+                    // 点击会话记录：在聊天区加载该案件对话记录
+                    recordEl.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        setSidebarActive(this);
+                        loadChatConversationDetail({
+                            id: record.id,
+                            title: `${caseItem.name} - ${record.title}`,
+                            preview: record.title,
+                            active: false,
+                            pinned: false
+                        });
+                    });
+
+                    recordsEl.appendChild(recordEl);
+                });
+
+                caseEl.appendChild(recordsEl);
+                caseList.appendChild(caseEl);
+            });
+        }
+
+        // 渲染「最近的对话」列表
+        function renderRecentConversations() {
+            const recentList = document.getElementById('asRecentList');
+            if (!recentList) return;
+
+            recentList.innerHTML = '';
+
+            sidebarRecentData.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'as-recent-item';
+                itemEl.textContent = item.title;
+                itemEl.title = item.title;
+
+                // 点击会话项：在聊天区加载该会话
+                itemEl.addEventListener('click', function() {
+                    setSidebarActive(this);
+                    loadChatConversationDetail(item);
+                });
+
+                recentList.appendChild(itemEl);
             });
         }
 
