@@ -733,7 +733,8 @@ function highlightText(text, query) {
 // Render knowledge grid
 function renderKnowledgeGrid(kbs = knowledgeBaseData, highlightQuery = '') {
     const grid = document.getElementById('knowledgeGrid');
-    
+    if (!grid) return; // 页面不存在知识库网格时（如 settings.html）跳过渲染
+
     if (kbs.length === 0) {
         grid.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1;">
@@ -1647,7 +1648,7 @@ function updatePersonalStorage() {
     let totalMB = 0;
 
     const allFiles = [
-        ...(myUploadsData || []),
+        ...(typeof myUploadsData !== 'undefined' ? myUploadsData : []),
         ...personalKnowledgeBaseData.flatMap(kb => kb.files || [])
     ];
 
@@ -1773,7 +1774,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Search input handler
-    document.getElementById('kbSearchInput').addEventListener('input', searchKnowledge);
+    const kbSearchInput = document.getElementById('kbSearchInput');
+    if (kbSearchInput) {
+        kbSearchInput.addEventListener('input', searchKnowledge);
+    }
     
     // Tag input handler
     const tagInput = document.getElementById('tagInput');
@@ -1815,11 +1819,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Close modal on backdrop click
-    document.getElementById('kbModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeModal();
-        }
-    });
+    const kbModal = document.getElementById('kbModal');
+    if (kbModal) {
+        kbModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    }
     
     // Upload Modal - File input
     const fileInput = document.getElementById('fileInput');

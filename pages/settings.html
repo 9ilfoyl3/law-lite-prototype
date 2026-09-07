@@ -737,9 +737,10 @@
         }
 
         // 打开分类模态框
-        let editingCategoryId = null;
-        let selectedCategoryIcon = 'blue';
-        let selectedCategoryIconClass = 'fa-folder';
+        // 注意：重命名为 settingEditingCategoryId，避免与 knowledge.js 中的全局 editingCategoryId 重复声明导致 SyntaxError
+        let settingEditingCategoryId = null;
+        let settingSelectedIcon = 'blue';
+        let settingSelectedIconClass = 'fa-folder';
 
         function openCategoryModal(categoryId = null) {
             if (!isAdmin()) {
@@ -747,7 +748,7 @@
                 return;
             }
 
-            editingCategoryId = categoryId;
+            settingEditingCategoryId = categoryId;
             const modal = document.getElementById('categoryModal');
             const title = document.getElementById('categoryModalTitle');
             const nameInput = document.getElementById('categoryName');
@@ -757,13 +758,13 @@
                 if (!category) return;
                 title.textContent = '编辑分类';
                 nameInput.value = category.name;
-                selectedCategoryIcon = category.icon;
-                selectedCategoryIconClass = category.iconClass;
+                settingSelectedIcon = category.icon;
+                settingSelectedIconClass = category.iconClass;
             } else {
                 title.textContent = '新建分类';
                 nameInput.value = '';
-                selectedCategoryIcon = 'blue';
-                selectedCategoryIconClass = 'fa-folder';
+                settingSelectedIcon = 'blue';
+                settingSelectedIconClass = 'fa-folder';
             }
 
             renderIconSelector();
@@ -773,14 +774,14 @@
         // 关闭分类模态框
         function closeCategoryModal() {
             document.getElementById('categoryModal').classList.remove('show');
-            editingCategoryId = null;
+            settingEditingCategoryId = null;
         }
 
         // 渲染图标选择器
         function renderIconSelector() {
             document.querySelectorAll('#categoryIconSelector .icon-option').forEach(option => {
                 option.classList.remove('selected');
-                if (option.dataset.icon === selectedCategoryIcon) {
+                if (option.dataset.icon === settingSelectedIcon) {
                     option.classList.add('selected');
                 }
             });
@@ -799,13 +800,13 @@
                 return;
             }
 
-            if (editingCategoryId) {
+            if (settingEditingCategoryId) {
                 // 更新现有分类
-                const category = publicCategories.find(c => c.id === editingCategoryId);
+                const category = publicCategories.find(c => c.id === settingEditingCategoryId);
                 if (category) {
                     category.name = name;
-                    category.icon = selectedCategoryIcon;
-                    category.iconClass = selectedCategoryIconClass;
+                    category.icon = settingSelectedIcon;
+                    category.iconClass = settingSelectedIconClass;
                     showNotification('分类已更新', 'success');
                 }
             } else {
@@ -814,8 +815,8 @@
                 publicCategories.push({
                     id: newId,
                     name: name,
-                    icon: selectedCategoryIcon,
-                    iconClass: selectedCategoryIconClass,
+                    icon: settingSelectedIcon,
+                    iconClass: settingSelectedIconClass,
                     count: 0
                 });
                 showNotification('分类创建成功', 'success');
@@ -892,8 +893,8 @@
             // 图标选择器事件
             document.querySelectorAll('#categoryIconSelector .icon-option').forEach(option => {
                 option.addEventListener('click', function() {
-                    selectedCategoryIcon = this.dataset.icon;
-                    selectedCategoryIconClass = this.dataset.class;
+                    settingSelectedIcon = this.dataset.icon;
+                    settingSelectedIconClass = this.dataset.class;
                     renderIconSelector();
                 });
             });

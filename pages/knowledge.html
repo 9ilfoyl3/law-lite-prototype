@@ -1605,25 +1605,67 @@
         }
     </style>
 </head>
-<body>
-    <!-- Sidebar -->
-    <nav class="sidebar">
-        <div class="sidebar-logo">
-            <i class="fas fa-cube"></i>
+<body class="as-page">
+    <!-- 新版左侧导航栏 -->
+    <nav class="app-sidebar" id="appSidebar">
+        <div class="as-header">
+            <div class="as-logo"><i class="fas fa-scale-balanced"></i></div>
+            <span class="as-logo-name">法律智能体</span>
         </div>
-        <div class="nav-items">
-            <a href="chat.html" class="nav-item">
-                <i class="fas fa-comments"></i>
-                <span>聊天</span>
-            </a>
-            <a href="cases.html" class="nav-item">
-                <i class="fas fa-folder"></i>
-                <span>案件</span>
-            </a>
-            <a href="knowledge.html" class="nav-item active">
-                <i class="fas fa-book"></i>
-                <span>知识库</span>
-            </a>
+        <div class="as-body">
+            <button class="as-new-chat" id="newChatBtn" title="新建对话（Ctrl+K）">
+                <i class="fas fa-plus"></i>
+                <span>新建对话</span>
+                <span class="as-shortcut">Ctrl K</span>
+            </button>
+
+            <div class="as-nav">
+                <a href="knowledge.html" class="as-nav-item active">
+                    <i class="fas fa-book"></i>
+                    <span>知识库</span>
+                </a>
+                <a href="cases.html" class="as-nav-item">
+                    <i class="fas fa-folder-open"></i>
+                    <span>案件</span>
+                </a>
+            </div>
+
+            <div class="as-section-label">案件</div>
+            <div class="as-case-list" id="asCaseList">
+                <!-- 案件对话历史将由 JavaScript 动态渲染 -->
+            </div>
+
+            <div class="as-recent" id="asRecent">
+                <div class="as-recent-header">
+                    <div class="as-recent-title" id="asRecentToggle">
+                        <i class="fas fa-chevron-down"></i>
+                        <span>最近的对话</span>
+                    </div>
+                </div>
+                <div class="as-recent-list" id="asRecentList">
+                    <!-- 最近的对话将由 JavaScript 动态渲染 -->
+                </div>
+            </div>
+        </div>
+        <div class="as-footer">
+            <div class="as-user" id="asUser" onclick="toggleAsUserMenu(event)" title="账号菜单">
+                <div class="as-user-avatar">洪</div>
+                <div class="as-user-info">
+                    <div class="as-user-name">洪虹</div>
+                    <div class="as-user-role">法院管理员</div>
+                </div>
+                <i class="fas fa-chevron-up as-user-arrow"></i>
+            </div>
+            <div class="as-user-menu" id="asUserMenu">
+                <a class="as-user-menu-item" href="settings.html">
+                    <i class="fas fa-gear"></i>
+                    <span>个人设置</span>
+                </a>
+                <button class="as-user-menu-item logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>退出登录</span>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -1633,21 +1675,6 @@
         <header class="header">
             <div class="header-left">
                 <span style="font-size: 16px; font-weight: 500; color: var(--text-primary);">知识库</span>
-            </div>
-            <div class="user-menu" id="userMenu" style="position: relative;">
-                <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
-                    <i class="fas fa-user"></i>
-                </div>
-                <div class="user-dropdown" id="userDropdown">
-                    <button class="user-dropdown-item" id="settingsBtn" onclick="goToSettings()" style="display: none;">
-                        <i class="fas fa-cog"></i>
-                        <span>设置</span>
-                    </button>
-                    <button class="user-dropdown-item logout" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>退出登录</span>
-                    </button>
-                </div>
             </div>
         </header>
 
@@ -2043,47 +2070,23 @@
     <script src="../js/common.js"></script>
     <script src="../js/knowledge.js"></script>
     <script>
-        // 切换用户下拉菜单
-        function toggleUserDropdown() {
-            document.getElementById('userDropdown').classList.toggle('show');
-        }
-
-        // 退出登录
+        // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {
             if (confirm('确定要退出登录吗？')) {
                 window.location.href = '../index.html';
             }
         }
 
-        // 点击外部关闭下拉菜单
-        document.addEventListener('click', function(e) {
-            const userMenu = document.getElementById('userMenu');
-            if (userMenu && !userMenu.contains(e.target)) {
-                document.getElementById('userDropdown').classList.remove('show');
-            }
-        });
-
-        // 跳转到设置页面
-        function goToSettings() {
-            window.location.href = 'settings.html';
-        }
-
-        // 更新用户下拉菜单（根据角色显示设置按钮）
-        function updateUserDropdown() {
-            const settingsBtn = document.getElementById('settingsBtn');
-            if (settingsBtn && typeof isAdmin === 'function') {
-                settingsBtn.style.display = isAdmin() ? 'flex' : 'none';
-            }
-        }
-
-        // 页面加载完成后更新下拉菜单和角色
+        // 页面加载完成后初始化左侧导航栏与角色
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化左侧导航栏（共享模块：默认点击后跳转对话页）
+            initAppSidebar();
+
             // 从 localStorage 读取角色并更新
             const savedRole = localStorage.getItem('userRole');
             if (savedRole && typeof setUserRole === 'function') {
                 setUserRole(savedRole);
             }
-            updateUserDropdown();
         });
 
         // ==================== 我的上传模块 ====================

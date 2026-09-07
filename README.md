@@ -6,7 +6,7 @@
 
 ## 核心用户场景
 
-1. **AI 对话工作台（系统默认首页）**：登录后默认进入对话页；左侧新版导航栏提供「新建对话（Ctrl+K）」「知识库」「案件」「文书（我的文书示例/我的指令/我的要件/全部文书）」入口、案件对话历史（点击案件名展开查看该案件的会话记录）、最近的对话（含"查看全部"）以及底部用户信息（头像/姓名/职位/个人设置）
+1. **AI 对话工作台（系统默认首页）**：登录后默认进入对话页；左侧新版导航栏提供「新建对话（Ctrl+K）」「知识库」「案件」入口、案件对话历史（点击案件名展开查看该案件的会话记录）、最近的对话以及底部用户信息（头像/姓名/职位，点击弹出个人设置与退出登录菜单）；知识库（knowledge.html）、案件（cases.html、case-files.html）模块页面使用同款左侧导航栏
 2. **案件管理**：案件列表、新建/编辑/删除、文件上传、解析状态查看、生成文书入口、批量生成
 3. **材料组织**：案件文件页按分类管理材料、材料树操作
 4. **文书生成**：一步生成（材料生成）+ 分步生成（仅裁判文书）两种模式，引入案由要件作为可选增强
@@ -26,15 +26,15 @@
 | 页面 | 文件路径 | 功能简述 |
 |------|----------|----------|
 | 登录页 | [pages/login.html](pages/login.html) | 系统入口，普通用户登录后默认进入对话页（chat.html），管理员进入管理后台 |
-| AI 对话（默认首页） | [pages/chat.html](pages/chat.html) | 系统默认首页；左侧新版导航栏（新建对话/知识库/案件/文书分组/案件对话历史/最近的对话/用户信息）+ 对话工作区（任务发起、处理状态可视化、文档预览） |
-| 案件管理 | [pages/cases.html](pages/cases.html) | 案件列表、状态追踪、文件解析状态、生成文书、批量生成（异步队列） |
-| 案件文件 | [pages/case-files.html](pages/case-files.html) | 三栏布局：左材料树 + 中/右文书生成配置区/文书展示区；一步生成/分步生成、引入要件、文书精修 |
+| AI 对话（默认首页） | [pages/chat.html](pages/chat.html) | 系统默认首页；左侧新版导航栏（新建对话/知识库/案件/案件对话历史/最近的对话/用户信息）+ 对话工作区（任务发起、处理状态可视化、文档预览） |
+| 案件管理 | [pages/cases.html](pages/cases.html) | 案件列表、状态追踪、文件解析状态、生成文书、批量生成（异步队列）；v1.20 起使用新版左侧导航栏 |
+| 案件文件 | [pages/case-files.html](pages/case-files.html) | 三栏布局：左材料树 + 中/右文书生成配置区/文书展示区；一步生成/分步生成、引入要件、文书精修；v1.20 起使用新版左侧导航栏 |
 | 文书详情 | [pages/document-detail.html](pages/document-detail.html) | 文书查看、下载、打印、精修跳转 |
 | 文书精修 | [pages/document-polish.html](pages/document-polish.html) | 独立页面：左侧文书内容 + 右侧对话式精修，保存为新版本 |
 | 我的要件 | [pages/my-elements.html](pages/my-elements.html) | 按案由维护用户自定义要件（含案字白名单约束） |
 | 我的模板 | [pages/my-templates.html](pages/my-templates.html) | 用户侧个人文书模板维护，关联文书类型 |
 | 我的指令 | [pages/my-prompts.html](pages/my-prompts.html) | 用户侧个人指令维护（含历史版本管理） |
-| 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理（待开发） |
+| 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理（待开发）；v1.20 起使用新版左侧导航栏 |
 | 个人设置 | [pages/settings.html](pages/settings.html) | 账户信息、全员公开库管理（管理员权限） |
 
 ### 管理后台页面

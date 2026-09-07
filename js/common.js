@@ -485,21 +485,15 @@ document.addEventListener('DOMContentLoaded', function() {
             renderHistoryList(e.target.value);
         });
     }
-    
-    // New chat button
-    const newChatBtn = document.getElementById('newChatBtn');
-    if (newChatBtn) {
-        newChatBtn.addEventListener('click', () => {
-            document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
-            closeHistorySidebar();
-        });
-    }
-    
+
     // Escape key handler
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeAllMenus();
             closeHistorySidebar();
+            // 关闭新版侧栏底部用户菜单
+            const asUserMenu = document.getElementById('asUserMenu');
+            if (asUserMenu) asUserMenu.classList.remove('show');
         }
     });
     
@@ -518,4 +512,232 @@ document.addEventListener('DOMContentLoaded', function() {
             hideAllHistoryMenus();
         }
     });
+
+    // 点击其他区域关闭新版侧栏底部用户菜单
+    document.addEventListener('click', (e) => {
+        const asUserMenu = document.getElementById('asUserMenu');
+        const asUser = document.getElementById('asUser');
+        if (asUserMenu && asUserMenu.classList.contains('show') &&
+            asUser && !asUser.contains(e.target) && !asUserMenu.contains(e.target)) {
+            asUserMenu.classList.remove('show');
+        }
+    });
 });
+
+// ==================== 新版左侧导航栏（核心模块页共用：chat / knowledge / cases / case-files） ====================
+
+// 案件对话历史（演示数据）
+const sidebarCaseData = [
+    {
+        id: 'asc1',
+        name: '(2025)粤0106民初2212号',
+        expanded: false,
+        records: [
+            { id: 'ascr1', title: '本案被告的答辩意见内容' },
+            { id: 'ascr2', title: '生成判决书' }
+        ]
+    },
+    {
+        id: 'asc2',
+        name: '(2026)苏05民终5555号',
+        expanded: false,
+        records: [
+            { id: 'ascr3', title: '请使用卷宗材料生成一份判决书' },
+            { id: 'ascr4', title: '归纳本案争议焦点' }
+        ]
+    },
+    {
+        id: 'asc3',
+        name: '测试案件',
+        expanded: false,
+        records: [
+            { id: 'ascr5', title: '本案被告的答辩意见内容' },
+            { id: 'ascr6', title: '生成判决书' }
+        ]
+    },
+    {
+        id: 'asc4',
+        name: '(2026)苏01民初0003号',
+        expanded: false,
+        records: [
+            { id: 'ascr7', title: '本案被告的答辩意见内容' },
+            { id: 'ascr8', title: '生成判决书' }
+        ]
+    }
+];
+
+// 最近的对话（演示数据）
+const sidebarRecentData = [
+    { id: 'asrc1', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' },
+    { id: 'asrc2', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' },
+    { id: 'asrc3', title: '请使用卷宗材料生成一份判决书', preview: '请使用卷宗材料生成一份判决书' },
+    { id: 'asrc4', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' }
+];
+
+// 清除左侧导航栏所有会话选中状态
+function clearSidebarActiveState() {
+    document.querySelectorAll('.as-recent-item, .as-case-record').forEach(el => {
+        el.classList.remove('active');
+    });
+}
+
+// 标记左侧导航栏某项为选中（互斥）
+function setSidebarActive(target) {
+    clearSidebarActiveState();
+    if (target) target.classList.add('active');
+}
+
+// 按会话 ID 查找侧栏会话（含案件对话记录与最近对话）
+function findSidebarConversation(conversationId) {
+    for (const caseItem of sidebarCaseData) {
+        const record = caseItem.records.find(r => r.id === conversationId);
+        if (record) {
+            return {
+                id: record.id,
+                title: `${caseItem.name} - ${record.title}`,
+                preview: record.title,
+                active: true,
+                pinned: false
+            };
+        }
+    }
+    return sidebarRecentData.find(item => item.id === conversationId) || null;
+}
+
+// 标记侧栏某会话为当前会话（案件记录会同时展开父级案件）
+function markSidebarConversationActive(conversationId) {
+    clearSidebarActiveState();
+    const el = document.querySelector(`.as-recent-item[data-id="${conversationId}"], .as-case-record[data-id="${conversationId}"]`);
+    if (!el) return;
+    el.classList.add('active');
+    const caseItemEl = el.closest('.as-case-item');
+    if (caseItemEl) {
+        caseItemEl.classList.add('expanded');
+        const caseId = caseItemEl.getAttribute('data-case-id');
+        const data = sidebarCaseData.find(c => c.id === caseId);
+        if (data) data.expanded = true;
+    }
+}
+
+// 渲染「案件对话历史」列表
+function renderSidebarCases(onRecordClick) {
+    const caseList = document.getElementById('asCaseList');
+    if (!caseList) return;
+
+    caseList.innerHTML = '';
+
+    sidebarCaseData.forEach(caseItem => {
+        const caseEl = document.createElement('div');
+        caseEl.className = 'as-case-item' + (caseItem.expanded ? ' expanded' : '');
+        caseEl.setAttribute('data-case-id', caseItem.id);
+
+        const rowEl = document.createElement('div');
+        rowEl.className = 'as-case-row';
+        rowEl.title = caseItem.name;
+        rowEl.innerHTML = `
+            <i class="fas fa-folder"></i>
+            <span class="as-case-name">${caseItem.name}</span>
+            <i class="fas fa-chevron-right as-case-arrow"></i>
+        `;
+
+        // 点击案件名：展开/收起该案件的会话记录
+        rowEl.addEventListener('click', function() {
+            caseItem.expanded = !caseItem.expanded;
+            caseEl.classList.toggle('expanded', caseItem.expanded);
+        });
+
+        caseEl.appendChild(rowEl);
+
+        const recordsEl = document.createElement('div');
+        recordsEl.className = 'as-case-records';
+
+        caseItem.records.forEach(record => {
+            const recordEl = document.createElement('div');
+            recordEl.className = 'as-case-record';
+            recordEl.setAttribute('data-id', record.id);
+            recordEl.textContent = record.title;
+            recordEl.title = record.title;
+
+            // 点击会话记录：加载/跳转该案件对话记录
+            recordEl.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (typeof onRecordClick === 'function') {
+                    onRecordClick(caseItem, record, recordEl);
+                }
+            });
+
+            recordsEl.appendChild(recordEl);
+        });
+
+        caseEl.appendChild(recordsEl);
+        caseList.appendChild(caseEl);
+    });
+}
+
+// 渲染「最近的对话」列表
+function renderRecentConversations(onRecentClick) {
+    const recentList = document.getElementById('asRecentList');
+    if (!recentList) return;
+
+    recentList.innerHTML = '';
+
+    sidebarRecentData.forEach(item => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'as-recent-item';
+        itemEl.setAttribute('data-id', item.id);
+        itemEl.textContent = item.title;
+        itemEl.title = item.title;
+
+        // 点击会话项：加载/跳转该会话
+        itemEl.addEventListener('click', function() {
+            if (typeof onRecentClick === 'function') {
+                onRecentClick(item, itemEl);
+            }
+        });
+
+        recentList.appendChild(itemEl);
+    });
+}
+
+// 底部用户菜单（向上弹出）
+function toggleAsUserMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('asUserMenu');
+    if (menu) menu.classList.toggle('show');
+}
+
+// 初始化新版左侧导航栏（核心模块页共用）
+// opts: { onNewChat, onRecordClick(caseItem, record, el), onRecentClick(item, el) }
+// 默认行为：跳转对话页（携带 conversation 参数自动加载会话）
+function initAppSidebar(opts = {}) {
+    const defaults = {
+        onNewChat: function() {
+            window.location.href = 'chat.html';
+        },
+        onRecordClick: function(caseItem, record) {
+            window.location.href = 'chat.html?conversation=' + encodeURIComponent(record.id);
+        },
+        onRecentClick: function(item) {
+            window.location.href = 'chat.html?conversation=' + encodeURIComponent(item.id);
+        }
+    };
+    const handlers = Object.assign({}, defaults, opts);
+
+    renderSidebarCases(handlers.onRecordClick);
+    renderRecentConversations(handlers.onRecentClick);
+
+    // 新建对话按钮
+    const newChatBtn = document.getElementById('newChatBtn');
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', handlers.onNewChat);
+    }
+
+    // 「最近的对话」标题点击：展开/收起会话列表
+    const asRecentToggle = document.getElementById('asRecentToggle');
+    if (asRecentToggle) {
+        asRecentToggle.addEventListener('click', function() {
+            const recent = document.getElementById('asRecent');
+            if (recent) recent.classList.toggle('collapsed');
+        });
+    }
+}

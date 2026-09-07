@@ -7,334 +7,6 @@
     <link href="../libs/font-awesome-all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/common.css">
     <style>
-        /* ===== 新版左侧导航栏（v1.18）===== */
-        .app-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            width: 264px;
-            background: #f9fafb;
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            z-index: 100;
-        }
-
-        .as-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 16px 16px 12px;
-            flex-shrink: 0;
-        }
-
-        .as-logo {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 15px;
-            flex-shrink: 0;
-        }
-
-        .as-logo-name {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-primary);
-            white-space: nowrap;
-        }
-
-        .as-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0 12px 12px;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-
-        .as-body::-webkit-scrollbar { width: 4px; }
-        .as-body::-webkit-scrollbar-thumb { background: #dfe3e8; border-radius: 2px; }
-
-        /* 新建对话按钮 */
-        .as-new-chat {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-primary);
-            font-family: inherit;
-            transition: all 0.2s;
-            flex-shrink: 0;
-            margin-top: 4px;
-        }
-
-        .as-new-chat:hover {
-            background: #f3f4f6;
-            border-color: #d1d5db;
-        }
-
-        .as-new-chat i { font-size: 12px; color: var(--text-secondary); }
-
-        .as-shortcut {
-            margin-left: auto;
-            font-size: 11px;
-            color: var(--text-muted);
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 1px 6px;
-            background: #f9fafb;
-            white-space: nowrap;
-        }
-
-        /* 导航项 */
-        .as-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            margin-top: 14px;
-            flex-shrink: 0;
-        }
-
-        .as-nav-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 9px 10px;
-            border-radius: 8px;
-            color: var(--text-primary);
-            text-decoration: none;
-            font-size: 14px;
-            transition: background 0.15s;
-        }
-
-        .as-nav-item:hover { background: #eef0f3; }
-
-        .as-nav-item i {
-            width: 18px;
-            text-align: center;
-            font-size: 15px;
-            color: var(--text-secondary);
-        }
-
-        /* 分组标签 */
-        .as-section-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            padding: 16px 10px 6px;
-            flex-shrink: 0;
-        }
-
-        /* 案件对话历史 */
-        .as-case-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-            flex-shrink: 0;
-        }
-
-        .as-case-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 7px 10px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            color: var(--text-primary);
-            transition: background 0.15s;
-            user-select: none;
-        }
-
-        .as-case-row:hover { background: #eef0f3; }
-
-        .as-case-row i.fa-folder {
-            font-size: 13px;
-            color: var(--text-muted);
-            flex-shrink: 0;
-        }
-
-        .as-case-name {
-            flex: 1;
-            min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .as-case-arrow {
-            font-size: 10px;
-            color: var(--text-muted);
-            transition: transform 0.2s;
-            flex-shrink: 0;
-        }
-
-        .as-case-item.expanded .as-case-arrow { transform: rotate(90deg); }
-
-        .as-case-records {
-            display: none;
-            padding: 2px 0 4px 30px;
-        }
-
-        .as-case-item.expanded .as-case-records { display: block; }
-
-        .as-case-record {
-            padding: 6px 8px;
-            font-size: 13px;
-            color: var(--text-secondary);
-            border-radius: 6px;
-            cursor: pointer;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            transition: all 0.15s;
-        }
-
-        .as-case-record:hover { background: #eef0f3; color: var(--text-primary); }
-
-        .as-case-record.active {
-            background: var(--accent-light);
-            color: var(--accent-primary);
-        }
-
-        /* 最近的对话 */
-        .as-recent {
-            margin-top: 4px;
-            flex-shrink: 0;
-        }
-
-        .as-recent-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 2px 6px;
-        }
-
-        .as-recent-title {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: var(--text-muted);
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .as-recent-title i {
-            font-size: 10px;
-            transition: transform 0.2s;
-        }
-
-        .as-recent.collapsed .as-recent-title i { transform: rotate(-90deg); }
-        .as-recent.collapsed .as-recent-list { display: none; }
-
-        .as-recent-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-        }
-
-        .as-recent-item {
-            padding: 7px 10px;
-            font-size: 13px;
-            color: var(--text-primary);
-            border-radius: 8px;
-            cursor: pointer;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            transition: background 0.15s;
-        }
-
-        .as-recent-item:hover { background: #eef0f3; }
-
-        .as-recent-item.active {
-            background: var(--accent-light);
-            color: var(--accent-primary);
-        }
-
-        /* 底部用户信息 */
-        .as-footer {
-            flex-shrink: 0;
-            border-top: 1px solid var(--border-color);
-            padding: 12px 16px;
-            background: #f9fafb;
-        }
-
-        .as-user {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .as-user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            color: white;
-            font-size: 15px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .as-user-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .as-user-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .as-user-role {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 1px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .as-user-settings {
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 14px;
-            flex-shrink: 0;
-            transition: all 0.15s;
-        }
-
-        .as-user-settings:hover {
-            background: #eef0f3;
-            color: var(--text-primary);
-        }
-
         /* Chat Page Styles */
         .chat-page {
             position: fixed;
@@ -2743,7 +2415,6 @@
         }
 
         @media (max-width: 600px) {
-            .app-sidebar { width: 220px; }
             .chat-page { left: 220px; }
             .chat-page-header { padding: 0 16px; }
             .new-task-btn span { display: none; }
@@ -3212,26 +2883,6 @@
                 </a>
             </div>
 
-            <div class="as-section-label">文书</div>
-            <div class="as-nav">
-                <a href="my-templates.html" class="as-nav-item">
-                    <i class="fas fa-file-lines"></i>
-                    <span>我的文书示例</span>
-                </a>
-                <a href="my-prompts.html" class="as-nav-item">
-                    <i class="fas fa-wand-magic-sparkles"></i>
-                    <span>我的指令</span>
-                </a>
-                <a href="my-elements.html" class="as-nav-item">
-                    <i class="fas fa-user-gear"></i>
-                    <span>我的要件</span>
-                </a>
-                <a href="documents.html" class="as-nav-item">
-                    <i class="fas fa-file-contract"></i>
-                    <span>全部文书</span>
-                </a>
-            </div>
-
             <div class="as-section-label">案件</div>
             <div class="as-case-list" id="asCaseList">
                 <!-- 案件对话历史将由 JavaScript 动态渲染 -->
@@ -3250,15 +2901,23 @@
             </div>
         </div>
         <div class="as-footer">
-            <div class="as-user">
+            <div class="as-user" id="asUser" onclick="toggleAsUserMenu(event)" title="账号菜单">
                 <div class="as-user-avatar">洪</div>
                 <div class="as-user-info">
                     <div class="as-user-name">洪虹</div>
                     <div class="as-user-role">法院管理员</div>
                 </div>
-                <a href="settings.html" class="as-user-settings" title="个人设置">
+                <i class="fas fa-chevron-up as-user-arrow"></i>
+            </div>
+            <div class="as-user-menu" id="asUserMenu">
+                <a class="as-user-menu-item" href="settings.html">
                     <i class="fas fa-gear"></i>
+                    <span>个人设置</span>
                 </a>
+                <button class="as-user-menu-item logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>退出登录</span>
+                </button>
             </div>
         </div>
     </nav>
@@ -3268,19 +2927,6 @@
         <div class="chat-page-header">
             <div class="chat-page-header-left">
                 <span class="chat-page-title" id="chatPageTitle" contenteditable="true" title="点击编辑标题" style="cursor: text; border-bottom: 1px dashed var(--primary-color); outline: none;">新会话</span>
-            </div>
-            <div class="chat-page-header-right">
-                <div class="user-menu" id="userMenu" style="position: relative;">
-                    <div class="user-avatar" onclick="toggleUserDropdown()" style="cursor: pointer;">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="user-dropdown" id="userDropdown">
-                        <button class="user-dropdown-item logout" onclick="logout()">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>退出登录</span>
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
         <div class="chat-page-body">
@@ -4452,25 +4098,12 @@
     <script src="../js/common.js"></script>
     <script src="../js/chat.js"></script>
     <script>
-        // 切换用户下拉菜单
-        function toggleUserDropdown() {
-            document.getElementById('userDropdown').classList.toggle('show');
-        }
-
-        // 退出登录
+        // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {
             if (confirm('确定要退出登录吗？')) {
                 window.location.href = '../index.html';
             }
         }
-
-        // 点击外部关闭下拉菜单
-        document.addEventListener('click', function(e) {
-            const userMenu = document.getElementById('userMenu');
-            if (userMenu && !userMenu.contains(e.target)) {
-                document.getElementById('userDropdown').classList.remove('show');
-            }
-        });
 
         // 显示欢迎页面（新任务）
         // 当前选择状态
@@ -8411,10 +8044,26 @@
             document.getElementById('closeSourcePanel').addEventListener('click', hideImagePanels);
             document.getElementById('closeChatPanel').addEventListener('click', hideImagePanels);
 
-            // 新建对话按钮：回到欢迎页并清除侧栏选中状态
-            document.getElementById('newChatBtn').addEventListener('click', function() {
-                showWelcomePage();
-                clearSidebarActiveState();
+            // 初始化左侧导航栏（共享模块）：新建对话/案件对话历史/最近的对话
+            initAppSidebar({
+                onNewChat: function() {
+                    showWelcomePage();
+                    clearSidebarActiveState();
+                },
+                onRecordClick: function(caseItem, record, recordEl) {
+                    setSidebarActive(recordEl);
+                    loadChatConversationDetail({
+                        id: record.id,
+                        title: `${caseItem.name} - ${record.title}`,
+                        preview: record.title,
+                        active: false,
+                        pinned: false
+                    });
+                },
+                onRecentClick: function(item, itemEl) {
+                    setSidebarActive(itemEl);
+                    loadChatConversationDetail(item);
+                }
             });
 
             // Ctrl+K 快捷键：新建对话
@@ -8425,18 +8074,6 @@
                     clearSidebarActiveState();
                 }
             });
-
-            // 初始化左侧导航栏：案件对话历史 + 最近的对话
-            renderSidebarCases();
-            renderRecentConversations();
-
-            // 「最近的对话」标题点击：展开/收起会话列表
-            const asRecentToggle = document.getElementById('asRecentToggle');
-            if (asRecentToggle) {
-                asRecentToggle.addEventListener('click', function() {
-                    document.getElementById('asRecent').classList.toggle('collapsed');
-                });
-            }
 
             window.addEventListener('beforeunload', function(e) {
                 var hasInput = document.getElementById('inputField') && document.getElementById('inputField').value.trim() !== '';
@@ -8452,12 +8089,14 @@
             const urlParams = new URLSearchParams(window.location.search);
             const conversationId = urlParams.get('conversation');
             if (conversationId) {
-                const item = findHistoryItem(conversationId);
+                const item = findHistoryItem(conversationId) || findSidebarConversation(conversationId);
                 if (item) {
                     // 更新活动状态
                     historyData.forEach(group => {
                         group.items.forEach(i => i.active = (i.id === conversationId));
                     });
+                    // 高亮侧栏对应会话（案件记录同时展开父级案件）
+                    markSidebarConversationActive(conversationId);
                     loadChatConversationDetail(item);
                 }
             }
@@ -9222,151 +8861,6 @@
                     }
                 }, 200);
             }
-        }
-
-        // ==================== 新版左侧导航栏（v1.18）====================
-
-        // 案件对话历史（演示数据）
-        const sidebarCaseData = [
-            {
-                id: 'asc1',
-                name: '(2025)粤0106民初2212号',
-                expanded: false,
-                records: [
-                    { id: 'ascr1', title: '本案被告的答辩意见内容' },
-                    { id: 'ascr2', title: '生成判决书' }
-                ]
-            },
-            {
-                id: 'asc2',
-                name: '(2026)苏05民终5555号',
-                expanded: false,
-                records: [
-                    { id: 'ascr3', title: '请使用卷宗材料生成一份判决书' },
-                    { id: 'ascr4', title: '归纳本案争议焦点' }
-                ]
-            },
-            {
-                id: 'asc3',
-                name: '测试案件',
-                expanded: false,
-                records: [
-                    { id: 'ascr5', title: '本案被告的答辩意见内容' },
-                    { id: 'ascr6', title: '生成判决书' }
-                ]
-            },
-            {
-                id: 'asc4',
-                name: '(2026)苏01民初0003号',
-                expanded: false,
-                records: [
-                    { id: 'ascr7', title: '本案被告的答辩意见内容' },
-                    { id: 'ascr8', title: '生成判决书' }
-                ]
-            }
-        ];
-
-        // 最近的对话（演示数据）
-        const sidebarRecentData = [
-            { id: 'asrc1', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' },
-            { id: 'asrc2', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' },
-            { id: 'asrc3', title: '请使用卷宗材料生成一份判决书', preview: '请使用卷宗材料生成一份判决书' },
-            { id: 'asrc4', title: '借款合同的诉讼时效是几年？', preview: '借款合同的诉讼时效是几年？' }
-        ];
-
-        // 清除左侧导航栏所有选中状态
-        function clearSidebarActiveState() {
-            document.querySelectorAll('.as-recent-item, .as-case-record').forEach(el => {
-                el.classList.remove('active');
-            });
-        }
-
-        // 标记左侧导航栏某项为选中（互斥）
-        function setSidebarActive(target) {
-            clearSidebarActiveState();
-            if (target) target.classList.add('active');
-        }
-
-        // 渲染「案件对话历史」列表
-        function renderSidebarCases() {
-            const caseList = document.getElementById('asCaseList');
-            if (!caseList) return;
-
-            caseList.innerHTML = '';
-
-            sidebarCaseData.forEach(caseItem => {
-                const caseEl = document.createElement('div');
-                caseEl.className = 'as-case-item' + (caseItem.expanded ? ' expanded' : '');
-                caseEl.setAttribute('data-id', caseItem.id);
-
-                const rowEl = document.createElement('div');
-                rowEl.className = 'as-case-row';
-                rowEl.title = caseItem.name;
-                rowEl.innerHTML = `
-                    <i class="fas fa-folder"></i>
-                    <span class="as-case-name">${caseItem.name}</span>
-                    <i class="fas fa-chevron-right as-case-arrow"></i>
-                `;
-
-                // 点击案件名：展开/收起该案件的会话记录
-                rowEl.addEventListener('click', function() {
-                    caseItem.expanded = !caseItem.expanded;
-                    caseEl.classList.toggle('expanded', caseItem.expanded);
-                });
-
-                caseEl.appendChild(rowEl);
-
-                const recordsEl = document.createElement('div');
-                recordsEl.className = 'as-case-records';
-
-                caseItem.records.forEach(record => {
-                    const recordEl = document.createElement('div');
-                    recordEl.className = 'as-case-record';
-                    recordEl.textContent = record.title;
-                    recordEl.title = record.title;
-
-                    // 点击会话记录：在聊天区加载该案件对话记录
-                    recordEl.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        setSidebarActive(this);
-                        loadChatConversationDetail({
-                            id: record.id,
-                            title: `${caseItem.name} - ${record.title}`,
-                            preview: record.title,
-                            active: false,
-                            pinned: false
-                        });
-                    });
-
-                    recordsEl.appendChild(recordEl);
-                });
-
-                caseEl.appendChild(recordsEl);
-                caseList.appendChild(caseEl);
-            });
-        }
-
-        // 渲染「最近的对话」列表
-        function renderRecentConversations() {
-            const recentList = document.getElementById('asRecentList');
-            if (!recentList) return;
-
-            recentList.innerHTML = '';
-
-            sidebarRecentData.forEach(item => {
-                const itemEl = document.createElement('div');
-                itemEl.className = 'as-recent-item';
-                itemEl.textContent = item.title;
-                itemEl.title = item.title;
-
-                // 点击会话项：在聊天区加载该会话
-                itemEl.addEventListener('click', function() {
-                    setSidebarActive(this);
-                    loadChatConversationDetail(item);
-                });
-
-                recentList.appendChild(itemEl);
-            });
         }
 
         // ==================== 任务流程控制 ====================
