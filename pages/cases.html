@@ -17,23 +17,13 @@
             overflow-y: auto;
         }
 
-        .page-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 32px;
-        }
-
-        .page-title {
-            font-size: 24px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
+        /* v1.73: 操作按钮并入筛选栏，靠右展示 */
         .page-actions {
             display: flex;
             gap: 12px;
             align-items: center;
+            margin-left: auto;
+            flex-shrink: 0;
         }
         .business-switch {
             display: flex;
@@ -157,7 +147,7 @@
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             margin-bottom: 24px;
             padding: 16px 20px;
             background: var(--bg-secondary);
@@ -167,7 +157,8 @@
 
         .search-box {
             flex: 1;
-            max-width: 400px;
+            min-width: 200px;
+            max-width: 340px;
             position: relative;
         }
 
@@ -2772,6 +2763,17 @@
                 max-width: none;
             }
 
+            /* v1.73: 窄屏下操作按钮平分一行 */
+            .page-actions {
+                margin-left: 0;
+            }
+
+            .page-actions .action-btn-primary,
+            .page-actions .action-btn-secondary {
+                flex: 1;
+                justify-content: center;
+            }
+
             .case-list-header {
                 display: none;
             }
@@ -3559,8 +3561,42 @@
 
         <!-- Cases Page Content -->
         <div class="cases-page">
-            <!-- Page Header -->
-            <div class="page-header">
+            <!-- 浮动批量操作栏（勾选案件后显示） -->
+            <div class="batch-action-bar" id="batchActionBar">
+                <div class="batch-bar-left">
+                    <i class="fas fa-check-square" style="color:var(--accent-primary);"></i>
+                    <span>已选 <span class="count" id="selectedCount">0</span> 件案件</span>
+                </div>
+                <div class="batch-bar-right">
+                    <button class="batch-bar-btn primary" onclick="openBatchFullscreen()">
+                        <i class="fas fa-boxes"></i> 批量生成
+                    </button>
+                    <button class="batch-bar-btn danger" id="batchDeleteBtn" onclick="confirmBatchDeleteCases()">
+                        <i class="fas fa-trash-alt"></i> <span id="batchDeleteBtnText">批量删除</span>
+                    </button>
+                    <button class="batch-bar-btn ghost" onclick="clearSelection()">
+                        <i class="fas fa-times"></i> 取消选择
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="搜索案件名称、案号、案由…" title="支持搜索：案件名称、案号、案由、当事人、材料文件名、已生成文书标题" id="caseSearchInput">
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">案由类型：</span>
+                    <select class="filter-select" id="causeFilter">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <button type="button" class="filter-advanced-toggle" id="filterAdvancedToggle" onclick="toggleAdvancedFilters()">
+                    <i class="fas fa-sliders-h"></i> 高级筛选
+                </button>
+
+                <!-- v1.73: 操作按钮并入筛选栏，靠右展示 -->
                 <div class="page-actions">
                     <button class="action-btn-secondary" style="display:none;" id="syncCaseBtn" onclick="showSyncComingSoon()">
                         <i class="fas fa-sync-alt"></i>
@@ -3612,44 +3648,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- 浮动批量操作栏（勾选案件后显示） -->
-            <div class="batch-action-bar" id="batchActionBar">
-                <div class="batch-bar-left">
-                    <i class="fas fa-check-square" style="color:var(--accent-primary);"></i>
-                    <span>已选 <span class="count" id="selectedCount">0</span> 件案件</span>
-                </div>
-                <div class="batch-bar-right">
-                    <button class="batch-bar-btn primary" onclick="openBatchFullscreen()">
-                        <i class="fas fa-boxes"></i> 批量生成
-                    </button>
-                    <button class="batch-bar-btn danger" id="batchDeleteBtn" onclick="confirmBatchDeleteCases()">
-                        <i class="fas fa-trash-alt"></i> <span id="batchDeleteBtnText">批量删除</span>
-                    </button>
-                    <button class="batch-bar-btn ghost" onclick="clearSelection()">
-                        <i class="fas fa-times"></i> 取消选择
-                    </button>
-                </div>
-            </div>
-
-            
-
-            <!-- Filter Bar -->
-            <div class="filter-bar">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="搜索案件名称、案号、案由…" title="支持搜索：案件名称、案号、案由、当事人、材料文件名、已生成文书标题" id="caseSearchInput">
-                </div>
-                <div class="filter-group">
-                    <span class="filter-label">案由类型：</span>
-                    <select class="filter-select" id="causeFilter">
-                        <option value="">全部</option>
-                    </select>
-                </div>
-                <button type="button" class="filter-advanced-toggle" id="filterAdvancedToggle" onclick="toggleAdvancedFilters()">
-                    <i class="fas fa-sliders-h"></i> 高级筛选
-                </button>
 
                 <div class="filter-advanced-panel" id="filterAdvancedPanel">
                     <div class="filter-group">
