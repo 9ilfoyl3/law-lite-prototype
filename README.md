@@ -34,7 +34,6 @@
 | 我的要件 | [pages/my-elements.html](pages/my-elements.html) | 按案由维护用户自定义要件（含案字白名单约束） |
 | 我的模板 | [pages/my-templates.html](pages/my-templates.html) | 用户侧个人文书模板维护，关联文书类型 |
 | 我的指令 | [pages/my-prompts.html](pages/my-prompts.html) | 用户侧个人指令维护（含历史版本管理） |
-| 历史任务 | [pages/tasks.html](pages/tasks.html) | 按任务类型展示历史任务记录；对话页左侧栏"最近对话-查看全部"入口跳转至此 |
 | 知识库 | [pages/knowledge.html](pages/knowledge.html) | 全员公开库与个人知识库的浏览与管理（待开发） |
 | 个人设置 | [pages/settings.html](pages/settings.html) | 账户信息、全员公开库管理（管理员权限） |
 
