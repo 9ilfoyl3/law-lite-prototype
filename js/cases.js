@@ -106,7 +106,9 @@ function switchBusinessSystem(type) {
     });
     
     const current = getCurrentBusiness();
-    document.getElementById('pageTitle').textContent = `${current.name}${current.label}`;
+    const pageTitleEl = document.getElementById('pageTitle');
+    // v1.72: 页面标题已随业务切换入口一起移除，判空保护（深链 ?openDocs= 仍可能触发本函数）
+    if (pageTitleEl) pageTitleEl.textContent = `${current.name}${current.label}`;
     
     // 更新案由类型、案字、承办人筛选选项
     updateCauseFilter();
@@ -3189,6 +3191,11 @@ function formatDateTime(iso) {
 
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', function() {
+    // v1.72: 业务系统切换入口已隐藏，固定按法院业务运行；
+    // 清理历史会话残留的其他业务值，避免指令模板等按 localStorage 业务键读取的配置错乱
+    currentBusiness = 'court';
+    localStorage.setItem('currentBusiness', 'court');
+
     loadColumnConfig();
     // v1.26: 清理页面刷新/关闭导致的异常挂起批量任务，避免阻塞新提交
     if (typeof cleanupBatchQueueState === 'function') cleanupBatchQueueState();
