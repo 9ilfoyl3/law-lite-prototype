@@ -36,9 +36,7 @@ let resultEditContent = '';                 // 右栏编辑模式内容
 let lastSavedVersionId = '';                // 最近保存的文书版本ID（用于精修跳转）
 let resultDocEditor = null;                 // 右栏文档编辑器实例
 let pendingUploadFiles = [];
-let pendingElementAll = { standard: [], mine: [], case: [] }; // 待确认的案由要件
-let pendingElementSelections = new Set();
-let pendingElementConfirmCallback = null;   // 要素确认回调
+let pendingElementConfirmCallback = null;   // 要素确认回调（V1.2：指向抽屉生成模式的确认回调）
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
 let stepDocType = '';                       // 分步生成视图中的文书类型
 let stepTemplate = '';                      // 分步生成视图中的文书模板
@@ -330,9 +328,6 @@ function initPage() {
             }
             if (document.getElementById('preElementConfirmModal').classList.contains('show')) {
                 closePreElementConfirmModal();
-            }
-            if (document.getElementById('elementConfirmModal').classList.contains('show')) {
-                closeElementConfirmModal();
             }
             if (document.getElementById('materialSelectorDialog').classList.contains('show')) {
                 closeMaterialSelector();
@@ -1482,17 +1477,11 @@ function generateByMaterial() {
     const _matDocType = document.getElementById('matDocType')?.value || '';
     const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (_matDocType === 'judgment' && _hasElements) {
-        // v1.48: 有答案→大文本框确认；无答案→恢复原有两个弹框（确认引入→选择要件→答案确认）
-        if (hasAnyElementAnswer(allPresets)) {
-            showElementContextModal(allPresets, (elementAnswers) => {
-                doGenerateByMaterial(elementAnswers);
-            });
-        } else {
-            showPreElementConfirmModal(allPresets,
-                () => { doGenerateByMaterial(null); },
-                (answers) => { doGenerateByMaterial(answers); }
-            );
-        }
+        // V1.2: 统一先弹轻量询问弹框；选择「引入案由要件」后打开本案要件抽屉（生成模式）确认答案
+        showPreElementConfirmModal(allPresets,
+            () => { doGenerateByMaterial(null); },
+            (answers) => { doGenerateByMaterial(answers); }
+        );
     } else {
         doGenerateByMaterial(null);
     }
@@ -3261,17 +3250,11 @@ function compileSteps() {
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
     const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     if (stepDocType === 'judgment' && _hasElements3) {
-        // v1.48: 有答案→大文本框确认；无答案→恢复原有两个弹框（确认引入→选择要件→答案确认）
-        if (hasAnyElementAnswer(allPresets)) {
-            showElementContextModal(allPresets, (elementAnswers) => {
-                doCompileSteps(elementAnswers);
-            });
-        } else {
-            showPreElementConfirmModal(allPresets,
-                () => { doCompileSteps(null); },
-                (answers) => { doCompileSteps(answers); }
-            );
-        }
+        // V1.2: 统一先弹轻量询问弹框；选择「引入案由要件」后打开本案要件抽屉（生成模式）确认答案
+        showPreElementConfirmModal(allPresets,
+            () => { doCompileSteps(null); },
+            (answers) => { doCompileSteps(answers); }
+        );
     } else {
         doCompileSteps(null);
     }
@@ -3309,176 +3292,80 @@ function doCompileSteps(elementAnswers) {
     startStreamingOutput(content, title);
 }
 
-// ===== v1.47: 案由要件上下文确认弹框（简化版大文本框）=====
-let pendingElementContextCallback = null;
-// v1.50: 标记大文本框弹框是否由「无答案→选完要件」路径触发（用于关闭时一并清理选择弹框 state）
-let elementContextHasPrevious = false;
+// ===== V1.2: 本案要件抽屉 · 生成模式 =====
+// 生成文书 → 轻量询问弹框选「引入案由要件」后，以生成模式打开本案要件抽屉，
+// 复用抽屉的答案展示/编辑/重新生成/内容优化能力，底部显示【确认生成（引入 N 条要件）】。
+let drawerGenerateMode = false;         // 抽屉是否处于生成模式
+let drawerGenerateCallback = null;      // 确认生成后的回调（接收 elementAnswers 结构化数组）
 
-// v1.51: 案由要件答案生成加载态——管理 timer 与 UI 重置
-let elementContextLoadingTimer = null;
-function resetElementContextLoading() {
-    if (elementContextLoadingTimer) {
-        clearTimeout(elementContextLoadingTimer);
-        elementContextLoadingTimer = null;
-    }
-    const loadingEl = document.getElementById('elementContextLoading');
-    const ta = document.getElementById('elementContextTextarea');
-    const backBtn = document.getElementById('elementContextBackBtn');
-    const confirmBtn = document.getElementById('elementContextConfirmBtn');
-    if (loadingEl) loadingEl.classList.add('hidden');
-    if (ta) ta.classList.remove('loading-hidden');
-    if (backBtn) backBtn.disabled = false;
-    if (confirmBtn) confirmBtn.disabled = false;
+// 展平当前案件全部可用要件（标准 + 我的 + 个案）
+function getAllCaseElementsFlat() {
+    const data = caseElementsCache || { standard: [], mine: [], case: [] };
+    return [
+        ...((data.standard || []).map(p => ({ ...p, source: 'standard' }))),
+        ...((data.mine || []).map(p => ({ ...p, source: 'mine' }))),
+        ...((data.case || []).map(p => ({ ...p, source: 'case' })))
+    ];
 }
 
-// v1.48: 判断当前案件可用要件中是否已有答案
-function hasAnyElementAnswer(allPresets) {
-    if (!allPresets) return false;
-    const all = [
-        ...(allPresets.standard || []),
-        ...(allPresets.mine || []),
-        ...(allPresets.case || [])
-    ];
-    return all.some(p => {
-        const ans = (caseElementsAnswers[p.name] || '').trim();
-        return ans.length > 0;
-    });
+// 生成模式打开抽屉：默认全选，显示确认生成按钮
+function openElementsDrawerForGenerate(callback) {
+    drawerGenerateMode = true;
+    drawerGenerateCallback = (typeof callback === 'function') ? callback : null;
+    loadCaseElementsAll();
+    // 默认勾选全部可用要件（不沿用上次取消勾选的状态）
+    const all = getAllCaseElementsFlat();
+    caseElementsSelection = new Set(all.map(p => p.name));
+    if (caseItem) saveElementSelection(caseItem.id, caseElementsSelection);
+    renderElementsList();
+    const bar = document.getElementById('drawerGenerateBar');
+    if (bar) bar.classList.remove('hidden');
+    updateDrawerGenerateBtn();
+    document.getElementById('caseElementsOverlay').classList.add('show');
+    document.getElementById('caseElementsDrawer').classList.add('show');
+    caseElementsDrawerOpen = true;
 }
 
-// v1.48: 从已有答案构建 elementAnswers 数组（仅含有答案的要件）
-function buildElementAnswersFromExisting(allPresets) {
-    if (!allPresets) return null;
-    const all = [
-        ...((allPresets.standard || []).map(p => ({ ...p, source: 'standard' }))),
-        ...((allPresets.mine || []).map(p => ({ ...p, source: 'mine' }))),
-        ...((allPresets.case || []).map(p => ({ ...p, source: 'case' })))
-    ];
-    const result = all.filter(p => {
-        const ans = (caseElementsAnswers[p.name] || '').trim();
-        return ans.length > 0;
-    }).map(p => ({
-        name: p.name,
-        desc: p.desc,
-        question: p.question,
-        answer: caseElementsAnswers[p.name]
-    }));
-    return result.length > 0 ? result : null;
+// 退出生成模式：隐藏确认生成按钮并清理回调（不改动勾选与答案，已持久化）
+function exitDrawerGenerateMode() {
+    drawerGenerateMode = false;
+    drawerGenerateCallback = null;
+    const bar = document.getElementById('drawerGenerateBar');
+    if (bar) bar.classList.add('hidden');
 }
 
-function showElementContextModal(presets, callback, opts) {
-    pendingElementContextCallback = callback;
-    const hasPrevious = !!(opts && opts.hasPrevious);
-    elementContextHasPrevious = hasPrevious;
+// 更新确认生成按钮：N = 已勾选且有答案的要件数；一键生成加载期间禁用
+function updateDrawerGenerateBtn() {
+    const btn = document.getElementById('drawerGenerateBtn');
+    if (!btn) return;
+    const n = collectDrawerElementAnswers().length;
+    btn.innerHTML = `<i class="fas fa-file-signature"></i> 确认生成（引入 ${n} 条要件）`;
+    btn.disabled = !!aiSummarizeLoadingTimer;
+    btn.title = aiSummarizeLoadingTimer ? '答案生成中，请稍候' : '';
+}
 
-    const all = [
-        ...((presets && presets.standard) || []).map(p => ({ ...p, source: 'standard' })),
-        ...((presets && presets.mine) || []).map(p => ({ ...p, source: 'mine' })),
-        ...((presets && presets.case) || []).map(p => ({ ...p, source: 'case' }))
-    ];
-
-    if (all.length === 0) {
-        if (typeof callback === 'function') callback(null);
+// 抽屉底部【确认生成】校验与触发
+function confirmDrawerGenerate() {
+    if (!drawerGenerateMode) return;
+    if (aiSummarizeLoadingTimer) {
+        showNotification('答案生成中，请稍候', 'warning');
         return;
     }
-
-    // 构建上下文文本：已有答案优先用已有答案，否则用 mock 答案
-    let contextText = '';
-    all.forEach((p, i) => {
-        const existingAns = (caseElementsAnswers[p.name] || '').trim();
-        const answer = existingAns || generateMockElementAnswer(p, caseItem);
-        contextText += `【${p.name}】\n问题：${p.question || ''}\n答案：${answer}`;
-        if (i < all.length - 1) contextText += '\n\n';
-    });
-
-    const ta = document.getElementById('elementContextTextarea');
-    const loadingEl = document.getElementById('elementContextLoading');
-    const cancelBtn = document.getElementById('elementContextCancelBtn');
-    const skipBtn = document.getElementById('elementContextSkipBtn');
-    const backBtn = document.getElementById('elementContextBackBtn');
-    const confirmBtn = document.getElementById('elementContextConfirmBtn');
-
-    // v1.50: 按入口切换按钮组——有答案直接弹框（简化版）维持三按钮；无答案路径第三步仅显示「上一步」+「确认生成」
-    if (cancelBtn) cancelBtn.style.display = hasPrevious ? 'none' : '';
-    if (skipBtn) skipBtn.style.display = hasPrevious ? 'none' : '';
-    if (backBtn) backBtn.style.display = hasPrevious ? '' : 'none';
-
-    // v1.51: 先清理上一次加载态残留
-    resetElementContextLoading();
-
-    document.getElementById('elementContextOverlay').classList.add('show');
-    document.getElementById('elementContextModal').classList.add('show');
-
-    // v1.51: 无答案路径（选完要件后进入）先显示加载态，模拟答案生成过程
-    if (hasPrevious) {
-        if (loadingEl) loadingEl.classList.remove('hidden');
-        if (ta) { ta.classList.add('loading-hidden'); ta.value = ''; }
-        if (backBtn) backBtn.disabled = true;
-        if (confirmBtn) confirmBtn.disabled = true;
-        // 原型演示加速：1.5s 后填充答案并恢复（实际约 1 分钟）
-        elementContextLoadingTimer = setTimeout(() => {
-            elementContextLoadingTimer = null;
-            if (ta) ta.value = contextText;
-            if (loadingEl) loadingEl.classList.add('hidden');
-            if (ta) ta.classList.remove('loading-hidden');
-            if (backBtn) backBtn.disabled = false;
-            if (confirmBtn) confirmBtn.disabled = false;
-        }, 1500);
-    } else {
-        // 有答案直接弹框：直接填充
-        if (ta) ta.value = contextText;
-    }
-}
-
-function closeElementContextModal() {
-    // v1.51: 清理加载态 timer 与 UI
-    resetElementContextLoading();
-    document.getElementById('elementContextOverlay').classList.remove('show');
-    document.getElementById('elementContextModal').classList.remove('show');
-    pendingElementContextCallback = null;
-    // v1.50: 若由「无答案→选完要件」路径触发，且未走「上一步」返回，则一并清理选择弹框 state 避免泄漏
-    if (elementContextHasPrevious) {
-        elementContextHasPrevious = false;
-        pendingElementAll = { standard: [], mine: [], case: [] };
-        pendingElementSelections = new Set();
-        pendingElementConfirmCallback = null;
-    }
-}
-
-function skipElementContext() {
-    const cb = pendingElementContextCallback;
-    closeElementContextModal();
-    if (typeof cb === 'function') cb(null);
-}
-
-function confirmElementContextModal() {
-    const text = (document.getElementById('elementContextTextarea')?.value || '').trim();
-    // v1.50: 先捕获 callback 再关闭弹框（closeElementContextModal 会置空 pendingElementContextCallback）
-    const cb = pendingElementContextCallback;
-    if (!text) {
-        // 用户清空了内容，等同于不引入要件
-        closeElementContextModal();
-        if (typeof cb === 'function') cb(null);
+    const answers = collectDrawerElementAnswers();
+    if (answers.length === 0) {
+        // 区分「勾选了但均无答案」与「未勾选任何要件」两种提示
+        const hasChecked = getAllCaseElementsFlat().some(p => caseElementsSelection.has(p.name));
+        if (hasChecked) {
+            showNotification('尚无答案，建议先生成', 'warning');
+        } else {
+            showNotification('请先勾选要引入的要件', 'warning');
+        }
         return;
     }
-
-    // 解析大文本框内容，按 【要件名】 分块提取问题与答案
-    const elementAnswers = [];
-    const blocks = text.split(/(?=【)/);
-    blocks.forEach(block => {
-        const nameMatch = block.match(/^【(.+?)】/);
-        if (!nameMatch) return;
-        const name = nameMatch[1].trim();
-        const qMatch = block.match(/问题：([\s\S]*?)(?=\n答案：)/);
-        const aMatch = block.match(/答案：([\s\S]*)/);
-        elementAnswers.push({
-            name: name,
-            question: qMatch ? qMatch[1].trim() : '',
-            answer: aMatch ? aMatch[1].trim() : ''
-        });
-    });
-
-    closeElementContextModal();
-    if (typeof cb === 'function') cb(elementAnswers);
+    const cb = drawerGenerateCallback;
+    exitDrawerGenerateMode();
+    closeElementsDrawer();
+    if (typeof cb === 'function') cb(answers);
 }
 
 // ===== 引入案由要件弹窗 =====
@@ -3516,189 +3403,9 @@ function chooseDirectGenerate() {
 }
 
 function chooseIntroduceElements() {
+    // V1.2: 选择引入后不再弹小窗口，直接以生成模式打开本案要件抽屉展示与编辑答案
     closePreElementConfirmModal();
-    showElementConfirmModal(pendingElementPresets, pendingElementConfirmCallback);
-}
-
-// v1.50: 选择要件弹框「上一步」——返回第一个弹框（确认是否引入），保留第一个弹框的 state
-function backToPreElementConfirm() {
-    // 仅隐藏选择弹框 UI + 清理本弹框本地 state，不动 pendingElementPresets/Direct/Confirm（第一个弹框共享）
-    document.getElementById('elementConfirmOverlay').classList.remove('show');
-    document.getElementById('elementConfirmModal').classList.remove('show');
-    pendingElementAll = { standard: [], mine: [], case: [] };
-    pendingElementSelections = new Set();
-    // 重新显示第一个弹框（state 未清理，直接复用）
-    document.getElementById('preElementConfirmOverlay').classList.add('show');
-    document.getElementById('preElementConfirmModal').classList.add('show');
-}
-
-function showElementConfirmModal(presets, callback) {
-    pendingElementAll = presets || { standard: [], mine: [], case: [] };
-    pendingElementConfirmCallback = callback;
-    pendingElementSelections = new Set();
-
-    // 默认勾选所有可用要件
-    (pendingElementAll.standard || []).forEach((_, idx) => {
-        pendingElementSelections.add(getElementGlobalIndex('standard', idx));
-    });
-    (pendingElementAll.mine || []).forEach((_, idx) => {
-        pendingElementSelections.add(getElementGlobalIndex('mine', idx));
-    });
-    (pendingElementAll.case || []).forEach((_, idx) => {
-        pendingElementSelections.add(getElementGlobalIndex('case', idx));
-    });
-
-    renderElementConfirmSelectList();
-    updateElementSelectedCount();
-    showElementConfirmSelectStep();
-
-    document.getElementById('elementConfirmOverlay').classList.add('show');
-    document.getElementById('elementConfirmModal').classList.add('show');
-}
-
-function renderElementConfirmSelectList() {
-    const container = document.getElementById('elementConfirmSelectList');
-    const standard = pendingElementAll.standard || [];
-    const mine = pendingElementAll.mine || [];
-    const caseElements = pendingElementAll.case || [];
-
-    let html = '';
-    if (standard.length > 0) {
-        html += renderElementCategory('标准要件', standard, 'standard');
-    }
-    if (mine.length > 0) {
-        html += renderElementCategory('我的要件', mine, 'mine');
-    }
-    if (caseElements.length > 0) {
-        html += renderElementCategory('个案要件', caseElements, 'case');
-    }
-    if (standard.length === 0 && mine.length === 0 && caseElements.length === 0) {
-        html = `<div class="element-confirm-empty">暂无可用的案由要件</div>`;
-    }
-    container.innerHTML = html;
-}
-
-function renderElementCategory(title, items, source) {
-    // v2.27 (V1.1.8): 三色标签 — 标准(蓝)/我的(绿)/个案(橙)，与本案要件抽屉一致
-    const tagClass = source === 'mine' ? 'select-tag mine' : (source === 'case' ? 'select-tag case' : 'select-tag');
-    const tagText = source === 'mine' ? '我的' : (source === 'case' ? '个案' : '标准');
-    const listHtml = items.map((p, idx) => {
-        const globalIdx = getElementGlobalIndex(source, idx);
-        const checked = pendingElementSelections.has(globalIdx) ? 'checked' : '';
-        return `
-            <label class="element-confirm-select-item" onclick="toggleElementSelection('${source}', ${idx}, event)">
-                <input type="checkbox" ${checked} onclick="toggleElementSelection('${source}', ${idx}, event)">
-                <div class="select-info">
-                    <div class="select-title">${p.name}</div>
-                    <div class="select-question">${p.question || ''}</div>
-                </div>
-                <span class="${tagClass}">${tagText}</span>
-            </label>
-        `;
-    }).join('');
-    return `
-        <div class="element-confirm-category">
-            <div class="element-confirm-category-title">${title}</div>
-            <div class="element-confirm-select-list">${listHtml}</div>
-        </div>
-    `;
-}
-
-function getElementGlobalIndex(source, idx) {
-    return `${source}_${idx}`;
-}
-
-function toggleElementSelection(source, idx, event) {
-    if (event) event.stopPropagation();
-    const key = getElementGlobalIndex(source, idx);
-    if (pendingElementSelections.has(key)) {
-        pendingElementSelections.delete(key);
-    } else {
-        pendingElementSelections.add(key);
-    }
-    renderElementConfirmSelectList();
-    updateElementSelectedCount();
-}
-
-function updateElementSelectedCount() {
-    const el = document.getElementById('elementSelectedCount');
-    if (el) el.textContent = `已选 ${pendingElementSelections.size} 项`;
-}
-
-function showElementConfirmSelectStep() {
-    document.getElementById('elementConfirmStep1').classList.add('active');
-    document.getElementById('elementConfirmStep2').classList.remove('active');
-}
-
-function showElementConfirmAnswerStep() {
-    if (pendingElementSelections.size === 0) {
-        showNotification('请先勾选要引入的要件', 'warning');
-        return;
-    }
-    // v1.48: 选完要件后切换到大文本框确认弹框展示所有已选要件问题及参考答案
-    // v1.50: 不调 closeElementConfirmModal（会清状态），仅隐藏 UI 以支持「上一步」返回并保留已勾选
-    const selected = getSelectedElements();
-    const callback = pendingElementConfirmCallback;
-    document.getElementById('elementConfirmOverlay').classList.remove('show');
-    document.getElementById('elementConfirmModal').classList.remove('show');
-    // 构造只含已选要件的 presets，传入大文本框弹框
-    const filteredPresets = {
-        standard: selected.filter(p => p.source === 'standard'),
-        mine: selected.filter(p => p.source === 'mine'),
-        case: selected.filter(p => p.source === 'case')
-    };
-    showElementContextModal(filteredPresets, callback, { hasPrevious: true });
-}
-
-// v1.50: 大文本框弹框「上一步」——返回要件选择弹框（保留已勾选状态）
-function backToElementConfirmSelect() {
-    // v1.51: 清理加载态 timer 与 UI
-    resetElementContextLoading();
-    // 关闭大文本框弹框
-    document.getElementById('elementContextOverlay').classList.remove('show');
-    document.getElementById('elementContextModal').classList.remove('show');
-    pendingElementContextCallback = null;
-    // 重新渲染选择列表（state 未清理，已勾选状态保留）并显示
-    renderElementConfirmSelectList();
-    updateElementSelectedCount();
-    showElementConfirmSelectStep();
-    document.getElementById('elementConfirmOverlay').classList.add('show');
-    document.getElementById('elementConfirmModal').classList.add('show');
-}
-
-function getSelectedElements() {
-    const result = [];
-    (pendingElementAll.standard || []).forEach((p, idx) => {
-        if (pendingElementSelections.has(getElementGlobalIndex('standard', idx))) {
-            result.push({ ...p, source: 'standard', idx });
-        }
-    });
-    (pendingElementAll.mine || []).forEach((p, idx) => {
-        if (pendingElementSelections.has(getElementGlobalIndex('mine', idx))) {
-            result.push({ ...p, source: 'mine', idx });
-        }
-    });
-    (pendingElementAll.case || []).forEach((p, idx) => {
-        if (pendingElementSelections.has(getElementGlobalIndex('case', idx))) {
-            result.push({ ...p, source: 'case', idx });
-        }
-    });
-    return result;
-}
-
-function renderElementConfirmAnswers() {
-    const list = document.getElementById('elementConfirmAnswerList');
-    const selected = getSelectedElements();
-    list.innerHTML = selected.map((p, i) => {
-        const answer = generateMockElementAnswer(p, caseItem);
-        return `
-            <div class="element-confirm-answer-item" data-answer-idx="${i}">
-                <div class="answer-title"><i class="fas fa-puzzle-piece"></i> ${p.name}</div>
-                <div class="answer-question">${p.question || ''}</div>
-                <textarea class="answer-textarea" placeholder="AI 预生成答案，可直接修改">${answer}</textarea>
-            </div>
-        `;
-    }).join('');
+    openElementsDrawerForGenerate(pendingElementConfirmCallback);
 }
 
 function generateMockElementAnswer(preset, caseData) {
@@ -3727,44 +3434,6 @@ function generateMockElementAnswer(preset, caseData) {
     if (name.includes('故意')) return `主观故意需结合行为人供述及客观行为综合判断。`;
     if (name.includes('数额') || name.includes('标准')) return `涉案金额已达到相关立案标准。`;
     return `关于“${name}”的问题，需结合案件具体材料进一步分析。`;
-}
-
-function closeElementConfirmModal() {
-    document.getElementById('elementConfirmOverlay').classList.remove('show');
-    document.getElementById('elementConfirmModal').classList.remove('show');
-    pendingElementAll = { standard: [], mine: [], case: [] };
-    pendingElementSelections = new Set();
-    pendingElementConfirmCallback = null;
-}
-
-function collectElementAnswers() {
-    const selected = getSelectedElements();
-    const textareas = document.querySelectorAll('#elementConfirmAnswerList .answer-textarea');
-    return selected.map((p, i) => {
-        const ta = textareas[i];
-        return {
-            name: p.name,
-            desc: p.desc,
-            question: p.question,
-            answer: ta ? ta.value.trim() : ''
-        };
-    });
-}
-
-function confirmElementContext(useElements) {
-    const callback = pendingElementConfirmCallback;
-    if (useElements) {
-        const answers = collectElementAnswers();
-        closeElementConfirmModal();
-        if (typeof callback === 'function') {
-            callback(answers);
-        }
-    } else {
-        closeElementConfirmModal();
-        if (typeof callback === 'function') {
-            callback(null);
-        }
-    }
 }
 
 function openMyElements() {
@@ -3799,6 +3468,9 @@ function startStreamingOutput(fullContent, title) {
 
     // 流式输出期间禁用【文书精修】【重新配置】按钮
     setResultActionButtonsDisabled(true);
+
+    // V1.2: 流式输出期间禁用「本案要件」入口，避免边生成边修改要件答案
+    setCaseElementsEntryDisabled(true);
 
     // 清理旧编辑器实例
     if (resultDocEditor) {
@@ -3960,8 +3632,20 @@ function finishStreaming(fullContent, title) {
     showResult(fullContent, title);
     // v2.30: 流式输出完成后启用操作按钮
     setResultActionButtonsDisabled(false);
+    // V1.2: 流式输出完成后恢复「本案要件」入口
+    setCaseElementsEntryDisabled(false);
     // v2.24 (任务 8.8): 流式输出完成后统一提示
     showNotification('文书已生成完成', 'success');
+}
+
+// V1.2: 材料树「本案要件」入口按钮的禁用/启用（流式输出期间禁止修改要件答案）
+function setCaseElementsEntryDisabled(disabled) {
+    const btn = document.getElementById('caseElementsEntryBtn');
+    if (!btn) return;
+    btn.disabled = disabled;
+    btn.title = disabled ? '文书生成中，暂不可修改要件' : '查看本案要件';
+    btn.style.opacity = disabled ? '0.5' : '';
+    btn.style.cursor = disabled ? 'not-allowed' : '';
 }
 
 function escapeHtmlForStreaming(text) {
@@ -4763,6 +4447,9 @@ function closeElementsDrawer() {
     document.getElementById('caseElementsDrawer').classList.remove('show');
     caseElementsDrawerOpen = false;
     toggleCaseElementAddForm(false);
+    // V1.2: 生成模式下关闭抽屉（X/遮罩/ESC）= 放弃本次生成，回到配置区，不触发生成
+    // （抽屉内已编辑/生成的答案已持久化，关闭不丢失）
+    exitDrawerGenerateMode();
 }
 
 // ---- 渲染要件列表 ----
@@ -4807,6 +4494,8 @@ function renderElementsList() {
     body.innerHTML = html;
     if (loadingEl) body.appendChild(loadingEl);
     updateAiSummarizeBtnState(standard.length + mine.length + caseC.length);
+    // V1.2: 生成模式下，列表渲染后同步刷新确认生成按钮计数（覆盖编辑/重新生成/优化/新增删除等变更）
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
 }
 
 // v2.29: 一键生成按钮可用性控制——无可用要件时置灰并提示
@@ -5107,6 +4796,8 @@ function toggleDrawerElementSelection(name, checked) {
     if (checked) caseElementsSelection.add(name);
     else caseElementsSelection.delete(name);
     if (caseItem) saveElementSelection(caseItem.id, caseElementsSelection);
+    // V1.2: 勾选变化实时刷新确认生成按钮的 N 计数
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
 }
 
 // ---- 要件问答弹窗 ----
@@ -5237,6 +4928,8 @@ function aiSummarizeElements() {
     if (loadingEl) loadingEl.classList.remove('hidden');
     if (aiBtn) aiBtn.disabled = true;
     if (addBtn) addBtn.disabled = true;
+    // V1.2: 加载期间禁用确认生成按钮（防半成品确认）
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
 
     // 原型演示加速：1.5s 后填充答案并恢复（实际约 1 分钟）
     aiSummarizeLoadingTimer = setTimeout(() => {

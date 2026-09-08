@@ -1783,186 +1783,7 @@
             outline: none;
         }
 
-        /* Element Confirm Modal */
-        .element-confirm-desc {
-            font-size: 13px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            margin-bottom: 14px;
-        }
-        .element-confirm-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .element-confirm-item {
-            display: flex;
-            gap: 10px;
-            padding: 10px 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-        }
-        .element-confirm-item i {
-            color: var(--accent-primary);
-            font-size: 12px;
-            margin-top: 3px;
-        }
-        .element-confirm-item-title {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 2px;
-        }
-        .element-confirm-item-desc {
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-        .element-confirm-step {
-            display: none;
-        }
-        .element-confirm-step.active {
-            display: block;
-        }
-        .element-confirm-preview-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 320px;
-            overflow-y: auto;
-        }
-        .element-confirm-preview-item {
-            padding: 10px 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-        }
-        .element-confirm-preview-item .preview-title {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .element-confirm-preview-item .preview-title i {
-            color: var(--accent-primary);
-            font-size: 11px;
-        }
-        .element-confirm-preview-item .preview-questions {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .element-confirm-preview-item .preview-question {
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.5;
-            padding-left: 16px;
-            position: relative;
-        }
-        .element-confirm-preview-item .preview-question::before {
-            content: '•';
-            position: absolute;
-            left: 6px;
-            color: var(--accent-primary);
-        }
-        .element-confirm-answer-list {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            max-height: 380px;
-            overflow-y: auto;
-        }
-        .element-confirm-answer-item {
-            padding: 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-        }
-        .element-confirm-answer-item .answer-title {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .element-confirm-answer-item .answer-title i {
-            color: var(--accent-primary);
-            font-size: 11px;
-        }
-        .element-question {
-            margin-bottom: 8px;
-        }
-        .element-question:last-child {
-            margin-bottom: 0;
-        }
-        .element-question-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-            display: block;
-        }
-        .element-question-input {
-            width: 100%;
-            min-height: 56px;
-            padding: 8px 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 13px;
-            line-height: 1.5;
-            font-family: inherit;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            outline: none;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        .element-question-input:focus {
-            border-color: var(--accent-primary);
-        }
-        .element-confirm-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 16px;
-        }
-        .element-confirm-manage {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 10px;
-        }
-        .element-confirm-manage a {
-            font-size: 12px;
-            color: var(--accent-primary);
-            text-decoration: none;
-        }
-        .element-confirm-manage a:hover {
-            text-decoration: underline;
-        }
-        .element-confirm-time-hint {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            padding: 10px 12px;
-            background: #fffbeb;
-            border: 1px solid #fcd34d;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #92400e;
-            margin-bottom: 12px;
-            line-height: 1.5;
-        }
-        .element-confirm-time-hint i {
-            margin-top: 1px;
-            flex-shrink: 0;
-        }
+        /* V1.2: 已移除 elementConfirmModal（选择要件弹框）与 elementContextModal（大文本框弹框）相关样式 */
         .pre-element-confirm-body {
             text-align: center;
             padding: 8px 12px 4px;
@@ -2020,197 +1841,10 @@
             justify-content: flex-end;
             gap: 12px;
         }
-        .element-confirm-selected-count {
-            margin-bottom: 14px;
-        }
-        .element-confirm-category-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            padding-left: 4px;
-        }
-        .element-confirm-select-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 260px;
-            overflow-y: auto;
-        }
-        .element-confirm-select-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 10px 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .element-confirm-select-item:hover {
-            border-color: var(--accent-primary);
-        }
-        .element-confirm-select-item input[type="checkbox"] {
-            margin-top: 2px;
-            cursor: pointer;
-        }
-        .element-confirm-select-item .select-info {
-            flex: 1;
-            min-width: 0;
-        }
-        .element-confirm-select-item .select-title {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 2px;
-        }
-        .element-confirm-select-item .select-question {
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-        .element-confirm-select-item .select-tag {
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: #e0e7ff;
-            color: #3730a3;
-            white-space: nowrap;
-        }
-        .element-confirm-select-item .select-tag.mine {
-            background: #dcfce7;
-            color: #166534;
-        }
-        /* v2.27 (V1.1.8): 个案要件橙色标签，与本案要件抽屉 .source-tag.case 一致 */
-        .element-confirm-select-item .select-tag.case {
-            background: #fed7aa;
-            color: #9a3412;
-        }
-        .element-confirm-empty {
-            text-align: center;
-            padding: 24px 16px;
-            color: var(--text-muted);
-            font-size: 13px;
-        }
-        .element-confirm-answer-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            max-height: 360px;
-            overflow-y: auto;
-        }
-        .element-confirm-answer-item {
-            padding: 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-        }
-        .element-confirm-answer-item .answer-title {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .element-confirm-answer-item .answer-title i {
-            color: var(--accent-primary);
-            font-size: 11px;
-        }
-        .element-confirm-answer-item .answer-question {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            line-height: 1.5;
-        }
-        .element-confirm-answer-item .answer-textarea {
-            width: 100%;
-            min-height: 64px;
-            padding: 8px 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 13px;
-            line-height: 1.5;
-            font-family: inherit;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            outline: none;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        .element-confirm-answer-item .answer-textarea:focus {
-            border-color: var(--accent-primary);
-        }
-        .element-confirm-add {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 6px 12px;
-            border: 1px dashed var(--border-color);
-            border-radius: 6px;
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-            font-size: 12px;
-            cursor: pointer;
-            font-family: inherit;
-        }
-        .element-confirm-add:hover {
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
-        .element-confirm-selected-count {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-        }
 
-        /* v1.47: 案由要件上下文确认弹框（简化版大文本框） */
-        .element-context-desc {
-            margin-bottom: 12px;
-            font-size: 13px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-        }
-        .element-context-textarea {
-            width: 100%;
-            min-height: 320px;
-            padding: 12px 14px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 13px;
-            line-height: 1.8;
-            font-family: inherit;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            outline: none;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        .element-context-textarea:focus {
-            border-color: var(--accent-primary);
-        }
-        .element-context-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 14px;
-        }
-        /* v1.51: 案由要件答案生成加载态 */
-        .element-context-loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 320px;
-            text-align: center;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-primary);
-            box-sizing: border-box;
-        }
-        .element-context-loading .ec-spinner {
+        /* V1.2: 抽屉「一键生成」加载态（原 .element-context-loading .ec-* 作用域随旧弹框移除，
+           重挂到 .case-elements-loading 下，修复抽屉加载态 spinner/进度条无样式的问题） */
+        .case-elements-loading .ec-spinner {
             width: 40px;
             height: 40px;
             border-radius: 50%;
@@ -2220,21 +1854,21 @@
             margin-bottom: 16px;
         }
         @media (prefers-reduced-motion: reduce) {
-            .element-context-loading .ec-spinner { animation: none; }
+            .case-elements-loading .ec-spinner { animation: none; }
         }
         @keyframes ec-spin { to { transform: rotate(360deg); } }
-        .element-context-loading .ec-title {
+        .case-elements-loading .ec-title {
             font-size: 15px;
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 6px;
         }
-        .element-context-loading .ec-sub {
+        .case-elements-loading .ec-sub {
             font-size: 13px;
             color: var(--text-secondary);
             line-height: 1.6;
         }
-        .element-context-loading .ec-bar {
+        .case-elements-loading .ec-bar {
             margin-top: 16px;
             width: 220px;
             height: 4px;
@@ -2243,7 +1877,7 @@
             overflow: hidden;
             position: relative;
         }
-        .element-context-loading .ec-bar::after {
+        .case-elements-loading .ec-bar::after {
             content: "";
             position: absolute;
             top: 0;
@@ -2255,18 +1889,11 @@
             animation: ec-slide 1.4s ease-in-out infinite;
         }
         @media (prefers-reduced-motion: reduce) {
-            .element-context-loading .ec-bar::after { animation: none; left: 0; width: 30%; }
+            .case-elements-loading .ec-bar::after { animation: none; left: 0; width: 30%; }
         }
         @keyframes ec-slide {
             0% { left: -40%; }
             100% { left: 100%; }
-        }
-        .element-context-loading.hidden { display: none; }
-        .element-context-textarea.loading-hidden { display: none; }
-        .element-context-actions button[disabled] {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
         }
 
         /* ===== History Panel (keep existing) ===== */
@@ -2914,6 +2541,47 @@
             color: #9ca3af;
             opacity: 1;
         }
+        /* V1.2: 生成模式确认生成操作条（仅「生成文书→引入案由要件」入口显示） */
+        .case-elements-generate-bar.hidden { display: none; }
+        .case-elements-generate-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--accent-primary);
+            border-radius: 8px;
+            background: var(--accent-primary);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .case-elements-generate-btn:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        .case-elements-generate-btn:disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+        }
+        .case-elements-generate-btn:disabled:hover {
+            background: #e5e7eb;
+        }
+        /* V1.2: 流式输出期间「本案要件」入口禁用态 */
+        .case-elements-entry-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .case-elements-entry-btn:disabled:hover {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
         .case-elements-footer-link {
             text-align: center;
             font-size: 12px;
@@ -3452,64 +3120,8 @@
         </div>
     </div>
 
-    <!-- Element Confirm Modal -->
-    <div class="modal-overlay" id="elementConfirmOverlay" onclick="closeElementConfirmModal()"></div>
-    <div class="modal-dialog" id="elementConfirmModal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <h3><i class="fas fa-puzzle-piece"></i> 引入案由要件</h3>
-            <button class="modal-close" onclick="closeElementConfirmModal()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <!-- 第一步：选择要件 -->
-            <div class="element-confirm-step active" id="elementConfirmStep1">
-                <div class="element-confirm-desc">已为你默认勾选所有可用要件，你可取消不需要的要件，确认后点击【引入要件】。</div>
-                <div class="element-confirm-time-hint">
-                    <i class="fas fa-clock"></i>
-                    <span>引入要件后，系统将针对每个问题预生成答案并整合到文书中，生成时间可能会稍长。</span>
-                </div>
-                <div class="element-confirm-selected-count" id="elementSelectedCount">已选 0 项</div>
-                <div id="elementConfirmSelectList"></div>
-                <div class="element-confirm-actions">
-                    <button class="modal-btn-secondary" onclick="backToPreElementConfirm()"><i class="fas fa-arrow-left"></i> 上一步</button>
-                    <button class="modal-btn-primary" id="elementIntroduceBtn" onclick="showElementConfirmAnswerStep()">引入要件</button>
-                </div>
-            </div>
-            <!-- 第二步：确认 AI 预生成答案 -->
-            <div class="element-confirm-step" id="elementConfirmStep2">
-                <div class="element-confirm-desc">系统已根据每个要件问题预生成参考答案，你可直接修改或补充。</div>
-                <div class="element-confirm-answer-list" id="elementConfirmAnswerList"></div>
-                <div class="element-confirm-actions">
-                    <button class="modal-btn-secondary" onclick="showElementConfirmSelectStep()">上一步</button>
-                    <button class="modal-btn-primary" onclick="confirmElementContext(true)">确认生成</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- v1.47: Element Context Confirm Modal (简化版大文本框) -->
-    <div class="modal-overlay" id="elementContextOverlay" onclick="closeElementContextModal()"></div>
-    <div class="modal-dialog" id="elementContextModal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <h3><i class="fas fa-puzzle-piece"></i> 确认案由要件</h3>
-            <button class="modal-close" onclick="closeElementContextModal()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <div class="element-context-desc">以下为该案由的要件问题及参考答案（已有答案自动填充），请确认或修改后点击「确认生成」。修改后的内容将作为辅助依据生成文书。</div>
-            <div class="element-context-loading hidden" id="elementContextLoading">
-                <div class="ec-spinner"></div>
-                <div class="ec-title">正在生成参考答案…</div>
-                <div class="ec-sub">预计需要约 1 分钟，完成后可直接修改</div>
-                <div class="ec-bar"></div>
-            </div>
-            <textarea class="element-context-textarea" id="elementContextTextarea" placeholder="加载中..."></textarea>
-            <div class="element-context-actions">
-                <button class="modal-btn-secondary" id="elementContextCancelBtn" onclick="closeElementContextModal()">取消</button>
-                <button class="modal-btn-secondary" id="elementContextSkipBtn" onclick="skipElementContext()">不引入要件</button>
-                <button class="modal-btn-secondary" id="elementContextBackBtn" onclick="backToElementConfirmSelect()" style="display:none;"><i class="fas fa-arrow-left"></i> 上一步</button>
-                <button class="modal-btn-primary" id="elementContextConfirmBtn" onclick="confirmElementContextModal()">确认生成</button>
-            </div>
-        </div>
-    </div>
+    <!-- V1.2: 移除 elementConfirmModal（选择要件弹框）与 elementContextModal（大文本框确认弹框） -->
+    <!-- 引入要件的答案确认与编辑统一复用「本案要件」抽屉（生成模式），见底部 caseElementsDrawer -->
 
     <!-- Material Selector Modal -->
     <div class="modal-overlay" id="materialSelectorOverlay" onclick="closeMaterialSelector()"></div>
@@ -3571,6 +3183,12 @@
             </div>
         </div>
         <div class="case-elements-drawer-footer">
+            <!-- V1.2: 生成模式专属确认生成操作条（仅从「生成文书→引入案由要件」入口打开时显示） -->
+            <div class="case-elements-generate-bar hidden" id="drawerGenerateBar">
+                <button type="button" id="drawerGenerateBtn" class="case-elements-generate-btn" onclick="confirmDrawerGenerate()">
+                    <i class="fas fa-file-signature"></i> 确认生成（引入 0 条要件）
+                </button>
+            </div>
             <!-- 新增个案要件内联表单 -->
             <div class="case-elements-add-form" id="caseElementsAddForm">
                 <div class="form-row">
