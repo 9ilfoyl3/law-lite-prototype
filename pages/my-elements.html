@@ -313,11 +313,6 @@
                 <div class="page-title">我的要件</div>
                 <div class="page-subtitle">按案由维护个人自定义要件，生成文书时与标准要件一同作为可选上下文</div>
             </div>
-            <div class="business-switch" id="businessSwitch">
-                <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
-                <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
-                <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
-            </div>
         </div>
         <div style="margin-bottom:16px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;display:flex;align-items:center;gap:8px;">
             <i class="fas fa-info-circle"></i>
@@ -381,7 +376,8 @@
         const addElementBtn = document.getElementById('addElementBtn');
 
         // case-data.js 已声明全局 currentBusiness，此处直接复用/覆盖，不可重新 let/const
-        currentBusiness = localStorage.getItem('currentBusiness') || currentBusiness || 'court';
+        // v2.33: 业务系统切换已隐藏，固定默认法院（不读 localStorage，避免残留值锁定非法院视图）
+        currentBusiness = 'court';
         let currentCause = '';
         let editingId = null;
         let searchKeyword = '';

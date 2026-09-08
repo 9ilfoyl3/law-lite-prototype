@@ -290,6 +290,10 @@ function renderCaseList(cases = getCurrentCases()) {
         const error = stats.error > 0;
         // v2.24: 文书数量直接调用 getAllDocumentVersions，与详情页历史文书面板完全一致
         const docCount = getAllDocumentVersions(c.id).length;
+        // v2.32: 首次解析待确认标识（编辑保存后消失）
+        const newBadge = c.firstParsePending
+            ? `<span class="case-new-badge" title="案件信息待确认，请点击「编辑」核对识别结果">新</span>`
+            : '';
         // v2.23: 材料数量列只表达材料状态（任务 1.1，修订：不再混入文书数）
         // 状态优先级：无材料 → 解析中 → 有异常 → 正常
         let fileCellTitle, fileCellText, fileCellIcon, fileCellClass = '';
@@ -332,6 +336,7 @@ function renderCaseList(cases = getCurrentCases()) {
             </div>
             <div class="case-name" onclick="openCaseFiles('${c.id}')" title="点击新标签页打开案件文件">
                 <span class="case-name-text">${c.caseName || c.caseNumber}</span>
+                ${newBadge}
                 ${docBadge}
                 <i class="fas fa-external-link-alt case-name-icon"></i>
             </div>
@@ -443,14 +448,9 @@ function renderCaseHeader() {
         uploadDate: '上传日期',
         caseWord: '案字'
     };
-    
-    const current = getCurrentBusiness();
-    const dynamicLabels = {
-        ...colLabels,
-        parties: `${current.partiesLabels[0]}/${current.partiesLabels[1]}`
-    };
-    
-    const extraHeaderCols = [...visibleColumns].map(col => `<div class="case-col">${dynamicLabels[col]}</div>`).join('');
+
+    // v2.32: 当事人列头固定显示「当事人」，不再随业务动态切换（单元格内容仍为"A 诉 B"）
+    const extraHeaderCols = [...visibleColumns].map(col => `<div class="case-col">${colLabels[col]}</div>`).join('');
     
     header.innerHTML = `
         <div class="case-checkbox-col"><input type="checkbox" class="case-checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" title="全选"></div>
@@ -1887,35 +1887,10 @@ function showBatchHelp() {
 let uploadedFiles = [];
 
 function openCreateCaseDialog() {
-    const current = getCurrentBusiness();
-    const labels = current.partiesLabels;
-
-    document.getElementById('createPartyALabel').textContent = labels[0];
-    document.getElementById('createPartyBLabel').textContent = labels[1];
-
-    document.getElementById('createCaseCauseHidden').value = '';
-    document.getElementById('createCaseCauseText').textContent = '请选择案由（选填）';
-    document.getElementById('createCaseCauseText').classList.add('placeholder');
-
-    const caseWordSelect = document.getElementById('createCaseWord');
-    const caseWords = caseWordListByOrg[currentBusiness] || [];
-    caseWordSelect.innerHTML = '<option value="">请选择案字（选填）</option>' +
-        caseWords.map(w => `<option value="${w}">${w}</option>`).join('');
-    caseWordSelect.value = '';
-
-    document.getElementById('createCaseName').value = '';
-    document.getElementById('createCaseNumber').value = '';
-    document.getElementById('createPartyA').value = '';
-    document.getElementById('createPartyB').value = '';
-    document.getElementById('createHandler').value = getCurrentUserName();
-    document.getElementById('createCaseDate').value = new Date().toISOString().split('T')[0];
-
     uploadedFiles = [];
     document.getElementById('uploadFileList').innerHTML = '';
     document.getElementById('createCaseFile').value = '';
-
-    // 默认收起选填结构化信息区域
-    collapseOptionalFields();
+    updateCreateSubmitBtn();
 
     document.getElementById('createCaseOverlay').classList.add('show');
     document.getElementById('createCaseDialog').classList.add('show');
@@ -1926,43 +1901,38 @@ function closeCreateCaseDialog() {
     document.getElementById('createCaseDialog').classList.remove('show');
 }
 
-function toggleOptionalFields() {
-    const toggle = document.getElementById('optionalFieldsToggle');
-    const content = document.getElementById('optionalFieldsContent');
-    if (!toggle || !content) return;
-
-    const isExpanded = toggle.classList.contains('expanded');
-    if (isExpanded) {
-        toggle.classList.remove('expanded');
-        content.classList.remove('expanded');
-    } else {
-        toggle.classList.add('expanded');
-        content.classList.add('expanded');
-    }
+// v2.33: 主按钮文案固定「上传并解析」；0 文件时弱化置灰，点击弹提示（必须 ≥1 个文件才能建案）
+function updateCreateSubmitBtn() {
+    const btn = document.getElementById('createCaseSubmitBtn');
+    if (!btn) return;
+    const hasFiles = uploadedFiles.length > 0;
+    btn.classList.toggle('btn-empty-hint', !hasFiles);
+    btn.title = hasFiles ? '' : '请先上传至少 1 个材料文件';
 }
 
-function collapseOptionalFields() {
-    const toggle = document.getElementById('optionalFieldsToggle');
-    const content = document.getElementById('optionalFieldsContent');
-    if (toggle) toggle.classList.remove('expanded');
-    if (content) content.classList.remove('expanded');
-}
-
+// v2.33: 上传限制对齐实际系统（PRD 第九章）
+// 类型：PDF / DOC / DOCX / JPG / JPEG / PNG / ZIP 整卷压缩包
+// 大小：单个材料 ≤ 50MB；ZIP 压缩包 ≤ 1000MB
 function handleFileUpload(input) {
     const files = Array.from(input.files);
     if (files.length === 0) return;
 
-    const validExts = ['.zip', '.rar', '.pdf', '.doc', '.docx'];
+    const validExts = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.zip'];
+    const SINGLE_FILE_LIMIT = 50 * 1024 * 1024;       // 单个材料 50MB
+    const ZIP_ARCHIVE_LIMIT = 1000 * 1024 * 1024;     // 压缩包 1000MB
     let addedCount = 0;
 
     files.forEach(file => {
         const ext = '.' + file.name.split('.').pop().toLowerCase();
         if (!validExts.includes(ext)) {
-            showNotification(`${file.name} 格式不支持，请上传 .zip / .rar / .pdf / .doc / .docx 文件`, 'error');
+            showNotification(`${file.name} 格式不支持，请上传 PDF / DOC / DOCX / JPG / JPEG / PNG 或 ZIP 文件`, 'error');
             return;
         }
-        if (file.size > 100 * 1024 * 1024) {
-            showNotification(`${file.name} 超过 100MB 限制`, 'error');
+        const isZip = ext === '.zip';
+        const limit = isZip ? ZIP_ARCHIVE_LIMIT : SINGLE_FILE_LIMIT;
+        const limitText = isZip ? '1000MB' : '50MB';
+        if (file.size > limit) {
+            showNotification(`${file.name} 超过${isZip ? '压缩包' : '单个材料'} ${limitText} 限制`, 'error');
             return;
         }
         uploadedFiles.push({ name: file.name, size: file.size });
@@ -1971,24 +1941,25 @@ function handleFileUpload(input) {
 
     if (addedCount > 0) {
         renderFileList();
-        // 如果案件名称为空，自动取第一个文件的文件名（去掉扩展名）
-        const nameInput = document.getElementById('createCaseName');
-        if (!nameInput.value.trim() && uploadedFiles.length > 0) {
-            const firstName = uploadedFiles[0].name;
-            const dotIndex = firstName.lastIndexOf('.');
-            nameInput.value = dotIndex > 0 ? firstName.substring(0, dotIndex) : firstName;
-        }
+        updateCreateSubmitBtn();
     }
     input.value = '';
 }
 
 function renderFileList() {
     const listEl = document.getElementById('uploadFileList');
+    // v2.33: 图标按文件类型区分（压缩包/图片/文档）
+    const fileIcon = (name) => {
+        const ext = '.' + name.split('.').pop().toLowerCase();
+        if (ext === '.zip') return 'fa-file-archive';
+        if (['.jpg', '.jpeg', '.png'].includes(ext)) return 'fa-file-image';
+        return 'fa-file-alt';
+    };
     listEl.innerHTML = uploadedFiles.map((f, i) => {
         const sizeStr = f.size < 1024 * 1024 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size / 1024 / 1024).toFixed(1) + ' MB';
         return `
             <div class="upload-file-item">
-                <i class="fas fa-file-archive"></i>
+                <i class="fas ${fileIcon(f.name)}"></i>
                 <span class="upload-file-name">${f.name}</span>
                 <span class="upload-file-size">${sizeStr}</span>
                 <button class="upload-file-remove" onclick="removeUploadedFile(${i})"><i class="fas fa-times"></i></button>
@@ -2000,41 +1971,47 @@ function renderFileList() {
 function removeUploadedFile(index) {
     uploadedFiles.splice(index, 1);
     renderFileList();
+    updateCreateSubmitBtn();
 }
-
+// v2.33: 提交新建案件（极简流程）
+// 必须 ≥1 个文件才能建案：0 文件时提示并高亮上传区，不建案
+// ≥1 文件：默认名 = 首个文件名（去扩展名），材料进入解析中，标记 firstParsePending，生成 mock 识别结果
 function submitCreateCase() {
-    const caseName = document.getElementById('createCaseName').value.trim();
-    const caseNumber = document.getElementById('createCaseNumber').value.trim();
-    const caseWord = document.getElementById('createCaseWord').value;
-    const cause = document.getElementById('createCaseCauseHidden').value;
-    const partyA = document.getElementById('createPartyA').value.trim();
-    const partyB = document.getElementById('createPartyB').value.trim();
-    const handler = document.getElementById('createHandler').value.trim();
-    const date = document.getElementById('createCaseDate').value;
-    const type = getCauseType(cause) || 'contract';
-    
-    if (!caseName) {
-        showNotification('请填写案件名称', 'error');
+    // v2.33: 建案前置校验（原支持 0 文件建案，现必须 ≥1 个文件）
+    if (uploadedFiles.length === 0) {
+        showNotification('请先上传至少 1 个材料文件，再上传并解析', 'error');
+        const uploadArea = document.getElementById('uploadArea');
+        if (uploadArea) {
+            uploadArea.classList.add('upload-area-nudge');
+            setTimeout(() => uploadArea.classList.remove('upload-area-nudge'), 1500);
+        }
         return;
     }
-    
+
     const now = new Date().toISOString().split('T')[0];
     const currentUser = getCurrentUserName();
+
+    // 默认名：首个文件名去扩展名
+    const firstName = uploadedFiles[0].name;
+    const dotIndex = firstName.lastIndexOf('.');
+    const base = dotIndex > 0 ? firstName.substring(0, dotIndex) : firstName;
+    const caseName = base.trim() || '未命名案件';
+
     const newCase = {
         id: 'newcase_' + Date.now(),
         caseName: caseName,
-        caseNumber: caseNumber || '',
-        caseWord: caseWord || '',
-        cause: cause || '',
-        type: type,
-        partyA: partyA || '',
-        partyB: partyB || '',
-        handler: handler || currentUser,
+        caseNumber: '',
+        caseWord: '',
+        cause: '',
+        type: 'contract',
+        partyA: '',
+        partyB: '',
+        handler: currentUser,
         // v1.39: handlers 数组与 handler 同步（用户侧新建为单承办人，保持向后兼容）
-        handlers: [handler || currentUser],
+        handlers: [currentUser],
         createdBy: currentUser,
         status: 'pending',
-        date: date || now,
+        date: now,
         fileCount: uploadedFiles.length,
         updatedAt: now,
         filesInitialized: true,
@@ -2044,21 +2021,82 @@ function submitCreateCase() {
             size: f.size,
             estimatedTokens: estimateFileTokens(f),
             updatedAt: now,
-            ocrStatus: 'done',
-            parseStatus: 'success',  // v1.36: 新建案件时材料标记为已解析
+            ocrStatus: 'pending',
+            parseStatus: 'parsing',  // v2.32: 上传后进入解析中
             errorType: null,
-            parsedAt: now
+            parsedAt: null
         })),
         documents: []
     };
-    
+
+    // v2.32: 首次解析标记（列表页「新」标 + 详情页确认提示条依据，编辑保存后清除）
+    newCase.firstParsePending = true;
+    // v2.32: mock 识别结果（解析完成后由「编辑」弹框预填）
+    newCase.parseResult = generateMockParseResult(uploadedFiles[0].name);
+
     getCurrentBusiness().cases.unshift(newCase);
     saveBusinessSystems();
     renderCaseList();
     closeCreateCaseDialog();
-    
-    const fileMsg = uploadedFiles.length > 0 ? `，已上传 ${uploadedFiles.length} 个案件包` : '';
-    showNotification(`案件 "${caseName}" 已创建成功${fileMsg}`, 'success');
+
+    const caseIdForParse = newCase.id;
+    const newFileIds = newCase.files.map(f => f.id);
+    showNotification(`已上传 ${uploadedFiles.length} 个文件，正在解析...`, 'success');
+    newFileIds.forEach(fid => startMockParsing(caseIdForParse, fid));
+}
+
+// v2.32: 生成 mock 识别结果（演示用）
+// 刻意演示"案由识别为上级案由"问题（如 房屋租赁合同纠纷 → 合同纠纷），
+// 呼应 2026-09-07 演示评审实际案例：案由识别错误将导致要件匹配错误，需用户确认修改
+function generateMockParseResult(fileName) {
+    const name = fileName || '';
+    // 关键词 → 子案由映射（找到所属大类后，取大类作为 mock"识别结果"，即上级案由）
+    const causeKeywords = [
+        { kw: ['租赁', '房租'], child: '房屋租赁合同纠纷' },
+        { kw: ['借贷', '借款', '欠款'], child: '民间借贷纠纷' },
+        { kw: ['买卖', '购销'], child: '买卖合同纠纷' },
+        { kw: ['施工', '工程'], child: '建设工程施工合同纠纷' },
+        { kw: ['离婚'], child: '离婚纠纷' },
+        { kw: ['交通', '事故'], child: '机动车交通事故责任纠纷' },
+        { kw: ['劳动', '工伤'], child: '劳动争议' }
+    ];
+    let childCause = '';
+    for (const item of causeKeywords) {
+        if (item.kw.some(k => name.includes(k))) { childCause = item.child; break; }
+    }
+    if (!childCause) childCause = '民间借贷纠纷';
+
+    // 在案由树中找到该子案由的父级案由组，作为 mock 识别结果（上级案由）
+    let mockCause = '合同纠纷';
+    const tree = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentBusiness]) || [];
+    outer:
+    for (const cat of tree) {
+        for (const grp of (cat.children || [])) {
+            if ((grp.children || []).includes(childCause)) { mockCause = grp.name; break outer; }
+        }
+    }
+
+    const surnamePool = ['张', '李', '王', '刘', '陈', '赵', '周', '吴'];
+    const pick = () => surnamePool[Math.floor(Math.random() * surnamePool.length)] + '某';
+    const num = Math.floor(10000 + Math.random() * 89999);
+    const caseWords = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[currentBusiness]) || ['民初'];
+
+    return {
+        caseNumber: `（2026）京0105民初${num}号`,
+        caseWord: caseWords.includes('民初') ? '民初' : (caseWords[0] || ''),
+        cause: mockCause,
+        partyA: pick(),
+        partyB: pick()
+    };
+}
+
+// v2.32: 页面加载时续接未完成的 mock 解析（覆盖刷新/切页中断的 parsing 文件）
+function resumePendingParsing() {
+    getCurrentCases().forEach(c => {
+        (c.files || []).forEach(f => {
+            if (f.parseStatus === 'parsing') startMockParsing(c.id, f.id);
+        });
+    });
 }
 
 // ===== 补充上传弹窗 =====
@@ -2640,39 +2678,52 @@ function openEditCase(caseId) {
     const cases = getCurrentCases();
     const caseItem = cases.find(c => c.id === caseId);
     if (!caseItem) return;
-    
+
     const current = getCurrentBusiness();
     const labels = current.partiesLabels;
     document.getElementById('editPartyALabel').textContent = labels[0];
     document.getElementById('editPartyBLabel').textContent = labels[1];
-    
+
+    // v2.32: 首次解析完成后，编辑弹框预填 mock 识别结果（此前为空）
+    // 解析未完成时不预填（识别结果尚未"提取"）；非首次解析案件沿用案件原有值
+    const displayCase = { ...caseItem };
+    const parseStats = getCaseParseStats(caseItem);
+    const parseDone = parseStats.parsing === 0 && (caseItem.files || []).length > 0;
+    if (caseItem.firstParsePending && parseDone && caseItem.parseResult) {
+        displayCase.caseNumber = caseItem.parseResult.caseNumber || caseItem.caseNumber;
+        displayCase.caseWord = caseItem.parseResult.caseWord || caseItem.caseWord;
+        displayCase.cause = caseItem.parseResult.cause || caseItem.cause;
+        displayCase.partyA = caseItem.parseResult.partyA || caseItem.partyA;
+        displayCase.partyB = caseItem.parseResult.partyB || caseItem.partyB;
+    }
+
     const causeText = document.getElementById('editCaseCauseText');
     const causeHidden = document.getElementById('editCaseCauseHidden');
-    if (caseItem.cause) {
-        causeHidden.value = caseItem.cause;
-        causeText.textContent = caseItem.cause;
+    if (displayCase.cause) {
+        causeHidden.value = displayCase.cause;
+        causeText.textContent = displayCase.cause;
         causeText.classList.remove('placeholder');
     } else {
         causeHidden.value = '';
         causeText.textContent = '请选择案由';
         causeText.classList.add('placeholder');
     }
-    
-    document.getElementById('editCaseName').value = caseItem.caseName || '';
-    document.getElementById('editCaseNumber').value = caseItem.caseNumber || '';
-    
+
+    document.getElementById('editCaseName').value = displayCase.caseName || '';
+    document.getElementById('editCaseNumber').value = displayCase.caseNumber || '';
+
     const editCaseWordSelect = document.getElementById('editCaseWord');
     const editCaseWords = caseWordListByOrg[currentBusiness] || [];
     editCaseWordSelect.innerHTML = '<option value="">请选择案字</option>' +
         editCaseWords.map(w => `<option value="${w}">${w}</option>`).join('');
-    editCaseWordSelect.value = caseItem.caseWord || '';
-    
-    document.getElementById('editPartyA').value = caseItem.partyA || '';
-    document.getElementById('editPartyB').value = caseItem.partyB || '';
+    editCaseWordSelect.value = displayCase.caseWord || '';
+
+    document.getElementById('editPartyA').value = displayCase.partyA || '';
+    document.getElementById('editPartyB').value = displayCase.partyB || '';
     // v1.39: 编辑时展示全部承办人（顿号分隔），保存时按分隔符拆分同步 handlers
     document.getElementById('editHandler').value = getCaseHandlers(caseItem).join('、');
-    document.getElementById('editCaseDate').value = caseItem.date || '';
-    
+    document.getElementById('editCaseDate').value = displayCase.date || '';
+
     document.getElementById('editOverlay').classList.add('show');
     document.getElementById('editDialog').classList.add('show');
 }
@@ -2712,6 +2763,12 @@ function submitEditCase() {
     caseItem.handlers = handlerArr.length > 0 ? handlerArr : [primaryHandler];
     caseItem.date = document.getElementById('editCaseDate').value || caseItem.date;
     caseItem.updatedAt = new Date().toISOString().split('T')[0];
+
+    // v2.32: 首次编辑保存即完成信息确认——移除「新」标与详情页确认提示条
+    if (caseItem.firstParsePending) {
+        caseItem.firstParsePending = false;
+        delete caseItem.parseResult;
+    }
 
     saveBusinessSystems();
     renderCaseList();
@@ -2810,12 +2867,8 @@ function toggleCauseLevel2(i1, i2) {
 
 function selectCause(causeName) {
     selectedCauseValue = causeName;
-    
-    if (causeSelectorTarget === 'create') {
-        document.getElementById('createCaseCauseHidden').value = causeName;
-        document.getElementById('createCaseCauseText').textContent = causeName;
-        document.getElementById('createCaseCauseText').classList.remove('placeholder');
-    } else if (causeSelectorTarget === 'edit') {
+
+    if (causeSelectorTarget === 'edit') {
         document.getElementById('editCaseCauseHidden').value = causeName;
         document.getElementById('editCaseCauseText').textContent = causeName;
         document.getElementById('editCaseCauseText').classList.remove('placeholder');
@@ -3014,14 +3067,13 @@ function renderRefinePreview() {
 // ===== 全部文书面板 =====
 let docsPanelSearch = '';
 
-// v1.21: 打开「我的模板」「我的指令」页面，URL 携带当前业务系统参数
+// v2.33: 打开「我的模板」「我的指令」「我的要件」页面
+// 业务系统切换已在各页隐藏并固定默认法院，不再通过 URL 传 org 参数
 function openMyTemplates() {
-    const orgParam = encodeURIComponent(localStorage.getItem('currentBusiness') || 'court');
-    window.open('my-templates.html?org=' + orgParam, '_blank');
+    window.open('my-templates.html', '_blank');
 }
 function openMyPrompts() {
-    const orgParam = encodeURIComponent(localStorage.getItem('currentBusiness') || 'court');
-    window.open('my-prompts.html?org=' + orgParam, '_blank');
+    window.open('my-prompts.html', '_blank');
 }
 // 打开「我的要件」页面（无当前案由上下文，由用户在页面左侧案由列表自行选择）
 function openMyElements() {
@@ -3204,6 +3256,19 @@ document.addEventListener('DOMContentLoaded', function() {
     updateHandlerFilter();
     renderCaseHeader();
     renderCaseList();
+
+    // v2.32: 续接未完成的 mock 解析（页面刷新/切页中断的 parsing 文件）
+    resumePendingParsing();
+
+    // v2.32: 支持详情页提示条【去修改】跳转——自动打开对应案件的编辑弹框
+    const openEditCaseId = sessionStorage.getItem('openEditCaseId');
+    if (openEditCaseId) {
+        sessionStorage.removeItem('openEditCaseId');
+        setTimeout(() => {
+            const result = findCaseById(openEditCaseId);
+            if (result) openEditCase(openEditCaseId);
+        }, 100);
+    }
 
     // v1.36: 监听文件解析状态更新事件，自动刷新列表（mock 解析完成后触发）
     window.addEventListener('case-file-parse-updated', function(e) {

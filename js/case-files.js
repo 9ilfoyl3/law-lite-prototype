@@ -1,4 +1,5 @@
 // ============ Case Files Page JavaScript ============
+// v2.31 要件抽屉交互增强（V1.2.1 PRD 第八章）：1)一键生成取消整体加载遮罩，改为逐条错峰完成、每完成一条就地刷新该卡片（refreshElementItemDom），批量运行期间已答要件【编辑/重新生成/内容优化】全程可操作；2)未答要件新增单条【生成答案】按钮（generateSingleElementAnswer，含单条生成中指示）；3)标准/我的要件支持个案移除（removeElementFromCase，记录存 localStorage.caseElementsRemoved_${caseId}，仅本案生效不动后台模板与个人预设，答案/优化记录/勾选联动清理）；4)抽屉底部新增「恢复默认要件」入口（restoreDefaultElements，仅存在移除记录时显示）；5)mergeCaseElements/loadCaseElementsAll 加载时过滤已移除要件；6)移除 caseElementsLoading 整体遮罩相关逻辑
 // v2.30 文书生成结果接入可复用文档编辑器：1)流式输出速度加快；2)流式输出期间禁用【文书精修】【重新配置】按钮，完成后启用；3)流式输出完成后右栏自动渲染 DocEditor，用户可直接编辑文书；4)保存/下载/精修均读取编辑器最新内容
 // v2.29 本案要件内联编辑与生成联动优化：1)内联编辑区移除"修改答案"文字标签与 placeholder，仅保留文本框与保存/取消按钮；2)新增 hasExistingElementAnswers/collectExistingElementAnswers 辅助函数；3)generateByMaterial（一步生成）、compileSteps（分步生成编译）新增"已 AI 总结则默认引入"逻辑——caseElementsAnswers 存在任意要件答案时不再弹框，直接引入已生成要件答案并直接生成，友好提示告知；未做过 AI 总结时维持原弹框询问逻辑；4)compileSteps 要件范围同步用 mergeCaseElements 合并个案要件（与 generateByMaterial 一致）
 // v2.28 本案要件答案操作升级（对齐分步生成步骤操作模式）：1)原"修改"按钮更名为"编辑"；2)新增"重新生成"按钮（regenerateElementAnswer，覆盖原答案）；3)新增"追问"按钮（followUpElement/submitElementFollowUp，多轮对话式追问，历史持久化到 caseElementsFollowUps/localStorage.caseElementsFollowUps_${caseId}）；4)移除答案区"AI 生成答案"文字标签，仅展示答案正文；5)三个操作按钮仅在已生成答案后出现
@@ -296,11 +297,19 @@ function initPage() {
     // 渲染材料树
     renderMaterialTree();
 
+    // v2.32: 续接未完成的 mock 解析（页面刷新/切页中断的 parsing 文件）
+    (caseItem.files || []).forEach(f => {
+        if (f.parseStatus === 'parsing') startMockParsing(caseId, f.id);
+    });
+    // v2.32: 渲染案件信息解析提示条（解析中浅蓝 / 待确认浅黄+去修改）
+    renderCaseInfoParseAlert();
+
     // v1.36: 监听文件解析状态更新事件，自动刷新材料树（mock 解析完成后触发）
     window.addEventListener('case-file-parse-updated', function(e) {
         if (e.detail && e.detail.caseId === caseId) {
             renderMaterialTree();
             updateAllSelectedCounts();
+            renderCaseInfoParseAlert();  // v2.32: 解析状态变化时同步刷新提示条
         }
     });
 
@@ -416,6 +425,44 @@ function initPage() {
             }
         }, 100);
     }
+}
+
+// ===== v2.32: 案件信息解析提示条（PRD 第九章） =====
+// 状态 1 解析中：浅蓝「正在从材料中提取案件信息」，无按钮
+// 状态 2 待确认：浅黄「案件信息已提取，请确认是否准确」+【去修改】，编辑保存后不再显示
+function renderCaseInfoParseAlert() {
+    const alertEl = document.getElementById('caseInfoParseAlert');
+    if (!alertEl || !caseItem) return;
+
+    const stats = getCaseParseStats(caseItem);
+    if (stats.parsing > 0) {
+        alertEl.className = 'case-info-parse-alert parsing';
+        alertEl.innerHTML = `
+            <div class="parse-alert-text">
+                <i class="fas fa-info-circle"></i>
+                <span>正在从材料中提取案件信息</span>
+            </div>`;
+        alertEl.style.display = 'flex';
+        return;
+    }
+    if (caseItem.firstParsePending && stats.total > 0) {
+        alertEl.className = 'case-info-parse-alert confirm';
+        alertEl.innerHTML = `
+            <div class="parse-alert-text">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>案件信息已提取，请确认是否准确；如识别有误，可点击"去修改"调整</span>
+            </div>
+            <button class="parse-alert-action" onclick="gotoEditCaseInfo()">去修改</button>`;
+        alertEl.style.display = 'flex';
+        return;
+    }
+    alertEl.style.display = 'none';
+}
+
+// v2.32: 提示条【去修改】→ 跳回案件列表页并自动打开该案件的编辑弹框
+function gotoEditCaseInfo() {
+    sessionStorage.setItem('openEditCaseId', caseId);
+    window.location.href = 'cases.html';
 }
 
 // v2.23 (任务 9.1): 应用 sessionStorage 中的生成配置
@@ -3334,20 +3381,20 @@ function exitDrawerGenerateMode() {
     if (bar) bar.classList.add('hidden');
 }
 
-// 更新确认生成按钮：N = 已勾选且有答案的要件数；一键生成加载期间禁用
+// 更新确认生成按钮：N = 已勾选且有答案的要件数；一键生成批量运行期间禁用
 function updateDrawerGenerateBtn() {
     const btn = document.getElementById('drawerGenerateBtn');
     if (!btn) return;
     const n = collectDrawerElementAnswers().length;
     btn.innerHTML = `<i class="fas fa-file-signature"></i> 确认生成（引入 ${n} 条要件）`;
-    btn.disabled = !!aiSummarizeLoadingTimer;
-    btn.title = aiSummarizeLoadingTimer ? '答案生成中，请稍候' : '';
+    btn.disabled = aiBatchGenerating;
+    btn.title = aiBatchGenerating ? '答案生成中，请稍候' : '';
 }
 
 // 抽屉底部【确认生成】校验与触发
 function confirmDrawerGenerate() {
     if (!drawerGenerateMode) return;
-    if (aiSummarizeLoadingTimer) {
+    if (aiBatchGenerating) {
         showNotification('答案生成中，请稍候', 'warning');
         return;
     }
@@ -4312,16 +4359,33 @@ function setCaseCustomElements(cid, arr) {
 
 // v2.27 (V1.1.8): 将个案要件合并进 allPresets，供引入要件弹框统一消费
 // 与 loadCaseElementsAll 保持一致的过滤（enabled !== false）与 source 标记
+// v2.31 (V1.2.1): 标准/我的要件按本案移除记录过滤（mergeCaseElements 同时服务一步/分步生成的引入弹框计数）
 function mergeCaseElements(allPresets, cid) {
     const base = allPresets && typeof allPresets === 'object' ? allPresets : { standard: [], mine: [] };
+    const removedSet = new Set(getRemovedElementNames(cid));
+    const filterRemoved = (arr) => (arr || []).filter(p => p && p.name && !removedSet.has(p.name));
     const caseCustom = getCaseCustomElements(cid)
         .filter(p => p && p.enabled !== false)
         .map(p => ({ ...p, source: 'case' }));
     return {
-        standard: base.standard || [],
-        mine: base.mine || [],
+        standard: filterRemoved(base.standard),
+        mine: filterRemoved(base.mine),
         case: caseCustom
     };
+}
+
+// ---- V1.2.1: 标准/我的要件个案移除记录存取（案件维度）----
+// 移除 = 个案内"不引用"，非物理删除：后台案由模板与个人要件预设不受影响，恢复默认要件可一键还原
+function getRemovedElementNames(cid) {
+    if (!cid) return [];
+    try {
+        const arr = JSON.parse(localStorage.getItem(`caseElementsRemoved_${cid}`) || '[]');
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+}
+function setRemovedElementNames(cid, arr) {
+    if (!cid) return;
+    localStorage.setItem(`caseElementsRemoved_${cid}`, JSON.stringify(arr || []));
 }
 
 // ---- 要件答案存取（案件维度）----
@@ -4403,8 +4467,14 @@ function loadCaseElementsAll() {
     const _org = localStorage.getItem('currentBusiness') || org || 'court';
     const _cw = parseCaseWord(caseItem.caseNumber, _org);
     const presets = getAllElementPresets(caseItem.cause, _org, _cw);
-    const standard = (presets.standard || []).map(p => ({ ...p, source: 'standard' }));
-    const mine = (presets.mine || []).map(p => ({ ...p, source: 'mine' }));
+    // v2.31 (V1.2.1): 标准/我的要件按本案移除记录过滤（仅本案生效，不动后台模板与个人预设）
+    const _removedSet = new Set(getRemovedElementNames(caseItem.id));
+    const standard = (presets.standard || [])
+        .filter(p => p && p.name && !_removedSet.has(p.name))
+        .map(p => ({ ...p, source: 'standard' }));
+    const mine = (presets.mine || [])
+        .filter(p => p && p.name && !_removedSet.has(p.name))
+        .map(p => ({ ...p, source: 'mine' }));
     const caseCustom = getCaseCustomElements(caseItem.id)
         .filter(p => p && p.enabled !== false)
         .map(p => ({ ...p, source: 'case' }));
@@ -4461,9 +4531,6 @@ function renderElementsList() {
     const mine = data.mine || [];
     const caseC = data.case || [];
 
-    // v1.51: 保存加载态 DOM 引用，innerHTML 赋值后重新 append（避免被清掉）
-    const loadingEl = document.getElementById('caseElementsLoading');
-
     // 统计条
     const statsEl = document.getElementById('caseElementsStats');
     if (statsEl) {
@@ -4474,6 +4541,21 @@ function renderElementsList() {
         `;
     }
 
+    // v2.31 (V1.2.1): 恢复默认要件入口——仅当本案存在已移除的标准/我的要件时显示
+    const restoreLink = document.getElementById('restoreElementsLink');
+    if (restoreLink) {
+        const removedCount = caseItem ? getRemovedElementNames(caseItem.id).length : 0;
+        if (removedCount > 0) {
+            restoreLink.classList.remove('hidden');
+            restoreLink.disabled = aiBatchGenerating;
+            restoreLink.title = aiBatchGenerating ? '生成中，请稍候' : '恢复本案已移除的标准/我的要件';
+        } else {
+            restoreLink.classList.add('hidden');
+            restoreLink.disabled = false;
+            restoreLink.title = '';
+        }
+    }
+
     if (standard.length === 0 && mine.length === 0 && caseC.length === 0) {
         body.innerHTML = `
             <div class="case-elements-empty">
@@ -4482,7 +4564,6 @@ function renderElementsList() {
                 <div style="font-size:11px;margin-top:6px;">可在下方新增个案要件，或前往"管理我的要件"维护</div>
             </div>
         `;
-        if (loadingEl) body.appendChild(loadingEl);
         updateAiSummarizeBtnState(0);
         return;
     }
@@ -4492,20 +4573,20 @@ function renderElementsList() {
     if (mine.length > 0) html += renderElementsGroup('我的要件', mine, 'mine');
     if (caseC.length > 0) html += renderElementsGroup('个案要件', caseC, 'case');
     body.innerHTML = html;
-    if (loadingEl) body.appendChild(loadingEl);
     updateAiSummarizeBtnState(standard.length + mine.length + caseC.length);
     // V1.2: 生成模式下，列表渲染后同步刷新确认生成按钮计数（覆盖编辑/重新生成/优化/新增删除等变更）
     if (drawerGenerateMode) updateDrawerGenerateBtn();
 }
 
 // v2.29: 一键生成按钮可用性控制——无可用要件时置灰并提示
+// v2.31 (V1.2.1): 批量生成运行期间保持禁用
 function updateAiSummarizeBtnState(totalCount) {
     const btn = document.getElementById('aiSummarizeBtn');
     if (!btn) return;
     if (totalCount > 0) {
-        btn.disabled = false;
+        btn.disabled = aiBatchGenerating;
         btn.classList.remove('disabled');
-        btn.title = '';
+        btn.title = aiBatchGenerating ? '答案生成中，请稍候' : '';
     } else {
         btn.disabled = true;
         btn.classList.add('disabled');
@@ -4516,25 +4597,43 @@ function updateAiSummarizeBtnState(totalCount) {
 function renderElementsGroup(title, items, source) {
     const listHtml = items.map((p, idx) => {
         const checked = caseElementsSelection.has(p.name) ? 'checked' : '';
-        const answer = (caseElementsAnswers[p.name] || '').trim();
-        const answered = answer.length > 0;
-        const answeredDot = answered ? '<span class="answered-dot" title="已生成答案"></span>' : '';
-        const delBtn = source === 'case'
-            ? `<button type="button" class="case-elements-item-del-btn" onclick="deleteCaseElement('${escapeJsString(p.name)}')" title="删除该个案要件"><i class="fas fa-trash-alt"></i></button>`
-            : '';
-        // 已答状态直接在要件项下方展示答案内容；操作按钮参考分步生成（编辑/重新生成/内容优化）
-        let answerHtml = '';
-        if (answered) {
-            const followUps = (caseElementsFollowUps[p.name] || []);
-            const optimizeCount = followUps.length;
-            const optimizeDisabled = optimizeCount >= 3 ? 'disabled title="已达到最大优化轮次（3 轮）"' : '';
-            const optimizeLabel = optimizeCount > 0 ? `内容优化（${optimizeCount}/3）` : '内容优化';
-            // v1.63: 优化记录（与分步生成 v1.61/v1.62 逻辑一致）——置顶「优化前原始内容」可回填；
-            // 每轮下行展示该轮优化前内容（beforeAnswer → 上一轮 appliedAnswer → 兜底 f.a）
-            const pv = s => { const t = (s || '').replace(/\s+/g, ' ').trim(); return t.length > 60 ? t.substring(0, 60) + '…' : t; };
-            const origAnswer = (followUps.length > 0 && followUps[0].beforeAnswer != null) ? followUps[0].beforeAnswer : null;
-            const followUpsHtml = origAnswer != null
-                ? `<details class="case-elements-optimization-history">
+        return `
+            <div class="case-elements-item">
+                <input type="checkbox" ${checked} onchange="toggleDrawerElementSelection('${escapeJsString(p.name)}', this.checked)">
+                <div class="case-elements-item-body">${buildElementItemBodyHtml(p, source)}</div>
+            </div>
+        `;
+    }).join('');
+    return `
+        <div class="case-elements-group">
+            <div class="case-elements-group-title">${title} <span class="group-count">${items.length} 项</span></div>
+            ${listHtml}
+        </div>
+    `;
+}
+
+// v2.31 (V1.2.1): 单条要件卡片正文 HTML（标题+问题+答案区），供整体渲染与就地刷新（refreshElementItemDom）共用
+function buildElementItemBodyHtml(p, source) {
+    const answer = (caseElementsAnswers[p.name] || '').trim();
+    const answered = answer.length > 0;
+    const answeredDot = answered ? '<span class="answered-dot" title="已生成答案"></span>' : '';
+    // v2.31 (V1.2.1): 标准/我的要件支持从本案移除（复用个案要件删除按钮样式，仅本案生效）；个案要件维持物理删除
+    const delBtn = source === 'case'
+        ? `<button type="button" class="case-elements-item-del-btn" onclick="deleteCaseElement('${escapeJsString(p.name)}')" title="删除该个案要件"><i class="fas fa-trash-alt"></i></button>`
+        : `<button type="button" class="case-elements-item-del-btn" onclick="removeElementFromCase('${escapeJsString(p.name)}')" title="从本案移除，不影响案由模板"><i class="fas fa-trash-alt"></i></button>`;
+    // 已答状态直接在要件项下方展示答案内容；操作按钮参考分步生成（编辑/重新生成/内容优化）
+    let answerHtml = '';
+    if (answered) {
+        const followUps = (caseElementsFollowUps[p.name] || []);
+        const optimizeCount = followUps.length;
+        const optimizeDisabled = optimizeCount >= 3 ? 'disabled title="已达到最大优化轮次（3 轮）"' : '';
+        const optimizeLabel = optimizeCount > 0 ? `内容优化（${optimizeCount}/3）` : '内容优化';
+        // v1.63: 优化记录（与分步生成 v1.61/v1.62 逻辑一致）——置顶「优化前原始内容」可回填；
+        // 每轮下行展示该轮优化前内容（beforeAnswer → 上一轮 appliedAnswer → 兜底 f.a）
+        const pv = s => { const t = (s || '').replace(/\s+/g, ' ').trim(); return t.length > 60 ? t.substring(0, 60) + '…' : t; };
+        const origAnswer = (followUps.length > 0 && followUps[0].beforeAnswer != null) ? followUps[0].beforeAnswer : null;
+        const followUpsHtml = origAnswer != null
+            ? `<details class="case-elements-optimization-history">
                     <summary>优化记录（已优化 ${followUps.length} 轮，可回填历史状态）</summary>
                     <div class="case-elements-followup-item">
                         <div class="case-elements-followup-q"><i class="fas fa-file-alt"></i> 优化前原始内容</div>
@@ -4560,37 +4659,33 @@ function renderElementsGroup(title, items, source) {
                         </div>
                     `;}).join('')}
                 </details>`
-                : '';
-            answerHtml = `<div class="case-elements-item-answer">
-                   <div class="answer-text">${escapeHtmlForElements(answer)}</div>
-                   <div class="case-elements-item-actions">
-                       <button type="button" class="case-elements-item-edit-btn" onclick="editElementAnswerInline('${escapeJsString(p.name)}')"><i class="fas fa-edit"></i> 编辑</button>
-                       <button type="button" class="case-elements-item-edit-btn" onclick="regenerateElementAnswer('${escapeJsString(p.name)}')"><i class="fas fa-redo"></i> 重新生成</button>
-                       <button type="button" class="case-elements-item-edit-btn" onclick="contentOptimizeElement('${escapeJsString(p.name)}')" ${optimizeDisabled}><i class="fas fa-magic-wand-sparkles"></i> ${optimizeLabel}</button>
-                   </div>
-                   <div class="case-elements-followup-list">${followUpsHtml}</div>
-               </div>`;
-        }
-        return `
-            <div class="case-elements-item">
-                <input type="checkbox" ${checked} onchange="toggleDrawerElementSelection('${escapeJsString(p.name)}', this.checked)">
-                <div class="case-elements-item-body">
-                    <div class="case-elements-item-title">
-                        ${escapeHtmlForElements(p.name)} ${answeredDot}
-                        <span class="source-tag ${source}">${sourceLabel(source)}</span>
-                        ${delBtn}
-                    </div>
-                    <div class="case-elements-item-question">${escapeHtmlForElements(p.question || p.desc || '')}</div>
-                    ${answerHtml}
-                </div>
-            </div>
-        `;
-    }).join('');
+            : '';
+        answerHtml = `<div class="case-elements-item-answer">
+               <div class="answer-text">${escapeHtmlForElements(answer)}</div>
+               <div class="case-elements-item-actions">
+                   <button type="button" class="case-elements-item-edit-btn" onclick="editElementAnswerInline('${escapeJsString(p.name)}')"><i class="fas fa-edit"></i> 编辑</button>
+                   <button type="button" class="case-elements-item-edit-btn" onclick="regenerateElementAnswer('${escapeJsString(p.name)}')"><i class="fas fa-redo"></i> 重新生成</button>
+                   <button type="button" class="case-elements-item-edit-btn" onclick="contentOptimizeElement('${escapeJsString(p.name)}')" ${optimizeDisabled}><i class="fas fa-magic-wand-sparkles"></i> ${optimizeLabel}</button>
+               </div>
+               <div class="case-elements-followup-list">${followUpsHtml}</div>
+           </div>`;
+    } else if (elementGeneratingNames.has(p.name)) {
+        // v2.31 (V1.2.1): 该要件正在生成中（批量或单条）——轻量单条生成指示
+        answerHtml = `<div class="case-elements-item-generating"><span class="ec-spinner ec-spinner-sm"></span><span>正在生成参考答案…</span></div>`;
+    } else {
+        // v2.31 (V1.2.1): 未答要件提供单条【生成答案】入口（对齐实际系统）
+        answerHtml = `<div class="case-elements-item-pending">
+               <button type="button" class="case-elements-item-edit-btn" onclick="generateSingleElementAnswer('${escapeJsString(p.name)}')"><i class="fas fa-magic-wand-sparkles"></i> 生成答案</button>
+           </div>`;
+    }
     return `
-        <div class="case-elements-group">
-            <div class="case-elements-group-title">${title} <span class="group-count">${items.length} 项</span></div>
-            ${listHtml}
+        <div class="case-elements-item-title">
+            ${escapeHtmlForElements(p.name)} ${answeredDot}
+            <span class="source-tag ${source}">${sourceLabel(source)}</span>
+            ${delBtn}
         </div>
+        <div class="case-elements-item-question">${escapeHtmlForElements(p.question || p.desc || '')}</div>
+        ${answerHtml}
     `;
 }
 
@@ -4904,13 +4999,20 @@ function deleteCaseElement(name) {
 
 // v2.27: 一键生成（原名"AI总结"，V1.1.9 改名去技术术语）—— 对全部要件批量生成答案，无需勾选，用户可直接在列表中修改
 // 复用 generateMockElementAnswer（与"生成文书弹框中引入要件"保持一致逻辑）
-// v1.51: 新增加载态——点击后先显示加载态覆盖要件列表区域，禁用底部按钮，1.5s 后填充答案（原型演示加速，实际约 1 分钟）
-let aiSummarizeLoadingTimer = null;
+// v2.31 (V1.2.1): 取消整体加载遮罩，改为逐条错峰完成——每完成一条就地刷新该卡片并立即放开该条操作，
+// 批量运行期间已答要件的【编辑/重新生成/内容优化】全程可操作，单条操作与批量任务并行不互斥
+let aiBatchGenerating = false;          // 批量任务运行中
+let aiBatchTimers = [];                 // 批量任务计时器集合（抽屉关闭时统一清理）
+let aiBatchDone = 0;                    // 已完成条数（含运行中被移除而跳过的）
+let aiBatchWritten = 0;                 // 实际写入答案的条数（排除运行中被移除的）
+let elementGeneratingNames = new Set(); // 正在生成中的要件名（批量或单条），用于渲染单条"生成中"指示
+let elementSingleTimers = new Map();    // 单条生成计时器 { name: timerId }
 function aiSummarizeElements() {
     if (!caseItem) {
         showNotification('请先选择案件', 'warning');
         return;
     }
+    if (aiBatchGenerating) return; // 防重入
     const all = [
         ...(caseElementsCache.standard || []).map(p => ({ ...p, source: 'standard' })),
         ...(caseElementsCache.mine || []).map(p => ({ ...p, source: 'mine' })),
@@ -4921,46 +5023,177 @@ function aiSummarizeElements() {
         showNotification('暂无要件可生成，请先新增或维护要件', 'warning');
         return;
     }
-    // v1.51: 显示加载态，禁用底部按钮
-    const loadingEl = document.getElementById('caseElementsLoading');
+    // v2.31: 禁用底部按钮与确认生成按钮（防半成品确认），恢复默认要件入口由 renderElementsList 联动禁用
+    aiBatchGenerating = true;
+    aiBatchDone = 0;
+    aiBatchWritten = 0;
     const aiBtn = document.getElementById('aiSummarizeBtn');
     const addBtn = document.getElementById('addCaseElementBtn');
-    if (loadingEl) loadingEl.classList.remove('hidden');
     if (aiBtn) aiBtn.disabled = true;
     if (addBtn) addBtn.disabled = true;
-    // V1.2: 加载期间禁用确认生成按钮（防半成品确认）
+    all.forEach(p => elementGeneratingNames.add(p.name));
+    renderElementsList(); // 渲染各要件"生成中"指示
     if (drawerGenerateMode) updateDrawerGenerateBtn();
-
-    // 原型演示加速：1.5s 后填充答案并恢复（实际约 1 分钟）
-    aiSummarizeLoadingTimer = setTimeout(() => {
-        aiSummarizeLoadingTimer = null;
-        let count = 0;
-        all.forEach(p => {
-            const answer = generateMockElementAnswer(p, caseItem);
-            caseElementsAnswers[p.name] = answer;
-            caseElementsSelection.add(p.name);  // 自动勾选已生成答案的要件
-            count++;
-        });
-        saveElementAnswers(caseItem.id, caseElementsAnswers);
-        saveElementSelection(caseItem.id, caseElementsSelection);
-        renderElementsList();
-        if (loadingEl) loadingEl.classList.add('hidden');
-        if (aiBtn) aiBtn.disabled = false;
-        if (addBtn) addBtn.disabled = false;
-        showNotification(`已为 ${count} 项要件生成答案，可直接在列表中修改`, 'success');
-    }, 1500);
+    // 原型演示加速：逐条错峰完成（500ms 后首条，之后每 450ms 完成一条；实际约 1 分钟并行）
+    all.forEach((p, i) => {
+        const t = setTimeout(() => {
+            aiBatchDone++;
+            // 批量运行中被移除的要件跳过生成（不写入答案）
+            const stillExists = [
+                ...(caseElementsCache.standard || []),
+                ...(caseElementsCache.mine || []),
+                ...(caseElementsCache.case || [])
+            ].some(q => q.name === p.name);
+            if (stillExists) {
+                caseElementsAnswers[p.name] = generateMockElementAnswer(p, caseItem);
+                caseElementsSelection.add(p.name);  // 自动勾选已生成答案的要件
+                aiBatchWritten++;
+                saveElementAnswers(caseItem.id, caseElementsAnswers);
+                saveElementSelection(caseItem.id, caseElementsSelection);
+            }
+            elementGeneratingNames.delete(p.name);
+            // 就地刷新该条卡片（不整体重渲染，避免打断其他条目正在进行的内联编辑）
+            refreshElementItemDom(p.name);
+            if (drawerGenerateMode) updateDrawerGenerateBtn();
+            if (aiBatchDone >= all.length) finishAiBatchSummarize();
+        }, 500 + i * 450);
+        aiBatchTimers.push(t);
+    });
 }
 
-// v1.51: 抽屉关闭时清理一键生成加载态
-function resetAiSummarizeLoading() {
-    if (aiSummarizeLoadingTimer) {
-        clearTimeout(aiSummarizeLoadingTimer);
-        aiSummarizeLoadingTimer = null;
-    }
-    const loadingEl = document.getElementById('caseElementsLoading');
+// v2.31 (V1.2.1): 批量任务全部完成——恢复底部按钮并汇总提示
+function finishAiBatchSummarize() {
+    aiBatchGenerating = false;
+    aiBatchTimers = [];
     const aiBtn = document.getElementById('aiSummarizeBtn');
     const addBtn = document.getElementById('addCaseElementBtn');
-    if (loadingEl) loadingEl.classList.add('hidden');
+    if (aiBtn) aiBtn.disabled = false;
+    if (addBtn) addBtn.disabled = false;
+    // 运行中可能有要件被移除，按当前缓存数量刷新按钮可用性
+    const total = (caseElementsCache.standard?.length || 0) + (caseElementsCache.mine?.length || 0) + (caseElementsCache.case?.length || 0);
+    updateAiSummarizeBtnState(total);
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
+    showNotification(`已为 ${aiBatchWritten} 项要件生成答案，可直接在列表中修改`, 'success');
+}
+
+// v2.31 (V1.2.1): 就地刷新单条要件卡片（标题+答案区），不整体重渲染、不打断其他条目的内联编辑
+function refreshElementItemDom(name) {
+    const sources = [
+        { list: caseElementsCache.standard || [], source: 'standard' },
+        { list: caseElementsCache.mine || [], source: 'mine' },
+        { list: caseElementsCache.case || [], source: 'case' }
+    ];
+    let target = null;
+    sources.forEach(s => {
+        if (target) return;
+        const p = s.list.find(q => q && q.name === name);
+        if (p) target = { p: { ...p, source: s.source }, source: s.source };
+    });
+    if (!target) return; // 该要件已被移除，无需刷新
+    // 标题 DOM 文本 = 要件名 + 已答圆点(无文本) + 来源标签文案；模板缩进/换行会混入空白，统一归一化后精确匹配
+    const normalize = s => (s || '').replace(/\s+/g, '');
+    const expectedTitle = normalize(`${name}${sourceLabel(target.source)}`);
+    let el = null;
+    document.querySelectorAll('.case-elements-item').forEach(node => {
+        const titleEl = node.querySelector('.case-elements-item-title');
+        if (titleEl && normalize(titleEl.textContent) === expectedTitle) el = node;
+    });
+    if (!el) return;
+    const cb = el.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = caseElementsSelection.has(name);
+    const bodyEl = el.querySelector('.case-elements-item-body');
+    if (bodyEl) bodyEl.innerHTML = buildElementItemBodyHtml(target.p, target.source);
+}
+
+// v2.31 (V1.2.1): 未答要件单条生成答案（对齐实际系统「生成答案」入口）
+function generateSingleElementAnswer(name) {
+    if (!caseItem) return;
+    if (elementGeneratingNames.has(name)) return; // 该条已在生成中
+    const all = [
+        ...(caseElementsCache.standard || []).map(p => ({ ...p, source: 'standard' })),
+        ...(caseElementsCache.mine || []).map(p => ({ ...p, source: 'mine' })),
+        ...(caseElementsCache.case || []).map(p => ({ ...p, source: 'case' }))
+    ];
+    const preset = all.find(p => p.name === name);
+    if (!preset) {
+        showNotification('未找到该要件', 'warning');
+        return;
+    }
+    elementGeneratingNames.add(name);
+    refreshElementItemDom(name); // 就地切换为"生成中"指示（不整体重渲染）
+    const t = setTimeout(() => {
+        elementSingleTimers.delete(name);
+        // 生成期间被移除的要件跳过写入
+        const stillExists = all.some(p => p.name === name) && [
+            ...(caseElementsCache.standard || []),
+            ...(caseElementsCache.mine || []),
+            ...(caseElementsCache.case || [])
+        ].some(q => q.name === name);
+        if (stillExists) {
+            caseElementsAnswers[name] = generateMockElementAnswer(preset, caseItem);
+            caseElementsSelection.add(name);
+            saveElementAnswers(caseItem.id, caseElementsAnswers);
+            saveElementSelection(caseItem.id, caseElementsSelection);
+        }
+        elementGeneratingNames.delete(name);
+        refreshElementItemDom(name);
+        if (drawerGenerateMode) updateDrawerGenerateBtn();
+        if (stillExists) showNotification('答案已生成，可直接修改', 'success');
+    }, 900);
+    elementSingleTimers.set(name, t);
+}
+
+// v2.31 (V1.2.1): 标准/我的要件从本案移除——仅当前案件生效，不影响后台案由模板与个人要件预设
+// 移除 = 个案内"不引用"（非物理删除），可通过「恢复默认要件」一键还原；答案/优化记录/勾选联动清理
+function removeElementFromCase(name) {
+    if (!caseItem) return;
+    const removed = getRemovedElementNames(caseItem.id);
+    if (!removed.includes(name)) removed.push(name);
+    setRemovedElementNames(caseItem.id, removed);
+    // 联动清理答案、优化记录、勾选状态
+    delete caseElementsAnswers[name];
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+    delete caseElementsFollowUps[name];
+    saveElementFollowUps(caseItem.id, caseElementsFollowUps);
+    caseElementsSelection.delete(name);
+    saveElementSelection(caseItem.id, caseElementsSelection);
+    // 若该条正在生成（批量或单条），计时器回调会检测到已移除并跳过写入
+    loadCaseElementsAll();
+    renderElementsList();
+    refreshCaseElementsEntryCount();
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
+    showNotification(`已从本案移除"${name}"要件，不影响案由模板`, 'success');
+}
+
+// v2.31 (V1.2.1): 恢复默认要件——一次性恢复本案全部已移除的标准/我的要件（清空移除记录并重载模板）
+function restoreDefaultElements() {
+    if (!caseItem) return;
+    if (aiBatchGenerating) {
+        showNotification('生成中，请稍候', 'warning');
+        return;
+    }
+    const removed = getRemovedElementNames(caseItem.id);
+    if (removed.length === 0) return;
+    setRemovedElementNames(caseItem.id, []);
+    loadCaseElementsAll();
+    renderElementsList();
+    refreshCaseElementsEntryCount();
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
+    showNotification(`已恢复 ${removed.length} 项默认要件`, 'success');
+}
+
+// v1.51 → v2.31 (V1.2.1): 抽屉关闭时清理批量/单条生成运行状态（含全部未完成计时器），已完成答案保留
+function resetAiSummarizeLoading() {
+    if (aiBatchGenerating) {
+        aiBatchTimers.forEach(t => { if (t) clearTimeout(t); });
+        aiBatchTimers = [];
+        aiBatchGenerating = false;
+    }
+    elementSingleTimers.forEach(t => clearTimeout(t));
+    elementSingleTimers.clear();
+    elementGeneratingNames.clear();
+    const aiBtn = document.getElementById('aiSummarizeBtn');
+    const addBtn = document.getElementById('addCaseElementBtn');
     if (aiBtn) aiBtn.disabled = false;
     if (addBtn) addBtn.disabled = false;
 }

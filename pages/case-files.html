@@ -58,6 +58,50 @@
             gap: 8px;
             align-items: center;
         }
+        /* v2.32: 案件信息解析提示条（标题栏下方） */
+        .case-info-parse-alert {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 28px;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .case-info-parse-alert.parsing {
+            background: #f0f5ff;
+            color: #1e40af;
+            border-bottom: 1px solid #dbeafe;
+        }
+        .case-info-parse-alert.confirm {
+            background: #fffbeb;
+            color: #92400e;
+            border-bottom: 1px solid #fde68a;
+        }
+        .case-info-parse-alert .parse-alert-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .case-info-parse-alert .parse-alert-text i {
+            font-size: 14px;
+        }
+        .case-info-parse-alert .parse-alert-action {
+            flex-shrink: 0;
+            padding: 5px 14px;
+            border-radius: 6px;
+            border: 1px solid #f59e0b;
+            background: #fff;
+            color: #b45309;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .case-info-parse-alert .parse-alert-action:hover {
+            background: #fef3c7;
+        }
         .detail-meta-tag {
             display: inline-flex;
             align-items: center;
@@ -2282,6 +2326,34 @@
             white-space: pre-wrap;
             word-break: break-word;
         }
+        /* V1.2.1: 未答要件单条【生成答案】按钮容器 与 单条"生成中"指示 */
+        .case-elements-item-pending {
+            margin-top: 2px;
+        }
+        .case-elements-item-generating {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+            padding: 8px 10px;
+            background: #f9fafb;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .case-elements-item-generating .ec-spinner-sm {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--accent-bg, #f3f0ff);
+            border-top-color: var(--accent-primary);
+            animation: ec-spin 0.9s linear infinite;
+            flex-shrink: 0;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .case-elements-item-generating .ec-spinner-sm { animation: none; }
+        }
         .case-elements-item-actions {
             display: flex;
             flex-wrap: wrap;
@@ -2595,6 +2667,17 @@
         .case-elements-footer-link:hover {
             text-decoration: underline;
         }
+        /* V1.2.1: 恢复默认要件入口——显隐控制与批量生成期间禁用态 */
+        .case-elements-footer-link.hidden {
+            display: none;
+        }
+        .case-elements-footer-link:disabled {
+            color: var(--text-muted, #9ca3af);
+            cursor: not-allowed;
+        }
+        .case-elements-footer-link:disabled:hover {
+            text-decoration: none;
+        }
 
         /* 新增个案要件内联表单 */
         .case-elements-add-form {
@@ -2899,6 +2982,9 @@
                 </div>
             </div>
 
+            <!-- v2.32: 案件信息解析提示条（解析中浅蓝 / 待确认浅黄+去修改），对齐实际系统截图 -->
+            <div class="case-info-parse-alert" id="caseInfoParseAlert" style="display:none;"></div>
+
             <!-- Three Column Body -->
             <div class="detail-body" id="detailBody">
                 <!-- Left Column: Material Tree -->
@@ -3173,14 +3259,7 @@
         </div>
         <div class="case-elements-stats" id="caseElementsStats"></div>
         <div class="case-elements-drawer-body" id="caseElementsBody">
-            <!-- 要件列表由 JS 动态渲染 -->
-            <!-- v1.51: 一键生成加载态覆盖层 -->
-            <div class="case-elements-loading hidden" id="caseElementsLoading">
-                <div class="ec-spinner"></div>
-                <div class="ec-title">正在生成参考答案…</div>
-                <div class="ec-sub">预计需要约 1 分钟，完成后可直接修改</div>
-                <div class="ec-bar"></div>
-            </div>
+            <!-- 要件列表由 JS 动态渲染（v2.31: 取消一键生成整体加载遮罩，改为单条"生成中"指示） -->
         </div>
         <div class="case-elements-drawer-footer">
             <!-- V1.2: 生成模式专属确认生成操作条（仅从「生成文书→引入案由要件」入口打开时显示） -->
@@ -3219,6 +3298,10 @@
             <button type="button" class="case-elements-footer-link" onclick="openMyElements()">
                 <i class="fas fa-external-link-alt"></i> 管理我的要件
             </button>
+            <!-- V1.2.1: 恢复默认要件（仅本案存在已移除的标准/我的要件时显示，由 JS 控制显隐） -->
+            <button type="button" class="case-elements-footer-link hidden" id="restoreElementsLink" onclick="restoreDefaultElements()">
+                <i class="fas fa-rotate-left"></i> 恢复默认要件
+            </button>
         </div>
     </aside>
 
@@ -3247,7 +3330,7 @@
     <script src="../js/common.js?v=16"></script>
     <script src="../js/case-data.js?v=65"></script>
     <script src="../js/doc-editor.js?v=1"></script>
-    <script src="../js/case-files.js?v=135"></script>
+    <script src="../js/case-files.js?v=136"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {
