@@ -1885,11 +1885,33 @@ function showBatchHelp() {
 
 // ===== 新建案件弹窗 =====
 let uploadedFiles = [];
+// v2.34: 用户是否手动编辑过案件名称（控制文件名自动填充/清空）
+let caseNameEdited = false;
+
+// v2.34: 标记用户手动编辑案件名称（HTML oninput 调用）
+function onCaseNameInput() {
+    caseNameEdited = true;
+}
+
+// v2.34: 案件名称默认值 = 首个文件名去扩展名
+function autoFillCaseName() {
+    if (caseNameEdited || uploadedFiles.length === 0) return;
+    const nameInput = document.getElementById('createCaseNameInput');
+    if (!nameInput) return;
+    const firstName = uploadedFiles[0].name;
+    const dotIndex = firstName.lastIndexOf('.');
+    const base = (dotIndex > 0 ? firstName.substring(0, dotIndex) : firstName).trim();
+    nameInput.value = base;
+}
 
 function openCreateCaseDialog() {
     uploadedFiles = [];
     document.getElementById('uploadFileList').innerHTML = '';
     document.getElementById('createCaseFile').value = '';
+    // v2.34: 案件名称输入框（保留字段，默认自动填充文件名，用户可改）
+    caseNameEdited = false;
+    const nameInput = document.getElementById('createCaseNameInput');
+    if (nameInput) nameInput.value = '';
     updateCreateSubmitBtn();
 
     document.getElementById('createCaseOverlay').classList.add('show');
@@ -1942,6 +1964,8 @@ function handleFileUpload(input) {
     if (addedCount > 0) {
         renderFileList();
         updateCreateSubmitBtn();
+        // v2.34: 名称未手动编辑时自动填充首个文件名
+        autoFillCaseName();
     }
     input.value = '';
 }
@@ -1972,10 +1996,18 @@ function removeUploadedFile(index) {
     uploadedFiles.splice(index, 1);
     renderFileList();
     updateCreateSubmitBtn();
+    // v2.34: 文件全部移除后，名称未手动编辑时同步清空；仍有文件则回填新的首个文件名
+    const nameInput = document.getElementById('createCaseNameInput');
+    if (nameInput && !caseNameEdited) {
+        nameInput.value = uploadedFiles.length > 0
+            ? (uploadedFiles[0].name.replace(/\.[^.]+$/, '')).trim()
+            : '';
+    }
 }
-// v2.33: 提交新建案件（极简流程）
+// v2.34: 提交新建案件（极简流程）
 // 必须 ≥1 个文件才能建案：0 文件时提示并高亮上传区，不建案
-// ≥1 文件：默认名 = 首个文件名（去扩展名），材料进入解析中，标记 firstParsePending，生成 mock 识别结果
+// 案件名称必填：默认自动填充首个文件名（用户可改），空值时提示并聚焦输入框
+// 建案后材料进入解析中，标记 firstParsePending，生成 mock 识别结果
 function submitCreateCase() {
     // v2.33: 建案前置校验（原支持 0 文件建案，现必须 ≥1 个文件）
     if (uploadedFiles.length === 0) {
@@ -1988,14 +2020,21 @@ function submitCreateCase() {
         return;
     }
 
+    // v2.34: 案件名称必填校验（弹窗内可见可改，避免用户找不到刚建的案子）
+    const nameInput = document.getElementById('createCaseNameInput');
+    const caseName = (nameInput ? nameInput.value : '').trim();
+    if (!caseName) {
+        showNotification('请填写案件名称', 'error');
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.classList.add('input-error-nudge');
+            setTimeout(() => nameInput.classList.remove('input-error-nudge'), 1500);
+        }
+        return;
+    }
+
     const now = new Date().toISOString().split('T')[0];
     const currentUser = getCurrentUserName();
-
-    // 默认名：首个文件名去扩展名
-    const firstName = uploadedFiles[0].name;
-    const dotIndex = firstName.lastIndexOf('.');
-    const base = dotIndex > 0 ? firstName.substring(0, dotIndex) : firstName;
-    const caseName = base.trim() || '未命名案件';
 
     const newCase = {
         id: 'newcase_' + Date.now(),

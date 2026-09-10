@@ -47,7 +47,7 @@
     const COL_CONFIG_KEY = 'adminCaseListColumns';
     // 列顺序：复选框 | 案件名称 | [可选列...] | 文件数 | 文书数 | 更新时间 | 操作
     const BASE_COL_TEMPLATE_LEFT = '40px minmax(0,3fr)';
-    const BASE_COL_TEMPLATE_RIGHT = '100px 100px minmax(0,1fr) 180px';
+    const BASE_COL_TEMPLATE_RIGHT = '100px 100px minmax(0,1fr) 268px';
 
     // ===== 数据加载 =====
     function loadData() {
@@ -323,6 +323,7 @@
                         <button class="action-btn view" onclick="window.AdminCases.editCase('${c.id}')">编辑</button>
                         <button class="action-btn handler" onclick="window.AdminCases.openHandlerModal(['${c.id}'])">改承办人</button>
                         <button class="action-btn delete" onclick="window.AdminCases.deleteCase('${c.id}')">删除</button>
+                        <button class="action-btn ocr" onclick="window.location.href='ocr-chunk-view.html?caseId=' + encodeURIComponent('${c.id}')" title="查看案件 OCR 内容与分块信息（后台排错）">OCR/分块</button>
                    </div>`;
 
             const extraCols = [...visibleColumns].map(col => buildColumn(col, c)).join('');

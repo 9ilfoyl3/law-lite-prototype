@@ -36,6 +36,9 @@ let resultContent = '';                     // 右栏结果内容HTML
 let resultEditContent = '';                 // 右栏编辑模式内容
 let lastSavedVersionId = '';                // 最近保存的文书版本ID（用于精修跳转）
 let resultDocEditor = null;                 // 右栏文档编辑器实例
+// 清单第5项：文书排版——docFormatted 是否已套用全量格式；docFormatState: idle/formatting/done
+let docFormatted = false;
+let docFormatState = 'idle';
 let pendingUploadFiles = [];
 let pendingElementConfirmCallback = null;   // 要素确认回调（V1.2：指向抽屉生成模式的确认回调）
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
@@ -329,6 +332,9 @@ function initPage() {
     loadCaseElementsAll();
     refreshCaseElementsEntryCount();
 
+    // V1.2.4: 进入详情页即后台异步预生成法条（不占用用户动作），刷新「本案法条」入口
+    initCaseLaws();
+
     // 监听 ESC 关闭弹窗
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
@@ -346,6 +352,15 @@ function initPage() {
                 closeElementQaModal();
             } else if (caseElementsDrawerOpen) {
                 closeElementsDrawer();
+            }
+            // V1.2.4: 本案法条抽屉 ESC 关闭
+            if (caseLawsDrawerOpen) {
+                closeLawsDrawer();
+            }
+            // V1.2.5: 法条库弹窗 ESC 关闭
+            const lawLibModal = document.getElementById('lawLibraryModal');
+            if (lawLibModal && lawLibModal.classList.contains('show')) {
+                closeLawLibraryModal();
             }
         }
     });
@@ -425,6 +440,9 @@ function initPage() {
             }
         }, 100);
     }
+
+    // 清单第5项：初始化「文书排版」按钮状态（无文书时置灰）
+    updateDocFormatBtnState();
 }
 
 // ===== v2.32: 案件信息解析提示条（PRD 第九章） =====
@@ -459,10 +477,22 @@ function renderCaseInfoParseAlert() {
     alertEl.style.display = 'none';
 }
 
-// v2.32: 提示条【去修改】→ 跳回案件列表页并自动打开该案件的编辑弹框
+// v2.32: 提示条【去修改】→ 在当前详情页内直接弹出编辑弹框（V1.2.10），不再跳列表页
+// 保存后回调：刷新提示条 + 案件信息（案号/案字/案由等）+ 标题栏
 function gotoEditCaseInfo() {
-    sessionStorage.setItem('openEditCaseId', caseId);
-    window.location.href = 'cases.html';
+    openCaseEditDialog(caseId, {
+        onSaved: function (item) {
+            // V1.2.2 编辑保存后即完成信息确认，重新渲染提示条（会因 firstParsePending=false 而隐藏）
+            renderCaseInfoParseAlert();
+            // 刷新案件信息显示（标题栏、案号等）
+            if (item) {
+                const nameEl = document.getElementById('caseName');
+                if (nameEl) nameEl.textContent = item.caseName || item.caseNumber || '案件材料';
+                const numEl = document.getElementById('caseNumber');
+                if (numEl) numEl.textContent = item.caseNumber || '-';
+            }
+        }
+    });
 }
 
 // v2.23 (任务 9.1): 应用 sessionStorage 中的生成配置
@@ -1523,14 +1553,18 @@ function generateByMaterial() {
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
     const _matDocType = document.getElementById('matDocType')?.value || '';
     const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
+    // V1.2.4（清单 1/3）: 全部文书类型均需先经法条确认，再由法条确认回调触发文书渲染
+    const proceedToLawConfirm = (answers) => {
+        openLawsDrawerForGenerate((laws) => { doGenerateByMaterial(answers, laws); });
+    };
     if (_matDocType === 'judgment' && _hasElements) {
         // V1.2: 统一先弹轻量询问弹框；选择「引入案由要件」后打开本案要件抽屉（生成模式）确认答案
         showPreElementConfirmModal(allPresets,
-            () => { doGenerateByMaterial(null); },
-            (answers) => { doGenerateByMaterial(answers); }
+            () => { proceedToLawConfirm(null); },
+            (answers) => { proceedToLawConfirm(answers); }
         );
     } else {
-        doGenerateByMaterial(null);
+        proceedToLawConfirm(null);
     }
 }
 
@@ -1571,9 +1605,10 @@ function autoGenerateWithAllElements() {
             question: p.question,
             answer: (caseElementsAnswers[p.name] || '').trim() || generateMockElementAnswer(p, caseItem)
         }));
-        doGenerateByMaterial(elementAnswers);
+        // V1.2.4: 列表页快捷生成同样需经法条确认（要件已自动引入，不再弹框）
+        openLawsDrawerForGenerate((laws) => { doGenerateByMaterial(elementAnswers, laws); });
     } else {
-        doGenerateByMaterial(null);
+        openLawsDrawerForGenerate((laws) => { doGenerateByMaterial(null, laws); });
     }
 }
 
@@ -1671,7 +1706,7 @@ function closeOverflowAndSwitchStep() {
     showNotification('已切换至分步生成', 'success');
 }
 
-function doGenerateByMaterial(elementAnswers) {
+function doGenerateByMaterial(elementAnswers, confirmedLaws) {
     const docType = document.getElementById('matDocType').value;
     if (!docType) {
         showNotification('请选择文书类型', 'warning');
@@ -1702,14 +1737,27 @@ function doGenerateByMaterial(elementAnswers) {
             : null;
         workflowId = (matchedWf && matchedWf.id) ? matchedWf.id : '';
     } catch (e) { /* ignore */ }
-    const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers, templateContent, workflowId);
+    // V1.2.4: 法条确认环节已确认的适用法条一并传入，作为「法律适用依据」并入正文
+    const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers, templateContent, workflowId, confirmedLaws);
 
     startStreamingOutput(fullContent, templateName);
 }
 
+// V1.2.4: 已确认法条 → 「法律适用依据」章节 HTML（脚本匹配渲染，不使用大模型生成）
+function buildLawSectionHtml(confirmedLaws) {
+    if (!confirmedLaws || !confirmedLaws.length) return '';
+    const items = confirmedLaws.map(function (l) {
+        const name = escapeHtmlForStreaming(l.name || '');
+        const content = escapeHtmlForStreaming(l.content || '');
+        return '<p>' + name + (content ? '：' + content : '') + '</p>';
+    }).join('');
+    return '<h3>法律适用依据</h3>' + items;
+}
+
 // 生成 Mock 文书内容
 // V1.1.2: 两步生成流程——第一步按模板 content 内容指引生成；第二步按匹配 workflow 的格式骨架套版填充占位符
-function generateMockDocument(caseData, orgType, docTypeName, templateName, elementAnswers, templateContent, workflowId) {
+// V1.2.4: 新增 confirmedLaws 参数（法条确认环节结果）；输出统一使用 script-render-doc 脚本渲染样式
+function generateMockDocument(caseData, orgType, docTypeName, templateName, elementAnswers, templateContent, workflowId, confirmedLaws) {
     const cause = caseData.cause || '纠纷';
     const caseName = caseData.caseName || caseData.caseNumber || '';
     const caseNumber = caseData.caseNumber || '';
@@ -1722,7 +1770,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
 
     // ===== 特殊类型分支：材料总结（保持原有逻辑，不参与两步生成）=====
     if (docTypeName === '材料总结') {
-        return `<div class="result-doc">
+        return `<div class="result-doc script-render-doc">
             <h2>${title}</h2>
             <div class="result-doc-meta">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
             <p>案由：${cause}</p>
@@ -1735,6 +1783,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
             <p>对现有证据进行梳理，提炼与${cause}相关的主要证据及双方争议焦点。</p>
             <h3>四、待补充或关注事项</h3>
             <p>基于当前材料，建议进一步核实关键事实、补充缺失证据，并关注法律适用问题。</p>
+            ${buildLawSectionHtml(confirmedLaws)}
             <p style="text-align:right;margin-top:32px;">${getSignerLabel(orgType)}</p>
             <p style="text-align:right;">${new Date().toLocaleDateString('zh-CN')}</p>
         </div>`;
@@ -1777,13 +1826,16 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
 
     // A 类完整文书模板：第一步已生成完整文书，直接返回（不再套格式骨架，避免框架重复）
     if (isFullDocTemplate) {
-        return `<div class="result-doc">
+        return `<div class="result-doc script-render-doc">
             <div class="result-doc-meta" style="margin-bottom:8px;">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
             ${bodyHtml}
+            ${buildLawSectionHtml(confirmedLaws)}
         </div>`;
     }
 
     // ===== 第二步·按匹配 workflow 的格式骨架套版填充占位符 =====
+    // V1.2.4: 已确认法条并入正文，供格式骨架或兜底输出一并渲染
+    bodyHtml += buildLawSectionHtml(confirmedLaws);
     let formatSkeleton = null;
     try {
         if (workflowId && typeof getAdminWorkflowFormat === 'function') {
@@ -1799,7 +1851,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
     }
 
     // 未配置格式骨架时直接输出第一步内容
-    return `<div class="result-doc">
+    return `<div class="result-doc script-render-doc">
         <h2>${title}</h2>
         <div class="result-doc-meta">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
         <p>案由：${cause}</p>
@@ -1994,7 +2046,7 @@ function applyFormatSkeleton(skeleton, ctx) {
     Object.entries(replacements).forEach(([k, v]) => {
         out = out.split(k).join(v);
     });
-    return `<div class="result-doc">${out}</div>`;
+    return `<div class="result-doc script-render-doc">${out}</div>`;
 }
 
 function getSignerLabel(orgType) {
@@ -3296,18 +3348,22 @@ function compileSteps() {
     const allPresets = mergeCaseElements(getAllElementPresets(caseItem.cause, _org3, _cw3), caseItem.id);
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
     const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
+    // V1.2.4（清单 1/3）: 分步生成最终「生成文书」同样先经法条确认
+    const proceedToLawConfirm = (answers) => {
+        openLawsDrawerForGenerate((laws) => { doCompileSteps(answers, laws); });
+    };
     if (stepDocType === 'judgment' && _hasElements3) {
         // V1.2: 统一先弹轻量询问弹框；选择「引入案由要件」后打开本案要件抽屉（生成模式）确认答案
         showPreElementConfirmModal(allPresets,
-            () => { doCompileSteps(null); },
-            (answers) => { doCompileSteps(answers); }
+            () => { proceedToLawConfirm(null); },
+            (answers) => { proceedToLawConfirm(answers); }
         );
     } else {
-        doCompileSteps(null);
+        proceedToLawConfirm(null);
     }
 }
 
-function doCompileSteps(elementAnswers) {
+function doCompileSteps(elementAnswers, confirmedLaws) {
     // 将所有步骤内容编译为完整文书
     const allItems = [];
     stepsConfig.forEach(s => {
@@ -3322,15 +3378,18 @@ function doCompileSteps(elementAnswers) {
 
     // v1.71: 正文不再包含「已引入案由要件辅助生成」提示条
 
+    // V1.2.4: 已确认法条作为「法律适用依据」章节并入正文（脚本匹配渲染）
+    const lawSectionHtml = buildLawSectionHtml(confirmedLaws);
     const templateName = getTemplateName(getCurrentTemplates()[stepTemplate]);
     const docTypeName = getCurrentDocTypes()[stepDocType]?.name || '法律文书';
     const title = templateName ? `${docTypeName}（${templateName}）` : docTypeName;
     const reqHint = stepRequirement ? `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-info-circle"></i> 生成需求：${stepRequirement}</div>` : '';
-    const content = `<div class="result-doc">
+    const content = `<div class="result-doc script-render-doc">
         <h2>${title}</h2>
         <div class="result-doc-meta">案件：${caseItem.caseName || caseItem.caseNumber} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
         ${reqHint}
         ${allItems.join('')}
+        ${lawSectionHtml}
         <p style="text-align:right;margin-top:32px;">${getSignerLabel(org)}</p>
         <p style="text-align:right;">${new Date().toLocaleDateString('zh-CN')}</p>
     </div>`;
@@ -3413,6 +3472,581 @@ function confirmDrawerGenerate() {
     exitDrawerGenerateMode();
     closeElementsDrawer();
     if (typeof cb === 'function') cb(answers);
+}
+
+// ===== V1.2.4: 本案法条（清单 1/2/3） =====
+// V1.2.5: 法条库改由 js/law-library.js 提供（LAW_LIBRARY_ALL 全量库 + LAW_RECOMMEND_RULES 推荐规则）
+function getLawLibraryAll() {
+    return (typeof LAW_LIBRARY_ALL !== 'undefined' && Array.isArray(LAW_LIBRARY_ALL)) ? LAW_LIBRARY_ALL : [];
+}
+
+// 按案由关键词匹配推荐规则，返回 { core: [条目...], optional: [条目...] }
+// V1.2.8: 规则结构由 ids 改为 core / optional 两层，用于默认勾选策略（核心勾选、可补充不勾）
+function matchLawsByCause(cause) {
+    const rules = (typeof LAW_RECOMMEND_RULES !== 'undefined' && Array.isArray(LAW_RECOMMEND_RULES)) ? LAW_RECOMMEND_RULES : [];
+    const c = String(cause || '');
+    let matched = null;
+    for (let i = 0; i < rules.length; i++) {
+        const r = rules[i];
+        if (!r || !Array.isArray(r.keys)) continue;
+        if (r.keys.indexOf('__default__') !== -1) continue;
+        if (r.keys.some(function (k) { return c.indexOf(k) !== -1; })) { matched = r; break; }
+    }
+    if (!matched) {
+        matched = rules.filter(function (r) { return r && Array.isArray(r.keys) && r.keys.indexOf('__default__') !== -1; })[0]
+            || { core: [], optional: [] };
+    }
+    const lib = getLawLibraryAll();
+    const pick = function (ids) {
+        return (ids || []).map(function (id) {
+            return lib.find(function (l) { return l.id === id; });
+        }).filter(Boolean);
+    };
+    // 兼容旧规则结构（仅有 ids）：整体视为 core
+    if (!matched.core && !matched.optional && matched.ids) {
+        return { core: pick(matched.ids), optional: [] };
+    }
+    return { core: pick(matched.core), optional: pick(matched.optional) };
+}
+
+// 法条运行状态
+let caseLawsState = { status: 'idle', cause: '', items: [] };
+let caseLawsDrawerOpen = false;
+let lawsDrawerGenerateMode = false;
+let lawsGenerateCallback = null;
+let lawsRetrieveTimer = null;
+
+function getCaseLawsKey(cid) {
+    return 'caseLaws_' + (cid || (caseItem && caseItem.id) || 'unknown');
+}
+
+function loadCaseLaws(cid) {
+    try {
+        const raw = localStorage.getItem(getCaseLawsKey(cid));
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !Array.isArray(obj.items)) return null;
+        // V1.2.5: 历史数据 source 'system' 兼容映射为 'ai'
+        const items = obj.items.map(function (i) {
+            return Object.assign({}, i, { source: (i.source === 'system' || i.source === 'ai') ? 'ai' : 'manual' });
+        });
+        return { status: obj.status || 'done', cause: obj.cause || '', items: items };
+    } catch (e) { return null; }
+}
+
+function saveCaseLaws() {
+    try { localStorage.setItem(getCaseLawsKey(), JSON.stringify(caseLawsState)); } catch (e) { /* ignore */ }
+}
+
+// V1.2.5: 旧的按案由匹配法条库实现已移除，统一使用 3466 行的新实现（基于 js/law-library.js）
+
+// V1.2.9: AI 推荐法条默认全部不勾选（不替用户预选，由用户自行判断）；
+// tier 仅用于排序（core 排前），不再影响默认勾选与 UI 分组。
+function buildLawItems(cause) {
+    const grouped = matchLawsByCause(cause);
+    const items = [];
+    (grouped.core || []).forEach(function (l, i) {
+        items.push({
+            id: 'law_' + Date.now().toString(36) + '_c' + i,
+            name: l.name, content: l.content, source: 'ai', tier: 'core', selected: false
+        });
+    });
+    (grouped.optional || []).forEach(function (l, i) {
+        items.push({
+            id: 'law_' + Date.now().toString(36) + '_o' + i,
+            name: l.name, content: l.content, source: 'ai', tier: 'optional', selected: false
+        });
+    });
+    return items;
+}
+
+// 进入详情页初始化：已完成后不重跑；案由变更自动重跑；运行中续接
+function initCaseLaws() {
+    const saved = loadCaseLaws();
+    const cause = (typeof extractCauseFromCase === 'function') ? extractCauseFromCase() : (caseItem && caseItem.cause) || '';
+    if (saved) {
+        caseLawsState = saved;
+        if (caseLawsState.status === 'running') {
+            startLawRetrieve(cause, true);
+        } else if (caseLawsState.status === 'done' && caseLawsState.cause !== cause) {
+            // 案由变更 → 清空并按新案由重跑（要件答案保留）
+            startLawRetrieve(cause, false);
+        }
+    } else {
+        startLawRetrieve(cause, false);
+    }
+    refreshCaseLawsEntry();
+}
+
+// 启动/续接法条异步检索（mock 4-6 秒）
+// preserveManual=true 时仅重建 AI 推荐法条、保留手动添加的法条（供【AI推荐】按钮使用）；
+// 首次生成 / 案由变更时 preserveManual 缺省为 false，全量重建（含手动，因案由已变）。
+function startLawRetrieve(cause, isResume, preserveManual) {
+    if (lawsRetrieveTimer) { clearTimeout(lawsRetrieveTimer); lawsRetrieveTimer = null; }
+    caseLawsState.status = 'running';
+    caseLawsState.cause = cause || '';
+    // V1.2.9: 重新生成即重置确认态，入口徽标回到「待确认」
+    caseLawsState.confirmed = false;
+    if (!isResume) {
+        caseLawsState.items = preserveManual
+            ? (caseLawsState.items || []).filter(function (i) { return i.source === 'manual'; })
+            : [];
+    }
+    saveCaseLaws();
+    refreshCaseLawsEntry();
+    renderLawsList();
+    updateLawsGenerateBtn();
+
+    const delay = 4000 + Math.random() * 2000;
+    lawsRetrieveTimer = setTimeout(function () {
+        lawsRetrieveTimer = null;
+        caseLawsState.status = 'done';
+        const newAiItems = buildLawItems(caseLawsState.cause);
+        // preserveManual 时在原有手动法条之后追加新 AI 推荐；否则整体替换
+        caseLawsState.items = preserveManual
+            ? (caseLawsState.items || []).concat(newAiItems)
+            : newAiItems;
+        saveCaseLaws();
+        refreshCaseLawsEntry();
+        renderLawsList();
+        updateLawsGenerateBtn();
+    }, delay);
+}
+
+// 刷新材料树「本案法条」入口：检索中转圈，完成后显示条数
+// V1.2.9: 增加必办状态徽标——检索中 / 待确认 / 已确认 N 条
+function refreshCaseLawsEntry() {
+    const btn = document.getElementById('caseLawsEntryBtn');
+    const cnt = document.getElementById('caseLawsEntryCount');
+    const badge = document.getElementById('caseLawsEntryBadge');
+    if (!btn || !cnt) return;
+    if (caseLawsState.status === 'running') {
+        cnt.innerHTML = '<i class="fas fa-circle-notch fa-spin entry-spinner"></i>';
+        btn.title = '正在检索适用法条…';
+    } else if (caseLawsState.status === 'failed') {
+        cnt.textContent = '!';
+        btn.title = '法条检索失败，点击查看并重试';
+    } else {
+        cnt.textContent = String((caseLawsState.items || []).length);
+        btn.title = '查看本案法条（生成文书前需确认）';
+    }
+    if (badge) {
+        const selected = (caseLawsState.items || []).filter(function (i) { return i.selected; }).length;
+        if (caseLawsState.status === 'running') {
+            badge.className = 'entry-badge pending';
+            badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 检索中';
+        } else if (caseLawsState.confirmed && selected > 0) {
+            badge.className = 'entry-badge confirmed';
+            badge.innerHTML = '已确认 ' + selected + ' 条';
+        } else {
+            badge.className = 'entry-badge pending';
+            badge.innerHTML = '待确认';
+        }
+    }
+}
+
+function toggleLawsDrawer() {
+    if (caseLawsDrawerOpen) closeLawsDrawer();
+    else openLawsDrawer();
+}
+
+function openLawsDrawer() {
+    // 与要件抽屉互斥（同一时刻只打开一个）
+    if (caseElementsDrawerOpen && !drawerGenerateMode) closeElementsDrawer();
+    renderLawsList();
+    document.getElementById('caseLawsOverlay').classList.add('show');
+    document.getElementById('caseLawsDrawer').classList.add('show');
+    caseLawsDrawerOpen = true;
+}
+
+function closeLawsDrawer() {
+    document.getElementById('caseLawsOverlay').classList.remove('show');
+    document.getElementById('caseLawsDrawer').classList.remove('show');
+    caseLawsDrawerOpen = false;
+    closeLawLibraryModal();
+    // 生成模式下关闭 = 放弃本次生成，回到配置区
+    exitLawsGenerateMode();
+}
+
+// ---- 渲染法条清单 ----
+function renderLawsList() {
+    const body = document.getElementById('caseLawsBody');
+    const stats = document.getElementById('caseLawsStats');
+    if (!body) return;
+
+    if (caseLawsState.status === 'running') {
+        body.innerHTML = '<div class="law-retrieving-hint"><i class="fas fa-circle-notch fa-spin"></i><span>正在检索适用法条，请稍候…</span></div>';
+        if (stats) stats.innerHTML = '';
+        updateLawsGenerateBtn();
+        return;
+    }
+    if (caseLawsState.status === 'failed') {
+        body.innerHTML = '<div class="case-elements-empty"><div><i class="fas fa-triangle-exclamation"></i></div><div>法条检索失败</div></div>';
+        if (stats) stats.innerHTML = '';
+        updateLawsGenerateBtn();
+        return;
+    }
+
+    const items = caseLawsState.items || [];
+    // V1.2.9: 两组——AI推荐（默认全不选）/ 手动添加（默认勾选）；无手动法条时不渲染该组
+    const aiItems = items.filter(function (i) { return i.source !== 'manual'; });
+    const manualItems = items.filter(function (i) { return i.source === 'manual'; });
+
+    if (stats) {
+        const selected = items.filter(function (i) { return i.selected; }).length;
+        stats.innerHTML =
+            '<span class="stat-group">' +
+                '<span class="stat-item"><span class="stat-dot standard"></span>共 ' + items.length + ' 条</span>' +
+                '<span class="stat-item"><span class="stat-num">' + selected + '</span> 已选</span>' +
+                (manualItems.length > 0 ? '<span class="stat-item"><span class="stat-dot case"></span>手动添加 ' + manualItems.length + '</span>' : '') +
+            '</span>' +
+            '<span class="law-batch-actions">' +
+                '<button type="button" class="law-batch-btn" onclick="selectAllLaws(true)">全选</button>' +
+                '<span class="law-batch-sep">|</span>' +
+                '<button type="button" class="law-batch-btn" onclick="selectAllLaws(false)">清空</button>' +
+            '</span>';
+    }
+
+    if (items.length === 0) {
+        body.innerHTML = '<div class="case-elements-empty"><div><i class="fas fa-gavel"></i></div><div>暂无适用法条，可点击「手动检索」从法条库添加，或点「AI推荐」重新生成</div></div>';
+        updateLawsGenerateBtn();
+        return;
+    }
+
+    // V1.2.9: 按「AI推荐 / 手动添加」分组；组内已勾选置顶
+    body.innerHTML =
+        renderLawsGroup('AI推荐', sortLawsBySelected(aiItems)) +
+        (manualItems.length > 0 ? renderLawsGroup('手动添加', sortLawsBySelected(manualItems)) : '');
+    updateLawsGenerateBtn();
+}
+
+// V1.2.9: 已勾选法条置顶（同状态下保持原相对顺序，core 已在前）
+function sortLawsBySelected(items) {
+    return items.slice().sort(function (a, b) {
+        const sa = a.selected ? 0 : 1;
+        const sb = b.selected ? 0 : 1;
+        return sa - sb;
+    });
+}
+
+// V1.2.9: 全选 / 清空（作用于全部法条，含手动添加）
+function selectAllLaws(checked) {
+    (caseLawsState.items || []).forEach(function (i) { i.selected = !!checked; });
+    saveCaseLaws();
+    renderLawsList();
+    updateLawsGenerateBtn();
+}
+
+// V1.2.9: 单个法条分组（复用要件抽屉分组样式）
+function renderLawsGroup(title, items) {
+    if (!items.length) return '';
+    const listHtml = items.map(function (law) {
+        const isManual = law.source === 'manual';
+        const tagCls = isManual ? 'manual' : 'ai';
+        const tagText = isManual ? '手动添加' : 'AI推荐';
+        return '' +
+            '<div class="case-elements-item' + (law.selected ? ' law-selected' : '') + '" data-law-id="' + law.id + '">' +
+                '<input type="checkbox" ' + (law.selected ? 'checked' : '') + ' onchange="toggleLawSelection(\'' + law.id + '\', this.checked)">' +
+                '<div class="case-elements-item-body">' +
+                    '<div class="case-elements-item-title">' +
+                        '<span class="law-item-name" ondblclick="editLawField(\'' + law.id + '\', \'name\')" title="双击编辑">' + escapeHtmlForElements(law.name) + '</span>' +
+                        '<span class="source-tag ' + tagCls + '">' + tagText + '</span>' +
+                        '<button type="button" class="case-elements-item-del-btn" title="从本案移除该法条" onclick="deleteCaseLaw(\'' + law.id + '\')"><i class="fas fa-trash-alt"></i></button>' +
+                    '</div>' +
+                    '<div class="law-item-text" ondblclick="editLawField(\'' + law.id + '\', \'content\')" title="双击编辑">' + escapeHtmlForElements(law.content || '（未填写法条内容）') + '</div>' +
+                '</div>' +
+            '</div>';
+    }).join('');
+    return '' +
+        '<div class="case-elements-group">' +
+            '<div class="case-elements-group-title">' + title + ' <span class="group-count">' + items.length + ' 项</span></div>' +
+            listHtml +
+        '</div>';
+}
+
+function toggleLawSelection(lawId, checked) {
+    const law = (caseLawsState.items || []).find(function (i) { return i.id === lawId; });
+    if (!law) return;
+    law.selected = !!checked;
+    saveCaseLaws();
+    updateLawsGenerateBtn();
+    renderLawsList();
+}
+
+// 双击内联编辑法条名称/内容
+function editLawField(lawId, field) {
+    const law = (caseLawsState.items || []).find(function (i) { return i.id === lawId; });
+    if (!law) return;
+    const body = document.getElementById('caseLawsBody');
+    const item = body ? body.querySelector('[data-law-id="' + lawId + '"]') : null;
+    if (!item) return;
+    const target = item.querySelector(field === 'name' ? '.law-item-name' : '.law-item-text');
+    if (!target) return;
+    const isText = field === 'content';
+    const oldVal = law[field] || '';
+    target.innerHTML =
+        (isText
+            ? '<textarea class="law-item-inline-input" id="lawInlineInput" rows="3">' + escapeHtmlForElements(oldVal) + '</textarea>'
+            : '<input class="law-item-inline-input" id="lawInlineInput" type="text" value="' + escapeHtmlForElements(oldVal) + '">') +
+        '<div class="law-item-inline-actions">' +
+            '<button type="button" class="case-elements-item-edit-btn primary" onclick="saveLawField(\'' + lawId + '\', \'' + field + '\')">保存</button>' +
+            '<button type="button" class="case-elements-item-edit-btn" onclick="renderLawsList()">取消</button>' +
+        '</div>';
+    const input = document.getElementById('lawInlineInput');
+    if (input) input.focus();
+}
+
+function saveLawField(lawId, field) {
+    const law = (caseLawsState.items || []).find(function (i) { return i.id === lawId; });
+    const input = document.getElementById('lawInlineInput');
+    if (!law || !input) return;
+    const val = String(input.value || '').trim();
+    if (field === 'name' && !val) {
+        showNotification('法条名称不能为空', 'warning');
+        return;
+    }
+    law[field] = val;
+    saveCaseLaws();
+    renderLawsList();
+    showNotification('已保存修改', 'success');
+}
+
+// ===== V1.2.5: 法条库检索弹窗（手动添加）=====
+let lawLibrarySelection = new Set();   // 弹窗中已勾选的法条库条目 id
+let lawLibraryKeyword = '';            // 当前搜索关键词
+
+function openLawLibraryModal() {
+    lawLibrarySelection = new Set();
+    lawLibraryKeyword = '';
+    const input = document.getElementById('lawLibrarySearchInput');
+    if (input) input.value = '';
+    toggleLawCustomForm(false);
+    renderLawLibraryResults();
+    document.getElementById('lawLibraryOverlay').classList.add('show');
+    document.getElementById('lawLibraryModal').classList.add('show');
+}
+
+function closeLawLibraryModal() {
+    document.getElementById('lawLibraryOverlay').classList.remove('show');
+    document.getElementById('lawLibraryModal').classList.remove('show');
+    lawLibrarySelection = new Set();
+    toggleLawCustomForm(false);
+}
+
+// 当前案件已有的法条名称集合（用于防重）
+function getCaseLawNames() {
+    return new Set((caseLawsState.items || []).map(function (i) { return String(i.name || '').trim(); }));
+}
+
+// 按关键词过滤法条库（名称 / 正文 / 分类）
+function getFilteredLawLibrary() {
+    const lib = getLawLibraryAll();
+    const kw = String(lawLibraryKeyword || '').trim();
+    if (!kw) return lib;
+    return lib.filter(function (l) {
+        return (l.name || '').indexOf(kw) !== -1
+            || (l.content || '').indexOf(kw) !== -1
+            || (l.category || '').indexOf(kw) !== -1;
+    });
+}
+
+function filterLawLibrary() {
+    const input = document.getElementById('lawLibrarySearchInput');
+    lawLibraryKeyword = input ? input.value : '';
+    renderLawLibraryResults();
+}
+
+function renderLawLibraryResults() {
+    const list = document.getElementById('lawLibraryList');
+    if (!list) return;
+    const results = getFilteredLawLibrary();
+    const existing = getCaseLawNames();
+
+    if (results.length === 0) {
+        list.innerHTML = '<div class="law-library-empty"><i class="fas fa-search"></i><div>未找到匹配的法条</div>'
+            + '<button type="button" class="law-library-create-btn" onclick="toggleLawCustomForm(true)"><i class="fas fa-plus"></i> 新建自定义法条</button></div>';
+    } else {
+        list.innerHTML = results.map(function (l) {
+            const added = existing.has(String(l.name).trim());
+            const checked = lawLibrarySelection.has(l.id);
+            return '' +
+                '<label class="law-library-item' + (added ? ' added' : '') + '">' +
+                    '<input type="checkbox" ' + (checked ? 'checked' : '') + (added ? ' disabled' : '') +
+                        ' onchange="toggleLawLibraryItem(\'' + l.id + '\', this.checked)">' +
+                    '<span class="law-library-item-body">' +
+                        '<span class="law-library-item-title">' + escapeHtmlForElements(l.name) +
+                            (added ? '<span class="law-added-tag">已添加</span>' : '') + '</span>' +
+                        '<span class="law-library-item-content">' + escapeHtmlForElements(l.content) + '</span>' +
+                    '</span>' +
+                    '<span class="law-category-tag">' + escapeHtmlForElements(l.category) + '</span>' +
+                '</label>';
+        }).join('');
+    }
+    updateLawLibraryConfirmBtn();
+}
+
+function toggleLawLibraryItem(lawId, checked) {
+    if (checked) lawLibrarySelection.add(lawId);
+    else lawLibrarySelection.delete(lawId);
+    updateLawLibraryConfirmBtn();
+}
+
+function updateLawLibraryConfirmBtn() {
+    const btn = document.getElementById('lawLibraryConfirmBtn');
+    if (!btn) return;
+    const n = lawLibrarySelection.size;
+    btn.textContent = '确认添加（' + n + ' 条）';
+    btn.disabled = n === 0;
+}
+
+function confirmAddLawsFromLibrary() {
+    const n = lawLibrarySelection.size;
+    if (n === 0) return;
+    const lib = getLawLibraryAll();
+    let added = 0;
+    lawLibrarySelection.forEach(function (id) {
+        const l = lib.find(function (x) { return x.id === id; });
+        if (!l) return;
+        caseLawsState.items = caseLawsState.items || [];
+        caseLawsState.items.push({
+            id: 'law_' + Date.now().toString(36) + '_' + caseLawsState.items.length,
+            name: l.name,
+            content: l.content || '',
+            source: 'manual',
+            selected: true
+        });
+        added++;
+    });
+    saveCaseLaws();
+    closeLawLibraryModal();
+    refreshCaseLawsEntry();
+    renderLawsList();
+    showNotification('已添加 ' + added + ' 条法条', 'success');
+}
+
+// ---- 库内无匹配时：新建自定义法条 ----
+function toggleLawCustomForm(show) {
+    const form = document.getElementById('lawCustomForm');
+    if (!form) return;
+    form.classList.toggle('show', !!show);
+    if (show) {
+        const n = document.getElementById('customLawName');
+        if (n) { n.value = ''; n.focus(); }
+        const c = document.getElementById('customLawContent');
+        if (c) c.value = '';
+        const g = document.getElementById('customLawCategory');
+        if (g) g.value = '';
+    }
+}
+
+function addCustomLawConfirm() {
+    const nameEl = document.getElementById('customLawName');
+    const contentEl = document.getElementById('customLawContent');
+    const categoryEl = document.getElementById('customLawCategory');
+    if (!nameEl) return;
+    const name = String(nameEl.value || '').trim();
+    if (!name) {
+        showNotification('请输入法条名称', 'warning');
+        nameEl.focus();
+        return;
+    }
+    caseLawsState.items = caseLawsState.items || [];
+    caseLawsState.items.push({
+        id: 'law_' + Date.now().toString(36) + '_' + caseLawsState.items.length,
+        name: name,
+        content: String((contentEl && contentEl.value) || '').trim(),
+        category: String((categoryEl && categoryEl.value) || '').trim() || '自定义',
+        source: 'manual',
+        selected: true
+    });
+    saveCaseLaws();
+    closeLawLibraryModal();
+    refreshCaseLawsEntry();
+    renderLawsList();
+    showNotification('已添加自定义法条', 'success');
+}
+
+function deleteCaseLaw(lawId) {
+    caseLawsState.items = (caseLawsState.items || []).filter(function (i) { return i.id !== lawId; });
+    saveCaseLaws();
+    refreshCaseLawsEntry();
+    renderLawsList();
+    showNotification('已移除 1 条法条', 'success');
+}
+
+// 【AI推荐】按钮（V1.2.9 文案）：仅重建 AI 推荐法条、保留手动添加的法条，按当前案由重跑
+function reretrieveLaws() {
+    if (!confirm('AI推荐将按当前案由重新生成法条，手动添加的法条将保留，是否继续？')) return;
+    const cause = (typeof extractCauseFromCase === 'function') ? extractCauseFromCase() : (caseItem && caseItem.cause) || '';
+    startLawRetrieve(cause, false, true);
+    showNotification('已重新生成 AI 推荐法条', 'info');
+}
+
+// ---- 生成模式 ----
+function openLawsDrawerForGenerate(callback) {
+    lawsDrawerGenerateMode = true;
+    lawsGenerateCallback = callback || null;
+    document.getElementById('caseLawsOverlay').classList.add('show');
+    document.getElementById('caseLawsDrawer').classList.add('show');
+    caseLawsDrawerOpen = true;
+    const bar = document.getElementById('caseLawsGenerateBar');
+    if (bar) bar.classList.remove('hidden');
+    renderLawsList();
+}
+
+function exitLawsGenerateMode() {
+    lawsDrawerGenerateMode = false;
+    lawsGenerateCallback = null;
+    const bar = document.getElementById('caseLawsGenerateBar');
+    if (bar) bar.classList.add('hidden');
+}
+
+function collectSelectedLaws() {
+    return (caseLawsState.items || [])
+        .filter(function (i) { return i.selected; })
+        .map(function (i) { return { name: i.name, content: i.content }; });
+}
+
+function updateLawsGenerateBtn() {
+    const btn = document.getElementById('caseLawsGenerateBtn');
+    if (!btn) return;
+    const retrieving = caseLawsState.status === 'running';
+    const n = collectSelectedLaws().length;
+    // V1.2.8: 文案明示后果（勾选的法条将写入文书）
+    btn.innerHTML = '<i class="fas fa-file-signature"></i> ' +
+        (retrieving ? '法条检索中…' : '确认法条并生成文书（' + n + ' 条写入文书）');
+    btn.disabled = retrieving || n === 0;
+    btn.title = retrieving ? '正在检索适用法条，请稍候' : (n === 0 ? '请至少确认 1 条适用法条' : '');
+}
+
+function confirmLawsGenerate() {
+    if (!lawsDrawerGenerateMode) return;
+    if (caseLawsState.status === 'running') {
+        showNotification('法条检索中，请稍候', 'warning');
+        return;
+    }
+    const laws = collectSelectedLaws();
+    if (laws.length === 0) {
+        showNotification('请至少确认 1 条适用法条', 'warning');
+        return;
+    }
+    const cb = lawsGenerateCallback;
+    // V1.2.9: 标记已确认，入口徽标切换为「已确认 N 条」
+    caseLawsState.confirmed = true;
+    saveCaseLaws();
+    refreshCaseLawsEntry();
+    exitLawsGenerateMode();
+    closeLawsDrawer();
+    if (typeof cb === 'function') cb(laws);
+}
+
+// 流式输出期间禁用「本案法条」入口
+function setCaseLawsEntryDisabled(disabled) {
+    const btn = document.getElementById('caseLawsEntryBtn');
+    if (!btn) return;
+    btn.disabled = !!disabled;
+    if (!disabled) refreshCaseLawsEntry();
+    else btn.title = '文书生成中，暂不可修改法条';
 }
 
 // ===== 引入案由要件弹窗 =====
@@ -3518,6 +4152,8 @@ function startStreamingOutput(fullContent, title) {
 
     // V1.2: 流式输出期间禁用「本案要件」入口，避免边生成边修改要件答案
     setCaseElementsEntryDisabled(true);
+    // V1.2.4: 流式输出期间同步禁用「本案法条」入口
+    setCaseLawsEntryDisabled(true);
 
     // 清理旧编辑器实例
     if (resultDocEditor) {
@@ -3582,16 +4218,13 @@ function startStreamingOutput(fullContent, title) {
     renderNextThinking();
 }
 
-// 根据文书标题生成思考过程文案
+// V1.2.4: 脚本匹配渲染——思考过程精简为 3 条（原 6 条），降低等待感
 function buildThinkingSteps(title) {
     const t = title || '法律文书';
     return [
         `正在阅读案件材料，梳理案情脉络与当事人信息...`,
-        `分析原告诉求、被告抗辩及举证质证要点...`,
-        `审查证据材料，判断真实性、合法性与关联性...`,
-        `归纳本案争议焦点，匹配适用法律条文...`,
-        `组织${t}的裁判理由与论据结构...`,
-        `生成${t}正文内容并校对排版格式...`
+        `结合已确认的适用法条，组织${t}的结构与说理...`,
+        `生成${t}正文内容...`
     ];
 }
 
@@ -3647,6 +4280,14 @@ function setResultActionButtonsDisabled(disabled) {
         reconfigBtn.style.cursor = disabled ? 'not-allowed' : '';
         reconfigBtn.title = disabled ? '生成中，请稍候' : '重新配置生成参数（默认回填最近一次历史文书快照）';
     }
+    // 清单第5项：生成期间同步禁用「文书排版」按钮
+    const formatBtn = document.getElementById('caseDocFormatBtn');
+    if (formatBtn) {
+        formatBtn.disabled = disabled;
+        formatBtn.style.opacity = disabled ? '0.5' : '';
+        formatBtn.style.cursor = disabled ? 'not-allowed' : '';
+        if (!disabled) updateDocFormatBtnState();
+    }
     // v2.31: 同步编辑器内保存按钮状态
     if (saveBtn) {
         saveBtn.disabled = disabled;
@@ -3681,6 +4322,8 @@ function finishStreaming(fullContent, title) {
     setResultActionButtonsDisabled(false);
     // V1.2: 流式输出完成后恢复「本案要件」入口
     setCaseElementsEntryDisabled(false);
+    // V1.2.4: 恢复「本案法条」入口
+    setCaseLawsEntryDisabled(false);
     // v2.24 (任务 8.8): 流式输出完成后统一提示
     showNotification('文书已生成完成', 'success');
 }
@@ -3703,6 +4346,9 @@ function escapeHtmlForStreaming(text) {
 function showResult(html, title) {
     resultContent = html;
     resultEditContent = html.replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    // 清单第5项：新生成的文书回到「未排版」态，全量格式（案号/签章/落款）需用户手动触发
+    docFormatted = false;
+    docFormatState = 'idle';
 
     const body = document.getElementById('resultBody');
     body.innerHTML = '';
@@ -3750,7 +4396,139 @@ function showResult(html, title) {
     }
 
     setLayoutState('generated');
+    updateDocFormatBtnState();
     showNotification('文书生成完成', 'success');
+}
+
+// ===== 清单第5项：文书排版（手动触发全量格式：案号 / 签章 / 落款） =====
+// 本期默认「标题+统一正文、靠左」流式渲染，全量格式由用户按需手动触发，生成时不自动排版
+function formatDocumentLayout() {
+    if (guardReadOnly('文书排版')) return;
+    if (docFormatState === 'formatting') return;
+    // 同步编辑器最新内容
+    if (resultDocEditor) resultContent = resultDocEditor.getContent();
+    if (!resultContent || !resultContent.trim()) {
+        showNotification('暂无可排版的文书，请先生成文书', 'warning');
+        return;
+    }
+    if (docFormatted && !confirm('文书已套用全量格式，是否重新排版？')) return;
+
+    docFormatState = 'formatting';
+    updateDocFormatBtnState();
+    // 脚本匹配排版（不使用大模型），模拟处理耗时
+    setTimeout(() => {
+        try {
+            const formatted = applyFullDocFormat(resultContent);
+            resultContent = formatted;
+            if (resultDocEditor) resultDocEditor.setContent(formatted);
+            docFormatted = true;
+            docFormatState = 'done';
+            showNotification('文书排版完成：已补齐案号、落款与签章', 'success');
+        } catch (e) {
+            docFormatState = docFormatted ? 'done' : 'idle';
+            showNotification('排版失败，请重试', 'error');
+        }
+        updateDocFormatBtnState();
+    }, 1200);
+}
+
+// 脚本排版：补案号行 + 落款签章区，并标记 doc-formatted（案号/签章的显隐由 CSS 控制）
+function applyFullDocFormat(html) {
+    const doc = new DOMParser().parseFromString(html || '', 'text/html');
+    const first = doc.body.firstElementChild;
+    let container;
+    if (first && first.classList && first.classList.contains('result-doc')) {
+        container = first;
+    } else {
+        // 无 result-doc 包裹时补一层容器，保证排版类与案号/签章样式生效
+        container = doc.createElement('div');
+        container.className = 'result-doc';
+        while (doc.body.firstChild) container.appendChild(doc.body.firstChild);
+        doc.body.appendChild(container);
+    }
+
+    // 1) 案号行：插到标题之后（无标题则置顶）
+    if (!container.querySelector('.doc-format-caseno')) {
+        const caseNoEl = document.getElementById('caseNumber');
+        const caseNo = (caseItem && caseItem.caseNumber) || (caseNoEl ? caseNoEl.textContent.trim() : '') || '';
+        if (caseNo && caseNo !== '-') {
+            const noEl = doc.createElement('div');
+            noEl.className = 'doc-format-caseno';
+            noEl.textContent = caseNo;
+            const heading = container.querySelector('h1, h2');
+            if (heading && heading.nextSibling) container.insertBefore(noEl, heading.nextSibling);
+            else if (heading) container.appendChild(noEl);
+            else container.insertBefore(noEl, container.firstChild);
+        }
+    }
+
+    // 2) 落款签章区：追加到末尾（法院口径用 getSignerLabel，其余沿用）
+    if (!container.querySelector('.doc-format-sign')) {
+        const sign = doc.createElement('div');
+        sign.className = 'doc-format-sign';
+        sign.innerHTML = '<div>' + getSignerLabel(org) + '　张XX</div>' +
+            '<div>书记员　王XX</div>' +
+            '<div>' + toChineseDate(new Date()) + '</div>' +
+            '<div class="doc-format-sign-seal">院印</div>';
+        container.appendChild(sign);
+    }
+
+    container.classList.add('doc-formatted');
+    return container.outerHTML;
+}
+
+// 日期转中文（二〇二六年九月十日），用于落款日期
+// 年份逐位读（二〇二六），月/日按数值读（九月 / 二十五日），符合司法文书落款习惯
+function toChineseDate(date) {
+    const cn = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    const digitCn = (n) => String(n).split('').map(d => cn[Number(d)]).join('');
+    const unitCn = (n) => {
+        if (n <= 10) return n === 10 ? '十' : cn[n];
+        if (n < 20) return '十' + cn[n - 10];
+        const tens = Math.floor(n / 10), ones = n % 10;
+        return cn[tens] + '十' + (ones ? cn[ones] : '');
+    };
+    return digitCn(date.getFullYear()) + '年' + unitCn(date.getMonth() + 1) + '月' + unitCn(date.getDate()) + '日';
+}
+
+// 按钮状态：无内容置灰 / 排版中 loading / 已排版「重新排版」
+function updateDocFormatBtnState() {
+    const btn = document.getElementById('caseDocFormatBtn');
+    if (!btn) return;
+    const label = document.getElementById('caseDocFormatBtnLabel');
+    const icon = document.getElementById('caseDocFormatBtnIcon');
+    const hasContent = !!(resultContent && resultContent.trim());
+
+    if (docFormatState === 'formatting') {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+        btn.title = '正在排版，请稍候';
+        if (label) label.textContent = '排版中';
+        if (icon) icon.className = 'fas fa-circle-notch fa-spin';
+        return;
+    }
+    if (icon) icon.className = 'fas fa-align-left';
+
+    if (!hasContent) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+        btn.title = '暂无可排版的文书，请先生成文书';
+        if (label) label.textContent = '文书排版';
+        return;
+    }
+
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    if (docFormatted) {
+        btn.title = '文书已套用全量格式（案号/签章/落款），点击重新排版';
+        if (label) label.textContent = '重新排版';
+    } else {
+        btn.title = '手动触发全量格式排版（案号/签章/落款），本期默认不自动排版';
+        if (label) label.textContent = '文书排版';
+    }
 }
 
 function switchResultTab(tab) {

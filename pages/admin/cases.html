@@ -202,7 +202,7 @@
         .case-grid .grid-head,
         .case-grid .grid-row {
             display: grid;
-            grid-template-columns: var(--case-grid-cols, 40px minmax(0,3fr) 100px 100px minmax(0,1fr) 180px);
+            grid-template-columns: var(--case-grid-cols, 40px minmax(0,3fr) 100px 100px minmax(0,1fr) 268px);
             align-items: center;
         }
         .case-grid .grid-head > div,
@@ -244,7 +244,7 @@
         .case-grid .doc-count-link { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
         .case-grid .doc-count-link:hover { text-decoration: underline; }
         .case-grid .doc-count-link.disabled { color: var(--text-muted); cursor: not-allowed; pointer-events: none; }
-        .case-grid .action-cell { display: flex; justify-content: center; gap: 6px; }
+        .case-grid .action-cell { display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
         .case-grid .action-btn {
             padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer;
             border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151;
@@ -259,6 +259,8 @@
         .case-grid .action-btn.handler:hover { background: #f5f3ff; }
         .case-grid .action-btn.restore { color: #047857; border-color: #a7f3d0; }
         .case-grid .action-btn.restore:hover { background: #ecfdf5; }
+        .case-grid .action-btn.ocr { color: #0369a1; border-color: #bae6fd; }
+        .case-grid .action-btn.ocr:hover { background: #f0f9ff; }
 
         /* 分页 */
         .pagination { display: flex; justify-content: space-between; align-items: center; padding: 16px 4px; margin-top: 12px; }
@@ -705,7 +707,7 @@
 
                 <!-- 案件表格 -->
                 <div class="case-table-wrap">
-                    <div class="case-grid" id="caseGrid" style="--case-grid-cols: 40px minmax(0,3fr) 100px 100px minmax(0,1fr) 180px;">
+                    <div class="case-grid" id="caseGrid" style="--case-grid-cols: 40px minmax(0,3fr) 100px 100px minmax(0,1fr) 268px;">
                         <div class="grid-head">
                             <div class="col-center"><input type="checkbox" id="selectAll" onchange="AdminCases.toggleSelectAll(this)"></div>
                             <div>案件名称</div>
@@ -881,6 +883,6 @@
 
     <!-- 脚本 -->
     <script src="../../js/case-data.js?v=65"></script>
-    <script src="../../js/admin-cases.js?v=10"></script>
+    <script src="../../js/admin-cases.js?v=11"></script>
 </body>
 </html>

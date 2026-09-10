@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+<html lang="zh-CN" data-page-node-id="9JOBB6npJMfVOQSCF6L3Ac">
+<head data-page-node-id="kAHSAJOA5VBI0FGVEcBdYu">
+    <meta charset="UTF-8" data-page-node-id="5jfb9aoZyg3Bpn5u8aFxEe">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="5LguBml2cWKQncTII6era5">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" data-page-node-id="8IHMGYostbvKamSHG3k3EG">
+    <meta http-equiv="Pragma" content="no-cache" data-page-node-id="VbCYzzKMzySZHZDWQHL4XO">
+    <meta http-equiv="Expires" content="0" data-page-node-id="0i1hJVE7LPPcPapm3BDIhn">
     <title>案件材料管理 - AI辅助办案系统</title>
-    <link href="../libs/font-awesome-all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../css/common.css">
+    <link href="../libs/font-awesome-all.min.css" rel="stylesheet" data-page-node-id="STiyCM6KlGp0iLBoCIGsZz">
+    <link rel="stylesheet" href="../css/common.css?v=3" data-page-node-id="vlazBi3AhrbE7km2ZuH1Rx">
     <style>
         /* ===== Page Layout ===== */
         .case-detail-page {
@@ -185,6 +185,10 @@
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-secondary);
             flex-shrink: 0;
+            /* V1.2.4: 容纳「本案要件」「本案法条」两个入口，纵向排列 */
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
         .material-col-elements-bar .case-elements-entry-btn {
             width: 100%;
@@ -1433,8 +1437,7 @@
         .result-col {
             flex: 0 0 0%;
             background: var(--bg-primary);
-            border-left: 1px solid var(--border-color);
-            display: flex;
+            border-left: 1px solid var(--border-color);            display: flex;
             flex-direction: column;
             overflow: hidden;
             transition: flex 0.25s;
@@ -1683,6 +1686,83 @@
             font-size: 12px;
             color: var(--text-muted);
             margin-bottom: 16px;
+        }
+
+        /* ===== V1.2.4: 脚本匹配渲染（清单第 4 项） =====
+           弃用大模型渲染，改为标题 + 统一字体正文、整体靠左；
+           案号 / 签章 / 落款日期本期后置，格式模板不引入 */
+        .result-doc.script-render-doc h2 {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: left;
+            color: #1f2937;
+            margin: 16px 0;
+        }
+        .result-doc.script-render-doc h3 {
+            font-size: 15px;
+            font-weight: 600;
+            text-align: left;
+            color: #1f2937;
+            margin: 14px 0 8px;
+        }
+        .result-doc.script-render-doc p {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #374151;
+            text-align: left;
+            text-indent: 2em;
+            margin-bottom: 12px;
+        }
+        /* 本期后置：meta 信息行、右对齐签章与落款日期 */
+        .result-doc.script-render-doc .result-doc-meta { display: none; }
+        .result-doc.script-render-doc p[style*="text-align:right"],
+        .result-doc.script-render-doc p[style*="text-align: right"] { display: none; }
+
+        /* ===== 清单第5项：文书排版（用户手动触发的全量格式） =====
+           本期默认「标题+统一正文、靠左」流式渲染，案号/签章/落款后置；
+           点「文书排版」后套用全量格式：案号行、标题居中、落款签章区 */
+        .result-doc .doc-format-caseno,
+        .result-doc .doc-format-sign { display: none; }
+        .result-doc.doc-formatted { font-family: "Noto Serif SC", "SimSun", serif; }
+        .result-doc.doc-formatted h2 {
+            font-size: 20px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 2px;
+            margin: 8px 0 18px;
+        }
+        .result-doc.doc-formatted h3 { font-size: 15px; font-weight: 700; margin: 18px 0 8px; }
+        .result-doc.doc-formatted p { text-indent: 2em; line-height: 2; margin-bottom: 8px; }
+        .result-doc.doc-formatted .doc-format-caseno {
+            display: block;
+            text-align: center;
+            font-size: 13px;
+            color: #374151;
+            margin-bottom: 20px;
+        }
+        .result-doc.doc-formatted .doc-format-sign {
+            display: block;
+            margin-top: 44px;
+            text-align: right;
+            font-size: 14px;
+            line-height: 2;
+            color: #1f2937;
+            padding-right: 20px;
+        }
+        /* 院印：红色圆形印章占位（脚本排版，不依赖大模型） */
+        .doc-format-sign-seal {
+            display: inline-block;
+            margin-top: 10px;
+            width: 104px;
+            height: 104px;
+            border: 2px solid #dc2626;
+            border-radius: 50%;
+            color: #dc2626;
+            font-size: 13px;
+            line-height: 100px;
+            text-align: center;
+            transform: rotate(-8deg);
+            opacity: 0.75;
         }
 
         .result-edit-area {
@@ -2748,6 +2828,400 @@
             background: #1d4ed8;
         }
 
+        /* ===== V1.2.4: 本案法条抽屉（复用要件抽屉样式体系，仅补充法条专属样式） ===== */
+        .law-item-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        .law-item-text {
+            margin-top: 4px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .law-item-inline-input {
+            width: 100%;
+            padding: 5px 8px;
+            border: 1px solid var(--accent-primary);
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            box-sizing: border-box;
+            margin-top: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .law-item-inline-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        /* V1.2.8: 后果说明条——说明「勾选 = 写入文书法律适用依据章节」 */
+        .law-consequence-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            flex-shrink: 0;
+            margin: 0 16px 8px;
+            padding: 7px 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+        .law-consequence-hint i {
+            color: var(--accent-primary);
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        /* V1.2.9: 可补充依据条目视觉弱化（默认不勾选，降低视觉权重） */
+        .case-elements-item.law-optional .law-item-name { font-weight: 400; }
+        .case-elements-item.law-optional .law-item-text { color: var(--text-tertiary, var(--text-muted)); }
+
+        /* ===== V1.2.9: 入口区分（必办 vs 选办）===== */
+        /* 状态徽标 */
+        .entry-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+            padding: 1px 7px;
+            border-radius: 9px;
+            font-size: 11px;
+            line-height: 1.6;
+            white-space: nowrap;
+            font-weight: 400;
+        }
+        .entry-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .entry-badge.confirmed {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .entry-badge.optional {
+            background: #f1efe8;
+            color: #5f5e5a;
+        }
+        /* 选办入口（本案要件）：弱化——浅灰底、灰边框、次要文字 */
+        .case-elements-entry-btn.entry-optional {
+            border-color: var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+        .case-elements-entry-btn.entry-optional:hover {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+        .case-elements-entry-btn.entry-optional .entry-count {
+            background: #d3d1c7;
+            color: #444441;
+        }
+        .case-elements-entry-btn.entry-optional:hover .entry-count {
+            background: var(--accent-primary);
+            color: #fff;
+        }
+        /* 必办入口（本案法条）：主色实心强化 */
+        .case-elements-entry-btn.entry-required {
+            border-width: 1px;
+            font-weight: 500;
+        }
+
+        /* V1.2.9: 统计条右侧【全选 / 清空】快捷操作 */
+        #caseLawsStats {
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        #caseLawsStats .stat-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .law-batch-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .law-batch-btn {
+            padding: 1px 6px;
+            border: none;
+            background: transparent;
+            color: var(--accent-primary);
+            font-size: 11px;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .law-batch-btn:hover { background: var(--accent-light); }
+        .law-batch-sep { color: var(--border-color); font-size: 11px; }
+
+        /* V1.2.9: 已勾选法条置顶并加浅色底标识 */
+        .case-elements-item.law-selected {
+            background: var(--accent-light);
+            border-color: var(--accent-primary);
+        }
+
+        /* 法条来源标签：AI推荐=蓝 / 手动添加=橙 */
+        .source-tag.ai {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        .source-tag.manual {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+        /* V1.2.8: 可补充依据标签（灰蓝，视觉权重低于核心） */
+        .source-tag.optional {
+            background: #f1efe8;
+            color: #5f5e5a;
+        }
+        .law-retrieving-hint {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .law-retrieving-hint .fa-spin { color: var(--accent-primary); }
+        /* 入口按钮检索中：计数位置显示转圈 */
+        .case-elements-entry-btn .entry-spinner {
+            margin-left: 2px;
+            font-size: 11px;
+        }
+
+        /* ===== V1.2.5: 法条库检索弹窗 =====
+           显式声明定位与 transform，避免 .modal-dialog 基础类的 transform
+           在某些场景下被覆盖导致弹窗偏离居中（曾出现 left:0 + 0 transform 的情况） */
+        .law-library-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 620px;
+            max-width: 92vw;
+            display: none;
+            flex-direction: column;
+            max-height: 82vh;
+            z-index: 500;  /* 高于法条抽屉(401)与要件抽屉(401)，避免抽屉底部按钮穿透 */
+        }
+        .law-library-modal.show { display: flex; }
+        /* V1.2.5: 弹窗遮罩高于抽屉遮罩(400)与抽屉(401) */
+        #lawLibraryOverlay { z-index: 499; }
+        .law-library-modal .modal-body {
+            padding: 16px 22px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        .law-library-search {
+            position: relative;
+            flex-shrink: 0;
+        }
+        .law-library-search i {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .law-library-search input {
+            width: 100%;
+            padding: 8px 12px 8px 30px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.15s;
+        }
+        .law-library-search input:focus { border-color: var(--accent-primary); }
+        .law-library-list {
+            margin-top: 12px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .law-library-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .law-library-item:hover {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+        .law-library-item.added {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .law-library-item.added:hover {
+            border-color: var(--border-color);
+            background: var(--bg-primary);
+        }
+        .law-library-item input[type="checkbox"] {
+            margin-top: 2px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .law-library-item.added input[type="checkbox"] { cursor: not-allowed; }
+        .law-library-item-body {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .law-library-item-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        .law-added-tag {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 0 6px;
+            border-radius: 4px;
+            background: #f1efe8;
+            color: #5f5e5a;
+            font-size: 11px;
+            font-weight: 400;
+        }
+        .law-library-item-content {
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .law-category-tag {
+            flex-shrink: 0;
+            padding: 1px 7px;
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            font-size: 11px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+        .law-library-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 28px 12px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .law-library-empty i { font-size: 26px; opacity: 0.35; }
+        .law-library-create-btn {
+            margin-top: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border: 1px dashed var(--accent-primary);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--accent-primary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .law-library-create-btn:hover { background: var(--accent-light); }
+        .law-library-custom-form {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px dashed var(--accent-primary);
+            border-radius: 8px;
+        }
+        .law-library-custom-form.show { display: flex; }
+        .law-library-custom-form .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .law-library-custom-form label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .law-library-custom-form .required { color: #dc2626; }
+        .law-library-custom-form input,
+        .law-library-custom-form textarea {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: inherit;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            outline: none;
+            box-sizing: border-box;
+        }
+        .law-library-custom-form input:focus,
+        .law-library-custom-form textarea:focus { border-color: var(--accent-primary); }
+        .law-library-custom-form textarea { min-height: 56px; resize: vertical; }
+        .law-library-custom-form .form-actions {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+        .law-library-custom-form .form-btn {
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+        }
+        .law-library-custom-form .form-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+        .law-library-modal .modal-footer { flex-shrink: 0; }
+
         /* 要件问答弹窗 */
         .element-qa-modal .modal-body {
             padding: 20px 22px;
@@ -2891,238 +3365,246 @@
         .doc-editor-paper li { margin: 0.3em 0; }
     </style>
 </head>
-<body class="as-page">
+<body class="as-page" data-page-node-id="ocyYCTlzB4oxlxGwkNk3pI">
     <!-- 新版左侧导航栏 -->
-    <nav class="app-sidebar" id="appSidebar">
-        <div class="as-header">
-            <div class="as-logo"><i class="fas fa-scale-balanced"></i></div>
-            <span class="as-logo-name">法律智能体</span>
+    <nav class="app-sidebar" id="appSidebar" data-page-node-id="5JpcQxgnabaUxDy38hT18X">
+        <div class="as-header" data-page-node-id="hPmtw0XwW3ziHBvKYBn3S2">
+            <div class="as-logo" data-page-node-id="HPjhbfswAwK0pPGvSk1ysL"><i class="fas fa-scale-balanced" data-page-node-id="KbHKGPOmrYQa6CgpyziREw"></i></div>
+            <span class="as-logo-name" data-page-node-id="PlzJ5KZTEP4BL1eXSo67Xk">法律智能体</span>
         </div>
-        <div class="as-body">
-            <button class="as-new-chat" id="newChatBtn" title="新建对话（Ctrl+K）">
-                <i class="fas fa-plus"></i>
-                <span>新建对话</span>
-                <span class="as-shortcut">Ctrl K</span>
+        <div class="as-body" data-page-node-id="cQt9Ct2ygiIwNWTpiAY1pi">
+            <button class="as-new-chat" id="newChatBtn" title="新建对话（Ctrl+K）" data-page-node-id="A1qx7UuHYiJL9Tfxt4cGV3">
+                <i class="fas fa-plus" data-page-node-id="iGGkJGWHGb0X5JC9XIEyNA"></i>
+                <span data-page-node-id="a7pVGvLbGD3YDo9j0NEdbS">新建对话</span>
+                <span class="as-shortcut" data-page-node-id="SCXr8PfNLWfqt2HbKOuqbC">Ctrl K</span>
             </button>
 
-            <div class="as-nav">
-                <a href="knowledge.html" class="as-nav-item">
-                    <i class="fas fa-book"></i>
-                    <span>知识库</span>
+            <div class="as-nav" data-page-node-id="HZ1PuJD1DAQWGJKGEBcugH">
+                <a href="knowledge.html" class="as-nav-item" data-page-node-id="aUNix1r0NYJBu6CkmAQj1M">
+                    <i class="fas fa-book" data-page-node-id="IRJSxbAvDxNWm6cXBVsHeA"></i>
+                    <span data-page-node-id="YCPxBzjFES70ekh9G7ymDB">知识库</span>
                 </a>
-                <a href="cases.html" class="as-nav-item active">
-                    <i class="fas fa-folder-open"></i>
-                    <span>案件</span>
+                <a href="cases.html" class="as-nav-item active" data-page-node-id="hfxsMh0VIPAnuSQC6JJoK6">
+                    <i class="fas fa-folder-open" data-page-node-id="5UTGRuyUEPlsrCD07ZIJrt"></i>
+                    <span data-page-node-id="H9yMw5ObUMUvrWJWedFDbs">案件</span>
                 </a>
             </div>
 
-            <div class="as-section-label">案件</div>
-            <div class="as-case-list" id="asCaseList">
+            <div class="as-section-label" data-page-node-id="QbMwXHJGXV9YbgmrypxvlE">案件</div>
+            <div class="as-case-list" id="asCaseList" data-page-node-id="ga7NF74ETpXa9Vkv8Ous65">
                 <!-- 案件对话历史将由 JavaScript 动态渲染 -->
             </div>
 
-            <div class="as-recent" id="asRecent">
-                <div class="as-recent-header">
-                    <div class="as-recent-title" id="asRecentToggle">
-                        <i class="fas fa-chevron-down"></i>
-                        <span>最近的对话</span>
+            <div class="as-recent" id="asRecent" data-page-node-id="POfVvX4gicyXPTHiQ5bkqg">
+                <div class="as-recent-header" data-page-node-id="iXPmHQv9xSNs08WsPw9fI4">
+                    <div class="as-recent-title" id="asRecentToggle" data-page-node-id="1MbLYFJBanFeq5Qknq41Du">
+                        <i class="fas fa-chevron-down" data-page-node-id="eAa1uguQBJxVvK3cwIawoh"></i>
+                        <span data-page-node-id="aFnmsEStD2VBxdlQSTpFjo">最近的对话</span>
                     </div>
                 </div>
-                <div class="as-recent-list" id="asRecentList">
+                <div class="as-recent-list" id="asRecentList" data-page-node-id="U0LGLTNIxIXq4tmfBLFzZF">
                     <!-- 最近的对话将由 JavaScript 动态渲染 -->
                 </div>
             </div>
         </div>
-        <div class="as-footer">
-            <div class="as-user" id="asUser" onclick="toggleAsUserMenu(event)" title="账号菜单">
-                <div class="as-user-avatar">洪</div>
-                <div class="as-user-info">
-                    <div class="as-user-name">洪虹</div>
-                    <div class="as-user-role">法院管理员</div>
+        <div class="as-footer" data-page-node-id="gJNtE5myfoZltjtlqeqsQG">
+            <div class="as-user" id="asUser" onclick="toggleAsUserMenu(event)" title="账号菜单" data-page-node-id="b0eAby3FWhrlJWFWLSEcNm">
+                <div class="as-user-avatar" data-page-node-id="C6P9k7AyLq7sE2aEaAHl1N">洪</div>
+                <div class="as-user-info" data-page-node-id="s6vepNhTHY4oLsCKSXX8j2">
+                    <div class="as-user-name" data-page-node-id="rK3Gky0F0oAQaQRvbPyWjQ">洪虹</div>
+                    <div class="as-user-role" data-page-node-id="KXNRG20dolC5ck4yGqliwU">法院管理员</div>
                 </div>
-                <i class="fas fa-chevron-up as-user-arrow"></i>
+                <i class="fas fa-chevron-up as-user-arrow" data-page-node-id="AENsab54vJCReacyRs5KT1"></i>
             </div>
-            <div class="as-user-menu" id="asUserMenu">
-                <a class="as-user-menu-item" href="settings.html">
-                    <i class="fas fa-gear"></i>
-                    <span>个人设置</span>
+            <div class="as-user-menu" id="asUserMenu" data-page-node-id="KSLMky53a6CBCA0YVcBEFn">
+                <a class="as-user-menu-item" href="settings.html" data-page-node-id="Fy0HOzKSYbxBjcIbytyIJU">
+                    <i class="fas fa-gear" data-page-node-id="V1hfBnwNOMmuJEDHSGKJS7"></i>
+                    <span data-page-node-id="xZ0YCa3gpiUlHsmfAMtTcL">个人设置</span>
                 </a>
-                <button class="as-user-menu-item logout" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>退出登录</span>
+                <button class="as-user-menu-item logout" onclick="logout()" data-page-node-id="OPjsxtaJZiGIWJwPH8E0Lo">
+                    <i class="fas fa-sign-out-alt" data-page-node-id="S9Xp1ySjhRFJFvNfNlCKap"></i>
+                    <span data-page-node-id="YRKHVNZ8Fjp1OGl4pBg6vb">退出登录</span>
                 </button>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="main-wrapper">
-        <header class="header">
-            <div class="header-left">
-                <span style="font-size:16px;font-weight:500;color:var(--text-primary);">案件助手</span>
+    <div class="main-wrapper" data-page-node-id="JoEyqSTbMkqXJEs2jXpB8v">
+        <header class="header" data-page-node-id="zzp6W0ItlgdKoRnrTFnyG1">
+            <div class="header-left" data-page-node-id="DjvCFUKrvfIZsw9KTjjYUX">
+                <span style="font-size:16px;font-weight:500;color:var(--text-primary);" data-page-node-id="3mGAyvrgoRLr9P81lHuyPl">案件助手</span>
             </div>
         </header>
 
-        <div class="case-detail-page">
+        <div class="case-detail-page" data-page-node-id="AOhagercwYNPUOAa1NyKlW">
             <!-- Header -->
-            <div class="detail-header">
-                <div class="detail-header-left">
-                    <button class="back-btn" onclick="goBack()" title="返回案件列表">
-                        <i class="fas fa-arrow-left"></i>
+            <div class="detail-header" data-page-node-id="7PLX0EThkrVn8frySxvIc2">
+                <div class="detail-header-left" data-page-node-id="w7POv5eezYPFstaAsJAmp6">
+                    <button class="back-btn" onclick="goBack()" title="返回案件列表" data-page-node-id="RBheRdBK5HLCAEkvbOZvgH">
+                        <i class="fas fa-arrow-left" data-page-node-id="b0xb5whkS6Gzkkhha6lDBU"></i>
                     </button>
-                    <div>
-                        <div class="detail-title" id="caseName">案件材料</div>
-                        <div class="detail-subtitle" id="caseNumber">-</div>
+                    <div data-page-node-id="m1BVWCAV41e7q9TyhFO1Nj">
+                        <div class="detail-title" id="caseName" data-page-node-id="xEAwR6k8LGL7NxDkUAKPgj">案件材料</div>
+                        <div class="detail-subtitle" id="caseNumber" data-page-node-id="t0femadrm3ufdLzGqbLG0W">-</div>
                     </div>
                 </div>
-                <div class="detail-header-right">
-                    <button class="detail-action-btn" id="caseHistoryDocsBtn" onclick="toggleHistoryTasks()" title="查看历史文书版本">
-                        <i class="fas fa-file-alt"></i> 历史文书
+                <div class="detail-header-right" data-page-node-id="6FhTm7EzhXAAfKYKLfCXI8">
+                    <!-- 清单第5项：文书排版——本期默认流式渲染，全量格式（案号/签章/落款）由用户手动触发 -->
+                    <button class="detail-action-btn" id="caseDocFormatBtn" onclick="formatDocumentLayout()" title="手动触发全量格式排版（案号/签章/落款），本期默认不自动排版" data-page-node-id="Tdx7VbNq2mRkZLe4Yw9sFa">
+                        <i class="fas fa-align-left" id="caseDocFormatBtnIcon" data-page-node-id="Wq6mZf3nBx8rTk2vCd5uHs"></i> <span id="caseDocFormatBtnLabel" data-page-node-id="Pz4nKd9wQm2xLb7vNc3rJt">文书排版</span>
+                    </button>
+                    <button class="detail-action-btn" id="caseHistoryDocsBtn" onclick="toggleHistoryTasks()" title="查看历史文书版本" data-page-node-id="ZIQwVLzTWC0bnKZR5oOcIq">
+                        <i class="fas fa-file-alt" data-page-node-id="Ng8ulvAuNgTKEZpDq39Gew"></i> 历史文书
                     </button>
                 </div>
             </div>
 
             <!-- v2.32: 案件信息解析提示条（解析中浅蓝 / 待确认浅黄+去修改），对齐实际系统截图 -->
-            <div class="case-info-parse-alert" id="caseInfoParseAlert" style="display:none;"></div>
+            <div class="case-info-parse-alert" id="caseInfoParseAlert" style="display:none;" data-page-node-id="rH1nO94uhU74JQJDFtw0Pz"></div>
 
             <!-- Three Column Body -->
-            <div class="detail-body" id="detailBody">
+            <div class="detail-body" id="detailBody" data-page-node-id="1jX797pjbg5c1wNn9n4BxR">
                 <!-- Left Column: Material Tree -->
-                <div class="material-col" id="materialCol">
-                    <div class="material-col-header">
-                        <span><i class="fas fa-th-large"></i> 材料树</span>
-                        <button onclick="toggleMaterialCol()" title="折叠/展开"><i class="fas fa-chevron-left"></i></button>
+                <div class="material-col" id="materialCol" data-page-node-id="UHxhviZQFF3PnTCDODBfDs">
+                    <div class="material-col-header" data-page-node-id="NsaDDCsGsklpGhJjwEV1DO">
+                        <span data-page-node-id="YKDwHz5Vlh3cZTrA2tjxkA"><i class="fas fa-th-large" data-page-node-id="8FvI8Vru8262PUAcIqJvWT"></i> 材料树</span>
+                        <button onclick="toggleMaterialCol()" title="折叠/展开" data-page-node-id="35lny073fxKla3BElyC5xG"><i class="fas fa-chevron-left" data-page-node-id="HBxc3VDLKIOmYnFAyD3SD9"></i></button>
                     </div>
-                    <!-- 优化1.1: 本案要件入口移到顶部固定条，材料多时无需滚动 -->
-                    <div class="material-col-elements-bar">
-                        <button type="button" class="case-elements-entry-btn" id="caseElementsEntryBtn" onclick="toggleElementsDrawer()" title="查看本案要件">
-                            <span class="entry-left"><i class="fas fa-puzzle-piece"></i> 本案要件 <span class="entry-count" id="caseElementsEntryCount">0</span></span>
-                            <i class="fas fa-chevron-right" style="font-size:11px;"></i>
+                    <!-- V1.2.9: 两入口区分——要件可选（弱化+选填标），法条必确认（主色+状态徽标） -->
+                    <div class="material-col-elements-bar" data-page-node-id="mtgb0Ttb1lWqwEC0GmvhP5">
+                        <button type="button" class="case-elements-entry-btn entry-optional" id="caseElementsEntryBtn" onclick="toggleElementsDrawer()" title="查看本案要件（可选引入）" data-page-node-id="OScD5bCKjG1Kh5jq03YmKq">
+                            <span class="entry-left" data-page-node-id="wstD2GRM7mt7qTwzyf0RaD"><i class="fas fa-puzzle-piece" data-page-node-id="xwQcbHkZQQ3vfjWXKRzVRf"></i> 本案要件 <span class="entry-count" id="caseElementsEntryCount" data-page-node-id="cuq1CB38RhipWTqIHGJyFJ">0</span></span>
+                            <span class="entry-badge optional" id="caseElementsEntryBadge">选填</span>
+                        </button>
+                        <button type="button" class="case-elements-entry-btn entry-required" id="caseLawsEntryBtn" onclick="toggleLawsDrawer()" title="查看本案法条（生成文书前需确认）" data-page-node-id="qOBUqaUJYfuElWywHHtnAy">
+                            <span class="entry-left" data-page-node-id="iIRLSTVxJMaadhRnvPlUM8"><i class="fas fa-gavel" data-page-node-id="lAQooDVkprEw6V6jVf9lJs"></i> 本案法条 <span class="entry-count" id="caseLawsEntryCount" data-page-node-id="RSCLddjoIAP2jp9CowfAfA">-</span></span>
+                            <span class="entry-badge pending" id="caseLawsEntryBadge">待确认</span>
                         </button>
                     </div>
-                    <div class="material-search">
-                        <div class="material-search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="materialSearchInput" placeholder="搜索材料..." oninput="renderMaterialTree()">
+                    <div class="material-search" data-page-node-id="sqIvslqtJ24MBvpdCRyKP3">
+                        <div class="material-search-box" data-page-node-id="f3WtK2FGV7LDTRwCrINjGG">
+                            <i class="fas fa-search" data-page-node-id="wV1ltNFfMr42oTY1b0Dxr3"></i>
+                            <input type="text" id="materialSearchInput" placeholder="搜索材料..." oninput="renderMaterialTree()" data-page-node-id="WtxJHUmA0pTBbwGEALsYEQ">
                         </div>
                     </div>
-                    <div class="material-col-toolbar" id="materialColToolbar">
-                        <span>已选 <span id="selectedMaterialCount">0</span> / <span id="totalMaterialCount">0</span></span>
-                        <div class="toolbar-actions">
-                            <button class="select-all-btn" id="selectAllBtn" onclick="toggleSelectAllMaterials()">全选</button>
-                            <button class="batch-delete-btn" id="batchDeleteBtn" onclick="deleteSelectedMaterials()">删除</button>
+                    <div class="material-col-toolbar" id="materialColToolbar" data-page-node-id="SUf2QmqeG9EdHPFljAHsjt">
+                        <span data-page-node-id="eE8V5Foc9qsG2Y08jSR6mv">已选 <span id="selectedMaterialCount" data-page-node-id="48z68OCAsZLBZ53zdcb251">0</span> / <span id="totalMaterialCount" data-page-node-id="VKTGfgnTrZmyCBMAaBwNDx">0</span></span>
+                        <div class="toolbar-actions" data-page-node-id="XYEMwYL1FGs2z0F0soSN4P">
+                            <button class="select-all-btn" id="selectAllBtn" onclick="toggleSelectAllMaterials()" data-page-node-id="97eSnpDWIt75KdesguLJEa">全选</button>
+                            <button class="batch-delete-btn" id="batchDeleteBtn" onclick="deleteSelectedMaterials()" data-page-node-id="x1EhYgCbf5fFZwkBQ9MrCd">删除</button>
                         </div>
                     </div>
-                    <div class="material-tree" id="materialTree"></div>
+                    <div class="material-tree" id="materialTree" data-page-node-id="FQifNFCF5wqUi5aiGRiups"></div>
                 </div>
-                <div class="col-resizer" id="materialResizer" data-resizer="material" title="拖动调整宽度"></div>
+                <div class="col-resizer" id="materialResizer" data-resizer="material" title="拖动调整宽度" data-page-node-id="rdObHvjclOzFLDTiC70TMw"></div>
 
                 <!-- Center Column: Generation Methods -->
-                <div class="gen-col" id="genCol">
-                    <div class="core-materials-alert" id="coreMaterialsAlert">
-                        <div class="core-materials-info">
-                            <i class="fas fa-info-circle"></i>
-                            <span>核心材料 <span class="core-materials-count" id="coreMaterialsCount">0</span></span>
-                            <span id="coreMaterialsText">未选择核心材料，请在左侧勾选生成文书所需的材料</span>
+                <div class="gen-col" id="genCol" data-page-node-id="XVf1sZHxsuQYdFuCS2nr4A">
+                    <div class="core-materials-alert" id="coreMaterialsAlert" data-page-node-id="C5YfGsxXLAr2ZtEcUiuqzg">
+                        <div class="core-materials-info" data-page-node-id="ybSQQh4Q9fkWYvg50hOgxP">
+                            <i class="fas fa-info-circle" data-page-node-id="F9nHMNfEHIjHOsx0fsXWE1"></i>
+                            <span data-page-node-id="UWG9yfv40WdDzJf2fQ0wKx">核心材料 <span class="core-materials-count" id="coreMaterialsCount" data-page-node-id="Ia9OWxZMHwzDx3bDSLJPK5">0</span></span>
+                            <span id="coreMaterialsText" data-page-node-id="4oayFNRwNXL7eoKYmpvlyH">未选择核心材料，请在左侧勾选生成文书所需的材料</span>
                         </div>
-                        <button class="core-materials-manage" onclick="scrollToMaterialTree()">管理</button>
+                        <button class="core-materials-manage" onclick="scrollToMaterialTree()" data-page-node-id="dpZMrRHaIRATVvV2G7xYRX">管理</button>
                     </div>
-                    <div class="gen-tabs">
-                        <button class="gen-tab active" data-method="material" onclick="switchGenMethod('material')">
-                            <i class="fas fa-bolt"></i> 一步生成
+                    <div class="gen-tabs" data-page-node-id="s9b8qE5D388NmqPVSsfRbK">
+                        <button class="gen-tab active" data-method="material" onclick="switchGenMethod('material')" data-page-node-id="lKLU5cP4CGvP0cGo7017VI">
+                            <i class="fas fa-bolt" data-page-node-id="zIi0lfUQ7fFwXZlb1iUGTg"></i> 一步生成
                         </button>
-                        <button class="gen-tab" data-method="steps" onclick="switchGenMethod('steps')">
-                            <i class="fas fa-list-ol"></i> 分步生成
+                        <button class="gen-tab" data-method="steps" onclick="switchGenMethod('steps')" data-page-node-id="saV04G09vzAYk7jTKNLpFQ">
+                            <i class="fas fa-list-ol" data-page-node-id="kdgkauzCNenAIhcWkmfFcX"></i> 分步生成
                         </button>
                     </div>
-                    <div class="gen-content">
+                    <div class="gen-content" data-page-node-id="nH2HURPACfHIdqa82lFvLw">
                         <!-- Main View: Material Generation -->
-                        <div class="gen-panel active" id="panel-main">
-                            <div class="mat-gen-form">
-                                <div class="mat-gen-info">
-                                    <i class="fas fa-info-circle"></i>
+                        <div class="gen-panel active" id="panel-main" data-page-node-id="FScvtBRcyvTVnI8LCdB6jK">
+                            <div class="mat-gen-form" data-page-node-id="GLCYPcaGTAslE8za7H7Fb4">
+                                <div class="mat-gen-info" data-page-node-id="PvDo25LroabhfVxecDZENb">
+                                    <i class="fas fa-info-circle" data-page-node-id="BN5DAJtpZYIuAFM3DMJws2"></i>
                                     将使用已选材料作为生成依据
                                 </div>
 
                                 <!-- Smart Recommendation Card -->
-                                <div class="smart-card" id="stepRecommendCard" style="display:none;" onclick="switchToStepView({auto:false})">
-                                    <div class="smart-card-icon"><i class="fas fa-list-ol"></i></div>
-                                    <div class="smart-card-body">
-                                        <div class="smart-card-title" id="recommendCardTitle">已选材料预估超出系统单次处理上限</div>
-                                        <div class="smart-card-desc" id="recommendCardDesc">当前已选材料预估约 <strong id="recommendTokenCount">0</strong> 字，已超过 <span id="modelName">系统</span> 的安全上限 <span id="materialLimit">102400</span> 字，请点击使用分步生成。</div>
+                                <div class="smart-card" id="stepRecommendCard" style="display:none;" onclick="switchToStepView({auto:false})" data-page-node-id="6pIbk3fHrGWeCHatdOoA9N">
+                                    <div class="smart-card-icon" data-page-node-id="iEt4wH8m7XnM9Bl3JnlROk"><i class="fas fa-list-ol" data-page-node-id="8VLH9BliEDSHt1Qn1CfnIw"></i></div>
+                                    <div class="smart-card-body" data-page-node-id="fFyl0gaE2oC7kuqiea86JD">
+                                        <div class="smart-card-title" id="recommendCardTitle" data-page-node-id="qt10QMts7NesZWaKu797pG">已选材料预估超出系统单次处理上限</div>
+                                        <div class="smart-card-desc" id="recommendCardDesc" data-page-node-id="OCOqshqqpuDFYZhCKIlvKw">当前已选材料预估约 <strong id="recommendTokenCount" data-page-node-id="MuurFgfgHvYDoeuf1ZxPRa">0</strong> 字，已超过 <span id="modelName" data-page-node-id="b7PquXUp7YsVwRQ4q4Naus">系统</span> 的安全上限 <span id="materialLimit" data-page-node-id="XaNYfDuuXiV4anH80maaob">102400</span> 字，请点击使用分步生成。</div>
                                     </div>
-                                    <button type="button" class="smart-card-action" id="recommendCardAction" onclick="event.stopPropagation();switchToStepView({auto:false})">使用分步生成</button>
-                                    <div class="smart-card-arrow"><i class="fas fa-chevron-right"></i></div>
+                                    <button type="button" class="smart-card-action" id="recommendCardAction" onclick="event.stopPropagation();switchToStepView({auto:false})" data-page-node-id="nrYVKpnHTMVv6NQ0lVdSUR">使用分步生成</button>
+                                    <div class="smart-card-arrow" data-page-node-id="ErLvtOa78FTADn1pXee0ll"><i class="fas fa-chevron-right" data-page-node-id="HFz4xze2rdtyVYSByeNtrK"></i></div>
                                 </div>
 
-                                <div class="mat-gen-controls" id="matGenControls">
-                                    <div class="gen-form-row">
-                                        <label class="gen-form-label">文书类型</label>
-                                        <select class="gen-form-select" id="matDocType" onchange="onMatDocTypeChange()"></select>
+                                <div class="mat-gen-controls" id="matGenControls" data-page-node-id="DIgwFtVjAzLfQC64EUpqYD">
+                                    <div class="gen-form-row" data-page-node-id="YY7P5gcjbXREISdz2kSCGM">
+                                        <label class="gen-form-label" data-page-node-id="14fhgkVCSBrV3AdQPEW990">文书类型</label>
+                                        <select class="gen-form-select" id="matDocType" onchange="onMatDocTypeChange()" data-page-node-id="Pmo0eONxA7m4ZJwWvoDCB4"></select>
                                     </div>
-                                    <div class="gen-form-row" id="matCaseStageRow" style="display:none;">
-                                        <label class="gen-form-label">案件阶段</label>
-                                        <select class="gen-form-select" id="matCaseStage" onchange="onCaseStageChange()"></select>
-                                        <span class="gen-form-hint" id="matCaseStageHint" style="display:none;"></span>
+                                    <div class="gen-form-row" id="matCaseStageRow" style="display:none;" data-page-node-id="H8gg50KWKmAbJIlTIVLmkp">
+                                        <label class="gen-form-label" data-page-node-id="hNGQR9adYHg9hu9WbiUdhY">案件阶段</label>
+                                        <select class="gen-form-select" id="matCaseStage" onchange="onCaseStageChange()" data-page-node-id="W4ZbysFkPCN7nl0rgtkd1L"></select>
+                                        <span class="gen-form-hint" id="matCaseStageHint" style="display:none;" data-page-node-id="hNrpooQ7mbHUi76Jsmfwia"></span>
                                     </div>
-                                    <div class="gen-form-row">
-                                        <label class="gen-form-label">文书模板</label>
-                                        <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial()"></select>
+                                    <div class="gen-form-row" data-page-node-id="gWasVPAQFFrPMTSx9oGFVJ">
+                                        <label class="gen-form-label" data-page-node-id="a6Sqs6gNiRZHjniZo9U7uX">文书模板</label>
+                                        <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial()" data-page-node-id="DzBxclNe8V5S3MzhoTAo7h"></select>
                                     </div>
-                                    <div class="gen-form-row">
-                                        <label class="gen-form-label">指令</label>
-                                        <div class="req-template-tags" id="matReqTemplates"></div>
+                                    <div class="gen-form-row" data-page-node-id="wFo0UvUAPi4aNY0QtVgDHs">
+                                        <label class="gen-form-label" data-page-node-id="NefRTW4F8n7DvbfiuRmEAx">指令</label>
+                                        <div class="req-template-tags" id="matReqTemplates" data-page-node-id="RiuDIEfJtikEyDNfDuitMe"></div>
                                         <textarea class="gen-form-textarea" id="matRequirement" placeholder="可选：描述特殊要求或关注点" oninput="syncStepConfigFromMaterial()"></textarea>
                                     </div>
                                 </div>
                             </div>
-                            <div class="step-start-actions">
-                                <button class="gen-start-btn" id="matGenerateBtn" onclick="generateByMaterial()">
-                                    <i class="fas fa-bolt"></i> 生成文书
+                            <div class="step-start-actions" data-page-node-id="sPw0GU2TMzYYX3LivujEgI">
+                                <button class="gen-start-btn" id="matGenerateBtn" onclick="generateByMaterial()" data-page-node-id="3ddJtuwGElYhqzTVTdKUxJ">
+                                    <i class="fas fa-bolt" data-page-node-id="nzafmVDlxFT5KjOvfQiX1N"></i> 生成文书
                                 </button>
                             </div>
                         </div>
 
                         <!-- Step View: Step-by-Step Generation -->
-                        <div class="gen-panel" id="panel-steps">
-                            <div class="step-gen-config">
-                                <div class="gen-form-row">
-                                    <label class="gen-form-label">文书类型</label>
-                                    <select class="gen-form-select" id="stepDocType" onchange="onStepDocTypeChange(this.value)"></select>
+                        <div class="gen-panel" id="panel-steps" data-page-node-id="phCZSFUYM89CiYGerVP7ZU">
+                            <div class="step-gen-config" data-page-node-id="5SlA7zXxlAFS9hQtsPoecQ">
+                                <div class="gen-form-row" data-page-node-id="j3RxHZcyHizB0fhV6FcnFh">
+                                    <label class="gen-form-label" data-page-node-id="xgEF4wwOSsKR6J9cfEjymo">文书类型</label>
+                                    <select class="gen-form-select" id="stepDocType" onchange="onStepDocTypeChange(this.value)" data-page-node-id="FMKkqQN6cTM3dsl5vrPV9d"></select>
                                 </div>
-                                <div class="gen-form-row" id="stepCaseStageRow" style="display:none;">
-                                    <label class="gen-form-label">案件阶段</label>
-                                    <select class="gen-form-select" id="stepCaseStage" onchange="onCaseStageChange()"></select>
-                                    <span class="gen-form-hint" id="stepCaseStageHint" style="display:none;"></span>
+                                <div class="gen-form-row" id="stepCaseStageRow" style="display:none;" data-page-node-id="jE8l1HvaYtuh3B9JagTbE0">
+                                    <label class="gen-form-label" data-page-node-id="2I80X9CvCuPTKGoKOvY8D9">案件阶段</label>
+                                    <select class="gen-form-select" id="stepCaseStage" onchange="onCaseStageChange()" data-page-node-id="F5whgOCDET6rGW7PZ3DQE4"></select>
+                                    <span class="gen-form-hint" id="stepCaseStageHint" style="display:none;" data-page-node-id="DQlLpPJvmJFyvMkXQruRnX"></span>
                                 </div>
-                                <div class="gen-form-row" id="stepPlanItem" style="display:none;">
-                                    <label class="gen-form-label">步骤方案</label>
-                                    <select class="gen-form-select" id="stepPlan" onchange="onStepPlanChange(this.value)"></select>
+                                <div class="gen-form-row" id="stepPlanItem" style="display:none;" data-page-node-id="oi6zruciHHwOsW6L7vQeEN">
+                                    <label class="gen-form-label" data-page-node-id="jhX5kUSN6qSnZyclpuBgeA">步骤方案</label>
+                                    <select class="gen-form-select" id="stepPlan" onchange="onStepPlanChange(this.value)" data-page-node-id="UCtXFD5HicX4AXQxggphXu"></select>
                                 </div>
-                                <div class="gen-form-row">
-                                    <label class="gen-form-label">文书模板</label>
-                                    <select class="gen-form-select" id="stepTemplate" onchange="onStepTemplateChange(this.value)"></select>
+                                <div class="gen-form-row" data-page-node-id="D8XTj2UZmXbFiwWtaII4fT">
+                                    <label class="gen-form-label" data-page-node-id="ILEuS2RFXqqs4G7EMkUoHL">文书模板</label>
+                                    <select class="gen-form-select" id="stepTemplate" onchange="onStepTemplateChange(this.value)" data-page-node-id="VmxblTbi0CQ9s4AZSgehHg"></select>
                                 </div>
                             </div>
-                            <div class="auto-switch-alert" id="autoSwitchAlert">
-                                <i class="fas fa-info-circle"></i>
-                                <span>已选材料预估超出系统单次处理上限，已切换为分步生成，请为每一步手动选择所需材料。</span>
+                            <div class="auto-switch-alert" id="autoSwitchAlert" data-page-node-id="bCuNXWlhyF3XRIyVzLxekH">
+                                <i class="fas fa-info-circle" data-page-node-id="0syDq4tBY91gPuDAE2nfGn"></i>
+                                <span data-page-node-id="4XJ6O7VMIRVlQegivbKAUX">已选材料预估超出系统单次处理上限，已切换为分步生成，请为每一步手动选择所需材料。</span>
                             </div>
                             <!-- v1.46 链 D: 移除「开始生成」按钮，分步生成视图直接展示步骤序列（按案件阶段） -->
-                            <div id="stepFlowArea">
-                                <div class="step-view-hint" id="stepViewHint">
-                                    <i class="fas fa-lightbulb"></i>
-                                    <span>请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐步生成。</span>
+                            <div id="stepFlowArea" data-page-node-id="kvOF4P1kRR1tinzTX6egek">
+                                <div class="step-view-hint" id="stepViewHint" data-page-node-id="QfQUgm1PNrmEJeJAUdeG5H">
+                                    <i class="fas fa-lightbulb" data-page-node-id="AfH7mRwXQX3M7AmrCdVRwg"></i>
+                                    <span data-page-node-id="T2kmgGeUFXUQdVmt0ToKxl">请在各步骤中手动勾选与步骤主题相关的材料，系统将基于所选材料逐步生成。</span>
                                 </div>
                                 <!-- v1.53: 顶部水平 Stepper（取代手风琴堆叠） -->
-                                <div class="step-stepper" id="stepStepper"></div>
+                                <div class="step-stepper" id="stepStepper" data-page-node-id="DUB1PemOpt862CgiAimpfu"></div>
                                 <!-- v1.53: 仅渲染当前选中步骤（单步视图） -->
-                                <div class="steps-list" id="stepsList"></div>
+                                <div class="steps-list" id="stepsList" data-page-node-id="p16JFywuHXWHJfo7MzQgrh"></div>
                                 <!-- v1.58: 底部上一步/下一步导航（与 Stepper 点击双导航） -->
-                                <div class="step-nav" id="stepNav"></div>
-                                <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;">
-                                    <button class="gen-start-btn" id="stepNextBtn" onclick="continueStepGeneration()">
-                                        <i class="fas fa-file-alt"></i> 生成文书
+                                <div class="step-nav" id="stepNav" data-page-node-id="3cdDGRGe55rv5VHISvvAcG"></div>
+                                <div class="steps-bottom-actions" id="stepNextActionArea" style="display:none;" data-page-node-id="A2LEZ1OkZAQ2HBO7ViNjDD">
+                                    <button class="gen-start-btn" id="stepNextBtn" onclick="continueStepGeneration()" data-page-node-id="94WLYQak4mNiSETnYY86HG">
+                                        <i class="fas fa-file-alt" data-page-node-id="5BZ9FTYFJhyPwlFDqZ76Hi"></i> 生成文书
                                     </button>
                                 </div>
                             </div>
@@ -3131,22 +3613,23 @@
                 </div>
 
                 <!-- Right Column: Result -->
-                <div class="result-col" id="resultCol">
-                    <div class="result-header">
-                        <div class="result-header-left">
-                            <button onclick="toggleResultCol()" title="折叠/展开"><i class="fas fa-chevron-right"></i></button>
-                            <span>生成结果</span>
+                <div class="result-col" id="resultCol" data-page-node-id="vnjdLRb9DqHE40hUcjfU8H">
+                    <div class="result-header" data-page-node-id="Z3ZVuTNvN0cyXTped361TD">
+                        <div class="result-header-left" data-page-node-id="p09c97AZqGug7Yq5RkfjiA">
+                            <button onclick="toggleResultCol()" title="折叠/展开" data-page-node-id="wSGgwgGCDlAO9CVBs2f3sW"><i class="fas fa-chevron-right" data-page-node-id="2NJIn1mIxoIeo5nCHWY6Wf"></i></button>
+                            <span id="resultHeaderTitle" data-page-node-id="xCUBL3VXJUWDXmw3qUVASr">生成结果</span>
                         </div>
-                        <div class="result-header-right">
-                            <button class="result-refine-btn" id="resultRefineBtn" onclick="refineResult()" title="基于当前文书内容进行多轮精修"><i class="fas fa-magic"></i> 文书精修</button>
-                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="重新配置生成参数（默认回填最近一次历史文书快照）"><i class="fas fa-sliders-h"></i> <span>重新配置</span></button>
+                        <div class="result-header-right" data-page-node-id="EnogWCQjD3kDWqUfnOWfWp" id="resultHeaderRight">
+                            <button class="result-refine-btn" id="resultRefineBtn" onclick="refineResult()" title="基于当前文书内容进行多轮精修" data-page-node-id="gtMFp9ys1D7fBD0OTFHdwt"><i class="fas fa-magic" data-page-node-id="4k3sqGhpXbTnzmdAjjIE1P"></i> 文书精修</button>
+                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="重新配置生成参数（默认回填最近一次历史文书快照）" data-page-node-id="MngcOEcxQzDXxf0eFdN96Y"><i class="fas fa-sliders-h" data-page-node-id="8XCifZcQcQMmo7rvCOOpn2"></i> <span data-page-node-id="BPcBP3hBSdrE2BGKWA1raw">重新配置</span></button>
                         </div>
                     </div>
-                    <div class="result-body" id="resultBody">
-                        <div class="result-empty">
-                            <i class="fas fa-file-alt"></i>
-                            <div class="result-empty-title">暂无生成结果</div>
-                            <div class="result-empty-desc">请在左侧选择材料并选择生成方式</div>
+                    <!-- 生成结果区（默认显示） -->
+                    <div class="result-body" id="resultBody" data-page-node-id="Zm0Fg2FhpOHtdVCakq9UDO">
+                        <div class="result-empty" data-page-node-id="vHRCvxaAK7I78My9TxQzGv">
+                            <i class="fas fa-file-alt" data-page-node-id="X0JCehZfVrzNlj8VkIRR5Q"></i>
+                            <div class="result-empty-title" data-page-node-id="qTKOpoxRfYjHLu53QrAsmh">暂无生成结果</div>
+                            <div class="result-empty-desc" data-page-node-id="tvIK9K767acocqVik27OcZ">请在左侧选择材料并选择生成方式</div>
                         </div>
                     </div>
                 </div>
@@ -3155,52 +3638,52 @@
     </div>
 
     <!-- Upload Modal -->
-    <div class="modal-overlay" id="uploadOverlay" onclick="closeUploadModal()"></div>
-    <div class="modal-dialog" id="uploadModal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <h3><i class="fas fa-upload"></i> 文件上传</h3>
-            <button class="modal-close" onclick="closeUploadModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-overlay" id="uploadOverlay" onclick="closeUploadModal()" data-page-node-id="jmxOFxm6FdSHUjSvBhn6Xa"></div>
+    <div class="modal-dialog" id="uploadModal" onclick="event.stopPropagation()" data-page-node-id="kZA3GhFUljgK0PwAtGJJoA">
+        <div class="modal-header" data-page-node-id="zlF5X5HH2nxJKCMWu4HBrn">
+            <h3 data-page-node-id="aTKp0ddEnJ2D3QdJJNxmYC"><i class="fas fa-upload" data-page-node-id="kjW9PBk8OmblOUzTAYSXzM"></i> 文件上传</h3>
+            <button class="modal-close" onclick="closeUploadModal()" data-page-node-id="ZZFV62KG3NV1ulJZ9hQlTW"><i class="fas fa-times" data-page-node-id="dvItIkSHmiyh5PySgsuBCK"></i></button>
         </div>
-        <div class="modal-body">
-            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <div class="upload-zone-text">点击或拖拽文件到此处上传</div>
-                <input type="file" id="fileInput" multiple style="display:none;" onchange="handleFileSelect(event)">
+        <div class="modal-body" data-page-node-id="wJDFWfs1eL4yLtChiHPMZY">
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" data-page-node-id="HLh75fgcLUIIEwJSXOS4D9">
+                <i class="fas fa-cloud-upload-alt" data-page-node-id="Uj6A0zGJ2QToNJNcHjeXnO"></i>
+                <div class="upload-zone-text" data-page-node-id="lI1llX8HOqkVgBzBb45MUx">点击或拖拽文件到此处上传</div>
+                <input type="file" id="fileInput" multiple style="display:none;" onchange="handleFileSelect(event)" data-page-node-id="XSOhsouYN2YUFjSbALWiAa">
             </div>
-            <div class="upload-category-row">
-                <label for="uploadCategorySelect">上传至分类：</label>
-                <select id="uploadCategorySelect">
-                    <option value="">自动分类</option>
+            <div class="upload-category-row" data-page-node-id="MYdq177JchUWjC0sO4KBmu">
+                <label for="uploadCategorySelect" data-page-node-id="uNGkavRmwJ8lzrshdSHfkQ">上传至分类：</label>
+                <select id="uploadCategorySelect" data-page-node-id="s2F88BQs8G0MkgPGMLyIx0">
+                    <option value="" data-page-node-id="hSaq9LLfEDvwNzGnKn8QTX">自动分类</option>
                 </select>
             </div>
-            <div class="upload-list" id="uploadList"></div>
+            <div class="upload-list" id="uploadList" data-page-node-id="DRluunV9bjBhDqxDr3AIBa"></div>
         </div>
-        <div class="modal-footer">
-            <button class="modal-btn-secondary" onclick="closeUploadModal()">取消</button>
-            <button class="modal-btn-primary" onclick="confirmUpload()">确认上传</button>
+        <div class="modal-footer" data-page-node-id="VsCyIepsTIFXBJOYGUEh0D">
+            <button class="modal-btn-secondary" onclick="closeUploadModal()" data-page-node-id="DjCCfygzdIE3k9I5LuILSO">取消</button>
+            <button class="modal-btn-primary" onclick="confirmUpload()" data-page-node-id="D4L4uN1mtZMdKuAik9UGM5">确认上传</button>
         </div>
     </div>
 
     <!-- Pre Element Confirm Modal -->
-    <div class="modal-overlay" id="preElementConfirmOverlay" onclick="closePreElementConfirmModal()"></div>
-    <div class="modal-dialog" id="preElementConfirmModal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <h3><i class="fas fa-file-signature"></i> 生成文书</h3>
-            <button class="modal-close" onclick="closePreElementConfirmModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-overlay" id="preElementConfirmOverlay" onclick="closePreElementConfirmModal()" data-page-node-id="BkxNsAtiTd71jDUPnsuN9M"></div>
+    <div class="modal-dialog" id="preElementConfirmModal" onclick="event.stopPropagation()" data-page-node-id="gJK9g8ngNxp4lGQgg0sGJ8">
+        <div class="modal-header" data-page-node-id="cN6qZ8CxAw7vt3wmPMxd0x">
+            <h3 data-page-node-id="Fey52m6OhaYAOk7prootWC"><i class="fas fa-file-signature" data-page-node-id="xccvAxRA3QJB8pTka88dXp"></i> 生成文书</h3>
+            <button class="modal-close" onclick="closePreElementConfirmModal()" data-page-node-id="CrlxCXxxLvbe0Y23y2bwz6"><i class="fas fa-times" data-page-node-id="sQFaCxGx0UxqOpDF4mHU0p"></i></button>
         </div>
-        <div class="modal-body">
-            <div class="pre-element-confirm-body">
-                <div class="pre-element-confirm-icon"><i class="fas fa-puzzle-piece"></i></div>
-                <div class="pre-element-confirm-title">检测到该案由存在可用要件</div>
-                <div class="pre-element-confirm-count" id="preElementConfirmCount"></div>
-                <div class="pre-element-confirm-desc">引入案由要件可让生成的文书更精确，系统会针对每个要件问题预生成参考答案，你可在下一步直接修改或补充。</div>
-                <div class="pre-element-confirm-time">
-                    <i class="fas fa-clock"></i>
-                    <span>注意：引入要件后将增加答案预生成与整合步骤，整体生成时间可能会稍长。</span>
+        <div class="modal-body" data-page-node-id="462n75jHPFxBBqYmOpJk5q">
+            <div class="pre-element-confirm-body" data-page-node-id="4x5Yq6MaYHRwAUrqmFqzw0">
+                <div class="pre-element-confirm-icon" data-page-node-id="K7cGmFudRhK2HqsNVCj32s"><i class="fas fa-puzzle-piece" data-page-node-id="JDVBVp91m6D048CET1KZZ2"></i></div>
+                <div class="pre-element-confirm-title" data-page-node-id="81E0ehWcvWQQRHF1G0uzXM">检测到该案由存在可用要件</div>
+                <div class="pre-element-confirm-count" id="preElementConfirmCount" data-page-node-id="AuVvFWXWczP6deiMuXu57K"></div>
+                <div class="pre-element-confirm-desc" data-page-node-id="tx8sGi1IVr5VkiE201A60R">引入案由要件可让生成的文书更精确，系统会针对每个要件问题预生成参考答案，你可在下一步直接修改或补充。</div>
+                <div class="pre-element-confirm-time" data-page-node-id="qRuA5s1lg23muOBU2KpeLi">
+                    <i class="fas fa-clock" data-page-node-id="b8MS7QaWzevxBnwkYUGktp"></i>
+                    <span data-page-node-id="XDVmxQHpYTQ83kWxvXthoG">注意：引入要件后将增加答案预生成与整合步骤，整体生成时间可能会稍长。</span>
                 </div>
-                <div class="pre-element-confirm-actions">
-                    <button class="modal-btn-secondary" id="preElementIntroduceBtn" onclick="chooseIntroduceElements()">引入案由要件</button>
-                    <button class="modal-btn-primary" onclick="chooseDirectGenerate()">直接生成</button>
+                <div class="pre-element-confirm-actions" data-page-node-id="1NUiddtwgKTf7jAgmFNi5b">
+                    <button class="modal-btn-secondary" id="preElementIntroduceBtn" onclick="chooseIntroduceElements()" data-page-node-id="XLasRKxVI328iBjVhi3hbl">引入案由要件</button>
+                    <button class="modal-btn-primary" onclick="chooseDirectGenerate()" data-page-node-id="jLaRoWpBUgFfG8p7NFqBty">直接生成</button>
                 </div>
             </div>
         </div>
@@ -3210,127 +3693,207 @@
     <!-- 引入要件的答案确认与编辑统一复用「本案要件」抽屉（生成模式），见底部 caseElementsDrawer -->
 
     <!-- Material Selector Modal -->
-    <div class="modal-overlay" id="materialSelectorOverlay" onclick="closeMaterialSelector()"></div>
-    <div class="modal-dialog material-selector-dialog" id="materialSelectorDialog" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <h3><i class="fas fa-folder-open"></i> 选择关联材料</h3>
-            <button class="modal-close" onclick="closeMaterialSelector()"><i class="fas fa-times"></i></button>
+    <div class="modal-overlay" id="materialSelectorOverlay" onclick="closeMaterialSelector()" data-page-node-id="39Y0HD59tqKQlkO3sFtA5h"></div>
+    <div class="modal-dialog material-selector-dialog" id="materialSelectorDialog" onclick="event.stopPropagation()" data-page-node-id="YseiI66WoDDUPiK23dMcr2">
+        <div class="modal-header" data-page-node-id="WPuk1XLnKJqqPxeLzxALji">
+            <h3 data-page-node-id="YSxvfU8jPGh20tAhCIO4rG"><i class="fas fa-folder-open" data-page-node-id="bH7yn47BSuOB9RvH2FMZWg"></i> 选择关联材料</h3>
+            <button class="modal-close" onclick="closeMaterialSelector()" data-page-node-id="PYFRUjlOdYQJBcTALJls3E"><i class="fas fa-times" data-page-node-id="r2KM7fxtt1kcaRScXGnoiP"></i></button>
         </div>
-        <div class="modal-body">
-            <div class="material-selector-search">
-                <i class="fas fa-search"></i>
-                <input type="text" id="materialSelectorSearch" placeholder="搜索材料名称..." oninput="filterMaterialSelector()">
+        <div class="modal-body" data-page-node-id="V3TGQ53UPCAZyxHkYIGu6I">
+            <div class="material-selector-search" data-page-node-id="EN9B2CHH7NwUQ8097m9M3g">
+                <i class="fas fa-search" data-page-node-id="WDiz2DvVazEBGbV1QNw2L7"></i>
+                <input type="text" id="materialSelectorSearch" placeholder="搜索材料名称..." oninput="filterMaterialSelector()" data-page-node-id="NfCFJDVI9Rn7IbbDYE8nCc">
             </div>
-            <div class="material-selector-toolbar">
-                <span id="materialSelectorCount">已选 0 / 共 0 件</span>
-                <div>
-                    <button onclick="selectAllMaterialSelector(true)">全选</button>
-                    <button onclick="selectAllMaterialSelector(false)">取消全选</button>
+            <div class="material-selector-toolbar" data-page-node-id="OscqhezuYqCsST8jGcf76H">
+                <span id="materialSelectorCount" data-page-node-id="tA6FsdBgCQdZEv8DSimYw0">已选 0 / 共 0 件</span>
+                <div data-page-node-id="mUlz9meh18VkOnfnwFUPST">
+                    <button onclick="selectAllMaterialSelector(true)" data-page-node-id="s66jEqGJmiHXr9ZexuKE76">全选</button>
+                    <button onclick="selectAllMaterialSelector(false)" data-page-node-id="DhPwTd6NPxPSFrT8JZsDma">取消全选</button>
                 </div>
             </div>
-            <div class="material-selector-token-hint" id="materialSelectorTokenHint"></div>
-            <div class="material-selector-list" id="materialSelectorList"></div>
+            <div class="material-selector-token-hint" id="materialSelectorTokenHint" data-page-node-id="eKIEcs9YZzhZ3d6m7yYIdO"></div>
+            <div class="material-selector-list" id="materialSelectorList" data-page-node-id="7OElxFhHJyiqe0hTNOdvrj"></div>
         </div>
-        <div class="modal-footer">
-            <button class="modal-btn-secondary" onclick="closeMaterialSelector()">取消</button>
-            <button class="modal-btn-primary" id="materialSelectorConfirmBtn" onclick="confirmMaterialSelection()">确定</button>
+        <div class="modal-footer" data-page-node-id="3GQtWmplRqYniWNusW9GDu">
+            <button class="modal-btn-secondary" onclick="closeMaterialSelector()" data-page-node-id="YrvQSL4XBH0O2pj1l1wXGb">取消</button>
+            <button class="modal-btn-primary" id="materialSelectorConfirmBtn" onclick="confirmMaterialSelection()" data-page-node-id="aUPqnEH4whKdb1eCAwKILP">确定</button>
         </div>
     </div>
 
     <!-- History Panel -->
-    <div class="history-tasks-overlay" id="historyTasksOverlay" onclick="toggleHistoryTasks()"></div>
-    <div class="history-tasks-panel" id="historyTasksPanel">
-        <div class="history-tasks-header">
-            <span>历史文书</span>
-            <button onclick="toggleHistoryTasks()"><i class="fas fa-times"></i></button>
+    <div class="history-tasks-overlay" id="historyTasksOverlay" onclick="toggleHistoryTasks()" data-page-node-id="MXDpikESxErvlxp2IBGiVs"></div>
+    <div class="history-tasks-panel" id="historyTasksPanel" data-page-node-id="kbwMBsk9P0NZ670BPVfOQn">
+        <div class="history-tasks-header" data-page-node-id="vM3gHiCTGEEBeCGdQRqCJu">
+            <span data-page-node-id="BfLa6L7R6b0cxkixX4qjqa">历史文书</span>
+            <button onclick="toggleHistoryTasks()" data-page-node-id="UpuXnWT7WxFSEO09rkjeAt"><i class="fas fa-times" data-page-node-id="LWEH9IjwnEOTKD3JR40av6"></i></button>
         </div>
-        <div class="history-tasks-list" id="historyTasksList"></div>
+        <div class="history-tasks-list" id="historyTasksList" data-page-node-id="AxvzoFqvaEAfVb788wseH8"></div>
     </div>
 
     <!-- v2.24 (任务 8.6 / 9.4): 本案要件抽屉 -->
-    <div class="case-elements-overlay" id="caseElementsOverlay" onclick="closeElementsDrawer()"></div>
-    <aside class="case-elements-drawer" id="caseElementsDrawer" role="dialog" aria-label="本案要件">
-        <div class="case-elements-drawer-header">
-            <div class="case-elements-drawer-title">
-                <i class="fas fa-puzzle-piece"></i>
-                <span>本案要件</span>
+    <div class="case-elements-overlay" id="caseElementsOverlay" onclick="closeElementsDrawer()" data-page-node-id="BCOQ6NoMD04d1VUK5uPRBq"></div>
+    <aside class="case-elements-drawer" id="caseElementsDrawer" role="dialog" aria-label="本案要件" data-page-node-id="kyvodRM5o6WK3QLwnGQNGK">
+        <div class="case-elements-drawer-header" data-page-node-id="tLsWZ3SpwDS8WKHFt0ZBFR">
+            <div class="case-elements-drawer-title" data-page-node-id="J4jlZBogUW6fTEWP7P4Pof">
+                <i class="fas fa-puzzle-piece" data-page-node-id="pVzseZ6iCfhgakpcJ4I0I7"></i>
+                <span data-page-node-id="5wpzbxZKUjmMx55AAUhARE">本案要件</span>
             </div>
-            <button type="button" class="case-elements-drawer-close" onclick="closeElementsDrawer()" title="关闭"><i class="fas fa-times"></i></button>
+            <button type="button" class="case-elements-drawer-close" onclick="closeElementsDrawer()" title="关闭" data-page-node-id="eYMn2z2OQbEDMpmwBnNIeT"><i class="fas fa-times" data-page-node-id="aQcw41D22zaGKzR2JqwGgU"></i></button>
         </div>
-        <div class="case-elements-stats" id="caseElementsStats"></div>
-        <div class="case-elements-drawer-body" id="caseElementsBody">
+        <div class="case-elements-stats" id="caseElementsStats" data-page-node-id="avwzNNsqBkGSYyWcoI628b"></div>
+        <div class="case-elements-drawer-body" id="caseElementsBody" data-page-node-id="4b90hLYHlcKcAhefiOX3mz">
             <!-- 要件列表由 JS 动态渲染（v2.31: 取消一键生成整体加载遮罩，改为单条"生成中"指示） -->
         </div>
-        <div class="case-elements-drawer-footer">
+        <div class="case-elements-drawer-footer" data-page-node-id="XE65sYQzk8Kc6OP2oRHUuG">
             <!-- V1.2: 生成模式专属确认生成操作条（仅从「生成文书→引入案由要件」入口打开时显示） -->
-            <div class="case-elements-generate-bar hidden" id="drawerGenerateBar">
-                <button type="button" id="drawerGenerateBtn" class="case-elements-generate-btn" onclick="confirmDrawerGenerate()">
-                    <i class="fas fa-file-signature"></i> 确认生成（引入 0 条要件）
+            <div class="case-elements-generate-bar hidden" id="drawerGenerateBar" data-page-node-id="GpR8ZHoyr9x1VMNLOm1r9y">
+                <button type="button" id="drawerGenerateBtn" class="case-elements-generate-btn" onclick="confirmDrawerGenerate()" data-page-node-id="DsNFmC20mYEIZ1eGB6N5uv">
+                    <i class="fas fa-file-signature" data-page-node-id="jX6GGq30zQiFxmhII4vBmT"></i> 确认生成（引入 0 条要件）
                 </button>
             </div>
             <!-- 新增个案要件内联表单 -->
-            <div class="case-elements-add-form" id="caseElementsAddForm">
-                <div class="form-row">
-                    <label>要件名称 <span style="color:#dc2626;">*</span></label>
-                    <input type="text" id="newCaseElementName" placeholder="如：原告具体身份核实" maxlength="40">
+            <div class="case-elements-add-form" id="caseElementsAddForm" data-page-node-id="N1XZArekelKeuA0CGIE1ge">
+                <div class="form-row" data-page-node-id="QZlpWUznx2mxXlhrzvNaz0">
+                    <label data-page-node-id="MrVm7ajSCsMcsTA9zV6fDC">要件名称 <span style="color:#dc2626;" data-page-node-id="tm4DWJw9Zam7QQxQQJw52s">*</span></label>
+                    <input type="text" id="newCaseElementName" placeholder="如：原告具体身份核实" maxlength="40" data-page-node-id="fA7vrWWFJVU42VjqzUTVbm">
                 </div>
-                <div class="form-row">
-                    <label>要件说明</label>
-                    <input type="text" id="newCaseElementDesc" placeholder="简要描述该要件的目的" maxlength="80">
+                <div class="form-row" data-page-node-id="hkkQS8JqaZqjvdDQR619Fp">
+                    <label data-page-node-id="ADtSiy6yYWAtr0nBnnHcB4">要件说明</label>
+                    <input type="text" id="newCaseElementDesc" placeholder="简要描述该要件的目的" maxlength="80" data-page-node-id="Qi1XwTfIvSuFwelOoudXxk">
                 </div>
-                <div class="form-row">
-                    <label>要件问题 <span style="color:#dc2626;">*</span></label>
+                <div class="form-row" data-page-node-id="hOhBVGMm3iqSDDK6edIXTb">
+                    <label data-page-node-id="dkKbh2S7xf5GWCfPBTiT5t">要件问题 <span style="color:#dc2626;" data-page-node-id="oRZr8bzWo51T92HDNwqL52">*</span></label>
                     <textarea id="newCaseElementQuestion" placeholder="针对该要件需要回答的问题" maxlength="200"></textarea>
                 </div>
-                <div class="form-actions">
-                    <button type="button" class="form-btn" onclick="toggleCaseElementAddForm(false)">取消</button>
-                    <button type="button" class="form-btn primary" onclick="addCaseElementConfirm()">保存</button>
+                <div class="form-actions" data-page-node-id="LfM8PRyHTKDt8WKh92Moot">
+                    <button type="button" class="form-btn" onclick="toggleCaseElementAddForm(false)" data-page-node-id="IInnBPhbgjy4c2tli9t8N0">取消</button>
+                    <button type="button" class="form-btn primary" onclick="addCaseElementConfirm()" data-page-node-id="DECzyHh6G7DzfrUBhCSGXe">保存</button>
                 </div>
             </div>
-            <div class="case-elements-footer-btns">
-                <button type="button" id="addCaseElementBtn" class="case-elements-footer-btn primary" onclick="toggleCaseElementAddForm(true)">
-                    <i class="fas fa-plus"></i> 新增个案要件
+            <div class="case-elements-footer-btns" data-page-node-id="R8GGupPD3NCCY4psXGmql2">
+                <button type="button" id="addCaseElementBtn" class="case-elements-footer-btn primary" onclick="toggleCaseElementAddForm(true)" data-page-node-id="XQ4M32XIxROvQUtHLfnXWw">
+                    <i class="fas fa-plus" data-page-node-id="xJQUEVL7Y1jparfQX25b8t"></i> 新增个案要件
                 </button>
-                <button type="button" id="aiSummarizeBtn" class="case-elements-footer-btn ai-summarize-btn" onclick="aiSummarizeElements()">
-                    <i class="fas fa-magic"></i> 一键生成
+                <button type="button" id="aiSummarizeBtn" class="case-elements-footer-btn ai-summarize-btn" onclick="aiSummarizeElements()" data-page-node-id="VFUy6WvtEguLsg72m3wtjV">
+                    <i class="fas fa-magic" data-page-node-id="XtyvdpMRDhmtbFCiy9rzQu"></i> 一键生成
                 </button>
             </div>
-            <button type="button" class="case-elements-footer-link" onclick="openMyElements()">
-                <i class="fas fa-external-link-alt"></i> 管理我的要件
+            <button type="button" class="case-elements-footer-link" onclick="openMyElements()" data-page-node-id="EErmwfVdfqOsUcm3BcAAxU">
+                <i class="fas fa-external-link-alt" data-page-node-id="LyFAHhwyKpDMhLfFf1jcHg"></i> 管理我的要件
             </button>
             <!-- V1.2.1: 恢复默认要件（仅本案存在已移除的标准/我的要件时显示，由 JS 控制显隐） -->
-            <button type="button" class="case-elements-footer-link hidden" id="restoreElementsLink" onclick="restoreDefaultElements()">
-                <i class="fas fa-rotate-left"></i> 恢复默认要件
+            <button type="button" class="case-elements-footer-link hidden" id="restoreElementsLink" onclick="restoreDefaultElements()" data-page-node-id="zkoyuXvcD2zCAotc6N0MZA">
+                <i class="fas fa-rotate-left" data-page-node-id="XrIS5A3LZLKg5HqqZjY5Mi"></i> 恢复默认要件
             </button>
         </div>
     </aside>
 
-    <!-- v2.24 (任务 8.6 / 9.4): 要件问答弹窗 -->
-    <div class="modal-overlay" id="elementQaOverlay" onclick="closeElementQaModal()"></div>
-    <div class="modal-dialog element-qa-modal" id="elementQaModal" onclick="event.stopPropagation()">
+    <!-- ===== V1.2.4: 本案法条抽屉（复用本案要件抽屉样式体系） ===== -->
+    <div class="case-elements-overlay" id="caseLawsOverlay" onclick="closeLawsDrawer()" data-page-node-id="CG8LXTD1Bk02vl1DAcPHYz"></div>
+    <aside class="case-elements-drawer" id="caseLawsDrawer" role="dialog" aria-label="本案法条" data-page-node-id="T45Pk21kKQgipzoBk21BLE">
+        <div class="case-elements-drawer-header" data-page-node-id="HxDGpuZBtD5Q9IJsRQehrT">
+            <div class="case-elements-drawer-title" data-page-node-id="i5OADIRCVWWFdrv2ndGnt0">
+                <i class="fas fa-gavel" data-page-node-id="1uVqc1nzXFTxM1pwE7l2T2"></i>
+                <span data-page-node-id="9ssaDuUI4cdJ48gi4hWDzN">本案法条</span>
+            </div>
+            <button type="button" class="case-elements-drawer-close" onclick="closeLawsDrawer()" title="关闭" data-page-node-id="PY3sISzA4MhZhzjWbQ3WnM"><i class="fas fa-times" data-page-node-id="JhT3FP0UJPtvc7S44uXrJe"></i></button>
+        </div>
+        <div class="case-elements-stats" id="caseLawsStats" data-page-node-id="8uQX0GNSKDlhZDPOLZxzST"></div>
+        <!-- V1.2.8: 后果说明条——让勾选与生成结果之间的因果关系可见 -->
+        <div class="law-consequence-hint" id="caseLawsConsequenceHint">
+            <i class="fas fa-info-circle"></i>
+            <span>勾选的法条将写入文书「法律适用依据」章节，未勾选的不写入</span>
+        </div>
+        <div class="case-elements-drawer-body" id="caseLawsBody" data-page-node-id="yPbqgkqBLdzgEeRGhj0ToH">
+            <!-- 法条清单由 JS 动态渲染；检索中显示「正在检索适用法条…」加载态 -->
+        </div>
+        <div class="case-elements-drawer-footer" data-page-node-id="UlWpW8DjQgxnD0jFnjGXB3">
+            <!-- V1.2.4: 生成模式专属确认操作条（仅从「生成文书」链路打开时显示） -->
+            <div class="case-elements-generate-bar hidden" id="caseLawsGenerateBar" data-page-node-id="FJSOg9Qnm4QdoAhtYPtikq">
+                <button type="button" id="caseLawsGenerateBtn" class="case-elements-generate-btn" onclick="confirmLawsGenerate()" data-page-node-id="ZoGbfDWhuvgJa7db7jTxQA">
+                    <i class="fas fa-file-signature" data-page-node-id="XT50wWsFDgaVZXHogTLceF"></i> 确认法条并生成文书（0 条）
+                </button>
+            </div>
+            <div class="case-elements-footer-btns">
+                <!-- V1.2.9: 文案改为「手动检索」/「AI推荐」，人工 vs AI 语义对立 -->
+                <button type="button" id="addCaseLawBtn" class="case-elements-footer-btn" onclick="openLawLibraryModal()" title="从法条库检索并手动添加">
+                    <i class="fas fa-magnifying-glass"></i> 手动检索
+                </button>
+                <button type="button" id="reretrieveLawsBtn" class="case-elements-footer-btn" onclick="reretrieveLaws()" title="按当前案由重新生成 AI 推荐法条，手动添加的法条将保留">
+                    <i class="fas fa-wand-magic-sparkles"></i> AI推荐
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===== V1.2.5: 法条库检索弹窗（手动添加） ===== -->
+    <div class="modal-overlay" id="lawLibraryOverlay" onclick="closeLawLibraryModal()"></div>
+    <div class="modal-dialog law-library-modal" id="lawLibraryModal" onclick="event.stopPropagation()">
         <div class="modal-header">
-            <h3><i class="fas fa-puzzle-piece"></i> <span id="elementQaTitle">要件问答</span></h3>
-            <button class="modal-close" onclick="closeElementQaModal()"><i class="fas fa-times"></i></button>
+            <h3><i class="fas fa-book"></i> 法条库</h3>
+            <button type="button" class="modal-close" onclick="closeLawLibraryModal()" title="关闭"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-            <div class="element-qa-source-row" id="elementQaSourceRow"></div>
-            <div class="element-qa-question" id="elementQaQuestion"></div>
-            <textarea class="element-qa-textarea" id="elementQaAnswer" placeholder="请输入对该要件问题的回答，作为文书生成的辅助依据..."></textarea>
-            <div class="element-qa-hint">
-                <i class="fas fa-info-circle"></i>
-                <span>保存后答案将持久化到本案件，下次进入本页面会自动恢复。已填写答案的要件在抽屉中显示绿点标识。</span>
+            <div class="law-library-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="lawLibrarySearchInput" placeholder="搜索法条名称或内容关键词…" oninput="filterLawLibrary()">
+            </div>
+            <div class="law-library-list" id="lawLibraryList"></div>
+            <div class="law-library-custom-form" id="lawCustomForm">
+                <div class="form-row">
+                    <label>法条名称 <span class="required">*</span></label>
+                    <input type="text" id="customLawName" placeholder="如：《XX省物业管理条例》第十二条" maxlength="120">
+                </div>
+                <div class="form-row">
+                    <label>法条内容</label>
+                    <textarea id="customLawContent" placeholder="请输入法条正文内容" maxlength="500"></textarea>
+                </div>
+                <div class="form-row">
+                    <label>分类</label>
+                    <input type="text" id="customLawCategory" placeholder="选填，如：地方法规" maxlength="30">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="form-btn" onclick="toggleLawCustomForm(false)">取消</button>
+                    <button type="button" class="form-btn primary" onclick="addCustomLawConfirm()">保存</button>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn-secondary" onclick="closeElementQaModal()">取消</button>
-            <button class="modal-btn-primary" onclick="saveElementAnswerFromModal()">保存答案</button>
+            <button type="button" class="modal-btn-secondary" onclick="closeLawLibraryModal()">取消</button>
+            <button type="button" class="modal-btn-primary" id="lawLibraryConfirmBtn" onclick="confirmAddLawsFromLibrary()">确认添加（0 条）</button>
+        </div>
+    </div>
+
+    <!-- v2.24 (任务 8.6 / 9.4): 要件问答弹窗 -->
+    <div class="modal-overlay" id="elementQaOverlay" onclick="closeElementQaModal()" data-page-node-id="GTpjgATmKESOAkts3DBwCW"></div>
+    <div class="modal-dialog element-qa-modal" id="elementQaModal" onclick="event.stopPropagation()" data-page-node-id="U1XCGR8jWaaOyIQJDx7k6w">
+        <div class="modal-header" data-page-node-id="01mw8fzaGPZUEARETcs9NW">
+            <h3 data-page-node-id="FNyTEC3WMM6UVepo0IqrDs"><i class="fas fa-puzzle-piece" data-page-node-id="3AjsDz2HKEbOB9eJ9S4j0n"></i> <span id="elementQaTitle" data-page-node-id="jGbN23DabYOQUtnkh98Nhr">要件问答</span></h3>
+            <button class="modal-close" onclick="closeElementQaModal()" data-page-node-id="zFnHGEsmzXICxUrZKghQm3"><i class="fas fa-times" data-page-node-id="nHpxFdSu3XjORDgMagnjc3"></i></button>
+        </div>
+        <div class="modal-body" data-page-node-id="y8DzoBjy8RqKZR2Fzi1hCG">
+            <div class="element-qa-source-row" id="elementQaSourceRow" data-page-node-id="xzWzJCmlU82hOgmUByAcWl"></div>
+            <div class="element-qa-question" id="elementQaQuestion" data-page-node-id="87PH1FKrP0QLiv5YQlMHkw"></div>
+            <textarea class="element-qa-textarea" id="elementQaAnswer" placeholder="请输入对该要件问题的回答，作为文书生成的辅助依据..."></textarea>
+            <div class="element-qa-hint" data-page-node-id="OPdZyHnBgaUSlgNG2t3bFw">
+                <i class="fas fa-info-circle" data-page-node-id="LQkdFqQ07tsuNwEslGWuX2"></i>
+                <span data-page-node-id="3FADvjbwRC8fliavfbgBsF">保存后答案将持久化到本案件，下次进入本页面会自动恢复。已填写答案的要件在抽屉中显示绿点标识。</span>
+            </div>
+        </div>
+        <div class="modal-footer" data-page-node-id="v58VWyx7Xe1Ec7Ys6xEfMF">
+            <button class="modal-btn-secondary" onclick="closeElementQaModal()" data-page-node-id="EhAMdvzfOIyreBJ1leWv0E">取消</button>
+            <button class="modal-btn-primary" onclick="saveElementAnswerFromModal()" data-page-node-id="BA5DJQQv7mUdxWwpSw540I">保存答案</button>
         </div>
     </div>
 
     <script src="../js/common.js?v=16"></script>
     <script src="../js/case-data.js?v=65"></script>
     <script src="../js/doc-editor.js?v=1"></script>
-    <script src="../js/case-files.js?v=136"></script>
+    <!-- V1.2.5: 全量法条库数据源（LAW_LIBRARY_ALL / LAW_RECOMMEND_RULES），需在 case-files.js 之前加载 -->
+    <script src="../js/law-library.js?v=1"></script>
+    <!-- V1.2.10: 案件信息编辑弹框公共组件（详情页内弹出，不跳列表页） -->
+    <script src="../js/case-edit-dialog.js?v=1"></script>
+    <script src="../js/case-files.js?v=139"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {

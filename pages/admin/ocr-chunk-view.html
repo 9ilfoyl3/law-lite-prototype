@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR/分块查看 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        /* ===== admin 基础布局（与 cases.html 保持一致） ===== */
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .sidebar-header {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-logo {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: 12px;
+        }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 0 12px; margin-bottom: 8px;
+        }
+        .nav-item {
+            display: flex; align-items: center;
+            padding: 12px 16px; border-radius: 10px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            transition: all 0.2s; margin-bottom: 4px;
+        }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px;
+            position: sticky; top: 0; z-index: 50;
+        }
+        .breadcrumb { display: flex; align-items: center; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { margin: 0 8px; font-size: 10px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-menu {
+            display: flex; align-items: center; gap: 12px;
+            padding: 6px 12px 6px 6px; border-radius: 10px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .user-menu:hover { background: var(--bg-primary); }
+        .user-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 14px; font-weight: 600;
+        }
+        .user-name { font-size: 14px; font-weight: 600; }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        /* 内容区 */
+        .content { flex: 1; padding: 24px 32px; overflow-x: hidden; }
+
+        .page-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+        .page-header .page-title-wrap { flex: 1; min-width: 0; }
+        .page-header h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 10px; }
+        .page-header h1 i { color: var(--accent-primary); font-size: 22px; }
+        .page-header p { font-size: 14px; color: var(--text-secondary); margin: 0; }
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px; border: 1px solid var(--border-color);
+            border-radius: 8px; background: var(--bg-secondary);
+            color: var(--text-primary); font-size: 13px; font-family: inherit;
+            cursor: pointer; transition: all 0.15s; text-decoration: none;
+        }
+        .back-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+
+        /* ===== OCR/分块查看（左材料 / 右内容） ===== */
+        .ocr-chunk-layout {
+            display: flex; gap: 14px;
+            height: calc(100vh - var(--header-height) - 150px);
+            min-height: 460px;
+            border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 14px; background: var(--bg-secondary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .ocr-material-pane {
+            flex: 0 0 260px; display: flex; flex-direction: column;
+            border-right: 1px solid var(--border-color); padding-right: 14px;
+        }
+        .ocr-pane-title {
+            font-size: 12px; font-weight: 600; color: var(--text-primary);
+            margin-bottom: 8px; flex-shrink: 0;
+        }
+        .ocr-material-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .ocr-material-item {
+            display: flex; align-items: center; gap: 6px;
+            padding: 7px 9px; border: 1px solid var(--border-color);
+            border-radius: 6px; background: var(--bg-primary);
+            font-size: 12px; color: var(--text-primary);
+            cursor: pointer; transition: all 0.15s; text-align: left;
+            width: 100%; font-family: inherit;
+        }
+        .ocr-material-item:hover { border-color: var(--accent-primary); background: var(--accent-light); }
+        .ocr-material-item.active {
+            border-color: var(--accent-primary); background: var(--accent-light);
+            color: var(--accent-primary); font-weight: 500;
+        }
+        .ocr-material-item .ocr-mat-name {
+            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ocr-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .ocr-status-dot.success { background: #22c55e; }
+        .ocr-status-dot.parsing { background: #f59e0b; }
+        .ocr-status-dot.error { background: #ef4444; }
+        .ocr-content-pane {
+            flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;
+        }
+        .ocr-file-info {
+            display: flex; flex-wrap: wrap; gap: 4px 14px;
+            padding: 8px 10px; background: var(--bg-primary);
+            border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 11px; color: var(--text-secondary); flex-shrink: 0;
+        }
+        .ocr-file-info b { color: var(--text-primary); font-weight: 500; margin-left: 2px; }
+        .ocr-file-info .st-success { color: #166534; }
+        .ocr-file-info .st-parsing { color: #92400e; }
+        .ocr-file-info .st-error { color: #991b1b; }
+        .ocr-chunk-subtabs { display: flex; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+        .ocr-subtab {
+            padding: 6px 14px; border: none; background: transparent;
+            color: var(--text-secondary); font-size: 12px; font-family: inherit;
+            cursor: pointer; border-bottom: 2px solid transparent;
+        }
+        .ocr-subtab:hover { color: var(--accent-primary); }
+        .ocr-subtab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); font-weight: 500; }
+        .ocr-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .ocr-text-body {
+            flex: 1; min-height: 0; overflow-y: auto;
+            padding: 12px 14px; background: var(--bg-primary);
+            border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 12.5px; line-height: 1.75; color: var(--text-primary);
+            white-space: pre-wrap; word-break: break-word;
+        }
+        .ocr-text-footer { padding: 4px 0 0; font-size: 11px; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+        .ocr-chunk-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0; flex-shrink: 0; }
+        .ocr-toolbar-label { font-size: 12px; color: var(--text-secondary); }
+        .ocr-radio { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; cursor: pointer; }
+        .ocr-radio input { cursor: pointer; }
+        .ocr-reslice-btn {
+            margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 5px;
+            background: var(--bg-primary); color: var(--text-primary);
+            font-size: 12px; font-family: inherit; cursor: pointer;
+        }
+        .ocr-reslice-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .ocr-reslice-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ocr-chunk-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+        .ocr-chunk-card {
+            padding: 8px 10px; background: var(--bg-primary);
+            border: 1px solid var(--border-color); border-radius: 6px;
+        }
+        .ocr-chunk-card:hover { border-color: var(--accent-primary); }
+        .ocr-chunk-card-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+        .ocr-chunk-idx { font-weight: 600; color: var(--accent-primary); }
+        .ocr-chunk-gran { padding: 0 5px; background: var(--bg-secondary); border-radius: 4px; font-size: 10px; }
+        .ocr-chunk-range { color: var(--text-muted); font-size: 10px; }
+        .ocr-chunk-text {
+            font-size: 12px; line-height: 1.6; color: var(--text-primary);
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .ocr-empty { text-align: center; color: var(--text-muted); padding: 32px 0; font-size: 12px; }
+
+        /* 通知 */
+        .notify-toast {
+            position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+            padding: 10px 20px; border-radius: 8px; font-size: 13px;
+            background: #1f2937; color: #fff; z-index: 2000;
+            opacity: 0; transition: opacity 0.25s; pointer-events: none;
+        }
+        .notify-toast.show { opacity: 1; }
+        .notify-toast.success { background: #059669; }
+        .notify-toast.error { background: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item active"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
+                    <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <a href="cases.html">案件管理</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>OCR/分块查看</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-avatar">管</div>
+                        <div>
+                            <div class="user-name">管理员</div>
+                            <div class="user-role">系统管理员</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1><i class="fas fa-magnifying-glass-chart"></i><span id="pageCaseName">OCR/分块查看</span></h1>
+                        <p>查看案件材料的 OCR 识别全文与分块切分结果，用于后台排错（不改动材料本身）</p>
+                    </div>
+                    <a class="back-btn" href="cases.html"><i class="fas fa-arrow-left"></i> 返回案件列表</a>
+                </div>
+
+                <div class="ocr-chunk-layout">
+                    <!-- 左：材料列表 -->
+                    <div class="ocr-material-pane">
+                        <div class="ocr-pane-title">案件材料</div>
+                        <div id="ocrMaterialList" class="ocr-material-list"></div>
+                    </div>
+                    <!-- 右：OCR 内容 / 分块 -->
+                    <div class="ocr-content-pane">
+                        <div id="ocrFileInfo" class="ocr-file-info"></div>
+                        <div class="ocr-chunk-subtabs">
+                            <button class="ocr-subtab active" id="ocrSubTextTab" onclick="window.OcrChunkView.switchOcrSubTab('text')">识别全文</button>
+                            <button class="ocr-subtab" id="ocrSubChunkTab" onclick="window.OcrChunkView.switchOcrSubTab('chunk')">分块预览</button>
+                        </div>
+                        <div id="ocrPaneText" class="ocr-pane">
+                            <div id="ocrTextBody" class="ocr-text-body"></div>
+                            <div id="ocrTextFooter" class="ocr-text-footer"></div>
+                        </div>
+                        <div id="ocrPaneChunk" class="ocr-pane" style="display:none;">
+                            <div class="ocr-chunk-toolbar">
+                                <span class="ocr-toolbar-label">粒度：</span>
+                                <label class="ocr-radio"><input type="radio" name="ocrGran" value="page" onchange="window.OcrChunkView.setOcrGranularity('page')"> 按页</label>
+                                <label class="ocr-radio"><input type="radio" name="ocrGran" value="paragraph" checked onchange="window.OcrChunkView.setOcrGranularity('paragraph')"> 按段</label>
+                                <label class="ocr-radio"><input type="radio" name="ocrGran" value="sentence" onchange="window.OcrChunkView.setOcrGranularity('sentence')"> 按句</label>
+                                <button class="ocr-reslice-btn" id="ocrResliceBtn" onclick="window.OcrChunkView.rerunOcrSlice()"><i class="fas fa-rotate"></i> 重新切片</button>
+                            </div>
+                            <div id="ocrChunkBody" class="ocr-chunk-body"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="notify-toast" id="notifyToast"></div>
+
+    <script src="../../js/case-data.js?v=65"></script>
+    <script src="../../js/ocr-chunk-view.js?v=1"></script>
+</body>
+</html>

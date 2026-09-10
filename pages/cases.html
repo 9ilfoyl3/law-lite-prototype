@@ -1998,6 +1998,21 @@
         .modal-form-input::placeholder {
             color: var(--text-muted);
         }
+        /* v2.34: 表单字段下方辅助提示文字 */
+        .modal-form-hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        /* v2.34: 案件名称必填校验失败时的输入框闪烁提示 */
+        .modal-form-input.input-error-nudge {
+            border-color: #ef4444;
+            animation: input-nudge 0.4s ease-in-out 3;
+        }
+        @keyframes input-nudge {
+            0%, 100% { box-shadow: none; }
+            50% { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15); }
+        }
 
         .modal-btn-primary {
             padding: 10px 20px;
@@ -3729,6 +3744,11 @@
         </div>
         <div class="modal-body">
             <div class="modal-form-group">
+                <label class="modal-form-label">案件名称 <span class="required">*</span></label>
+                <input type="text" class="modal-form-input" id="createCaseNameInput" placeholder="上传材料后自动填充，可修改" maxlength="50" oninput="onCaseNameInput()">
+                <div class="modal-form-hint">默认取首个材料文件名，可在列表页「编辑」中随时修改</div>
+            </div>
+            <div class="modal-form-group">
                 <label class="modal-form-label">上传案件材料</label>
                 <div class="upload-area" id="uploadArea" onclick="document.getElementById('createCaseFile').click()">
                     <i class="fas fa-cloud-upload-alt"></i>
@@ -4081,7 +4101,7 @@
 
     <script src="../js/common.js?v=30"></script>
     <script src="../js/case-data.js?v=65"></script>
-    <script src="../js/cases.js?v=94"></script>
+    <script src="../js/cases.js?v=95"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {
