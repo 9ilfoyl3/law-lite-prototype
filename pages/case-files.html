@@ -194,20 +194,9 @@
         .material-col.collapsed .material-col-header { justify-content: center; }
 
         /* 优化1.1: 本案要件顶部固定条样式 */
-        .material-col-elements-bar {
-            padding: 8px 12px;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--bg-secondary);
-            flex-shrink: 0;
-            /* V1.2.4: 容纳「本案要件」「本案法条」两个入口，纵向排列 */
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .material-col-elements-bar .case-elements-entry-btn {
-            width: 100%;
-            justify-content: space-between;
-        }
+        /* V1.2.26: .material-col-elements-bar 已随入口迁移整条移除——原为材料树顶部容纳「本案要件」「本案法条」
+           两个入口的纵向条（V1.2.4 建立）。两个入口现位于中间栏顶部入口带 .gen-views-bar 的组A，
+           样式见 .gen-views-group.assets .case-elements-entry-btn */
 
         .col-resizer {
             width: 6px;
@@ -728,6 +717,8 @@
             flex: 0 0 0%;
             overflow: hidden;
         }
+        /* V1.2.27: 入口带 .gen-views-bar 及其分组样式已撤销——两个入口移至页面顶部右侧 header
+           （见下方 .detail-header-right 相关规则）；中间栏顶部回归纯 .gen-tabs */
         .gen-tabs {
             display: flex;
             gap: 0;
@@ -735,6 +726,32 @@
             background: var(--bg-primary);
             border-bottom: 1px solid var(--border-color);
             flex-shrink: 0;
+        }
+
+        /* ===== V1.2.27: 页面顶部右侧「案件级面板入口组」=====
+           本案要件 / 本案法条（胶囊按钮，点击弹右侧抽屉）┃ 历史文书（展开历史面板），竖线分隔 */
+        .detail-header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .detail-header-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border-color);
+            flex-shrink: 0;
+        }
+        /* header 内入口按钮：自适应宽度胶囊，尺寸按 header 规格缩小 */
+        .detail-header-right .case-elements-entry-btn {
+            width: auto;
+            padding: 6px 12px;
+            gap: 8px;
+        }
+        /* V1.2.28: 基础样式已中性化（background: var(--bg-secondary) 白底 = 与 header 背景区分），
+           此条保留作为 header 作用域内的显式兜底，防止被其他规则覆盖后"融"进 header 背景 */
+        .detail-header-right .case-elements-entry-btn.entry-optional {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
         }
         .gen-tab {
             padding: 12px 20px;
@@ -1014,6 +1031,49 @@
             color: var(--accent-primary);
             font-weight: 500;
         }
+        /* V1.2.25: 检索范围只读标识（替代原「通用知识库」可选 chip） */
+        .aiq-scope-static {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        /* V1.2.25: AI 回答下方操作行（【存入本案要件】） */
+        .aiq-msg-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .aiq-save-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .aiq-save-btn:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .aiq-save-btn:disabled {
+            background: #f3f4f6;
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+        }
+        .aiq-save-btn:disabled i { color: #16a34a; }
         .aiq-input-box {
             display: flex;
             align-items: flex-end;
@@ -1866,7 +1926,7 @@
             cursor: default;
         }
         .detail-body.generated .result-doc-version { display: inline-flex; }
-        /* 保存 / 文书排版按钮（生成后与精修、重新配置并列） */
+        /* 保存 / 文书排版按钮（生成后与精修、修改生成设置并列） */
         .result-save-btn, .result-format-btn {
             display: none;
             align-items: center;
@@ -2514,25 +2574,29 @@
             background: var(--bg-secondary);
         }
         .material-col.collapsed .material-col-footer { display: none; }
+        /* V1.2.28: 基础样式改为【中性】——原「主色描边 + 主色浅底 + 主色文字」会读作"已选中"，
+           与相邻 .gen-tab 的主色下划线选中态语义冲突（进页面即误以为默认选中了本案法条）。
+           现统一中性，仅在 hover 时给主色反馈；强调职责交由状态徽标与法条计数承担 */
         .case-elements-entry-btn {
             display: flex;
             align-items: center;
             justify-content: space-between;
             width: 100%;
             padding: 8px 12px;
-            border: 1px solid var(--accent-primary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            background: var(--accent-light);
-            color: var(--accent-primary);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 400;
             cursor: pointer;
             font-family: inherit;
             transition: all 0.15s;
         }
         .case-elements-entry-btn:hover {
-            background: var(--accent-primary);
-            color: #fff;
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+            color: var(--accent-primary);
         }
         .case-elements-entry-btn .entry-left {
             display: flex;
@@ -2546,16 +2610,17 @@
             padding: 0 5px;
             align-items: center;
             justify-content: center;
-            background: var(--accent-primary);
-            color: #fff;
+            /* V1.2.28: 计数默认中性灰（不再是主色实心，避免被读作"选中态"） */
+            background: #d3d1c7;
+            color: #444441;
             border-radius: 9px;
             font-size: 11px;
             font-weight: 600;
             margin-left: 2px;
         }
         .case-elements-entry-btn:hover .entry-count {
-            background: #fff;
-            color: var(--accent-primary);
+            background: var(--accent-primary);
+            color: #fff;
         }
 
         /* 抽屉遮罩 */
@@ -3124,8 +3189,10 @@
             opacity: 0.5;
         }
         .case-elements-entry-btn:disabled:hover {
-            background: var(--accent-light);
-            color: var(--accent-primary);
+            /* V1.2.28: 禁用态 hover 不产生主色反馈，回落到中性默认态 */
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-secondary);
         }
         .case-elements-footer-link {
             text-align: center;
@@ -3303,29 +3370,17 @@
             color: #5f5e5a;
         }
         /* 选办入口（本案要件）：弱化——浅灰底、灰边框、次要文字 */
-        .case-elements-entry-btn.entry-optional {
-            border-color: var(--border-color);
-            background: var(--bg-primary);
-            color: var(--text-secondary);
-            font-weight: 400;
-        }
-        .case-elements-entry-btn.entry-optional:hover {
-            border-color: var(--accent-primary);
-            background: var(--accent-light);
-            color: var(--accent-primary);
-        }
-        .case-elements-entry-btn.entry-optional .entry-count {
-            background: #d3d1c7;
-            color: #444441;
-        }
-        .case-elements-entry-btn.entry-optional:hover .entry-count {
-            background: var(--accent-primary);
-            color: #fff;
-        }
-        /* 必办入口（本案法条）：主色实心强化 */
+        /* V1.2.28: 基础样式已中性化，「要件弱化」不再需要额外声明（灰边 / 浅底 / 次要文字已上移至基础类）。
+           .entry-optional 类名保留，供 JS 与语义标识使用 */
+        /* 必办入口（本案法条）：V1.2.28 起**不再用主色填充强调**（静态填充会被读作"选中态"），
+           改为【主色计数 + 状态徽标】表达"必办"——动态、有信息量、且不会与 tab 选中态混淆 */
         .case-elements-entry-btn.entry-required {
             border-width: 1px;
             font-weight: 500;
+        }
+        .case-elements-entry-btn.entry-required .entry-count {
+            background: var(--accent-primary);
+            color: #fff;
         }
 
         /* V1.2.9: 统计条右侧【全选 / 清空】快捷操作 */
@@ -3843,6 +3898,17 @@
                     </div>
                 </div>
                 <div class="detail-header-right" data-page-node-id="6FhTm7EzhXAAfKYKLfCXI8">
+                    <!-- ===== V1.2.27: 案件级面板入口组 =====
+                         本案要件 / 本案法条（点击弹右侧抽屉）与「历史文书」（展开历史面板）同属一组，竖线分隔 -->
+                    <button type="button" class="case-elements-entry-btn entry-optional" id="caseElementsEntryBtn" onclick="toggleElementsDrawer()" title="查看本案要件（可选引入）" data-page-node-id="OScD5bCKjG1Kh5jq03YmKq">
+                        <span class="entry-left" data-page-node-id="wstD2GRM7mt7qTwzyf0RaD"><i class="fas fa-puzzle-piece" data-page-node-id="xwQcbHkZQQ3vfjWXKRzVRf"></i> 本案要件 <span class="entry-count" id="caseElementsEntryCount" data-page-node-id="cuq1CB38RhipWTqIHGJyFJ">0</span></span>
+                        <span class="entry-badge optional" id="caseElementsEntryBadge">选填</span>
+                    </button>
+                    <button type="button" class="case-elements-entry-btn entry-required" id="caseLawsEntryBtn" onclick="toggleLawsDrawer()" title="查看本案法条（生成文书前需确认）" data-page-node-id="qOBUqaUJYfuElWywHHtnAy">
+                        <span class="entry-left" data-page-node-id="iIRLSTVxJMaadhRnvPlUM8"><i class="fas fa-gavel" data-page-node-id="lAQooDVkprEw6V6jVf9lJs"></i> 本案法条 <span class="entry-count" id="caseLawsEntryCount" data-page-node-id="RSCLddjoIAP2jp9CowfAfA">-</span></span>
+                        <span class="entry-badge pending" id="caseLawsEntryBadge">待确认</span>
+                    </button>
+                    <span class="detail-header-divider" data-page-node-id="detailHeaderDividerNode"></span>
                     <button class="detail-action-btn" id="caseHistoryDocsBtn" onclick="toggleHistoryTasks()" title="查看历史文书版本" data-page-node-id="ZIQwVLzTWC0bnKZR5oOcIq">
                         <i class="fas fa-file-alt" data-page-node-id="Ng8ulvAuNgTKEZpDq39Gew"></i> 历史文书
                     </button>
@@ -3860,17 +3926,7 @@
                         <span data-page-node-id="YKDwHz5Vlh3cZTrA2tjxkA"><i class="fas fa-th-large" data-page-node-id="8FvI8Vru8262PUAcIqJvWT"></i> 材料树</span>
                         <button onclick="toggleMaterialCol()" title="折叠/展开" data-page-node-id="35lny073fxKla3BElyC5xG"><i class="fas fa-chevron-left" data-page-node-id="HBxc3VDLKIOmYnFAyD3SD9"></i></button>
                     </div>
-                    <!-- V1.2.9: 两入口区分——要件可选（弱化+选填标），法条必确认（主色+状态徽标） -->
-                    <div class="material-col-elements-bar" data-page-node-id="mtgb0Ttb1lWqwEC0GmvhP5">
-                        <button type="button" class="case-elements-entry-btn entry-optional" id="caseElementsEntryBtn" onclick="toggleElementsDrawer()" title="查看本案要件（可选引入）" data-page-node-id="OScD5bCKjG1Kh5jq03YmKq">
-                            <span class="entry-left" data-page-node-id="wstD2GRM7mt7qTwzyf0RaD"><i class="fas fa-puzzle-piece" data-page-node-id="xwQcbHkZQQ3vfjWXKRzVRf"></i> 本案要件 <span class="entry-count" id="caseElementsEntryCount" data-page-node-id="cuq1CB38RhipWTqIHGJyFJ">0</span></span>
-                            <span class="entry-badge optional" id="caseElementsEntryBadge">选填</span>
-                        </button>
-                        <button type="button" class="case-elements-entry-btn entry-required" id="caseLawsEntryBtn" onclick="toggleLawsDrawer()" title="查看本案法条（生成文书前需确认）" data-page-node-id="qOBUqaUJYfuElWywHHtnAy">
-                            <span class="entry-left" data-page-node-id="iIRLSTVxJMaadhRnvPlUM8"><i class="fas fa-gavel" data-page-node-id="lAQooDVkprEw6V6jVf9lJs"></i> 本案法条 <span class="entry-count" id="caseLawsEntryCount" data-page-node-id="RSCLddjoIAP2jp9CowfAfA">-</span></span>
-                            <span class="entry-badge pending" id="caseLawsEntryBadge">待确认</span>
-                        </button>
-                    </div>
+                    <!-- V1.2.26: 「本案要件」「本案法条」两个入口已迁至中间栏顶部入口带 .gen-views-bar（组A 案件资料区）；材料树顶部固定条整条移除，材料树回归纯材料列表 -->
                     <div class="material-search" data-page-node-id="sqIvslqtJ24MBvpdCRyKP3">
                         <div class="material-search-box" data-page-node-id="f3WtK2FGV7LDTRwCrINjGG">
                             <i class="fas fa-search" data-page-node-id="wV1ltNFfMr42oTY1b0Dxr3"></i>
@@ -3898,16 +3954,18 @@
                         </div>
                         <button class="core-materials-manage" onclick="scrollToMaterialTree()" data-page-node-id="dpZMrRHaIRATVvV2G7xYRX">管理</button>
                     </div>
+                    <!-- V1.2.27: 「本案要件」「本案法条」两个入口已移至页面顶部右侧 header（.detail-header-right，
+                         位于「历史文书」左侧）；中间栏顶部回归纯生成方式 tab -->
                     <div class="gen-tabs" data-page-node-id="s9b8qE5D388NmqPVSsfRbK">
+                        <!-- V1.2.23 新增「AI问答」视图 / V1.2.25 移至最左 -->
+                        <button class="gen-tab" data-method="chat" onclick="switchGenMethod('chat')" data-page-node-id="wq7pLm2nRtVb5xCyD8aKfZ">
+                            <i class="fas fa-comments" data-page-node-id="aiQTb3xLmN8vQrDs6cUwPe"></i> AI问答
+                        </button>
                         <button class="gen-tab active" data-method="material" onclick="switchGenMethod('material')" data-page-node-id="lKLU5cP4CGvP0cGo7017VI">
-                            <i class="fas fa-bolt" data-page-node-id="zIi0lfUQ7fFwXZlb1iUGTg"></i> 一步生成
+                            <i class="fas fa-bolt" data-page-node-id="zIi0lfUQ7fFwXZlb1iUGTg"></i> 材料生成
                         </button>
                         <button class="gen-tab" data-method="steps" onclick="switchGenMethod('steps')" data-page-node-id="saV04G09vzAYk7jTKNLpFQ">
                             <i class="fas fa-list-ol" data-page-node-id="kdgkauzCNenAIhcWkmfFcX"></i> 分步生成
-                        </button>
-                        <!-- V1.2.23: 第三个视图「AI问答」——基于本案材料的知识检索问答，不要求先生成文书 -->
-                        <button class="gen-tab" data-method="chat" onclick="switchGenMethod('chat')" data-page-node-id="wq7pLm2nRtVb5xCyD8aKfZ">
-                            <i class="fas fa-comments" data-page-node-id="aiQTb3xLmN8vQrDs6cUwPe"></i> AI问答
                         </button>
                     </div>
                     <div class="gen-content" data-page-node-id="nH2HURPACfHIdqa82lFvLw">
@@ -4018,12 +4076,10 @@
                                 <!-- 输入区 -->
                                 <div class="aiq-input-area" data-page-node-id="aiqInputArea">
                                     <div class="aiq-input-toolbar" data-page-node-id="aiqInputToolbar">
-                                        <button type="button" class="aiq-scope-chip active" id="aiqScopeCase" onclick="toggleAiChatScope('case')" title="检索本案材料（默认启用）" data-page-node-id="aiqScopeCase">
-                                            <i class="fas fa-folder-open" data-page-node-id="aiqScopeCaseIcon"></i> 本案材料
-                                        </button>
-                                        <button type="button" class="aiq-scope-chip" id="aiqScopeKb" onclick="toggleAiChatScope('kb')" title="叠加通用知识库检索" data-page-node-id="aiqScopeKb">
-                                            <i class="fas fa-book" data-page-node-id="aiqScopeKbIcon"></i> 通用知识库
-                                        </button>
+                                        <!-- V1.2.25: 检索范围收敛为仅本案材料，原「通用知识库」可选 chip 移除 -->
+                                        <span class="aiq-scope-static" data-page-node-id="aiqScopeStatic">
+                                            <i class="fas fa-folder-open" data-page-node-id="aiqScopeStaticIcon"></i> 检索范围：本案材料
+                                        </span>
                                     </div>
                                     <div class="aiq-input-box" data-page-node-id="aiqInputBox">
                                         <textarea class="aiq-input" id="aiqInput" rows="1" maxlength="500"
@@ -4060,7 +4116,7 @@
                                 <i class="fas fa-align-left" id="caseDocFormatBtnIcon" data-page-node-id="Wq6mZf3nBx8rTk2vCd5uHs"></i> <span id="caseDocFormatBtnLabel" data-page-node-id="Pz4nKd9wQm2xLb7vNc3rJt">文书排版</span>
                             </button>
                             <button class="result-save-btn" id="resultSaveBtnTop" onclick="saveResult()" title="保存到历史文书"><i class="fas fa-save"></i> 保存</button>
-                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="重新配置生成参数（默认回填最近一次历史文书快照）" data-page-node-id="MngcOEcxQzDXxf0eFdN96Y"><i class="fas fa-sliders-h" data-page-node-id="8XCifZcQcQMmo7rvCOOpn2"></i> <span data-page-node-id="BPcBP3hBSdrE2BGKWA1raw">重新配置</span></button>
+                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="修改文书类型、模板、指令与已选材料，默认沿用最近一次生成时的设置" data-page-node-id="MngcOEcxQzDXxf0eFdN96Y"><i class="fas fa-sliders-h" data-page-node-id="8XCifZcQcQMmo7rvCOOpn2"></i> <span data-page-node-id="BPcBP3hBSdrE2BGKWA1raw">修改生成设置</span></button>
                         </div>
                     </div>
                     <!-- 生成结果区（默认显示） -->
