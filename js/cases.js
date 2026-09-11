@@ -368,7 +368,7 @@ function renderCaseList(cases = getCurrentCases()) {
                     <i class="fas fa-upload"></i> 文件上传
                 </button>
                 <button class="case-action-btn quick-gen-btn${genDisabled ? ' disabled' : ''}" title="${genTitle}"${genDisabled ? ' disabled' : ''} onclick="openGenModal('${c.id}')">
-                    <i class="fas fa-bolt"></i> 生成文书
+                    <i class="fas fa-bolt"></i> 快速生成
                 </button>
                 <div class="case-action-more-wrap">
                     <button class="case-action-btn more-btn" title="更多操作" onclick="toggleActionMenu(this)">
@@ -1358,7 +1358,7 @@ function renderBatchConfig() {
                 </div>
                 <div class="batch-mode-info">
                     <i class="fas fa-info-circle"></i>
-                    <span>批量生成使用一步生成方式。若某案件材料量过大导致 Workflow 超限，该案件将标记为失败，可在批量任务面板点击"进入详情页处理"改用分步生成。</span>
+                    <span>批量生成使用材料生成方式。若某案件材料量过大导致 Workflow 超限，该案件将标记为失败，可在批量任务面板点击"进入详情页处理"改用分步生成。</span>
                 </div>
                 <div class="full">
                     <label class="drawer-form-label">指令</label>
@@ -2536,7 +2536,7 @@ function renderDocumentsList() {
         return;
     }
     const docTypes = getCurrentDocTypes();
-    const genMethodLabel = (m) => m === 'step' ? '分步生成' : '一步生成';
+    const genMethodLabel = (m) => m === 'step' ? '分步生成' : '材料生成';
     const typeLabel = (t) => t === 'polish' ? '精修' : (t === 'regenerate' ? '重新生成' : '首次生成');
     const formatTime = (iso) => {
         if (!iso) return '-';

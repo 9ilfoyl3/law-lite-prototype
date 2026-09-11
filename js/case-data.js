@@ -1835,7 +1835,7 @@ function initCaseData() {
                             content: `<div style="font-family:'SimSun',serif;line-height:2;text-align:justify;"><h2 style="text-align:center;font-size:20pt;font-weight:bold;margin-bottom:24px;">${title}</h2><p style="text-indent:2em;margin-bottom:10px;">本文书为系统示例初稿内容，用于演示文书管理、精修与版本对比功能。</p><p style="text-indent:2em;margin-bottom:10px;">案件名称：${c.caseName}。</p><p style="text-indent:2em;margin-bottom:10px;">案由：${c.cause || '-'}。</p><p style="text-align:right;margin-bottom:20px;">生成时间：${c.updatedAt}</p></div>`,
                             createdAt: c.updatedAt,
                             createdBy: c.handler || getCurrentUserName(),
-                            // 配置快照（用于重新配置回填）
+                            // 配置快照（用于「修改生成设置」回填，V1.2.24 文案修订）
                             config: {
                                 docType: 'judgment',
                                 template: '',

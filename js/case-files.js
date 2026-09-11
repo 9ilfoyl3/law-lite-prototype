@@ -233,7 +233,7 @@ function applyReadOnlyMode() {
     const requirementInput = document.getElementById('requirementInput');
     if (requirementInput) requirementInput.disabled = true;
 
-    // 隐藏结果区「文书精修」「重新配置」「保存」按钮（保留「下载」）
+    // 隐藏结果区「文书精修」「修改生成设置」「保存」按钮（保留「下载」）
     const resultRefineBtn = document.getElementById('resultRefineBtn');
     if (resultRefineBtn) resultRefineBtn.style.display = 'none';
     const resultReconfigBtn = document.getElementById('resultReconfigBtn');
@@ -906,7 +906,7 @@ function getCurrentModel() {
 }
 
 // v2.20: 模型由 workflow 的 modelId 决定（agentflow 平台镜像），用户侧不可修改
-// 在文书类型/生成方式/初始化/重新配置等时机调用，刷新模型下拉为只读展示
+// 在文书类型/生成方式/初始化/修改生成设置等时机调用，刷新模型下拉为只读展示
 function refreshModelFromWorkflow() {
     const modelSelect = document.getElementById('modelSelect');
     if (!modelSelect) return;
@@ -1035,7 +1035,7 @@ function backToMainView() {
             return d && d.materials && d.materials.size > 0;
         });
         if (hasStepMaterials) {
-            if (!confirm('切换至一步生成将清空各步骤已选材料，是否继续？')) return;
+            if (!confirm('切换至材料生成将清空各步骤已选材料，是否继续？')) return;
             // v2.24 (任务 9.3): 确认后实际清空分步生成各步骤已选材料
             stepsConfig.forEach(s => {
                 stepData[s.id] = { items: [], materials: new Set() };
@@ -1079,7 +1079,7 @@ function setLayoutState(state) {
     }
 }
 
-// v2.19/v1.37: 重新配置——默认回填最近一次历史文书的快照数据
+// v2.19/v1.37: 修改生成设置（原「重新配置」，V1.2.24 文案修订）——默认回填最近一次生成时的参数
 // v1.37: 改用 getAllDocumentVersions 取最新版本，从 version.config 回填（任务 4.4）
 // 回填内容：文书类型 / 模板 / 指令 / 已选材料集合 / 生成方式
 // 模型由 workflow 决定（v2.20 不恢复），回填 docType 后由 refreshModelFromWorkflow 自动刷新
@@ -1093,7 +1093,7 @@ function reconfigWithLatestSnapshot() {
     const versions = getAllDocumentVersions(caseItem.id);
     if (versions.length === 0) {
         // 无历史文书：保持默认配置态（空表单 + 全部材料未勾选）
-        showNotification('已切换到配置态', 'info');
+        showNotification('已返回配置，请选择材料与文书类型', 'info');
         return;
     }
     const latest = versions[0]; // 最新版本
@@ -1143,7 +1143,7 @@ function reconfigWithLatestSnapshot() {
         backToMainView && backToMainView();
     }
 
-    showNotification('已加载最近一次历史文书的生成配置，可调整后再生成', 'success');
+    showNotification('已沿用最近一次生成的设置，修改后可重新生成', 'success');
 }
 
 // 初始化左栏材料树宽度拖拽调节
@@ -1583,7 +1583,7 @@ function generateByMaterial() {
     const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     // V1.2.4（清单 1/3）: 全部文书类型均需先经法条确认，再由法条确认回调触发文书渲染
     const proceedToLawConfirm = (answers) => {
-        openLawsDrawerForGenerate((laws) => { doGenerateByMaterial(answers, laws); });
+        proceedToGenerateWithLaws((laws) => { doGenerateByMaterial(answers, laws); });
     };
     if (_matDocType === 'judgment' && _hasElements) {
         // V1.2: 统一先弹轻量询问弹框；选择「引入案由要件」后打开本案要件抽屉（生成模式）确认答案
@@ -1633,9 +1633,9 @@ function autoGenerateWithAllElements() {
             answer: (caseElementsAnswers[p.name] || '').trim() || generateMockElementAnswer(p, caseItem)
         }));
         // V1.2.4: 列表页快捷生成同样需经法条确认（要件已自动引入，不再弹框）
-        openLawsDrawerForGenerate((laws) => { doGenerateByMaterial(elementAnswers, laws); });
+        proceedToGenerateWithLaws((laws) => { doGenerateByMaterial(elementAnswers, laws); });
     } else {
-        openLawsDrawerForGenerate((laws) => { doGenerateByMaterial(null, laws); });
+        proceedToGenerateWithLaws((laws) => { doGenerateByMaterial(null, laws); });
     }
 }
 
@@ -2381,7 +2381,7 @@ function renderSteps() {
         let hideHint = false;
         if (isJudgment && stage === 'retrial') {
             // v1.46: 再审暂不支持分步生成
-            hint = '再审案件暂不支持分步生成，请使用一步生成';
+            hint = '再审案件暂不支持分步生成，请使用材料生成';
             hideHint = true;
         } else if (isJudgment && stageOptions.length > 0 && !stage) {
             hint = '请先选择案件阶段，系统将按案件阶段展示对应步骤序列（一审 5 步 / 二审 6 步）';
@@ -3377,7 +3377,7 @@ function compileSteps() {
     const _hasElements3 = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     // V1.2.4（清单 1/3）: 分步生成最终「生成文书」同样先经法条确认
     const proceedToLawConfirm = (answers) => {
-        openLawsDrawerForGenerate((laws) => { doCompileSteps(answers, laws); });
+        proceedToGenerateWithLaws((laws) => { doCompileSteps(answers, laws); });
     };
     if (stepDocType === 'judgment' && _hasElements3) {
         // V1.2: 统一先弹轻量询问弹框；选择「引入案由要件」后打开本案要件抽屉（生成模式）确认答案
@@ -3683,7 +3683,9 @@ function refreshCaseLawsEntry() {
         if (caseLawsState.status === 'running') {
             badge.className = 'entry-badge pending';
             badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 检索中';
-        } else if (caseLawsState.confirmed && selected > 0) {
+        // V1.2.25: 按勾选数判定（勾选即视为已确认），与生成流程保持一致；
+        // 原判定要求 caseLawsState.confirmed（须点过【确认法条并生成文书】），会造成"徽标显示待确认、生成却不弹抽屉"的矛盾
+        } else if (selected > 0) {
             badge.className = 'entry-badge confirmed';
             badge.innerHTML = '已确认 ' + selected + ' 条';
         } else {
@@ -3783,6 +3785,7 @@ function selectAllLaws(checked) {
     saveCaseLaws();
     renderLawsList();
     updateLawsGenerateBtn();
+    refreshCaseLawsEntry();   // V1.2.25: 全选/清空实时刷新入口徽标
 }
 
 // V1.2.9: 单个法条分组（复用要件抽屉分组样式）
@@ -3818,6 +3821,7 @@ function toggleLawSelection(lawId, checked) {
     law.selected = !!checked;
     saveCaseLaws();
     updateLawsGenerateBtn();
+    refreshCaseLawsEntry();   // V1.2.25: 勾选变化实时刷新入口徽标（勾选即视为已确认）
     renderLawsList();
 }
 
@@ -4031,6 +4035,21 @@ function reretrieveLaws() {
 }
 
 // ---- 生成模式 ----
+// V1.2.25: 生成前统一入口——已勾选法条 ≥ 1 条即视为已确认，**直接沿用、不再弹「本案法条」抽屉**；
+// 一条未勾时仍弹抽屉让用户勾选（避免"零法条生成"导致文书「法律适用依据」章节为空）。
+// 判定只看勾选数，不看 caseLawsState.confirmed 标记（对齐 V1.2 版本 PRD 10.14）。
+function proceedToGenerateWithLaws(callback) {
+    const laws = getConfirmedLawsIfAny();
+    if (laws) { callback(laws); return; }
+    openLawsDrawerForGenerate(callback);
+}
+
+function getConfirmedLawsIfAny() {
+    if (typeof collectSelectedLaws !== 'function') return null;
+    const laws = collectSelectedLaws();
+    return (laws && laws.length > 0) ? laws : null;
+}
+
 function openLawsDrawerForGenerate(callback) {
     lawsDrawerGenerateMode = true;
     lawsGenerateCallback = callback || null;
@@ -4079,7 +4098,7 @@ function confirmLawsGenerate() {
         return;
     }
     const cb = lawsGenerateCallback;
-    // V1.2.9: 标记已确认，入口徽标切换为「已确认 N 条」
+    // V1.2.9: 标记已确认 / V1.2.25: 该标记已不再驱动入口徽标（徽标改为按勾选数判定），仅作"点过确认按钮"的留痕
     caseLawsState.confirmed = true;
     saveCaseLaws();
     refreshCaseLawsEntry();
@@ -4198,7 +4217,7 @@ function startStreamingOutput(fullContent, title) {
     resultDocTitle = title || '法律文书';
     updateResultDocInfo();
 
-    // 流式输出期间禁用【文书精修】【重新配置】按钮
+    // 流式输出期间禁用【文书精修】【修改生成设置】按钮
     setResultActionButtonsDisabled(true);
 
     // V1.2: 流式输出期间禁用「本案要件」入口，避免边生成边修改要件答案
@@ -4329,7 +4348,7 @@ function setResultActionButtonsDisabled(disabled) {
         reconfigBtn.disabled = disabled;
         reconfigBtn.style.opacity = disabled ? '0.5' : '';
         reconfigBtn.style.cursor = disabled ? 'not-allowed' : '';
-        reconfigBtn.title = disabled ? '生成中，请稍候' : '重新配置生成参数（默认回填最近一次历史文书快照）';
+        reconfigBtn.title = disabled ? '生成中，请稍候' : '修改文书类型、模板、指令与已选材料，默认沿用最近一次生成时的设置';
     }
     // 对齐实际系统：同步顶部【保存】按钮状态
     const saveTopBtn = document.getElementById('resultSaveBtnTop');
@@ -4786,7 +4805,7 @@ function renderHistoryTasks() {
         return;
     }
     const docTypes = getCurrentDocTypes();
-    const genMethodLabel = (m) => m === 'step' ? '分步生成' : '一步生成';
+    const genMethodLabel = (m) => m === 'step' ? '分步生成' : '材料生成';
     const typeLabel = (t) => t === 'polish' ? '精修' : (t === 'regenerate' ? '重新生成' : '首次生成');
     const formatTime = (iso) => {
         if (!iso) return '-';
@@ -6102,11 +6121,11 @@ function collectDrawerElementAnswers() {
 // 数据：对话仅存内存（aiChatMessages），刷新页面重置；切换案件自动清空。
 // =====================================================================================
 
-let aiChatMessages = [];                                          // [{ role:'user'|'ai', content, toolNodes?, sources? }]
-let aiChatScope = { caseMaterials: true, knowledgeBase: false };  // 检索范围
-let aiChatGenerating = false;                                     // 回答生成中（防并发提问）
-let aiChatTimer = null;                                           // mock 生成计时器
-let aiChatCaseId = null;                                          // 用于检测案件切换后重置对话
+let aiChatMessages = [];                     // [{ role:'user'|'ai', content, toolNodes?, sources?, savedToElements? }]
+let aiChatGenerating = false;                // 回答生成中（防并发提问）
+let aiChatTimer = null;                      // mock 生成计时器
+let aiChatCaseId = null;                     // 用于检测案件切换后重置对话
+// V1.2.25: 检索范围固定为「仅本案材料」，原 aiChatScope 的知识库维度已移除
 
 // 推荐问题（演示用）
 const AIQ_SUGGESTIONS = [
@@ -6168,12 +6187,9 @@ function switchToChatView() {
     renderAiChat();
 }
 
-// ---- 检索范围 ----
+// ---- 检索范围（V1.2.25: 固定为仅本案材料，不可切换） ----
 function getAiChatScopeText() {
-    const parts = [];
-    if (aiChatScope.caseMaterials) parts.push('本案材料');
-    if (aiChatScope.knowledgeBase) parts.push('通用知识库');
-    return parts.length ? parts.join(' + ') + '已参与检索' : '未选择检索范围';
+    return '本案材料已参与检索';
 }
 
 // ---- 本案材料 ----
@@ -6207,11 +6223,10 @@ function renderAiChat() {
     if (!hasChat) {
         body.innerHTML = buildAiChatEmptyHtml();
     } else {
-        body.innerHTML = aiChatMessages.map(buildAiChatMessageHtml).join('');
+        body.innerHTML = aiChatMessages.map((m, i) => buildAiChatMessageHtml(m, i)).join('');
         body.scrollTop = body.scrollHeight;
     }
     updateAiChatSendBtn();
-    syncAiChatScopeChips();
 }
 
 function buildAiChatEmptyHtml() {
@@ -6246,7 +6261,7 @@ function buildAiChatEmptyHtml() {
         </div>`;
 }
 
-function buildAiChatMessageHtml(msg) {
+function buildAiChatMessageHtml(msg, idx) {
     if (msg.role === 'user') {
         return `<div class="aiq-msg user"><div class="aiq-msg-bubble">${escapeHtmlForElements(msg.content)}</div></div>`;
     }
@@ -6268,11 +6283,20 @@ function buildAiChatMessageHtml(msg) {
     const textHtml = msg.content
         ? `<div class="aiq-msg-bubble">${escapeHtmlForElements(msg.content)}</div>`
         : '<div class="aiq-msg-bubble" style="color:var(--text-muted);">正在整理回答…</div>';
+    // V1.2.25: 回答完成后提供【存入本案要件】——自动新建个案要件（名=提问、答案=回答），不打开抽屉
+    const actionsHtml = msg.content
+        ? `<div class="aiq-msg-actions">
+               <button type="button" class="aiq-save-btn"${msg.savedToElements ? ' disabled' : ''} onclick="saveAiChatToElements(${idx})" title="以本次提问为要件名称、本回答为要件答案，新建一个个案要件">
+                   <i class="fas ${msg.savedToElements ? 'fa-check' : 'fa-puzzle-piece'}"></i> ${msg.savedToElements ? '已存入本案要件' : '存入本案要件'}
+               </button>
+           </div>`
+        : '';
     return `
         <div class="aiq-msg ai">
             ${toolsHtml}
             ${textHtml}
             ${sourcesHtml}
+            ${actionsHtml}
         </div>`;
 }
 
@@ -6298,24 +6322,52 @@ function updateAiChatSendBtn() {
     const hasText = !!(ta && ta.value.trim());
     btn.disabled = !hasText || aiChatGenerating || !canAiChatAsk();
 }
-function syncAiChatScopeChips() {
-    const c1 = document.getElementById('aiqScopeCase');
-    const c2 = document.getElementById('aiqScopeKb');
-    if (c1) c1.classList.toggle('active', !!aiChatScope.caseMaterials);
-    if (c2) c2.classList.toggle('active', !!aiChatScope.knowledgeBase);
-}
-function toggleAiChatScope(which) {
-    if (which === 'case') {
-        // 本案材料为定位所需，不可取消
-        if (aiChatScope.caseMaterials) return;
-        aiChatScope.caseMaterials = true;
-    } else if (which === 'kb') {
-        aiChatScope.knowledgeBase = !aiChatScope.knowledgeBase;
+// V1.2.25: 将某条 AI 回答存入「本案要件」——自动新建个案要件（名=本次提问、答案=本条回答），不打开抽屉
+function saveAiChatToElements(idx) {
+    if (typeof caseItem === 'undefined' || !caseItem) return;
+    const msg = aiChatMessages[idx];
+    if (!msg || msg.role !== 'ai' || !msg.content) return;
+    if (msg.savedToElements) {
+        showNotification('该回答已存入本案要件', 'warning');
+        return;
     }
-    syncAiChatScopeChips();
-    const scopeEl = document.getElementById('aiqTopbarScope');
-    if (scopeEl) scopeEl.innerHTML = '<i class="fas fa-paperclip"></i> ' + escapeHtmlForElements(getAiChatScopeText());
-    if (aiChatMessages.length === 0) renderAiChat();
+    // 回溯本条回答对应的提问（作为要件名称）
+    let question = '';
+    for (let i = idx - 1; i >= 0; i--) {
+        if (aiChatMessages[i].role === 'user') { question = aiChatMessages[i].content; break; }
+    }
+    if (!question) question = 'AI问答结论';
+
+    loadCaseElementsAll();                       // 先确保缓存与 localStorage 一致
+    const name = buildUniqueCaseElementName(question);
+    const arr = getCaseCustomElements(caseItem.id);
+    arr.push({ name, question, enabled: true, createdAt: Date.now() });
+    setCaseCustomElements(caseItem.id, arr);     // 写个案要件
+
+    caseElementsAnswers[name] = msg.content;     // 写答案（以要件名为索引）
+    saveElementAnswers(caseItem.id, caseElementsAnswers);
+
+    loadCaseElementsAll();                       // 重载，使缓存与 localStorage 同步
+    renderElementsList();
+    refreshCaseElementsEntryCount();
+
+    msg.savedToElements = true;
+    renderAiChat();
+    showNotification('已存入本案要件，可在「本案要件」抽屉查看', 'success');
+}
+
+// V1.2.25: 要件答案以「要件名」为索引（caseElementsAnswers[name]），重名会覆盖已有答案，
+// 故存入前对全部三类（标准/我的/个案）要件名做去重，重名自动追加序号后缀
+function buildUniqueCaseElementName(base) {
+    const all = [
+        ...((caseElementsCache.standard) || []),
+        ...((caseElementsCache.mine) || []),
+        ...((caseElementsCache.case) || [])
+    ].map(p => p && p.name).filter(Boolean);
+    if (all.indexOf(base) === -1) return base;
+    let n = 2;
+    while (all.indexOf(base + '（' + n + '）') !== -1) n++;
+    return base + '（' + n + '）';
 }
 
 // ---- 提问与 mock 回答 ----
