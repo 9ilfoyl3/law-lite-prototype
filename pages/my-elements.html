@@ -217,6 +217,7 @@
             font-weight: 600;
             margin-bottom: 4px;
         }
+        /* 清单第7项：要件说明不再展示，样式保留备用（用户侧已停止采集该字段） */
         .element-desc {
             font-size: 12px;
             color: var(--text-secondary);
@@ -811,7 +812,6 @@
                         <div class="element-header">
                             <div style="flex:1;min-width:0;">
                                 <div class="element-name">${p.name}</div>
-                                <div class="element-desc">${p.desc || ''}</div>
                                 <div class="element-question">${p.question || ''}</div>
                                 ${renderElementCwTags(p.caseWords)}
                             </div>
@@ -830,17 +830,14 @@
         }
 
         function renderMyElementForm(item, idx) {
-            const data = item || { name: '', desc: '', question: '', caseWords: [] };
+            const data = item || { name: '', question: '', caseWords: [] };
             return `
                 <div class="element-item" style="background:var(--accent-light);border-color:#bfdbfe;">
                     <div class="form-group">
                         <label class="form-label">要件名称</label>
                         <input type="text" class="form-input" id="editName_${idx}" value="${escapeHtml(data.name)}" placeholder="如：借款用途">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">要件说明</label>
-                        <input type="text" class="form-input" id="editDesc_${idx}" value="${escapeHtml(data.desc || '')}" placeholder="简要说明该要件的含义">
-                    </div>
+                    <!-- 清单第7项：要件说明字段已移除（用户侧不再采集、不再展示） -->
                     <div class="form-group">
                         <label class="form-label">问题</label>
                         <textarea class="form-textarea" id="editQuestion_${idx}" placeholder="生成文书前需要确认的单一问题">${escapeHtml(data.question || '')}</textarea>
@@ -882,7 +879,6 @@
 
         function saveMyElement(idx) {
             const name = document.getElementById(`editName_${idx}`).value.trim();
-            const desc = document.getElementById(`editDesc_${idx}`).value.trim();
             const question = document.getElementById(`editQuestion_${idx}`).value.trim();
             if (!name || !question) {
                 showToast('要件名称和问题不能为空', 'error');
@@ -891,9 +887,9 @@
             const caseWords = collectFormCaseWords(idx);
             const mine = getMyElementPresets(currentCause);
             if (idx === -1) {
-                mine.push({ name, desc, question, caseWords });
+                mine.push({ name, question, caseWords });
             } else {
-                mine[idx] = { name, desc, question, caseWords };
+                mine[idx] = { name, question, caseWords };
             }
             setMyElementPresets(currentCause, mine);
             editingId = null;

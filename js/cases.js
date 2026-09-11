@@ -226,6 +226,19 @@ function renderStatsCards() {
 }
 
 // ===== 案件列表渲染 =====
+
+// V1.2.21: 本地日期格式化 YYYY-MM-DD（用本地时区，避免 UTC 偏移导致「新」标在当天上午提前过期）
+function formatLocalDate(d) {
+    const dt = d || new Date();
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+// V1.2.21: 判断案件是否为「当天建案」（「新」标识依据）——无 createdAt 的存量案件视为非当天，不显示
+function isCaseCreatedToday(c) {
+    if (!c || !c.createdAt) return false;
+    return String(c.createdAt).slice(0, 10) === formatLocalDate(new Date());
+}
+
 function renderCaseList(cases = getCurrentCases()) {
     const listBody = document.getElementById('caseListBody');
     const current = getCurrentBusiness();
@@ -290,9 +303,11 @@ function renderCaseList(cases = getCurrentCases()) {
         const error = stats.error > 0;
         // v2.24: 文书数量直接调用 getAllDocumentVersions，与详情页历史文书面板完全一致
         const docCount = getAllDocumentVersions(c.id).length;
-        // v2.32: 首次解析待确认标识（编辑保存后消失）
-        const newBadge = c.firstParsePending
-            ? `<span class="case-new-badge" title="案件信息待确认，请点击「编辑」核对识别结果">新</span>`
+        // V1.2.21/V1.2.22: 列表页仅保留「新」标识（建案当天有效，时间性，跨自然日自动隐藏）
+        // 「待确认」状态不落列表页（V1.2.22 精简：避免与详情页提示条重复展示、减轻列表页视觉负担），
+        // 其唯一承载为详情页黄色确认提示条（js/case-files.js renderCaseInfoParseAlert）
+        const newBadge = isCaseCreatedToday(c)
+            ? `<span class="case-new-badge" title="当天新建的案件">新</span>`
             : '';
         // v2.23: 材料数量列只表达材料状态（任务 1.1，修订：不再混入文书数）
         // 状态优先级：无材料 → 解析中 → 有异常 → 正常
@@ -2068,8 +2083,10 @@ function submitCreateCase() {
         documents: []
     };
 
-    // v2.32: 首次解析标记（列表页「新」标 + 详情页确认提示条依据，编辑保存后清除）
+    // v2.32: 首次解析标记（列表页「待确认」标 + 详情页确认提示条依据，用户确认后清除）
     newCase.firstParsePending = true;
+    // V1.2.21: 建案日期（「新」标识依据——建案当天有效，跨自然日自动隐藏）
+    newCase.createdAt = formatLocalDate(new Date());
     // v2.32: mock 识别结果（解析完成后由「编辑」弹框预填）
     newCase.parseResult = generateMockParseResult(uploadedFiles[0].name);
 
@@ -2803,7 +2820,8 @@ function submitEditCase() {
     caseItem.date = document.getElementById('editCaseDate').value || caseItem.date;
     caseItem.updatedAt = new Date().toISOString().split('T')[0];
 
-    // v2.32: 首次编辑保存即完成信息确认——移除「新」标与详情页确认提示条
+    // v2.32 / V1.2.21: 首次编辑保存即完成信息确认——移除「待确认」标与详情页确认提示条
+    // （「新」标识由建案日期 createdAt 独立控制，不在此清除）
     if (caseItem.firstParsePending) {
         caseItem.firstParsePending = false;
         delete caseItem.parseResult;

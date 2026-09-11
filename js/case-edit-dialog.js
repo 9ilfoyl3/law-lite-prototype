@@ -191,6 +191,7 @@
         caseItem.updatedAt = new Date().toISOString().split('T')[0];
 
         // V1.2.2 首次解析确认：清掉首检标记与识别结果缓存
+        // V1.2.21: 该标记（firstParsePending）现仅驱动列表页「待确认」标识与详情页提示条；「新」标识改由 createdAt 独立控制
         if (caseItem.firstParsePending) {
             caseItem.firstParsePending = false;
             delete caseItem.parseResult;

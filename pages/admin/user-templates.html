@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户模板检索 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-logo { width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 12px; margin-bottom: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 16px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        /* 主内容区 */
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+        .header { height: var(--header-height); background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 50; }
+        .breadcrumb { display: flex; align-items: center; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { margin: 0 8px; font-size: 10px; }
+        .user-menu { display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 6px; border-radius: 10px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 600; }
+        .user-name { font-size: 14px; font-weight: 600; }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        .content { flex: 1; padding: 24px 32px; overflow-x: hidden; }
+        .page-header { margin-bottom: 20px; }
+        .page-header h1 { font-size: 24px; font-weight: 600; margin: 0 0 6px 0; display: flex; align-items: center; gap: 10px; }
+        .page-header h1 i { color: var(--accent-primary); font-size: 22px; }
+        .page-header p { font-size: 14px; color: var(--text-secondary); margin: 0; }
+
+        /* 卡片通用 */
+        .panel { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+        .panel-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+        .panel-title i { color: var(--accent-primary); font-size: 13px; }
+        .panel-title .hint { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: auto; }
+
+        /* 搜索区 */
+        .search-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .search-input { flex: 1; min-width: 240px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--text-primary); }
+        .search-input:focus { outline: none; border-color: var(--accent-primary); }
+        .search-select { padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--text-primary); background: var(--bg-secondary); cursor: pointer; }
+        .btn { padding: 9px 18px; border: none; border-radius: 8px; font-size: 13px; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; }
+        .btn-primary { background: var(--accent-primary); color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-ghost { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-ghost:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .search-tip { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
+        /* 统计卡 */
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .stat-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 18px; }
+        .stat-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+        .stat-value { font-size: 26px; font-weight: 600; color: var(--text-primary); line-height: 1.1; }
+        .stat-value.accent { color: var(--accent-primary); }
+        .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+        /* 案由分布表 */
+        .dist-table { width: 100%; border-collapse: collapse; }
+        .dist-table thead th { background: var(--bg-primary); padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+        .dist-table tbody td { padding: 10px 14px; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6; }
+        .dist-table tbody tr:last-child td { border-bottom: none; }
+        .dist-table tbody tr.gap-row { background: #fffbeb; }
+        .dist-table tbody tr.gap-row:hover { background: #fef3c7; }
+        .dist-table tbody tr:hover { background: var(--bg-primary); }
+        .cause-name { font-weight: 500; color: var(--text-primary); }
+        .num-cell { font-variant-numeric: tabular-nums; text-align: center; width: 90px; }
+        .num-zero { color: var(--text-muted); }
+        .gap-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; background: #fef3c7; color: #92400e; }
+        .ok-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; background: #d1fae5; color: #065f46; }
+        .judge-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .judge-tag { font-size: 11px; padding: 2px 7px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-secondary); cursor: pointer; }
+        .judge-tag:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+
+        /* 法官卡片 */
+        .judge-list { display: flex; gap: 10px; flex-wrap: wrap; }
+        .judge-card { padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-primary); cursor: pointer; transition: all 0.15s; min-width: 200px; }
+        .judge-card:hover { border-color: var(--accent-primary); }
+        .judge-card.active { border-color: var(--accent-primary); background: var(--accent-light); }
+        .judge-card .jc-name { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+        .judge-card.active .jc-name { color: var(--accent-primary); }
+        .judge-card .jc-name .jc-title { font-size: 11px; font-weight: 400; color: var(--text-muted); }
+        .judge-card .jc-meta { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+        .judge-card .jc-counts { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+        /* Tab */
+        .item-subtabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 0; }
+        .item-subtab { padding: 9px 18px; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-family: inherit; cursor: pointer; border-bottom: 2px solid transparent; display: inline-flex; align-items: center; gap: 6px; }
+        .item-subtab:hover { color: var(--accent-primary); }
+        .item-subtab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); font-weight: 500; }
+        .item-subtab .tab-count { font-size: 11px; background: var(--bg-primary); padding: 1px 6px; border-radius: 8px; color: var(--text-muted); }
+        .item-subtab.active .tab-count { background: #dbeafe; color: var(--accent-primary); }
+
+        /* 物料表格 */
+        .item-table { width: 100%; border-collapse: collapse; }
+        .item-table thead th { background: var(--bg-primary); padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+        .item-table tbody td { padding: 11px 14px; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6; }
+        .item-table tbody tr { cursor: pointer; }
+        .item-table tbody tr:hover { background: var(--bg-primary); }
+        .item-table tbody tr:last-child td { border-bottom: none; }
+        .item-name { font-weight: 500; color: var(--text-primary); }
+        .item-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .meta-cell { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .status-badge.on { background: #d1fae5; color: #065f46; }
+        .status-badge.off { background: #f3f4f6; color: #6b7280; }
+
+        /* 空态 */
+        .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 34px; color: #d1d5db; margin-bottom: 12px; display: block; }
+        .empty-state .es-title { font-size: 14px; color: var(--text-secondary); margin-bottom: 4px; }
+        .empty-state .es-sub { font-size: 12px; }
+
+        /* 抽屉 */
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); z-index: 200; display: none; }
+        .drawer-overlay.show { display: block; }
+        .drawer { position: fixed; top: 0; right: 0; width: 560px; max-width: 92vw; height: 100vh; background: var(--bg-secondary); z-index: 201; box-shadow: -4px 0 24px rgba(0,0,0,0.12); display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.22s ease; }
+        .drawer.show { transform: translateX(0); }
+        .drawer-header { padding: 18px 22px; border-bottom: 1px solid var(--border-color); display: flex; align-items: flex-start; gap: 12px; }
+        .drawer-title { flex: 1; min-width: 0; }
+        .drawer-title .dt-name { font-size: 16px; font-weight: 600; color: var(--text-primary); word-break: break-all; }
+        .drawer-title .dt-meta { font-size: 12px; color: var(--text-secondary); margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+        .drawer-close { width: 30px; height: 30px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .drawer-close:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .drawer-body { flex: 1; overflow-y: auto; padding: 18px 22px; }
+        .drawer-body .db-text { font-size: 13px; line-height: 1.9; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; }
+        .readonly-tip { display: flex; align-items: center; gap: 6px; padding: 9px 22px; background: #fffbeb; border-top: 1px solid #fde68a; font-size: 12px; color: #92400e; }
+
+        /* 分页 */
+        .pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--text-secondary); }
+        .pager-btn { padding: 4px 11px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--bg-secondary); color: var(--text-primary); font-size: 12px; cursor: pointer; font-family: inherit; }
+        .pager-btn:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .pager-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .pager-info { margin-right: auto; }
+
+        /* 涉及法官名单弹层 */
+        .judge-list-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 420px; max-width: 92vw; background: var(--bg-secondary);
+            border-radius: 12px; z-index: 201; box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+            display: none; flex-direction: column;
+        }
+        .judge-list-modal.show { display: flex; }
+        .jlm-header { padding: 16px 18px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; }
+        .jlm-title { flex: 1; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .jlm-body { padding: 14px 18px 18px; max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .jlm-item {
+            display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+            border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .jlm-item:hover { border-color: var(--accent-primary); background: var(--accent-light); }
+        .jlm-item .jlm-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        .jlm-item .jlm-dept { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+
+        /* 涉及法官数量（可点） */
+        .judge-count-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 12px; color: var(--accent-primary); cursor: pointer;
+            padding: 2px 8px; border-radius: 10px; background: var(--accent-light);
+        }
+        .judge-count-link:hover { text-decoration: underline; }
+        .judge-count-zero { font-size: 12px; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-gavel"></i></div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
+                    <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
+                    <a href="user-templates.html" class="nav-item active"><i class="fas fa-search"></i><span>用户模板检索</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+            <div class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+                    <span>用户模板检索</span>
+                </div>
+                <div class="user-menu">
+                    <div class="user-avatar">管</div>
+                    <div>
+                        <div class="user-name">系统管理员</div>
+                        <div class="user-role">管理员</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="page-header">
+                    <h1><i class="fas fa-search"></i> 用户模板检索</h1>
+                    <p>按法官检索其自建的文书模板、指令与要件（只读查看）；统计各案由官方模板覆盖情况，识别可收编的优秀模板</p>
+                </div>
+
+                <!-- 统计卡 -->
+                <div class="stat-grid" id="statGrid"></div>
+
+                <!-- 分布统计：模板/指令按文书类型，要件按案由 -->
+                <div class="panel" style="margin-top:16px;">
+                    <div class="panel-title">
+                        <i class="fas fa-chart-pie"></i> 分布统计
+                        <span class="hint">官方无标准内容、但法官已自建的，可择优收编</span>
+                    </div>
+                    <div class="item-subtabs" style="margin-bottom:12px;">
+                        <button class="item-subtab active" id="distTabDocType" onclick="AdminUserTemplates.switchDistTab('docType')"><i class="fas fa-file-alt"></i> 按文书类型（模板 / 指令）</button>
+                        <button class="item-subtab" id="distTabCause" onclick="AdminUserTemplates.switchDistTab('cause')"><i class="fas fa-puzzle-piece"></i> 按案由（要件）</button>
+                    </div>
+                    <div id="causeDistBox"></div>
+                </div>
+
+                <!-- 检索法官（搜索与结果合并） -->
+                <div class="panel">
+                    <div class="panel-title"><i class="fas fa-search"></i> 检索法官</div>
+                    <div class="search-row">
+                        <input type="text" class="search-input" id="judgeKeyword" placeholder="输入法官姓名或工号，如：王建国 / F001" onkeydown="if(event.key==='Enter')AdminUserTemplates.search()">
+                        <select class="search-select" id="deptFilter"><option value="all">全部部门</option></select>
+                        <button class="btn btn-primary" onclick="AdminUserTemplates.search()"><i class="fas fa-search"></i> 搜索</button>
+                        <button class="btn btn-ghost" onclick="AdminUserTemplates.reset()"><i class="fas fa-rotate-left"></i> 重置</button>
+                    </div>
+                    <div class="search-tip">为保护个人数据，本页不提供全员列表浏览；输入法官姓名或工号后查看其自建内容。</div>
+                    <div id="resultBox" style="margin-top:14px;"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 详情抽屉 -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="AdminUserTemplates.closeDrawer()"></div>
+    <div class="drawer" id="itemDrawer">
+        <div class="drawer-header">
+            <div class="drawer-title">
+                <div class="dt-name" id="drawerName">-</div>
+                <div class="dt-meta" id="drawerMeta"></div>
+            </div>
+            <button class="drawer-close" onclick="AdminUserTemplates.closeDrawer()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="drawer-body">
+            <div class="db-text" id="drawerContent"></div>
+        </div>
+        <div class="readonly-tip"><i class="fas fa-lock"></i> 只读查看。如需收编为官方模板，请复制内容后到「文书模板管理」新建。</div>
+    </div>
+
+    <!-- 涉及法官名单弹层 -->
+    <div class="drawer-overlay" id="judgeListOverlay" onclick="AdminUserTemplates.closeJudgeList()"></div>
+    <div class="judge-list-modal" id="judgeListModal">
+        <div class="jlm-header">
+            <div class="jlm-title" id="jlmTitle">涉及法官</div>
+            <button class="drawer-close" onclick="AdminUserTemplates.closeJudgeList()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="jlm-body" id="jlmBody"></div>
+    </div>
+
+    <script src="../../js/mock-user-templates.js"></script>
+    <script src="../../js/admin-user-templates.js"></script>
+</body>
+</html>

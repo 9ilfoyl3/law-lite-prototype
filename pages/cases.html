@@ -457,9 +457,22 @@
             flex-shrink: 0;
             transition: color 0.15s;
         }
-        /* v2.32: 首次解析待确认「新」标识（编辑保存后消失） */
+        /* v2.32 / V1.2.21 / V1.2.22: 列表页「新」标识——时间性（建案当天有效、跨自然日自动隐藏，蓝色） */
         .case-new-badge {
             flex-shrink: 0;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #1d4ed8;
+            background: #dbeafe;
+            border: 1px solid #bfdbfe;
+        }
+        /* V1.2.21 引入的「待确认」标识自 V1.2.22 起不再在列表页展示（状态提示收敛到详情页黄色提示条），
+           样式保留备用；如需恢复列表页状态标，在 cases.js 名称单元格重新挂载该 class 即可 */
+        .case-confirm-badge {
+            flex-shrink: 0;
+            margin-left: 4px;
             padding: 1px 7px;
             border-radius: 10px;
             font-size: 11px;

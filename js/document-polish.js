@@ -30,6 +30,8 @@ let aiRewriteLoading = false;          // 是否正在生成
 // 结构化审查消息状态
 // 结构：{ [msgId]: { reviews: [...], snapshotBeforeApply: 'html'|null, appliedReviewIds: [] } }
 let reviewMessages = {};
+// 清单第28项：精修溯源——本轮问答所用材料（refineContext 入口的材料 id；versionId 入口直接取 version.config）
+let polishContextMaterialIds = [];
 
 // ===== 法条链接 Ctrl+点击查看：常量（须在 initPolishPage 调用前声明，避免 TDZ） =====
 // 内部法规库跳转地址（占位，产品化时替换为实际内部法规库 URL）
@@ -95,6 +97,8 @@ function loadFromContext(ctx) {
     originalContent = ctx.docContent || '';
     currentContent = originalContent;
     polishCaseItem = ctx.caseId ? findCaseById(ctx.caseId)?.caseItem : null;
+    // 清单第28项：记录精修上下文材料，供每轮回答末尾溯源展示
+    polishContextMaterialIds = Array.isArray(ctx.materialIds) ? ctx.materialIds : [];
 
     document.getElementById('polishDocTitle').textContent = ctx.docTitle || '法律文书';
     document.getElementById('polishCaseName').textContent = ctx.caseName || '';
@@ -299,6 +303,32 @@ function getMaterialNamesByIds(ids) {
         const item = materials.find(m => m && (m.id === id || m.fileId === id));
         return item ? (item.name || item.fileName || `材料${id}`) : `材料${id}`;
     }).filter(Boolean);
+}
+
+// 清单第28项：本轮参考材料名列表——优先取当前文书版本的生成材料，其次 refineContext 传入的材料
+function getSourceMaterialNames() {
+    if (!polishCaseItem) return [];
+    const cfgIds = polishVersion?.config?.materialIds;
+    const ids = (Array.isArray(cfgIds) && cfgIds.length) ? cfgIds : polishContextMaterialIds;
+    return getMaterialNamesByIds(ids);
+}
+
+// 清单第28项：在修改建议卡片下方追加「本轮参考材料」列表（精修结果溯源，分步落地：先附材料总列表，逐句溯源后置）
+function appendReviewSources(msgId) {
+    const listEl = document.getElementById(`reviewList-${msgId}`);
+    if (!listEl || listEl.querySelector('.review-sources')) return;
+    const names = getSourceMaterialNames();
+    const div = document.createElement('div');
+    div.className = 'review-sources';
+    div.innerHTML = `
+        <div class="review-sources-title"><i class="fas fa-file-lines"></i> 本轮参考材料（${names.length} 份）</div>
+        ${names.length
+            ? '<div class="review-sources-list">' + names.map(n => `<span class="review-source-chip" title="${escapeHtml(n)}">${escapeHtml(n)}</span>`).join('') + '</div>'
+            : '<div class="review-sources-empty">本轮回答未引用案件材料</div>'}
+    `;
+    listEl.appendChild(div);
+    const container = document.getElementById('chatMessages');
+    if (container) container.scrollTop = container.scrollHeight;
 }
 
 function showError(msg) {
@@ -820,12 +850,18 @@ function streamReviewCards(msgId, reviews) {
         empty.className = 'review-empty';
         empty.textContent = '未识别到需要修改的内容，请尝试更具体的指令';
         listEl.appendChild(empty);
+        // 清单第28项：无建议时同样附本轮参考材料（溯源口径一致）
+        appendReviewSources(msgId);
         return;
     }
 
     let cardIndex = 0;
     const showNextCard = () => {
-        if (cardIndex >= reviews.length) return;
+        if (cardIndex >= reviews.length) {
+            // 清单第28项：全部建议卡片（含确认/忽略操作行）展示完后，追加「本轮参考材料」列表
+            appendReviewSources(msgId);
+            return;
+        }
         const review = reviews[cardIndex];
         const card = document.createElement('div');
         card.className = 'review-card';

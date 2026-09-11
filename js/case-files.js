@@ -39,6 +39,9 @@ let resultDocEditor = null;                 // 右栏文档编辑器实例
 // 清单第5项：文书排版——docFormatted 是否已套用全量格式；docFormatState: idle/formatting/done
 let docFormatted = false;
 let docFormatState = 'idle';
+// 对齐实际系统：生成结果信息条（文书名称 / 将保存的版本号）
+let resultDocTitle = '';
+let resultDocVersionNo = 1;
 let pendingUploadFiles = [];
 let pendingElementConfirmCallback = null;   // 要素确认回调（V1.2：指向抽屉生成模式的确认回调）
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
@@ -468,9 +471,12 @@ function renderCaseInfoParseAlert() {
         alertEl.innerHTML = `
             <div class="parse-alert-text">
                 <i class="fas fa-exclamation-triangle"></i>
-                <span>案件信息已提取，请确认是否准确；如识别有误，可点击"去修改"调整</span>
+                <span>案件信息已提取，请确认是否准确；识别无误可直接确认，有误则点击"去修改"调整</span>
             </div>
-            <button class="parse-alert-action" onclick="gotoEditCaseInfo()">去修改</button>`;
+            <div class="parse-alert-actions">
+                <button class="parse-alert-action ghost" onclick="confirmCaseInfoNoError()">信息无误</button>
+                <button class="parse-alert-action" onclick="gotoEditCaseInfo()">去修改</button>
+            </div>`;
         alertEl.style.display = 'flex';
         return;
     }
@@ -493,6 +499,19 @@ function gotoEditCaseInfo() {
             }
         }
     });
+}
+
+// V1.2.21: 提示条【信息无误】——轻量确认路径（识别正确时无需进编辑弹框即可完成确认）
+// 与【编辑→保存】等效：置 firstParsePending=false、清除 parseResult、隐藏提示条；
+// 列表页「待确认」标识随下次列表渲染同步消失（「新」标识由建案日期独立控制，不受影响）
+function confirmCaseInfoNoError() {
+    if (!caseItem || !caseItem.firstParsePending) return;
+    caseItem.firstParsePending = false;
+    delete caseItem.parseResult;
+    caseItem.updatedAt = new Date().toISOString().split('T')[0];
+    saveBusinessSystems();
+    renderCaseInfoParseAlert();
+    showNotification('案件信息已确认', 'success');
 }
 
 // v2.23 (任务 9.1): 应用 sessionStorage 中的生成配置
@@ -960,8 +979,11 @@ function switchToStepView(options = {}) {
     stepsConfig.forEach(s => {
         stepData[s.id] = { items: [], materials: new Set() };
     });
-    document.getElementById('panel-main').classList.remove('active');
+    // V1.2.23: 统一清空三个视图的 active（覆盖新的 AI问答视图），并退出 chat-mode
+    document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-steps').classList.add('active');
+    const genContentEl = document.querySelector('.gen-content');
+    if (genContentEl) genContentEl.classList.remove('chat-mode');
     currentGenMethod = 'steps';
 
     // 更新顶部 Tab 激活状态
@@ -1021,8 +1043,11 @@ function backToMainView() {
         }
     }
     syncMaterialConfigFromStep();
-    document.getElementById('panel-steps').classList.remove('active');
+    // V1.2.23: 统一清空三个视图的 active（覆盖新的 AI问答视图），并退出 chat-mode
+    document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-main').classList.add('active');
+    const genContentEl = document.querySelector('.gen-content');
+    if (genContentEl) genContentEl.classList.remove('chat-mode');
     currentGenMethod = 'material';
 
     // 更新顶部 Tab 激活状态
@@ -1218,7 +1243,10 @@ function updateStepsTabVisibility() {
 
 function switchGenMethod(method) {
     if (method === currentGenMethod) return;
-    if (method === 'steps') {
+    // V1.2.23: 新增第三个视图 'chat'（AI问答）
+    if (method === 'chat') {
+        switchToChatView();
+    } else if (method === 'steps') {
         switchToStepView({ auto: false });
     } else {
         backToMainView();
@@ -1601,7 +1629,6 @@ function autoGenerateWithAllElements() {
         ];
         const elementAnswers = all.map(p => ({
             name: p.name,
-            desc: p.desc,
             question: p.question,
             answer: (caseElementsAnswers[p.name] || '').trim() || generateMockElementAnswer(p, caseItem)
         }));
@@ -3440,14 +3467,35 @@ function exitDrawerGenerateMode() {
     if (bar) bar.classList.add('hidden');
 }
 
-// 更新确认生成按钮：N = 已勾选且有答案的要件数；一键生成批量运行期间禁用
+// V1.2.20: 确认生成按钮可用性 = N>0 且 非批量生成中（单点判定）；N=0 时按钮置灰并联动引导提示去点「一键生成」
+// 文案策略：有勾选但都未答 → 引导去一键生成；未勾选任何 → 引导去勾选/一键生成
 function updateDrawerGenerateBtn() {
     const btn = document.getElementById('drawerGenerateBtn');
     if (!btn) return;
+    const all = getAllCaseElementsFlat();
     const n = collectDrawerElementAnswers().length;
+    const checkedCount = all.reduce((acc, p) => acc + (caseElementsSelection.has(p.name) ? 1 : 0), 0);
+    const disabled = aiBatchGenerating || n === 0;
     btn.innerHTML = `<i class="fas fa-file-signature"></i> 确认生成（引入 ${n} 条要件）`;
-    btn.disabled = aiBatchGenerating;
-    btn.title = aiBatchGenerating ? '答案生成中，请稍候' : '';
+    btn.disabled = disabled;
+    if (aiBatchGenerating) {
+        btn.title = '答案生成中，请稍候';
+    } else if (n === 0) {
+        btn.title = checkedCount > 0 ? '请先点击一键生成生成答案' : '请先勾选要引入的要件，或点击一键生成';
+    } else {
+        btn.title = '';
+    }
+    // 联动引导提示：仅生成模式且 N=0 时显示，区分文案
+    const hint = document.getElementById('drawerGenerateHint');
+    if (hint) {
+        const showHint = (n === 0) && !aiBatchGenerating;
+        hint.classList.toggle('hidden', !showHint);
+        if (showHint) {
+            hint.innerHTML = checkedCount > 0
+                ? `<i class="fas fa-magic"></i> 已勾选 <strong>${checkedCount}</strong> 项，请点击右下角「<strong>一键生成</strong>」批量生成答案（也可单条点击「生成答案」）`
+                : `<i class="fas fa-hand-pointer"></i> 请勾选要引入的要件，或点击右下角「<strong>一键生成</strong>」生成答案`;
+        }
+    }
 }
 
 // 抽屉底部【确认生成】校验与触发
@@ -4146,6 +4194,9 @@ function startStreamingOutput(fullContent, title) {
 
     // v2.31: 流式开始即切换到结果视图，让结果栏可见
     setLayoutState('generated');
+    // 对齐实际系统：生成开始即展示文书信息条
+    resultDocTitle = title || '法律文书';
+    updateResultDocInfo();
 
     // 流式输出期间禁用【文书精修】【重新配置】按钮
     setResultActionButtonsDisabled(true);
@@ -4280,6 +4331,13 @@ function setResultActionButtonsDisabled(disabled) {
         reconfigBtn.style.cursor = disabled ? 'not-allowed' : '';
         reconfigBtn.title = disabled ? '生成中，请稍候' : '重新配置生成参数（默认回填最近一次历史文书快照）';
     }
+    // 对齐实际系统：同步顶部【保存】按钮状态
+    const saveTopBtn = document.getElementById('resultSaveBtnTop');
+    if (saveTopBtn) {
+        saveTopBtn.disabled = disabled;
+        saveTopBtn.style.opacity = disabled ? '0.5' : '';
+        saveTopBtn.style.cursor = disabled ? 'not-allowed' : '';
+    }
     // 清单第5项：生成期间同步禁用「文书排版」按钮
     const formatBtn = document.getElementById('caseDocFormatBtn');
     if (formatBtn) {
@@ -4349,6 +4407,10 @@ function showResult(html, title) {
     // 清单第5项：新生成的文书回到「未排版」态，全量格式（案号/签章/落款）需用户手动触发
     docFormatted = false;
     docFormatState = 'idle';
+    // 对齐实际系统：更新文书信息条（案件名_文书名 · 第 N 版 · 时间）
+    resultDocTitle = title || '法律文书';
+    resultDocVersionNo = (caseItem ? getAllDocumentVersions(caseItem.id).length : 0) + 1;
+    updateResultDocInfo();
 
     const body = document.getElementById('resultBody');
     body.innerHTML = '';
@@ -4531,14 +4593,30 @@ function updateDocFormatBtnState() {
     }
 }
 
+// 对齐实际系统（2026-09-10）：更新生成结果信息条——文书名称 + 第 N 版 · 系统管理员 · 时间
+function updateResultDocInfo() {
+    const titleEl = document.getElementById('resultDocInfoTitle');
+    if (!titleEl) return;
+    const caseName = (caseItem && caseItem.caseName) ? caseItem.caseName + '_' : '';
+    titleEl.textContent = caseName + (resultDocTitle || '法律文书');
+    const noEl = document.getElementById('resultDocVersionNo');
+    if (noEl) noEl.textContent = resultDocVersionNo;
+    const subEl = document.getElementById('resultDocInfoSub');
+    if (subEl) {
+        const n = new Date();
+        const p = (x) => (x < 10 ? '0' + x : '' + x);
+        subEl.textContent = '第 ' + resultDocVersionNo + ' 版 · 系统管理员 · ' +
+            n.getFullYear() + '-' + p(n.getMonth() + 1) + '-' + p(n.getDate()) + ' ' +
+            p(n.getHours()) + ':' + p(n.getMinutes());
+    }
+}
+
 function switchResultTab(tab) {
     // v2.30: 编辑器模式替代预览/源码 tab 切换，保留函数避免旧调用报错
     console.log('[case-files] switchResultTab 已废弃，当前使用文档编辑器');
 }
 
-function toggleResultCol() {
-    document.getElementById('resultCol').classList.toggle('collapsed');
-}
+// V1.2.16: 移除 toggleResultCol——结果栏「折叠/展开」按钮为历史遗留，折叠后无展开入口，已随按钮一并删除
 
 function saveResult() {
     if (guardReadOnly('saveResult')) return;
@@ -4565,6 +4643,7 @@ function saveResult() {
         if (ok) {
             showNotification('文书内容已更新', 'success');
             updateHistoryDocsBtnState();
+            updateResultDocInfo();
         } else {
             showNotification('保存失败，请重试', 'error');
         }
@@ -4610,6 +4689,7 @@ function saveResult() {
         showNotification('文书已保存到历史文书', 'success');
         // v1.37: 刷新历史文书按钮状态（任务 4.3）
         updateHistoryDocsBtnState();
+        updateResultDocInfo();
     } else {
         showNotification('保存失败，请重试', 'error');
     }
@@ -5227,7 +5307,7 @@ function collectExistingElementAnswers() {
     all.forEach(p => {
         const ans = (caseElementsAnswers[p.name] || '').trim();
         if (ans) {
-            result.push({ name: p.name, desc: p.desc, question: p.question, answer: ans });
+            result.push({ name: p.name, question: p.question, answer: ans });
         }
     });
     return result;
@@ -5462,7 +5542,7 @@ function buildElementItemBodyHtml(p, source) {
             <span class="source-tag ${source}">${sourceLabel(source)}</span>
             ${delBtn}
         </div>
-        <div class="case-elements-item-question">${escapeHtmlForElements(p.question || p.desc || '')}</div>
+        <div class="case-elements-item-question">${escapeHtmlForElements(p.question || '')}</div>
         ${answerHtml}
     `;
 }
@@ -5681,7 +5761,7 @@ function openElementQaModal(source, idx) {
     currentQaElement = { ...p, source, idx };
     document.getElementById('elementQaTitle').textContent = p.name;
     document.getElementById('elementQaSourceRow').innerHTML = `<span class="source-tag ${source}">${sourceLabel(source)}要件</span>`;
-    document.getElementById('elementQaQuestion').textContent = p.question || p.desc || '（无问题描述）';
+    document.getElementById('elementQaQuestion').textContent = p.question || '（无问题描述）';
     document.getElementById('elementQaAnswer').value = caseElementsAnswers[p.name] || '';
     document.getElementById('elementQaOverlay').classList.add('show');
     document.getElementById('elementQaModal').classList.add('show');
@@ -5722,7 +5802,6 @@ function toggleCaseElementAddForm(show) {
     if (show) {
         form.classList.add('show');
         document.getElementById('newCaseElementName').value = '';
-        document.getElementById('newCaseElementDesc').value = '';
         document.getElementById('newCaseElementQuestion').value = '';
         setTimeout(() => {
             const i = document.getElementById('newCaseElementName');
@@ -5736,7 +5815,6 @@ function toggleCaseElementAddForm(show) {
 function addCaseElementConfirm() {
     if (!caseItem) return;
     const name = (document.getElementById('newCaseElementName').value || '').trim();
-    const desc = (document.getElementById('newCaseElementDesc').value || '').trim();
     const question = (document.getElementById('newCaseElementQuestion').value || '').trim();
     if (!name) { showNotification('请填写要件名称', 'warning'); return; }
     if (!question) { showNotification('请填写要件问题', 'warning'); return; }
@@ -5747,7 +5825,7 @@ function addCaseElementConfirm() {
         showNotification('已存在同名个案要件，请使用其他名称', 'warning');
         return;
     }
-    arr.push({ name, desc, question, enabled: true, createdAt: Date.now() });
+    arr.push({ name, question, enabled: true, createdAt: Date.now() });
     setCaseCustomElements(caseItem.id, arr);
     toggleCaseElementAddForm(false);
     loadCaseElementsAll();
@@ -6007,7 +6085,6 @@ function collectDrawerElementAnswers() {
             if (answer) {
                 result.push({
                     name: p.name,
-                    desc: p.desc || '',
                     question: p.question || '',
                     answer: answer,
                     source: p.source
@@ -6016,4 +6093,305 @@ function collectDrawerElementAnswers() {
         }
     });
     return result;
+}
+
+// =====================================================================================
+// V1.2.23: AI问答（中间栏第三个视图）
+// 定位：案件详情页内、基于本案材料的知识检索问答。与「一步生成」「分步生成」同级并列；
+//       不要求先生成文书；与「文书精修」链路完全独立（并存，互不影响）。
+// 数据：对话仅存内存（aiChatMessages），刷新页面重置；切换案件自动清空。
+// =====================================================================================
+
+let aiChatMessages = [];                                          // [{ role:'user'|'ai', content, toolNodes?, sources? }]
+let aiChatScope = { caseMaterials: true, knowledgeBase: false };  // 检索范围
+let aiChatGenerating = false;                                     // 回答生成中（防并发提问）
+let aiChatTimer = null;                                           // mock 生成计时器
+let aiChatCaseId = null;                                          // 用于检测案件切换后重置对话
+
+// 推荐问题（演示用）
+const AIQ_SUGGESTIONS = [
+    '本案的争议焦点是什么',
+    '原被告双方的主要证据有哪些',
+    '本案适用的法律条文是什么'
+];
+
+// mock 回答模板：按问题关键词匹配
+const AIQ_ANSWER_TEMPLATES = [
+    {
+        keys: ['争议焦点', '焦点'],
+        toolName: '事实检索',
+        toolDetail: '按当事人诉辩主张与已查明事实比对，定位分歧点',
+        text: '根据本案材料，争议焦点主要集中为以下几点：\n\n1. 双方之间法律关系的性质及效力认定；\n2. 责任承担方式与责任比例的划分；\n3. 损失范围与具体金额的确定依据。\n\n建议结合庭审调查中双方对上述焦点的举证情况，进一步固定无争议事实。'
+    },
+    {
+        keys: ['证据', '举证', '材料'],
+        toolName: '材料检索',
+        toolDetail: '检索本案已解析材料，提取与证据相关的段落',
+        text: '已检索本案材料，双方提交的主要证据如下：\n\n【原告方】起诉状、证据清单、书证与支付凭证等；\n【被告方】答辩状、质证意见及相关反驳证据。\n\n从材料看，双方对基础事实的陈述基本一致，分歧主要在于责任划分与损失计算口径。'
+    },
+    {
+        keys: ['法条', '法律', '依据', '适用'],
+        toolName: '事实检索',
+        toolDetail: '按案由匹配可能适用的实体法与程序法条款',
+        text: '结合本案案由，可能适用的法律依据包括：\n\n1. 《中华人民共和国民法典》相关合同 / 侵权条款；\n2. 《中华人民共和国民事诉讼法》关于举证责任的规定。\n\n具体条款的最终适用，建议再结合当事人诉请与查明事实校对确认。'
+    }
+];
+
+// 兜底回答
+const AIQ_ANSWER_FALLBACK = {
+    toolName: '材料检索',
+    toolDetail: '检索本案材料并生成回答',
+    text: '已检索本案材料并生成回答。\n\n当前为原型演示内容，接入真实检索能力后，此处将展示基于本案材料的具体分析与结论。'
+};
+
+// ---- 视图切换 ----
+function switchToChatView() {
+    // 切换案件时重置对话（避免把上个案件的问答带到当前案件）
+    const cid = (typeof caseItem !== 'undefined' && caseItem) ? caseItem.id : null;
+    if (aiChatCaseId !== cid) {
+        aiChatCaseId = cid;
+        aiChatMessages = [];
+        aiChatGenerating = false;
+        if (aiChatTimer) { clearTimeout(aiChatTimer); aiChatTimer = null; }
+    }
+    document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('panel-chat');
+    if (panel) panel.classList.add('active');
+    const genContent = document.querySelector('.gen-content');
+    if (genContent) genContent.classList.add('chat-mode');
+    currentGenMethod = 'chat';
+    // Tab 激活态
+    document.querySelectorAll('.gen-tab').forEach(t => t.classList.toggle('active', t.dataset.method === 'chat'));
+    // 隐藏自动切换提示条（与分步视图保持一致）
+    const autoAlert = document.getElementById('autoSwitchAlert');
+    if (autoAlert) autoAlert.classList.remove('show');
+    renderAiChat();
+}
+
+// ---- 检索范围 ----
+function getAiChatScopeText() {
+    const parts = [];
+    if (aiChatScope.caseMaterials) parts.push('本案材料');
+    if (aiChatScope.knowledgeBase) parts.push('通用知识库');
+    return parts.length ? parts.join(' + ') + '已参与检索' : '未选择检索范围';
+}
+
+// ---- 本案材料 ----
+function getAiChatMaterialFiles() {
+    if (typeof caseItem === 'undefined' || !caseItem || !Array.isArray(caseItem.files)) return [];
+    return caseItem.files;
+}
+function getAiChatParsedMaterialNames() {
+    return getAiChatMaterialFiles()
+        .filter(f => f && f.parseStatus === 'success')
+        .map(f => f.name)
+        .filter(Boolean);
+}
+function canAiChatAsk() {
+    return getAiChatMaterialFiles().length > 0;
+}
+function isAiChatParsing() {
+    return getAiChatMaterialFiles().some(f => f && f.parseStatus === 'parsing');
+}
+
+// ---- 渲染 ----
+function renderAiChat() {
+    const body = document.getElementById('aiqBody');
+    if (!body) return;
+    const topbar = document.getElementById('aiqTopbar');
+    const scopeEl = document.getElementById('aiqTopbarScope');
+    const hasChat = aiChatMessages.length > 0;
+    if (topbar) topbar.style.display = hasChat ? 'flex' : 'none';
+    if (scopeEl) scopeEl.innerHTML = '<i class="fas fa-paperclip"></i> ' + escapeHtmlForElements(getAiChatScopeText());
+
+    if (!hasChat) {
+        body.innerHTML = buildAiChatEmptyHtml();
+    } else {
+        body.innerHTML = aiChatMessages.map(buildAiChatMessageHtml).join('');
+        body.scrollTop = body.scrollHeight;
+    }
+    updateAiChatSendBtn();
+    syncAiChatScopeChips();
+}
+
+function buildAiChatEmptyHtml() {
+    if (!canAiChatAsk()) {
+        // 边界 1：案件无材料 → 提示 + 输入区置灰
+        return `
+            <div class="aiq-empty">
+                <div class="aiq-empty-icon"><i class="fas fa-comments"></i></div>
+                <div class="aiq-empty-title">和 AI 一起阅卷</div>
+                <div class="aiq-empty-desc">本案暂无可检索材料，请先在左侧材料树中上传材料</div>
+            </div>`;
+    }
+    // 边界 2：材料解析中 → 允许先提问（不置灰）
+    const parsingTip = isAiChatParsing()
+        ? '<div class="aiq-empty-desc" style="color:#b45309;">材料解析中，稍后可检索；也可以先提问</div>'
+        : '';
+    return `
+        <div class="aiq-empty">
+            <div class="aiq-empty-icon"><i class="fas fa-comments"></i></div>
+            <div class="aiq-empty-title">和 AI 一起阅卷</div>
+            <div class="aiq-empty-desc">提出疑问，AI 检索本案材料，回答您。</div>
+            ${parsingTip}
+            <div class="aiq-scope-hint"><i class="fas fa-paperclip"></i> ${escapeHtmlForElements(getAiChatScopeText())}</div>
+            <div class="aiq-suggest-title"><i class="fas fa-lightbulb"></i> 试试这样问</div>
+            <div class="aiq-suggest-list">
+                ${AIQ_SUGGESTIONS.map(q => `
+                    <button type="button" class="aiq-suggest-item" onclick="askAiChat('${escapeJsString(q)}')">
+                        <span>${escapeHtmlForElements(q)}</span>
+                        <i class="fas fa-arrow-up-right-from-square"></i>
+                    </button>`).join('')}
+            </div>
+        </div>`;
+}
+
+function buildAiChatMessageHtml(msg) {
+    if (msg.role === 'user') {
+        return `<div class="aiq-msg user"><div class="aiq-msg-bubble">${escapeHtmlForElements(msg.content)}</div></div>`;
+    }
+    const toolsHtml = (msg.toolNodes || []).map(t => {
+        const done = t.state === 'done';
+        return `
+        <div class="aiq-tool-node${done ? ' done collapsed' : ''}">
+            <div class="aiq-tool-head" onclick="this.parentNode.classList.toggle('collapsed')">
+                <i class="fas ${done ? 'fa-circle-check' : 'fa-spinner aiq-spin'}"></i>
+                <span>${escapeHtmlForElements(t.name)}</span>
+                <span class="aiq-tool-state">${done ? escapeHtmlForElements(t.summary || '完成') : '检索中…'}</span>
+            </div>
+            <div class="aiq-tool-body">${escapeHtmlForElements(t.detail || '')}</div>
+        </div>`;
+    }).join('');
+    const sourcesHtml = (msg.sources && msg.sources.length)
+        ? `<div class="aiq-sources">${msg.sources.map(s => `<span class="aiq-source-chip"><i class="fas fa-file-alt"></i> ${escapeHtmlForElements(s)}</span>`).join('')}</div>`
+        : '';
+    const textHtml = msg.content
+        ? `<div class="aiq-msg-bubble">${escapeHtmlForElements(msg.content)}</div>`
+        : '<div class="aiq-msg-bubble" style="color:var(--text-muted);">正在整理回答…</div>';
+    return `
+        <div class="aiq-msg ai">
+            ${toolsHtml}
+            ${textHtml}
+            ${sourcesHtml}
+        </div>`;
+}
+
+// ---- 输入区 ----
+function onAiChatInputKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAiChatMessage();
+    }
+}
+function onAiChatInputInput() {
+    const ta = document.getElementById('aiqInput');
+    if (ta) {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    }
+    updateAiChatSendBtn();
+}
+function updateAiChatSendBtn() {
+    const ta = document.getElementById('aiqInput');
+    const btn = document.getElementById('aiqSendBtn');
+    if (!btn) return;
+    const hasText = !!(ta && ta.value.trim());
+    btn.disabled = !hasText || aiChatGenerating || !canAiChatAsk();
+}
+function syncAiChatScopeChips() {
+    const c1 = document.getElementById('aiqScopeCase');
+    const c2 = document.getElementById('aiqScopeKb');
+    if (c1) c1.classList.toggle('active', !!aiChatScope.caseMaterials);
+    if (c2) c2.classList.toggle('active', !!aiChatScope.knowledgeBase);
+}
+function toggleAiChatScope(which) {
+    if (which === 'case') {
+        // 本案材料为定位所需，不可取消
+        if (aiChatScope.caseMaterials) return;
+        aiChatScope.caseMaterials = true;
+    } else if (which === 'kb') {
+        aiChatScope.knowledgeBase = !aiChatScope.knowledgeBase;
+    }
+    syncAiChatScopeChips();
+    const scopeEl = document.getElementById('aiqTopbarScope');
+    if (scopeEl) scopeEl.innerHTML = '<i class="fas fa-paperclip"></i> ' + escapeHtmlForElements(getAiChatScopeText());
+    if (aiChatMessages.length === 0) renderAiChat();
+}
+
+// ---- 提问与 mock 回答 ----
+function sendAiChatMessage() {
+    const ta = document.getElementById('aiqInput');
+    if (!ta) return;
+    const text = ta.value.trim();
+    if (!text) return;
+    if (aiChatGenerating) {
+        showNotification('AI 正在回答，请稍候', 'warning');
+        return;
+    }
+    if (!canAiChatAsk()) {
+        showNotification('本案暂无可检索材料，请先上传材料', 'warning');
+        return;
+    }
+    askAiChat(text);
+}
+
+function askAiChat(question) {
+    if (aiChatGenerating) return;
+    if (!canAiChatAsk()) {
+        showNotification('本案暂无可检索材料，请先上传材料', 'warning');
+        return;
+    }
+    const ta = document.getElementById('aiqInput');
+    if (ta) { ta.value = ''; ta.style.height = 'auto'; }
+
+    aiChatMessages.push({ role: 'user', content: question });
+
+    // AI 占位消息：先挂"检索中"节点
+    const tpl = matchAiChatTemplate(question);
+    const aiMsg = {
+        role: 'ai',
+        content: '',
+        toolNodes: [{ name: tpl.toolName, detail: tpl.toolDetail, state: 'running' }],
+        sources: []
+    };
+    aiChatMessages.push(aiMsg);
+    aiChatGenerating = true;
+    renderAiChat();
+
+    // mock：700ms 检索完成 → 再 700ms 输出回答
+    aiChatTimer = setTimeout(() => {
+        aiMsg.toolNodes[0].state = 'done';
+        aiMsg.toolNodes[0].summary = '已检索 ' + Math.max(1, getAiChatParsedMaterialNames().length) + ' 份材料';
+        aiMsg.sources = pickAiChatSources();
+        renderAiChat();
+        aiChatTimer = setTimeout(() => {
+            aiMsg.content = tpl.text;
+            aiChatGenerating = false;
+            aiChatTimer = null;
+            renderAiChat();
+        }, 700);
+    }, 700);
+}
+
+function matchAiChatTemplate(question) {
+    const q = String(question || '');
+    for (let i = 0; i < AIQ_ANSWER_TEMPLATES.length; i++) {
+        const t = AIQ_ANSWER_TEMPLATES[i];
+        if (t.keys.some(k => q.indexOf(k) !== -1)) return t;
+    }
+    return AIQ_ANSWER_FALLBACK;
+}
+
+function pickAiChatSources() {
+    const names = getAiChatParsedMaterialNames();
+    return names.slice(0, 3);
+}
+
+function clearAiChat() {
+    if (aiChatMessages.length === 0) return;
+    if (!confirm('确定清空当前对话吗？')) return;
+    aiChatMessages = [];
+    aiChatGenerating = false;
+    if (aiChatTimer) { clearTimeout(aiChatTimer); aiChatTimer = null; }
+    renderAiChat();
 }

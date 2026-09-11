@@ -102,6 +102,20 @@
         .case-info-parse-alert .parse-alert-action:hover {
             background: #fef3c7;
         }
+        /* V1.2.21: 提示条双按钮（【信息无误】轻量确认 + 【去修改】） */
+        .case-info-parse-alert .parse-alert-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .case-info-parse-alert .parse-alert-action.ghost {
+            border-color: #e5e7eb;
+            color: #6b7280;
+        }
+        .case-info-parse-alert .parse-alert-action.ghost:hover {
+            background: #f3f4f6;
+        }
         .detail-meta-tag {
             display: inline-flex;
             align-items: center;
@@ -751,6 +765,301 @@
         }
         .gen-panel { display: none; }
         .gen-panel.active { display: block; }
+
+        /* ===== V1.2.23: AI问答（中间栏第三个视图，基于本案材料的知识检索问答） ===== */
+        /* chat-mode：去掉 gen-content 默认 padding、改纵向 flex、关掉外层滚动 → 对话区内部滚动 + 输入区固定底部 */
+        .gen-content.chat-mode {
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #panel-chat.active {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        .aiq-wrap {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        /* 顶部范围条 */
+        .aiq-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            flex-shrink: 0;
+        }
+        .aiq-topbar-scope {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .aiq-clear-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .aiq-clear-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        /* 对话区 */
+        .aiq-body {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            padding: 24px 20px;
+        }
+        /* ---- 空态 ---- */
+        .aiq-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+            text-align: center;
+            padding: 20px 0;
+        }
+        .aiq-empty-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+        .aiq-empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .aiq-empty-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .aiq-scope-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: var(--accent-light);
+            color: var(--accent-primary);
+            font-size: 12px;
+            margin-bottom: 28px;
+        }
+        .aiq-suggest-title {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+        .aiq-suggest-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .aiq-suggest-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--text-primary);
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .aiq-suggest-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+        .aiq-suggest-item i { color: var(--text-muted); font-size: 12px; flex-shrink: 0; }
+        /* ---- 对话流 ---- */
+        .aiq-msg { margin-bottom: 20px; }
+        .aiq-msg.user { display: flex; justify-content: flex-end; }
+        .aiq-msg-bubble {
+            max-width: 82%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .aiq-msg.user .aiq-msg-bubble {
+            background: var(--accent-primary);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .aiq-msg.ai .aiq-msg-bubble {
+            max-width: 100%;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 4px;
+        }
+        /* 工具调用节点 */
+        .aiq-tool-node {
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+        .aiq-tool-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+        .aiq-tool-head .aiq-tool-state { margin-left: auto; color: var(--text-muted); }
+        .aiq-tool-node.done .aiq-tool-state { color: #16a34a; }
+        .aiq-tool-body {
+            padding: 8px 12px 10px;
+            border-top: 1px dashed var(--border-color);
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+        .aiq-tool-node.collapsed .aiq-tool-body { display: none; }
+        .aiq-spin { display: inline-block; animation: aiq-rotate 1s linear infinite; }
+        @keyframes aiq-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        /* 引用来源 */
+        .aiq-sources {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .aiq-source-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 6px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        /* ---- 输入区 ---- */
+        .aiq-input-area {
+            flex-shrink: 0;
+            padding: 12px 20px 16px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+        .aiq-input-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .aiq-scope-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .aiq-scope-chip:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .aiq-scope-chip.active {
+            background: var(--accent-light);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            font-weight: 500;
+        }
+        .aiq-input-box {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            padding: 8px 8px 8px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            transition: border-color 0.15s;
+        }
+        .aiq-input-box:focus-within { border-color: var(--accent-primary); }
+        .aiq-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            resize: none;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            max-height: 120px;
+            padding: 4px 0;
+        }
+        .aiq-input::placeholder { color: var(--text-muted); }
+        .aiq-send-btn {
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+        .aiq-send-btn:hover:not(:disabled) { background: #1d4ed8; }
+        .aiq-send-btn:disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
 
         /* Method 1: Material Generation */
         .mat-gen-form { width: 100%; }
@@ -1445,6 +1754,7 @@
         .detail-body.generated .result-col {
             flex: 1 1 0%;
         }
+        /* V1.2.16: 结果栏「折叠/展开」入口已移除（历史遗留，折叠后无展开按钮可点），样式保留备用 */
         .result-col.collapsed {
             flex: 0 0 0% !important;
         }
@@ -1524,6 +1834,64 @@
             background: #1d4ed8;
             border-color: #1d4ed8;
         }
+
+        /* ===== 对齐实际系统（2026-09-10）：生成后文书信息条 =====
+           名称（案件名_文书名）+ 第 N 版 · 系统管理员 · 时间；配置态隐藏 */
+        .detail-body.generated .result-header-left > span { display: none; }
+        .result-doc-info { display: none; flex-direction: column; min-width: 0; line-height: 1.35; }
+        .detail-body.generated .result-doc-info { display: flex; }
+        .result-doc-info-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            max-width: 420px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .result-doc-info-sub { font-size: 11px; font-weight: 400; color: var(--text-muted); }
+        /* 版本徽章（仅展示当前版本号） */
+        .result-doc-version {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: default;
+        }
+        .detail-body.generated .result-doc-version { display: inline-flex; }
+        /* 保存 / 文书排版按钮（生成后与精修、重新配置并列） */
+        .result-save-btn, .result-format-btn {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .result-save-btn:hover:not(:disabled),
+        .result-format-btn:hover:not(:disabled) {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .detail-body.generated .result-save-btn,
+        .detail-body.generated .result-format-btn { display: inline-flex; }
+        /* 折叠态隐藏文书信息条与按钮组 */
+        .result-col.collapsed .result-doc-info,
+        .result-col.collapsed .result-header-right { display: none; }
 
         .result-tabs {
             display: flex;
@@ -2695,6 +3063,31 @@
         }
         /* V1.2: 生成模式确认生成操作条（仅「生成文书→引入案由要件」入口显示） */
         .case-elements-generate-bar.hidden { display: none; }
+        /* V1.2.20: N=0 时的引导提示——确认生成按钮置灰时，引导用户去点「一键生成」 */
+        .case-elements-generate-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-bottom: 8px;
+            padding: 8px 10px;
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #92400e;
+        }
+        .case-elements-generate-hint i {
+            margin-top: 2px;
+            font-size: 13px;
+            flex-shrink: 0;
+            color: #b45309;
+        }
+        .case-elements-generate-hint strong {
+            color: #b45309;
+            font-weight: 600;
+        }
+        .case-elements-generate-hint.hidden { display: none; }
         .case-elements-generate-btn {
             display: flex;
             align-items: center;
@@ -3450,10 +3843,6 @@
                     </div>
                 </div>
                 <div class="detail-header-right" data-page-node-id="6FhTm7EzhXAAfKYKLfCXI8">
-                    <!-- 清单第5项：文书排版——本期默认流式渲染，全量格式（案号/签章/落款）由用户手动触发 -->
-                    <button class="detail-action-btn" id="caseDocFormatBtn" onclick="formatDocumentLayout()" title="手动触发全量格式排版（案号/签章/落款），本期默认不自动排版" data-page-node-id="Tdx7VbNq2mRkZLe4Yw9sFa">
-                        <i class="fas fa-align-left" id="caseDocFormatBtnIcon" data-page-node-id="Wq6mZf3nBx8rTk2vCd5uHs"></i> <span id="caseDocFormatBtnLabel" data-page-node-id="Pz4nKd9wQm2xLb7vNc3rJt">文书排版</span>
-                    </button>
                     <button class="detail-action-btn" id="caseHistoryDocsBtn" onclick="toggleHistoryTasks()" title="查看历史文书版本" data-page-node-id="ZIQwVLzTWC0bnKZR5oOcIq">
                         <i class="fas fa-file-alt" data-page-node-id="Ng8ulvAuNgTKEZpDq39Gew"></i> 历史文书
                     </button>
@@ -3515,6 +3904,10 @@
                         </button>
                         <button class="gen-tab" data-method="steps" onclick="switchGenMethod('steps')" data-page-node-id="saV04G09vzAYk7jTKNLpFQ">
                             <i class="fas fa-list-ol" data-page-node-id="kdgkauzCNenAIhcWkmfFcX"></i> 分步生成
+                        </button>
+                        <!-- V1.2.23: 第三个视图「AI问答」——基于本案材料的知识检索问答，不要求先生成文书 -->
+                        <button class="gen-tab" data-method="chat" onclick="switchGenMethod('chat')" data-page-node-id="wq7pLm2nRtVb5xCyD8aKfZ">
+                            <i class="fas fa-comments" data-page-node-id="aiQTb3xLmN8vQrDs6cUwPe"></i> AI问答
                         </button>
                     </div>
                     <div class="gen-content" data-page-node-id="nH2HURPACfHIdqa82lFvLw">
@@ -3609,6 +4002,41 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- ===== V1.2.23: AI问答视图（中间栏第三个视图，基于本案材料的知识检索问答） ===== -->
+                        <div class="gen-panel" id="panel-chat" data-page-node-id="aiqPanelChat">
+                            <div class="aiq-wrap" data-page-node-id="aiqWrap">
+                                <!-- 顶部范围条（有对话记录时显示） -->
+                                <div class="aiq-topbar" id="aiqTopbar" style="display:none;" data-page-node-id="aiqTopbar">
+                                    <span class="aiq-topbar-scope" id="aiqTopbarScope" data-page-node-id="aiqTopbarScope"></span>
+                                    <button type="button" class="aiq-clear-btn" id="aiqClearBtn" onclick="clearAiChat()" title="清空当前对话" data-page-node-id="aiqClearBtn">
+                                        <i class="fas fa-trash-alt" data-page-node-id="aiqClearIcon"></i> 清空对话
+                                    </button>
+                                </div>
+                                <!-- 对话区（空态 / 对话流由 JS 渲染） -->
+                                <div class="aiq-body" id="aiqBody" data-page-node-id="aiqBody"></div>
+                                <!-- 输入区 -->
+                                <div class="aiq-input-area" data-page-node-id="aiqInputArea">
+                                    <div class="aiq-input-toolbar" data-page-node-id="aiqInputToolbar">
+                                        <button type="button" class="aiq-scope-chip active" id="aiqScopeCase" onclick="toggleAiChatScope('case')" title="检索本案材料（默认启用）" data-page-node-id="aiqScopeCase">
+                                            <i class="fas fa-folder-open" data-page-node-id="aiqScopeCaseIcon"></i> 本案材料
+                                        </button>
+                                        <button type="button" class="aiq-scope-chip" id="aiqScopeKb" onclick="toggleAiChatScope('kb')" title="叠加通用知识库检索" data-page-node-id="aiqScopeKb">
+                                            <i class="fas fa-book" data-page-node-id="aiqScopeKbIcon"></i> 通用知识库
+                                        </button>
+                                    </div>
+                                    <div class="aiq-input-box" data-page-node-id="aiqInputBox">
+                                        <textarea class="aiq-input" id="aiqInput" rows="1" maxlength="500"
+                                            placeholder="输入你的问题，Enter 发送 / Shift+Enter 换行"
+                                            onkeydown="onAiChatInputKeydown(event)"
+                                            oninput="onAiChatInputInput()" data-page-node-id="aiqInput"></textarea>
+                                        <button type="button" class="aiq-send-btn" id="aiqSendBtn" onclick="sendAiChatMessage()" disabled title="发送" data-page-node-id="aiqSendBtn">
+                                            <i class="fas fa-arrow-up" data-page-node-id="aiqSendIcon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -3616,11 +4044,22 @@
                 <div class="result-col" id="resultCol" data-page-node-id="vnjdLRb9DqHE40hUcjfU8H">
                     <div class="result-header" data-page-node-id="Z3ZVuTNvN0cyXTped361TD">
                         <div class="result-header-left" data-page-node-id="p09c97AZqGug7Yq5RkfjiA">
-                            <button onclick="toggleResultCol()" title="折叠/展开" data-page-node-id="wSGgwgGCDlAO9CVBs2f3sW"><i class="fas fa-chevron-right" data-page-node-id="2NJIn1mIxoIeo5nCHWY6Wf"></i></button>
+                            <!-- V1.2.16: 移除遗留的「折叠/展开结果栏」按钮——折叠后无展开入口，功能残缺且生成后无意义 -->
                             <span id="resultHeaderTitle" data-page-node-id="xCUBL3VXJUWDXmw3qUVASr">生成结果</span>
+                            <!-- 对齐实际系统（2026-09-10）：生成后展示文书名称 + 第 N 版 · 生成人 · 时间，配置态隐藏 -->
+                            <div class="result-doc-info" id="resultDocInfo">
+                                <div class="result-doc-info-title" id="resultDocInfoTitle">生成结果</div>
+                                <div class="result-doc-info-sub" id="resultDocInfoSub"></div>
+                            </div>
                         </div>
                         <div class="result-header-right" data-page-node-id="EnogWCQjD3kDWqUfnOWfWp" id="resultHeaderRight">
+                            <button class="result-doc-version" id="resultDocVersionBadge" disabled title="当前文书版本"><i class="fas fa-code-branch"></i> 版本 第 <span id="resultDocVersionNo">1</span> 版</button>
                             <button class="result-refine-btn" id="resultRefineBtn" onclick="refineResult()" title="基于当前文书内容进行多轮精修" data-page-node-id="gtMFp9ys1D7fBD0OTFHdwt"><i class="fas fa-magic" data-page-node-id="4k3sqGhpXbTnzmdAjjIE1P"></i> 文书精修</button>
+                            <!-- 清单第5项：文书排版放在文书精修旁，手动触发全量格式（案号/签章/落款） -->
+                            <button class="result-format-btn" id="caseDocFormatBtn" onclick="formatDocumentLayout()" title="手动触发全量格式排版（案号/签章/落款），本期默认不自动排版" data-page-node-id="Tdx7VbNq2mRkZLe4Yw9sFa">
+                                <i class="fas fa-align-left" id="caseDocFormatBtnIcon" data-page-node-id="Wq6mZf3nBx8rTk2vCd5uHs"></i> <span id="caseDocFormatBtnLabel" data-page-node-id="Pz4nKd9wQm2xLb7vNc3rJt">文书排版</span>
+                            </button>
+                            <button class="result-save-btn" id="resultSaveBtnTop" onclick="saveResult()" title="保存到历史文书"><i class="fas fa-save"></i> 保存</button>
                             <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="重新配置生成参数（默认回填最近一次历史文书快照）" data-page-node-id="MngcOEcxQzDXxf0eFdN96Y"><i class="fas fa-sliders-h" data-page-node-id="8XCifZcQcQMmo7rvCOOpn2"></i> <span data-page-node-id="BPcBP3hBSdrE2BGKWA1raw">重新配置</span></button>
                         </div>
                     </div>
@@ -3747,6 +4186,8 @@
         <div class="case-elements-drawer-footer" data-page-node-id="XE65sYQzk8Kc6OP2oRHUuG">
             <!-- V1.2: 生成模式专属确认生成操作条（仅从「生成文书→引入案由要件」入口打开时显示） -->
             <div class="case-elements-generate-bar hidden" id="drawerGenerateBar" data-page-node-id="GpR8ZHoyr9x1VMNLOm1r9y">
+                <!-- V1.2.20: N=0 时引导用户去点「一键生成」（与确认生成按钮置灰联动） -->
+                <div class="case-elements-generate-hint hidden" id="drawerGenerateHint"></div>
                 <button type="button" id="drawerGenerateBtn" class="case-elements-generate-btn" onclick="confirmDrawerGenerate()" data-page-node-id="DsNFmC20mYEIZ1eGB6N5uv">
                     <i class="fas fa-file-signature" data-page-node-id="jX6GGq30zQiFxmhII4vBmT"></i> 确认生成（引入 0 条要件）
                 </button>
@@ -3757,10 +4198,7 @@
                     <label data-page-node-id="MrVm7ajSCsMcsTA9zV6fDC">要件名称 <span style="color:#dc2626;" data-page-node-id="tm4DWJw9Zam7QQxQQJw52s">*</span></label>
                     <input type="text" id="newCaseElementName" placeholder="如：原告具体身份核实" maxlength="40" data-page-node-id="fA7vrWWFJVU42VjqzUTVbm">
                 </div>
-                <div class="form-row" data-page-node-id="hkkQS8JqaZqjvdDQR619Fp">
-                    <label data-page-node-id="ADtSiy6yYWAtr0nBnnHcB4">要件说明</label>
-                    <input type="text" id="newCaseElementDesc" placeholder="简要描述该要件的目的" maxlength="80" data-page-node-id="Qi1XwTfIvSuFwelOoudXxk">
-                </div>
+                <!-- 清单第7项：要件说明字段已移除（用户侧不再采集、不再展示） -->
                 <div class="form-row" data-page-node-id="hOhBVGMm3iqSDDK6edIXTb">
                     <label data-page-node-id="dkKbh2S7xf5GWCfPBTiT5t">要件问题 <span style="color:#dc2626;" data-page-node-id="oRZr8bzWo51T92HDNwqL52">*</span></label>
                     <textarea id="newCaseElementQuestion" placeholder="针对该要件需要回答的问题" maxlength="200"></textarea>
