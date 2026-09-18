@@ -145,9 +145,9 @@
             id: 'F001', name: '王建国', dept: '民一庭', title: '一级法官',
             templates: [
                 { id: 'F001-T1', name: '民间借贷纠纷判决书（常规版）', docType: '民事判决书（一审普通程序）', updatedAt: '2026-09-02', enabled: true, content: BODY.judgment('民间借贷纠纷', '张三', '李四') },
-                { id: 'F001-T2', name: '借贷案件调解书模板', docType: '民事调解书', updatedAt: '2026-08-19', enabled: true, content: BODY.mediation('民间借贷纠纷', '张三', '李四') },
+                { id: 'F001-T2', name: '借贷案件调解书示例', docType: '民事调解书', updatedAt: '2026-08-19', enabled: true, content: BODY.mediation('民间借贷纠纷', '张三', '李四') },
                 { id: 'F001-T3', name: '医疗损害责任纠纷判决书', docType: '民事判决书（一审普通程序）', updatedAt: '2026-09-08', enabled: true, content: BODY.judgment('医疗损害责任纠纷', '陈某', '某医院') },
-                { id: 'F001-T4', name: '买卖合同简易判决模板', docType: '民事判决书（简易程序）', updatedAt: '2026-07-11', enabled: false, content: BODY.simpleJudgment('买卖合同纠纷', '某贸易公司', '某实业公司') }
+                { id: 'F001-T4', name: '买卖合同简易判决示例', docType: '民事判决书（简易程序）', updatedAt: '2026-07-11', enabled: false, content: BODY.simpleJudgment('买卖合同纠纷', '某贸易公司', '某实业公司') }
             ],
             prompts: [
                 { id: 'F001-P1', name: '借贷事实认定要点提示', docType: '民事判决书（一审普通程序）', updatedAt: '2026-08-25', content: '请重点审查：1. 借条/转账凭证是否相互印证；2. 款项交付时间与金额；3. 是否已过诉讼时效；4. 利息约定是否超过法定上限（LPR 四倍）。' },
@@ -179,10 +179,10 @@
             id: 'F003', name: '张明远', dept: '民二庭', title: '一级法官',
             templates: [
                 { id: 'F003-T1', name: '建设工程合同纠纷判决书', docType: '民事判决书（一审普通程序）', updatedAt: '2026-09-09', enabled: true, content: BODY.judgment('建设工程施工合同纠纷', '某建筑公司', '某地产公司') },
-                { id: 'F003-T2', name: '财产保全裁定书模板', docType: '民事裁定书', updatedAt: '2026-08-15', enabled: true, content: BODY.ruling('买卖合同纠纷') },
+                { id: 'F003-T2', name: '财产保全裁定书示例', docType: '民事裁定书', updatedAt: '2026-08-15', enabled: true, content: BODY.ruling('买卖合同纠纷') },
                 { id: 'F003-T3', name: '房屋租赁合同纠纷判决书', docType: '民事判决书（一审普通程序）', updatedAt: '2026-06-18', enabled: true, content: BODY.judgment('房屋租赁合同纠纷', '孙某', '周某') },
                 { id: 'F003-T4', name: '股权转让纠纷判决书', docType: '民事判决书（一审普通程序）', updatedAt: '2026-05-30', enabled: true, content: BODY.judgment('股权转让纠纷', '吴某', '郑某') },
-                { id: 'F003-T5', name: '交通事故简易判决模板', docType: '民事判决书（简易程序）', updatedAt: '2026-07-04', enabled: false, content: BODY.simpleJudgment('机动车交通事故责任纠纷', '冯某', '陈某') }
+                { id: 'F003-T5', name: '交通事故简易判决示例', docType: '民事判决书（简易程序）', updatedAt: '2026-07-04', enabled: false, content: BODY.simpleJudgment('机动车交通事故责任纠纷', '冯某', '陈某') }
             ],
             prompts: [
                 { id: 'F003-P1', name: '工程款结算争议审查', docType: '民事判决书（一审普通程序）', updatedAt: '2026-09-03', content: '重点审查：合同价款约定、工程量签证、竣工验收情况、已付款项、质保金约定。对鉴定意见应说明采信与否的理由。' },
@@ -232,7 +232,7 @@
             id: 'F006', name: '赵雪', dept: '刑庭', title: '二级法官',
             templates: [
                 { id: 'F006-T1', name: '诈骗罪判决书（电信网络）', docType: '刑事判决书', updatedAt: '2026-09-04', enabled: true, content: BODY.criminal('诈骗罪', '秦某') },
-                { id: 'F006-T2', name: '盗窃罪简易判决模板', docType: '刑事判决书', updatedAt: '2026-07-28', enabled: true, content: BODY.criminal('盗窃罪', '许某') }
+                { id: 'F006-T2', name: '盗窃罪简易判决示例', docType: '刑事判决书', updatedAt: '2026-07-28', enabled: true, content: BODY.criminal('盗窃罪', '许某') },
             ],
             prompts: [
                 { id: 'F006-P1', name: '涉案财物处理', docType: '刑事判决书', updatedAt: '2026-08-11', content: '请在判决主文中一并处理涉案财物：责令退赔被害人损失、没收作案工具、追缴违法所得。' }
@@ -259,7 +259,7 @@
             id: 'F008', name: '周雅琴', dept: '民一庭', title: '三级法官',
             templates: [
                 { id: 'F008-T1', name: '离婚纠纷调解书', docType: '民事调解书', updatedAt: '2026-09-05', enabled: true, content: BODY.mediation('离婚纠纷', '吕某', '施某') },
-                { id: 'F008-T2', name: '民间借贷简易判决模板', docType: '民事判决书（简易程序）', updatedAt: '2026-08-12', enabled: true, content: BODY.simpleJudgment('民间借贷纠纷', '张某', '李某') }
+                { id: 'F008-T2', name: '民间借贷简易判决示例', docType: '民事判决书（简易程序）', updatedAt: '2026-08-12', enabled: true, content: BODY.simpleJudgment('民间借贷纠纷', '张某', '李某') }
             ],
             prompts: [
                 { id: 'F008-P1', name: '夫妻共同财产分割', docType: '民事判决书（一审普通程序）', updatedAt: '2026-09-01', content: '请先界定夫妻共同财产范围，再说明分割原则（照顾子女、女方和无过错方权益），逐项列明财产归属。' }

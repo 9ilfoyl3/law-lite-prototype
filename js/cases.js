@@ -949,13 +949,13 @@ function buildGenConfigHtml() {
     });
     let templateSelectHtml;
     if (stdOpts.length && myOpts.length) {
-        templateSelectHtml = `<optgroup label="标准模板">${stdOpts.join('')}</optgroup><optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+        templateSelectHtml = `<optgroup label="标准示例">${stdOpts.join('')}</optgroup><optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
     } else if (stdOpts.length) {
         templateSelectHtml = stdOpts.join('');
     } else if (myOpts.length) {
-        templateSelectHtml = `<optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+        templateSelectHtml = `<optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
     } else {
-        templateSelectHtml = `<option value="">暂无可用模板</option>`;
+        templateSelectHtml = `<option value="">暂无可用示例</option>`;
     }
 
     // v1.45 链 C: 案件阶段选择项（仅裁判文书类型显示，能自动判定时隐藏，无法判定时显示）
@@ -972,7 +972,7 @@ function buildGenConfigHtml() {
         ${caseStageRowHtml}
 
         <div class="gen-form-group">
-            <label class="gen-form-label">文书模板</label>
+            <label class="gen-form-label">文书示例</label>
             <select class="gen-form-select" id="genTemplate" onchange="quickState.template=this.value">
                 ${templateSelectHtml}
             </select>
@@ -1260,13 +1260,13 @@ function renderBatchConfig() {
     });
     let batchTemplateSelectHtml;
     if (stdOpts.length && myOpts.length) {
-        batchTemplateSelectHtml = '<optgroup label="标准模板">' + stdOpts.join('') + '</optgroup><optgroup label="我的模板">' + myOpts.join('') + '</optgroup>';
+        batchTemplateSelectHtml = '<optgroup label="标准示例">' + stdOpts.join('') + '</optgroup><optgroup label="我的示例">' + myOpts.join('') + '</optgroup>';
     } else if (stdOpts.length) {
         batchTemplateSelectHtml = stdOpts.join('');
     } else if (myOpts.length) {
-        batchTemplateSelectHtml = '<optgroup label="我的模板">' + myOpts.join('') + '</optgroup>';
+        batchTemplateSelectHtml = '<optgroup label="我的示例">' + myOpts.join('') + '</optgroup>';
     } else {
-        batchTemplateSelectHtml = '<option value="">暂无可用模板</option>';
+        batchTemplateSelectHtml = '<option value="">暂无可用示例</option>';
     }
     const labels = current.partiesLabels;
 
@@ -1351,7 +1351,7 @@ function renderBatchConfig() {
                     </select>
                 </div>
                 <div>
-                    <label class="drawer-form-label">文书模板</label>
+                    <label class="drawer-form-label">文书示例</label>
                     <select class="drawer-form-select" id="batchTemplate" onchange="batchState.template=this.value">
                         ${batchTemplateSelectHtml}
                     </select>
@@ -1895,7 +1895,7 @@ function newBatchTask() {
 }
 
 function showBatchHelp() {
-    alert('批量生成模式使用指南\n====================\n• 同时处理多个案件的文书生成\n• AI 在后台逐个执行，可离开处理其他事务\n• 适合类型化案件批量处理 / 制式文书批量生产\n\n操作步骤：\n1. 在案件列表勾选要处理的案件\n2. 点击顶部「批量生成」按钮进入全屏面板\n3. 配置文书模板和生成模式\n4. 点击「开始批量生成」\n5. 等待完成，一键打包下载\n\n如需对单个案件快速生成，请点击列表行的 ⚡ 按钮。');
+    alert('批量生成模式使用指南\n====================\n• 同时处理多个案件的文书生成\n• AI 在后台逐个执行，可离开处理其他事务\n• 适合类型化案件批量处理 / 制式文书批量生产\n\n操作步骤：\n1. 在案件列表勾选要处理的案件\n2. 点击顶部「批量生成」按钮进入全屏面板\n3. 配置文书示例和生成模式\n4. 点击「开始批量生成」\n5. 等待完成，一键打包下载\n\n如需对单个案件快速生成，请点击列表行的 ⚡ 按钮。');
 }
 
 // ===== 新建案件弹窗 =====
@@ -2668,7 +2668,10 @@ function regenerateCaseDocument(docId) {
     if (!res) return;
     const { caseItem, doc } = res;
     const current = getCurrentBusiness();
-    const templateName = current.docTemplates[doc.template] || '法律文书';
+    // V1.2.29: docTemplates 的值已由「名称字符串」升级为「{name, content, ...} 对象」，
+    //   不兼容会导致文书标题渲染成 [object Object]
+    const _tplVal = current.docTemplates[doc.template];
+    const templateName = (typeof _tplVal === 'string' ? _tplVal : (_tplVal && _tplVal.name)) || '法律文书';
     // 复用快速生成逻辑：临时设置 quickState，生成后覆盖原文书 versions
     quickState.caseId = documentsCaseId;
     quickState.template = doc.template;

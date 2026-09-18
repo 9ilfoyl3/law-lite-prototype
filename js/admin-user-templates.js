@@ -62,8 +62,8 @@
     function renderStats() {
         var ov = M.getOverview();
         var cards = [
-            { label: '建了模板的法官', value: ov.judgesWithTemplate, sub: '共 ' + ov.judgeCount + ' 名法官', accent: true },
-            { label: '文书模板总数', value: ov.templateCount, sub: '法官自建' },
+            { label: '建了示例的法官', value: ov.judgesWithTemplate, sub: '共 ' + ov.judgeCount + ' 名法官', accent: true },
+            { label: '文书示例总数', value: ov.templateCount, sub: '法官自建' },
             { label: '指令总数', value: ov.promptCount, sub: '法官自建' },
             { label: '要件总数', value: ov.elementCount, sub: '法官自建' }
         ];
@@ -165,14 +165,14 @@
         var gapCount = list.filter(function (r) { return r.isGap; }).length;
 
         var html = '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">' +
-            '模板与指令挂在<b>文书类型</b>下，案由由文书类型承载。共 ' + list.length +
-            ' 个文书类型，其中 <b style="color:#92400e;">' + gapCount + '</b> 个官方尚无标准模板但法官已自建（高亮行）</div>';
+            '示例与指令挂在<b>文书类型</b>下，案由由文书类型承载。共 ' + list.length +
+            ' 个文书类型，其中 <b style="color:#92400e;">' + gapCount + '</b> 个官方尚无标准示例但法官已自建（高亮行）</div>';
 
         html += '<table class="dist-table"><thead><tr>' +
             '<th>文书类型</th>' +
             '<th>匹配案由</th>' +
-            '<th class="num-cell">官方模板</th>' +
-            '<th class="num-cell">法官模板</th>' +
+            '<th class="num-cell">官方示例</th>' +
+            '<th class="num-cell">法官示例</th>' +
             '<th class="num-cell">法官指令</th>' +
             '<th>涉及法官</th>' +
             '<th style="width:150px;">状态</th>' +
@@ -195,8 +195,8 @@
                 '<td>' + (r.isGeneral
                     ? '<span class="ok-badge">通用指令</span>'
                     : (r.isGap
-                        ? '<span class="gap-badge">无官方模板 · 可收编</span>'
-                        : '<span class="ok-badge">已有官方模板</span>')) + '</td>' +
+                        ? '<span class="gap-badge">无官方示例 · 可收编</span>'
+                        : '<span class="ok-badge">已有官方示例</span>')) + '</td>' +
                 '</tr>';
         });
 
@@ -299,13 +299,13 @@
             html += '<div class="judge-card' + (j.id === currentJudgeId ? ' active' : '') + '" onclick="AdminUserTemplates.selectJudge(\'' + j.id + '\')">' +
                 '<div class="jc-name">' + esc(j.name) + '<span class="jc-title">' + esc(j.title || '') + '</span></div>' +
                 '<div class="jc-meta">' + esc(j.dept) + ' · ' + esc(j.id) + '</div>' +
-                '<div class="jc-counts">模板 ' + (j.templates || []).length + ' · 指令 ' + (j.prompts || []).length + ' · 要件 ' + (j.elements || []).length + '</div>' +
+                '<div class="jc-counts">示例 ' + (j.templates || []).length + ' · 指令 ' + (j.prompts || []).length + ' · 要件 ' + (j.elements || []).length + '</div>' +
                 '</div>';
         });
         html += '</div>';
 
         html += '<div class="item-subtabs" style="margin-top:16px;">' +
-            '<button class="item-subtab' + (currentTab === 'template' ? ' active' : '') + '" onclick="AdminUserTemplates.switchTab(\'template\')"><i class="fas fa-file-alt"></i> 文书模板 <span class="tab-count">' + tplN + '</span></button>' +
+            '<button class="item-subtab' + (currentTab === 'template' ? ' active' : '') + '" onclick="AdminUserTemplates.switchTab(\'template\')"><i class="fas fa-file-alt"></i> 文书示例 <span class="tab-count">' + tplN + '</span></button>' +
             '<button class="item-subtab' + (currentTab === 'prompt' ? ' active' : '') + '" onclick="AdminUserTemplates.switchTab(\'prompt\')"><i class="fas fa-comment-dots"></i> 指令 <span class="tab-count">' + pmtN + '</span></button>' +
             '<button class="item-subtab' + (currentTab === 'element' ? ' active' : '') + '" onclick="AdminUserTemplates.switchTab(\'element\')"><i class="fas fa-puzzle-piece"></i> 要件 <span class="tab-count">' + elmN + '</span></button>' +
             '</div>';
@@ -333,7 +333,7 @@
 
     function renderTemplates(judge) {
         var list = judge.templates || [];
-        if (!list.length) return emptyRow('该法官暂无自建文书模板');
+        if (!list.length) return emptyRow('该法官暂无自建文书示例');
 
         var rows = list.map(function (t) {
             return '<tr onclick="AdminUserTemplates.openDrawer(\'' + judge.id + '\',\'template\',\'' + t.id + '\')">' +
@@ -347,7 +347,7 @@
         }).join('');
 
         return '<table class="item-table"><thead><tr>' +
-            '<th>模板名称</th><th>文书类型</th><th>字数</th><th>更新时间</th><th>状态</th>' +
+            '<th>示例名称</th><th>文书类型</th><th>字数</th><th>更新时间</th><th>状态</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
     }
 

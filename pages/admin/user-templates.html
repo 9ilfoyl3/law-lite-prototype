@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户模板检索 - AI法官助理管理后台</title>
+    <title>用户示例检索 - AI法官助理管理后台</title>
     <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -215,9 +215,9 @@
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
                     <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
-                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
-                    <a href="user-templates.html" class="nav-item active"><i class="fas fa-search"></i><span>用户模板检索</span></a>
+                    <a href="user-templates.html" class="nav-item active"><i class="fas fa-search"></i><span>用户示例检索</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                 </div>
@@ -235,7 +235,7 @@
                 <div class="breadcrumb">
                     <a href="dashboard.html">首页</a>
                     <span class="breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
-                    <span>用户模板检索</span>
+                    <span>用户示例检索</span>
                 </div>
                 <div class="user-menu">
                     <div class="user-avatar">管</div>
@@ -248,8 +248,8 @@
 
             <div class="content">
                 <div class="page-header">
-                    <h1><i class="fas fa-search"></i> 用户模板检索</h1>
-                    <p>按法官检索其自建的文书模板、指令与要件（只读查看）；统计各案由官方模板覆盖情况，识别可收编的优秀模板</p>
+                    <h1><i class="fas fa-search"></i> 用户示例检索</h1>
+                    <p>按法官检索其自建的文书示例、指令与要件（只读查看）；统计各案由官方示例覆盖情况，识别可收编的优秀示例</p>
                 </div>
 
                 <!-- 统计卡 -->
@@ -262,7 +262,7 @@
                         <span class="hint">官方无标准内容、但法官已自建的，可择优收编</span>
                     </div>
                     <div class="item-subtabs" style="margin-bottom:12px;">
-                        <button class="item-subtab active" id="distTabDocType" onclick="AdminUserTemplates.switchDistTab('docType')"><i class="fas fa-file-alt"></i> 按文书类型（模板 / 指令）</button>
+                        <button class="item-subtab active" id="distTabDocType" onclick="AdminUserTemplates.switchDistTab('docType')"><i class="fas fa-file-alt"></i> 按文书类型（示例 / 指令）</button>
                         <button class="item-subtab" id="distTabCause" onclick="AdminUserTemplates.switchDistTab('cause')"><i class="fas fa-puzzle-piece"></i> 按案由（要件）</button>
                     </div>
                     <div id="causeDistBox"></div>
@@ -297,7 +297,7 @@
         <div class="drawer-body">
             <div class="db-text" id="drawerContent"></div>
         </div>
-        <div class="readonly-tip"><i class="fas fa-lock"></i> 只读查看。如需收编为官方模板，请复制内容后到「文书模板管理」新建。</div>
+        <div class="readonly-tip"><i class="fas fa-lock"></i> 只读查看。如需收编为官方示例，请复制内容后到「文书示例管理」新建。</div>
     </div>
 
     <!-- 涉及法官名单弹层 -->

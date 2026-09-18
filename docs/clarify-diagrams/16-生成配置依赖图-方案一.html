@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>16 · 生成配置依赖图（方案一 · 2026-09-17）</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-muted: #f9fafb;
+    --brand: #6d5ce7;
+    --warn: #d4a017;
+    --teal: #0d9488;
+    --radius-card: 12px;
+    --spacer-8: 8px;
+    --spacer-12: 12px;
+    --spacer-16: 16px;
+    --spacer-20: 20px;
+  }
+  body { margin: 0; padding: 24px; background: #f3f4f6; font-family: var(--font-sans); color: var(--text); }
+  .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--spacer-20); max-width: 1120px; margin: 0 auto; }
+  .widget-title { font-size: 18px; font-weight: 600; margin: 0 0 var(--spacer-8); }
+  .widget-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 var(--spacer-16); }
+  .svg-wrap { width: 100%; }
+  .legend { display: flex; gap: var(--spacer-16); margin-top: var(--spacer-12); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  /* 旧 vs 新 对比速览 */
+  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacer-12); margin-top: var(--spacer-16); }
+  .diff-col { border: 1px solid var(--border); border-radius: 8px; padding: var(--spacer-12) var(--spacer-16); }
+  .diff-col.old { background: #f9fafb; }
+  .diff-col.new { background: #faf5ff; border-color: var(--brand); }
+  .diff-h { font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+  .diff-col.old .diff-h { color: var(--text-muted); }
+  .diff-col.new .diff-h { color: var(--brand); }
+  .diff ul { margin: 0; padding-left: 18px; }
+  .diff li { font-size: 12px; color: var(--text); line-height: 1.6; }
+  .badge { display:inline-block; font-size:10px; padding:1px 7px; border-radius:999px; vertical-align:middle; margin-left:4px; }
+  .badge.del { background:#fef2f2; color:#e74c3c; border:1px solid #e74c3c; }
+  .badge.keep { background:#faf5ff; color:var(--brand); border:1px solid var(--brand); }
+  .badge.new { background:#fdf6e3; color:var(--warn); border:1px solid var(--warn); }
+  @media (max-width: 720px) { .diff { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="widget-card">
+  <div class="widget-title">生成配置依赖图（方案一 · 2026-09-17）</div>
+  <div class="widget-sub">核心变更：文书类型降级隐藏，workflow 成为唯一关联节点。系统示例/指令挂 workflow（空=通用）；用户自建不挂、仅归属用户；通用兜底 workflow 仅一步生成出现。</div>
+  <div class="svg-wrap">
+  <svg viewBox="0 0 1120 720" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif">
+
+    <defs>
+      <marker id="aBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M1 1 L7 4 L1 7 Z" fill="#6d5ce7"/></marker>
+      <marker id="aTeal" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M1 1 L7 4 L1 7 Z" fill="#0d9488"/></marker>
+      <marker id="aGray" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M1 1 L7 4 L1 7 Z" fill="#9ca3af"/></marker>
+    </defs>
+
+    <!-- ============ 旧（已废弃，淡色） ============ -->
+    <text x="40" y="34" fill="#9ca3af" font-size="13" font-weight="600">旧（V1.1 · 已废弃）</text>
+    <g opacity="0.55">
+      <rect x="40" y="46" width="190" height="52" rx="8" fill="#ffffff" stroke="#9ca3af"/>
+      <text x="135" y="66" text-anchor="middle" fill="#374151" font-size="12" font-weight="500">案件（案由+案字）</text>
+      <text x="135" y="84" text-anchor="middle" fill="#6b7280" font-size="10">材料解析得到</text>
+
+      <rect x="300" y="46" width="190" height="52" rx="8" fill="#ffffff" stroke="#9ca3af"/>
+      <text x="395" y="66" text-anchor="middle" fill="#374151" font-size="12" font-weight="500">文书类型（下拉）</text>
+      <text x="395" y="84" text-anchor="middle" fill="#6b7280" font-size="10">法官选"裁判文书"</text>
+
+      <rect x="560" y="46" width="200" height="52" rx="8" fill="#ffffff" stroke="#9ca3af"/>
+      <text x="660" y="66" text-anchor="middle" fill="#374151" font-size="12" font-weight="500">workflow（自动唯一匹配）</text>
+      <text x="660" y="84" text-anchor="middle" fill="#6b7280" font-size="10">同案由案字唯一</text>
+
+      <rect x="830" y="46" width="200" height="52" rx="8" fill="#ffffff" stroke="#9ca3af"/>
+      <text x="930" y="66" text-anchor="middle" fill="#374151" font-size="12" font-weight="500">示例 / 指令（挂类型）</text>
+      <text x="930" y="84" text-anchor="middle" fill="#6b7280" font-size="10">停在类型粒度</text>
+
+      <path d="M230 72 L300 72" stroke="#9ca3af" stroke-width="1.5" fill="none" marker-end="url(#aGray)"/>
+      <path d="M490 72 L560 72" stroke="#9ca3af" stroke-width="1.5" fill="none" marker-end="url(#aGray)"/>
+      <path d="M760 72 L830 72" stroke="#9ca3af" stroke-width="1.5" fill="none" marker-end="url(#aGray)"/>
+    </g>
+    <text x="40" y="126" fill="#9ca3af" font-size="11">⚠ 痛点：类型→流程被迫一对一，多流程（二审维持/改判、民再五种裁定）建不进去；示例挂在类型粒度，一审/二审/维持/改判混在同一下拉，无法收敛</text>
+
+    <line x1="40" y1="150" x2="1080" y2="150" stroke="#e5e7eb" stroke-width="1"/>
+
+    <!-- ============ 新（方案一，主图） ============ -->
+    <text x="40" y="182" fill="#6d5ce7" font-size="13" font-weight="600">新（方案一）</text>
+
+    <!-- 案件 -->
+    <g>
+      <rect x="40" y="198" width="220" height="60" rx="8" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <text x="150" y="220" text-anchor="middle" fill="#6d5ce7" font-size="13" font-weight="500">案件（案由 + 案字）</text>
+      <text x="150" y="240" text-anchor="middle" fill="#6b7280" font-size="11">来自材料解析 · 已确定</text>
+    </g>
+    <!-- 案件 → workflow -->
+    <path d="M150 258 L150 366" stroke="#6d5ce7" stroke-width="2" fill="none" marker-end="url(#aBrand)"/>
+
+    <!-- workflow 平铺（核心节点） -->
+    <g>
+      <rect x="40" y="372" width="330" height="140" rx="10" fill="#faf5ff" stroke="#6d5ce7" stroke-width="2.5"/>
+      <rect x="40" y="372" width="7" height="140" rx="3" fill="#6d5ce7"/>
+      <text x="64" y="400" fill="#1f2937" font-size="14" font-weight="600">选择文书流程（原"文书类型"位置）</text>
+      <text x="64" y="422" fill="#6b7280" font-size="11">卡片单选 · 按案由案字过滤后约 8 个平铺</text>
+      <text x="64" y="444" fill="#6b7280" font-size="11">· 一步生成型：全部平铺</text>
+      <text x="64" y="464" fill="#6b7280" font-size="11">· 分步生成型：仅裁判文书类</text>
+      <text x="64" y="488" fill="#d4a017" font-size="11">· 通用兜底 workflow：仅一步生成、固定末尾</text>
+      <text x="64" y="506" fill="#6b7280" font-size="10">用户手动选；解除"同案由案字唯一"限制</text>
+    </g>
+
+    <!-- 右侧配置项 -->
+    <!-- 系统示例 -->
+    <g>
+      <rect x="470" y="200" width="320" height="86" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <rect x="470" y="200" width="7" height="86" rx="3" fill="#6d5ce7"/>
+      <text x="494" y="226" fill="#1f2937" font-size="13" font-weight="600">系统预设示例（管理后台配）</text>
+      <text x="494" y="248" fill="#6b7280" font-size="11">关联 workflowIds · 空 = 通用示例</text>
+      <text x="494" y="268" fill="#6b7280" font-size="11">用户选流程后 → 过滤出该流程关联 + 通用</text>
+    </g>
+    <!-- 系统指令 -->
+    <g>
+      <rect x="470" y="302" width="320" height="86" rx="10" fill="#ffffff" stroke="#6d5ce7" stroke-width="1.5"/>
+      <rect x="470" y="302" width="7" height="86" rx="3" fill="#6d5ce7"/>
+      <text x="494" y="328" fill="#1f2937" font-size="13" font-weight="600">系统预设指令（提示词）</text>
+      <text x="494" y="350" fill="#6b7280" font-size="11">同示例 · 关联 workflowIds · 空 = 通用</text>
+      <text x="494" y="370" fill="#6b7280" font-size="11">与示例两段式展示在同一流程下</text>
+    </g>
+    <!-- 通用兜底 workflow -->
+    <g>
+      <rect x="470" y="404" width="320" height="86" rx="10" fill="#fdf6e3" stroke="#d4a017" stroke-width="1.5"/>
+      <rect x="470" y="404" width="7" height="86" rx="3" fill="#d4a017"/>
+      <text x="494" y="430" fill="#1f2937" font-size="13" font-weight="600">通用兜底 workflow（仅一步生成）</text>
+      <text x="494" y="452" fill="#6b7280" font-size="11">极简提示词：按指令+示例自由生成</text>
+      <text x="494" y="472" fill="#6b7280" font-size="11">兜住未预设的零散文书场景</text>
+    </g>
+    <!-- 我的示例 -->
+    <g>
+      <rect x="470" y="506" width="320" height="64" rx="10" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="470" y="506" width="7" height="64" rx="3" fill="#0d9488"/>
+      <text x="494" y="530" fill="#1f2937" font-size="13" font-weight="600">我的示例</text>
+      <text x="494" y="552" fill="#0d9488" font-size="11">不挂流程 · 仅归属用户 · 平铺、不分组</text>
+    </g>
+    <!-- 我的指令 -->
+    <g>
+      <rect x="470" y="584" width="320" height="64" rx="10" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="470" y="584" width="7" height="64" rx="3" fill="#0d9488"/>
+      <text x="494" y="608" fill="#1f2937" font-size="13" font-weight="600">我的指令</text>
+      <text x="494" y="630" fill="#0d9488" font-size="11">不挂流程 · 仅归属用户 · 平铺、不分组</text>
+    </g>
+
+    <!-- 关联箭头：workflow → 系统示例 / 系统指令 / 通用兜底 -->
+    <path d="M370 420 L470 243" stroke="#6d5ce7" stroke-width="1.5" fill="none" marker-end="url(#aBrand)"/>
+    <path d="M370 450 L470 345" stroke="#6d5ce7" stroke-width="1.5" fill="none" marker-end="url(#aBrand)"/>
+    <path d="M370 480 L470 447" stroke="#d4a017" stroke-width="1.5" fill="none" marker-end="url(#aBrand)"/>
+    <text x="424" y="300" fill="#6d5ce7" font-size="10" transform="rotate(28 424 300)">关联 / 过滤</text>
+    <text x="408" y="500" fill="#d4a017" font-size="10" transform="rotate(60 408 500)">仅一步</text>
+
+    <!-- 我的*：始终可用（非依赖，虚线） -->
+    <path d="M370 500 L470 538" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="5,4" fill="none" marker-end="url(#aTeal)"/>
+    <path d="M370 520 L470 616" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="5,4" fill="none" marker-end="url(#aTeal)"/>
+    <text x="406" y="560" fill="#0d9488" font-size="10" transform="rotate(82 406 560)">始终可用</text>
+
+    <!-- 文书类型（隐藏，不参与依赖） -->
+    <g>
+      <rect x="40" y="556" width="330" height="92" rx="10" fill="#f9fafb" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <text x="64" y="582" fill="#9ca3af" font-size="13" font-weight="600">文书类型（隐藏 · 保留）</text>
+      <text x="64" y="604" fill="#9ca3af" font-size="11">原一级分组容器，现已解耦</text>
+      <text x="64" y="624" fill="#9ca3af" font-size="11">不参与依赖 · 数据保留</text>
+      <text x="64" y="642" fill="#9ca3af" font-size="11">后续流程过多时复用为级联一级</text>
+    </g>
+
+    <!-- 注释：workflow 是核心节点 -->
+    <text x="150" y="350" fill="#6d5ce7" font-size="10" text-anchor="middle">核心节点</text>
+  </svg>
+  </div>
+
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#6d5ce7"></span>workflow / 系统预设（关联 workflowIds）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#d4a017"></span>通用兜底 workflow（仅一步生成）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#0d9488"></span>我的示例 / 我的指令（不挂、仅归属用户）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span>文书类型（隐藏·不参与依赖）</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#9ca3af;border:1px dashed #9ca3af"></span>旧（已废弃）</span>
+  </div>
+
+  <div class="diff">
+    <div class="diff-col old">
+      <div class="diff-h">旧 · 配置依赖</div>
+      <ul>
+        <li>文书类型：用户侧下拉，自动匹配唯一 workflow <span class="badge del">删除</span></li>
+        <li>示例 / 指令：关联<b>文书类型</b>，停在类型粒度，一审/二审/维持/改判混排</li>
+        <li>同案由案字：仅允许 1 个 workflow <span class="badge del">解限</span></li>
+        <li>多流程场景（二审维持/改判、民再裁定）建不进去</li>
+        <li>用户自建内容：挂类型，按类型分组</li>
+      </ul>
+    </div>
+    <div class="diff-col new">
+      <div class="diff-h">新（方案一）· 配置依赖</div>
+      <ul>
+        <li>workflow：唯一关联节点，用户平铺手选 <span class="badge keep">核心</span></li>
+        <li>示例 / 指令：关联<b>workflow</b>（workflowIds，空=通用），按流程收敛</li>
+        <li>同案由案字：允许多个 workflow <span class="badge new">放开</span></li>
+        <li>通用兜底 workflow：仅一步生成，兜零散场景 <span class="badge new">新增</span></li>
+        <li>我的示例 / 我的指令：不挂流程、仅归属用户、平铺 <span class="badge new">调整</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

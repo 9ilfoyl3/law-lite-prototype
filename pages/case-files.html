@@ -1172,6 +1172,55 @@
             color: var(--text-tertiary);
             font-style: italic;
         }
+        /* V1.2.33: 模板内容查看入口——与「文书模板」标签同行右端，不新增纵向空间 */
+        .gen-form-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 20px;
+            margin-bottom: 6px;
+        }
+        .gen-form-label-row .gen-form-label {
+            margin-bottom: 0;
+        }
+        .tpl-view-entry {
+            flex: none;
+            white-space: nowrap;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .tpl-view-link {
+            display: inline-flex;
+            align-items: center;
+            color: var(--accent-primary);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .tpl-view-link:hover {
+            text-decoration: underline;
+        }
+        .tpl-view-link.is-disabled {
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .tpl-view-link.is-disabled:hover {
+            text-decoration: none;
+        }
+        /* 弹窗内的模板原文 */
+        .tpl-content-raw {
+            margin: 0;
+            max-height: 60vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.9;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            padding: 14px 16px;
+            border-radius: 8px;
+        }
         .gen-form-select, .gen-form-textarea {
             width: 100%;
             padding: 8px 12px;
@@ -3999,8 +4048,12 @@
                                         <span class="gen-form-hint" id="matCaseStageHint" style="display:none;" data-page-node-id="hNrpooQ7mbHUi76Jsmfwia"></span>
                                     </div>
                                     <div class="gen-form-row" data-page-node-id="gWasVPAQFFrPMTSx9oGFVJ">
-                                        <label class="gen-form-label" data-page-node-id="a6Sqs6gNiRZHjniZo9U7uX">文书模板</label>
-                                        <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial()" data-page-node-id="DzBxclNe8V5S3MzhoTAo7h"></select>
+                                        <div class="gen-form-label-row">
+                                            <label class="gen-form-label" data-page-node-id="a6Sqs6gNiRZHjniZo9U7uX">文书示例</label>
+                                            <!-- V1.2.33: 模板内容查看入口（与标签同行右端，不单独占行） -->
+                                            <div class="tpl-view-entry" id="matTplPreview" style="display:none;"></div>
+                                        </div>
+                                        <select class="gen-form-select" id="matTemplate" onchange="syncStepConfigFromMaterial();renderMatTplPreview();" data-page-node-id="DzBxclNe8V5S3MzhoTAo7h"></select>
                                     </div>
                                     <div class="gen-form-row" data-page-node-id="wFo0UvUAPi4aNY0QtVgDHs">
                                         <label class="gen-form-label" data-page-node-id="NefRTW4F8n7DvbfiuRmEAx">指令</label>
@@ -4033,7 +4086,11 @@
                                     <select class="gen-form-select" id="stepPlan" onchange="onStepPlanChange(this.value)" data-page-node-id="UCtXFD5HicX4AXQxggphXu"></select>
                                 </div>
                                 <div class="gen-form-row" data-page-node-id="D8XTj2UZmXbFiwWtaII4fT">
-                                    <label class="gen-form-label" data-page-node-id="ILEuS2RFXqqs4G7EMkUoHL">文书模板</label>
+                                    <div class="gen-form-label-row">
+                                        <label class="gen-form-label" data-page-node-id="ILEuS2RFXqqs4G7EMkUoHL">文书示例</label>
+                                        <!-- V1.2.33: 模板内容查看入口（与标签同行右端，不单独占行） -->
+                                        <div class="tpl-view-entry" id="stepTplPreview" style="display:none;"></div>
+                                    </div>
                                     <select class="gen-form-select" id="stepTemplate" onchange="onStepTemplateChange(this.value)" data-page-node-id="VmxblTbi0CQ9s4AZSgehHg"></select>
                                 </div>
                             </div>
@@ -4116,7 +4173,7 @@
                                 <i class="fas fa-align-left" id="caseDocFormatBtnIcon" data-page-node-id="Wq6mZf3nBx8rTk2vCd5uHs"></i> <span id="caseDocFormatBtnLabel" data-page-node-id="Pz4nKd9wQm2xLb7vNc3rJt">文书排版</span>
                             </button>
                             <button class="result-save-btn" id="resultSaveBtnTop" onclick="saveResult()" title="保存到历史文书"><i class="fas fa-save"></i> 保存</button>
-                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="修改文书类型、模板、指令与已选材料，默认沿用最近一次生成时的设置" data-page-node-id="MngcOEcxQzDXxf0eFdN96Y"><i class="fas fa-sliders-h" data-page-node-id="8XCifZcQcQMmo7rvCOOpn2"></i> <span data-page-node-id="BPcBP3hBSdrE2BGKWA1raw">修改生成设置</span></button>
+                            <button class="result-reconfig-btn" id="resultReconfigBtn" onclick="reconfigWithLatestSnapshot()" title="修改文书类型、示例、指令与已选材料，默认沿用最近一次生成时的设置" data-page-node-id="MngcOEcxQzDXxf0eFdN96Y"><i class="fas fa-sliders-h" data-page-node-id="8XCifZcQcQMmo7rvCOOpn2"></i> <span data-page-node-id="BPcBP3hBSdrE2BGKWA1raw">修改生成设置</span></button>
                         </div>
                     </div>
                     <!-- 生成结果区（默认显示） -->
@@ -4381,13 +4438,13 @@
     </div>
 
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=65"></script>
+    <script src="../js/case-data.js?v=67"></script>
     <script src="../js/doc-editor.js?v=1"></script>
     <!-- V1.2.5: 全量法条库数据源（LAW_LIBRARY_ALL / LAW_RECOMMEND_RULES），需在 case-files.js 之前加载 -->
     <script src="../js/law-library.js?v=1"></script>
     <!-- V1.2.10: 案件信息编辑弹框公共组件（详情页内弹出，不跳列表页） -->
     <script src="../js/case-edit-dialog.js?v=1"></script>
-    <script src="../js/case-files.js?v=139"></script>
+    <script src="../js/case-files.js?v=142"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {

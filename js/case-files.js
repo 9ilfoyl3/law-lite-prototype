@@ -1114,6 +1114,7 @@ function reconfigWithLatestSnapshot() {
         const matTemplateEl = document.getElementById('matTemplate');
         if (matTemplateEl && cfg.template) matTemplateEl.value = cfg.template;
         renderMatReqTemplates(cfg.docType);
+        renderMatTplPreview();   // V1.2.29: 回填最近一次生成的模板后同步预览
     }
     if (cfg.prompt !== undefined) {
         const matRequirementEl = document.getElementById('matRequirement');
@@ -1251,6 +1252,9 @@ function switchGenMethod(method) {
     } else {
         backToMainView();
     }
+    // V1.2.29: 切换生成方式后刷新模板预览（两处都刷，幂等，作为兜底）
+    renderMatTplPreview();
+    renderStepTplPreview();
 }
 
 // ===== 方法1 - 材料生成 =====
@@ -1272,6 +1276,7 @@ function initMaterialGen() {
         renderMatReqTemplates('');
     }
     syncStepConfigFromMaterial();
+    renderMatTplPreview();   // V1.2.29: 初始化后渲染模板预览
 }
 
 // v1.45 链 C: 初始化案件阶段选择项
@@ -1377,18 +1382,115 @@ function buildTemplateSelectHtml(templates, selectedKey) {
     keys.forEach(key => {
         const val = templates[key];
         const name = getTemplateName(val);
+        // V1.2.32: 只显示模板名，不再追加任何后缀。
+        //   来源由下方 optgroup 分组（标准模板 / 我的模板）表达，章节数在模板内容中本就可见。
         const sel = key === selectedKey ? 'selected' : '';
         const opt = `<option value="${key}" ${sel}>${name}</option>`;
         if (val && val.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
     });
     if (stdOpts.length && myOpts.length) {
-        return `<optgroup label="标准模板">${stdOpts.join('')}</optgroup><optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+        return `<optgroup label="标准示例">${stdOpts.join('')}</optgroup><optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
     } else if (stdOpts.length) {
         return stdOpts.join('');
     } else if (myOpts.length) {
-        return `<optgroup label="我的模板">${myOpts.join('')}</optgroup>`;
+        return `<optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
     }
-    return `<option value="">暂无可用模板</option>`;
+    return `<option value="">暂无可用示例</option>`;
+}
+
+// ===== V1.2.32: 模板内容查看入口（取代 V1.2.29 的「选中即内联展开卡片」）=====
+// 设计要点：
+//   1. 按需查看——下拉框下方只放一行文字链，内容收在弹窗里。
+//      为什么改：V1.2.29 的零点击内联只在「模板内容短」时成立——内容一多会把下方指令、要件等
+//      表单项整体推低；且模板数量少、法官记得住时，常驻内容纯属噪音。**可查 ≠ 常驻**。
+//   2. 弹窗展示 content 原文，不做结构化加工（PRD 13.5）
+//   3. content 为空 → 入口置灰 + hover 提示（沿用 V1.1.2 修改建议按钮 / V1.2.20 确认生成按钮范式，
+//      状态前置优于「点击后才提示」）
+//   4. 技术约束：原生 <select> 的 <option> 只能放纯文本，无法为每个模板各带一个入口；
+//      故入口针对【当前选中】的模板，置于下拉框外侧
+const TPL_VIEW_EMPTY_TIP = '该模板暂未配置内容，生成将按默认结构输出';
+
+function renderTemplatePreviewInto(containerId, templateKey) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!templateKey) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    const all = (typeof getCurrentTemplates === 'function') ? getCurrentTemplates() : {};
+    const tpl = all[templateKey];
+    if (!tpl) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    const hasContent = !!(tpl.content && tpl.content.trim());
+    const icon = '<i class="fas fa-file-alt" style="margin-right:5px;"></i>';
+    if (hasContent) {
+        el.innerHTML = `<a class="tpl-view-link" href="javascript:void(0)"`
+            + ` onclick="openTemplateContentModal('${containerId}')">${icon}查看模板内容</a>`;
+    } else {
+        el.innerHTML = `<span class="tpl-view-link is-disabled" title="${TPL_VIEW_EMPTY_TIP}">`
+            + `${icon}查看模板内容</span>`;
+    }
+    el.style.display = 'block';
+}
+
+// 弹窗展示当前选中模板的 content 原文
+function openTemplateContentModal(containerId) {
+    const selectId = (containerId === 'matTplPreview') ? 'matTemplate' : 'stepTemplate';
+    const sel = document.getElementById(selectId);
+    const key = sel ? sel.value : '';
+    const all = (typeof getCurrentTemplates === 'function') ? getCurrentTemplates() : {};
+    const tpl = all[key];
+    if (!tpl || !tpl.content || !tpl.content.trim()) return;
+    const name = (typeof getTemplateName === 'function') ? getTemplateName(tpl) : (tpl.name || '模板内容');
+
+    closeTemplateContentModal();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'tplContentOverlay';
+    overlay.className = 'modal-overlay show';
+    overlay.onclick = closeTemplateContentModal;
+
+    const dialog = document.createElement('div');
+    dialog.id = 'tplContentModal';
+    dialog.className = 'modal-dialog show';
+    dialog.style.width = '620px';
+    dialog.onclick = function (e) { e.stopPropagation(); };
+    dialog.innerHTML = `
+        <div class="modal-header">
+            <h3>${escapeHtmlForStreaming(name)}</h3>
+            <button class="modal-close" onclick="closeTemplateContentModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <pre class="tpl-content-raw">${escapeHtmlForStreaming(tpl.content)}</pre>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn-secondary" onclick="closeTemplateContentModal()">关闭</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(dialog);
+}
+
+function closeTemplateContentModal() {
+    const o = document.getElementById('tplContentOverlay');
+    if (o) o.remove();
+    const d = document.getElementById('tplContentModal');
+    if (d) d.remove();
+}
+
+function renderMatTplPreview() {
+    const sel = document.getElementById('matTemplate');
+    renderTemplatePreviewInto('matTplPreview', sel ? sel.value : '');
+}
+
+function renderStepTplPreview() {
+    const sel = document.getElementById('stepTemplate');
+    renderTemplatePreviewInto('stepTplPreview', sel ? sel.value : '');
 }
 
 function onMatDocTypeChange(shouldSync = true) {
@@ -1401,6 +1503,7 @@ function onMatDocTypeChange(shouldSync = true) {
         templateSelect.value = templateKeys[0];
     }
     renderMatReqTemplates(docTypeKey);
+    renderMatTplPreview();   // V1.2.29: 切换文书类型后刷新模板预览
     refreshStepsConfig();
     // v1.28: 材料生成 tab 切换文书类型时，同步匹配材料型 workflow（用户侧不感知）
     refreshMaterialWorkflow();
@@ -1478,6 +1581,7 @@ function syncMaterialConfigFromStep() {
 
     if (matRequirementEl) matRequirementEl.value = stepRequirement || '';
     renderMatReqTemplates(stepDocType);
+    renderMatTplPreview();   // V1.2.29: 由分步视图回同步后刷新模板预览
 }
 
 function renderStepGenConfig() {
@@ -1523,6 +1627,7 @@ function renderStepGenConfig() {
         stepTemplate = templateKeys[0];
         templateSelect.value = stepTemplate;
     }
+    renderStepTplPreview();   // V1.2.29: 分步生成配置重建后刷新模板预览
 }
 
 function onStepDocTypeChange(docTypeKey) {
@@ -1539,10 +1644,12 @@ function onStepDocTypeChange(docTypeKey) {
     updateCaseStageRowVisibility();
     updateStartStepsButtonState();
     renderSteps();
+    renderStepTplPreview();   // V1.2.29: 切换文书类型后刷新模板预览
 }
 
 function onStepTemplateChange(templateKey) {
     stepTemplate = templateKey;
+    renderStepTplPreview();   // V1.2.29: 切换模板后立即刷新预览
 }
 
 function generateByMaterial() {
@@ -2037,6 +2144,13 @@ function generateSectionContent(title, desc, caseData, orgType) {
     }
     if (t.indexOf('事实') >= 0) {
         return `经审理查明：${partyA}与${partyB}因${cause}产生纠纷...（结合材料归纳案件事实）`;
+    }
+    // V1.2.29: 法律适用分支——B 类模板显式设「法律适用依据」章节后，生成结果必须含法条。
+    //   背景：模板补齐 content 后生成由 C 类兜底切到 B 类，而 B 类原先不输出法条，
+    //   会掐断「文书精修页法条链接 Ctrl+点击查看」的演示链路，故在此补回。
+    //   匹配词刻意不含裸「依据」——避免误吞「执行依据」「报告义务依据」等非法条章节。
+    if (t.indexOf('法律适用') >= 0 || t.indexOf('法律依据') >= 0 || t.indexOf('法条') >= 0) {
+        return `本案适用的法律适用依据为：《中华人民共和国民法典》第一千一百六十五条、第一千一百七十九条、第一千一百八十三条、第一千二百零八条，《中华人民共和国道路交通安全法》第七十六条，《中华人民共和国民事诉讼法》第一百六十二条。（结合本案事实准确引用具体条款）`;
     }
     if (t.indexOf('理由') >= 0 || t.indexOf('认为') >= 0) {
         return `本院认为，本案的争议焦点在于${cause}的相关事实认定和法律适用...（结合要件与证据进行说理）`;
@@ -4882,6 +4996,7 @@ function applyRegenerateConfig() {
         const matTemplateEl = document.getElementById('matTemplate');
         if (matTemplateEl && d.template) matTemplateEl.value = d.template;
         renderMatReqTemplates(d.docType);
+        renderMatTplPreview();   // V1.2.29: 恢复历史版本配置后同步预览
     }
     if (d.requirement !== undefined) {
         const matRequirementEl = document.getElementById('matRequirement');

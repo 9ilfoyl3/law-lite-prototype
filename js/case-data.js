@@ -1098,18 +1098,190 @@ const defaultDocTypesByOrg = {
     }
 };
 
-const defaultDocTemplatesByOrg = {
+// ===== V1.2.30: 内置文书模板内容的唯一真相源 =====
+// 为什么单独抽出来（V1.2.29 实测缺陷的修复，详见 PRD 13.13）：
+//   模板数据实际有三个来源，运行时以 localStorage 为准 ——
+//     ① 本文件的代码默认值
+//     ② localStorage.CASE_DATA_KEY：loadBusinessSystems() 会用它【整体替换】businessSystems（不是合并）
+//     ③ localStorage.adminDocTemplates / myDocTemplates：管理端、用户侧覆盖，由 mergeXxx 合并
+//   V1.2.29 只改了 ①，而 ② 会把 ① 整个顶掉（是整体替换、不是合并）；
+//   initCaseData() 每次加载还会执行 Object.assign({}, defaultDocTemplatesByOrg[org], system.docTemplates)
+//   → 结果以 localStorage 旧值为准，再由 normalizeDocTemplates 把「名称字符串」转成 content 为空的对象
+//   —— 于是代码里的新内容永远进不了运行时（页面表现为：下拉项无「N 章」、预览卡片显示空态文案）。
+// 不变式（后续改动必须遵守）：
+//   1) 新增 / 修改内置模板只改这里，不得在别处再复制一份
+//   2) businessSystems.court.docTemplates 与 defaultDocTemplatesByOrg.court 均由这里派生
+//   3) 兜底规则为「仅 content 为空时补」—— 管理端对同一 key 的显式覆盖优先级更高，不得被冲掉
+//   ⚠️ content 为 mock 假数据，仅用于原型演示；真实模板内容需业务方（法官 / 书记员）补录
+const BUILTIN_DOC_TEMPLATE_META = {
     court: {
-        'judgment-civil-1st': '民事判决书（一审普通程序）',
-        'judgment-civil-simple': '民事判决书（简易程序）',
-        'ruling-civil': '民事裁定书',
-        'mediation-civil': '民事调解书',
-        'trial-outline': '庭审提纲',
-        'court-investigation-outline': '法庭调查提纲',
-        'execution-notice': '执行通知书',
-        'property-report': '财产报告令',
-        'service-notice': '送达回证'
-    },
+        'judgment-civil-1st': {
+            name: '民事判决书（一审普通程序）',
+            docType: 'judgment',
+            content: [
+                '1. 诉讼参加人：列明原告、被告及委托诉讼代理人的身份信息与到庭情况',
+                '2. 原告诉讼请求：按原文逐条输出原告的诉讼请求及事实理由，不总结、不遗漏',
+                '3. 被告答辩意见：引用原文输出被告答辩，多被告时分段输出',
+                '4. 争议焦点：结合双方主张提炼本案核心争议',
+                '5. 事实认定：经审理查明，结合证据材料认定案件事实',
+                '6. 法律适用依据：列明本案适用的法律法规及具体条款',
+                '7. 判决主文：逐项写明裁判结果与诉讼费负担'
+            ].join('\n')
+        },
+        'judgment-civil-simple': {
+            name: '民事判决书（简易程序）',
+            docType: 'judgment',
+            content: [
+                '1. 诉讼参加人：简要列明原被告身份信息与到庭情况',
+                '2. 诉讼请求与答辩：概括原告请求与被告意见要点',
+                '3. 事实认定：经审理查明，简要认定案件事实',
+                '4. 法律适用依据：列明本案适用的法律法规及具体条款',
+                '5. 判决主文：写明裁判结果与诉讼费负担'
+            ].join('\n')
+        },
+        'ruling-civil': {
+            name: '民事裁定书',
+            docType: 'ruling',
+            content: [
+                '1. 申请事项：写明申请人提出的程序性申请内容',
+                '2. 事实与理由：简述作出裁定所依据的程序事实',
+                '3. 法律适用依据：列明作出该裁定的程序法依据',
+                '4. 裁定主文：写明裁定结果及救济途径'
+            ].join('\n')
+        },
+        'mediation-civil': {
+            name: '民事调解书',
+            docType: 'mediation',
+            content: [
+                '1. 诉讼参加人：列明原被告及委托代理人身份信息',
+                '2. 案件事实：简述双方争议的事实背景与诉辩主张',
+                '3. 调解协议：逐条写明双方自愿达成的协议内容',
+                '4. 确认与效力：确认协议自愿合法，载明调解书生效条件'
+            ].join('\n')
+        },
+        'trial-outline': {
+            name: '庭审提纲',
+            docType: 'trial',
+            content: [
+                '1. 庭前准备：核对当事人身份、宣布法庭纪律与诉讼权利义务',
+                '2. 法庭调查：组织举证质证，围绕要件逐项核查',
+                '3. 法庭辩论：归纳争议焦点，引导双方发表辩论意见',
+                '4. 最后陈述与调解：征询双方最后意见及调解意愿'
+            ].join('\n')
+        },
+        'court-investigation-outline': {
+            name: '法庭调查提纲',
+            docType: 'trial',
+            content: [
+                '1. 当事人陈述：依次听取原告主张与被告答辩',
+                '2. 证据交换与质证：按证据清单逐份举证、质证并认证',
+                '3. 事实核查：围绕要件逐项核对已知事实与待证事实',
+                '4. 法庭询问：针对争议焦点向双方发问'
+            ].join('\n')
+        },
+        'execution-notice': {
+            name: '执行通知书',
+            docType: 'execution',
+            content: [
+                '1. 执行依据：载明据以执行的生效法律文书名称与案号',
+                '2. 执行事项：责令被执行人履行的义务、履行期限与方式',
+                '3. 财产申报要求：责令被执行人如实申报财产状况',
+                '4. 法律后果：告知逾期不履行将采取的强制措施与法律责任'
+            ].join('\n')
+        },
+        'property-report': {
+            name: '财产报告令',
+            docType: 'execution',
+            content: [
+                '1. 报告义务依据：载明责令报告财产的法律依据与期限',
+                '2. 报告内容范围：列明应当报告的财产类型与报告期间',
+                '3. 报告方式与期限：说明提交方式、期限及补充报告义务',
+                '4. 法律后果：告知拒绝报告或虚假报告的法律后果'
+            ].join('\n')
+        },
+        'service-notice': {
+            name: '送达回证',
+            docType: 'execution',
+            content: [
+                '1. 送达文书信息：载明受送达文书名称、案号与份数',
+                '2. 受送达人信息：填写受送达人姓名或名称及送达地址',
+                '3. 送达方式与日期：记录送达方式及实际送达日期',
+                '4. 签收与备注：受送达人签章、代收人关系说明与备注'
+            ].join('\n')
+        }
+    }
+};
+
+// 由 META 克隆出运行时使用的模板对象（深拷贝，避免运行时的归一化 / 合并改写污染常量）
+function cloneBuiltinDocTemplates(org) {
+    const meta = BUILTIN_DOC_TEMPLATE_META[org];
+    if (!meta) return {};
+    const out = {};
+    Object.entries(meta).forEach(([key, def]) => {
+        out[key] = {
+            name: def.name,
+            docType: def.docType,
+            content: def.content || ''
+        };
+    });
+    return out;
+}
+
+// ===== V1.2.30: 内置模板内容兜底（每次加载都执行，不受 DATA_VERSION 门控）=====
+// 背景：localStorage 中的历史数据会把内置模板整体覆盖成「只有名称、content 为空」的旧形态，
+//   导致用户侧下拉项没有「N 章」、预览卡片显示空态文案（详见 PRD 13.13）。
+// 规则：
+//   1) 内置模板（META 中的 key）以代码为唯一真相源 —— 缺失、或为旧字符串形态、或字段为空时补全
+//   2) content 仅在「为空」时补 —— 保留管理端「编辑内置示例」对同一 key 的显式覆盖（该 key 会写入
+//      localStorage.adminDocTemplates，是本项目既有的自定义覆盖口径，不得被兜底冲掉）
+//   3) 管理端显式停用的内置模板不补全（尊重停用状态）
+// 为什么不能放进 migrateDataIfNeeded 的版本门控内：测试/演示时版本号通常不变，门控会整块跳过，
+//   于是「新内容进不了运行时」这个缺陷会反复出现。
+function applyBuiltinTemplateMeta(org, system) {
+    if (!system || !system.docTemplates) return;
+    const meta = BUILTIN_DOC_TEMPLATE_META[org];
+    if (!meta) return;
+
+    // 读取管理端的停用列表（结构：adminDocTemplates[org].__builtinDisabled__ = [key, ...]）
+    let disabled = [];
+    try {
+        const all = JSON.parse(localStorage.getItem('adminDocTemplates')) || {};
+        const orgData = all[org] || {};
+        if (Array.isArray(orgData.__builtinDisabled__)) disabled = orgData.__builtinDisabled__;
+    } catch (e) {
+        disabled = [];
+    }
+
+    Object.entries(meta).forEach(([key, def]) => {
+        if (disabled.indexOf(key) >= 0) return;
+        const cur = system.docTemplates[key];
+        // 缺失 / 旧字符串形态 / 非对象：整条按 META 重建
+        if (typeof cur === 'string' || !cur || typeof cur !== 'object') {
+            system.docTemplates[key] = {
+                name: (typeof cur === 'string' && cur) ? cur : def.name,
+                docType: def.docType,
+                content: def.content || ''
+            };
+            return;
+        }
+        // 对象形态：缺什么补什么（content 为空正是本次缺陷的直接表现）
+        if (!cur.name) cur.name = def.name;
+        if (!cur.docType) cur.docType = def.docType;
+        if (!cur.content) cur.content = def.content || '';
+    });
+}
+
+// 对当前全部业务系统执行兜底（在「加载 localStorage 数据 + 迁移」之后调用）
+function applyBuiltinTemplateMetaAll() {
+    Object.entries(businessSystems).forEach(([org, system]) => {
+        if (org === '_dataVersion' || !system || !Array.isArray(system.cases)) return;
+        applyBuiltinTemplateMeta(org, system);
+    });
+}
+
+const defaultDocTemplatesByOrg = {
+    // V1.2.30: 名称由 BUILTIN_DOC_TEMPLATE_META 派生（避免名称与内容两处维护）
+    court: Object.fromEntries(Object.entries(BUILTIN_DOC_TEMPLATE_META.court).map(([k, v]) => [k, v.name])),
     procuratorate: {
         'prosecution-indictment': '起诉书',
         'prosecution-notice': '审查起诉告知书',
@@ -1571,17 +1743,9 @@ let businessSystems = {
             execution: { name: '执行文书', templates: ['execution-notice', 'property-report', 'service-notice'] },
             materialSummary: { name: '材料总结', templates: [] }
         },
-        docTemplates: {
-            'judgment-civil-1st': '民事判决书（一审普通程序）',
-            'judgment-civil-simple': '民事判决书（简易程序）',
-            'ruling-civil': '民事裁定书',
-            'mediation-civil': '民事调解书',
-            'trial-outline': '庭审提纲',
-            'court-investigation-outline': '法庭调查提纲',
-            'execution-notice': '执行通知书',
-            'property-report': '财产报告令',
-            'service-notice': '送达回证'
-        },
+        // V1.2.30: 内置模板内容统一由 BUILTIN_DOC_TEMPLATE_META 提供（唯一真相源，见 PRD 13.13.4）。
+        //   localStorage 中的历史数据可能整体覆盖本对象，由 applyBuiltinTemplateMeta() 在每次加载时兜底补全。
+        docTemplates: cloneBuiltinDocTemplates('court'),
         statusConfig: {
             pending: '待开庭',
             ongoing: '审理中',
@@ -2362,4 +2526,10 @@ if (loadBusinessSystems()) {
 // 必须在 loadBusinessSystems 之后调用：否则会在默认数据上先设置标记，导致老用户加载旧数据后跳过追加
 ensureExtraCases();
 initCaseData();
+// V1.2.30: 内置模板内容兜底 —— 必须放在【最后一次 initCaseData() 之后】：
+//   initCaseData() 每次加载都会重跑 mergeAdminDocTemplates()（它会把管理端记录里的空 content 写回），
+//   兜底放在其后，才能保证「内置模板预览永远有内容」。
+//   同时它不受 migrateDataIfNeeded() 的 DATA_VERSION 门控约束，避免"版本号没变就不补"。
+//   详见 PRD 13.13。
+applyBuiltinTemplateMetaAll();
 saveBusinessSystems();

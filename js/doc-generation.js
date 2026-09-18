@@ -92,7 +92,11 @@ function getUrlParam(name) {
 function getTemplateName() {
     const sys = businessSystems[org];
     if (!sys || !sys.docTemplates) return '法律文书';
-    return sys.docTemplates[template] || '法律文书';
+    // V1.2.29: docTemplates 的值已由「名称字符串」升级为「{name, content, ...} 对象」，
+    //   不兼容会导致标题渲染成 [object Object]
+    const t = sys.docTemplates[template];
+    if (typeof t === 'string') return t;
+    return (t && t.name) || '法律文书';
 }
 
 function getDocTypeName() {

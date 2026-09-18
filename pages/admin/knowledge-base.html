@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -844,7 +844,7 @@
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
                     <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
-                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
@@ -1062,7 +1062,7 @@
         let categories = JSON.parse(localStorage.getItem('adminKbCategories')) || [
             { id: 'law', name: '法律法规', icon: 'green', iconClass: 'fa-gavel', count: 6, status: 'active', desc: '各类法律法规条文汇编' },
             { id: 'case', name: '案例库', icon: 'orange', iconClass: 'fa-balance-scale', count: 3, status: 'active', desc: '典型案例及裁判文书' },
-            { id: 'template', name: '文书模板', icon: 'purple', iconClass: 'fa-file-signature', count: 2, status: 'active', desc: '标准法律文书模板' },
+            { id: 'template', name: '文书示例', icon: 'purple', iconClass: 'fa-file-signature', count: 2, status: 'active', desc: '标准法律文书示例' },
             { id: 'local', name: '地方法规', icon: 'cyan', iconClass: 'fa-map-marker-alt', count: 1, status: 'active', desc: '各地方法规规章' }
         ];
 

@@ -928,7 +928,7 @@
         editingIsBuiltin = false;
         document.getElementById('modalTitle').textContent = '新增类型';
         document.getElementById('tplName').value = '';
-        document.getElementById('nameHint').textContent = '用于模板和指令的分类，不可与现有类型重名';
+        document.getElementById('nameHint').textContent = '用于示例和指令的分类，不可与现有类型重名';
         document.getElementById('nameHint').style.color = '';
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
@@ -944,7 +944,7 @@
         document.getElementById('tplName').value = t.name;
         document.getElementById('nameHint').textContent = editingIsBuiltin
             ? '修改后将覆盖内置配置；删除自定义覆盖可恢复内置默认'
-            : '用于模板和指令的分类，不可与现有类型重名';
+            : '用于示例和指令的分类，不可与现有类型重名';
         document.getElementById('nameHint').style.color = '';
         document.getElementById('tplModal').classList.add('show');
     };
@@ -1051,7 +1051,7 @@
 
         if (tplCount > 0 || promptCount > 0) {
             const reasons = [];
-            if (tplCount > 0) reasons.push(tplCount + ' 个模板');
+            if (tplCount > 0) reasons.push(tplCount + ' 个示例');
             if (promptCount > 0) reasons.push(promptCount + ' 条指令');
             showNotification('该类型下仍存在 ' + reasons.join('、') + '，请先迁移或删除后再删除类型', 'warning');
             return;

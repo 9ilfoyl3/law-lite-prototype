@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文书模板管理 - AI法官助理管理后台</title>
+    <title>文书示例管理 - AI法官助理管理后台</title>
     <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -192,9 +192,9 @@
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
                     <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
-                    <a href="doc-templates.html" class="nav-item active"><i class="fas fa-file-alt"></i><span>文书模板管理</span></a>
+                    <a href="doc-templates.html" class="nav-item active"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
-                    <a href="user-templates.html" class="nav-item"><i class="fas fa-search"></i><span>用户模板检索</span></a>
+                    <a href="user-templates.html" class="nav-item"><i class="fas fa-search"></i><span>用户示例检索</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
                     <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
                     <a href="model-management.html" class="nav-item" style="display:none;"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
@@ -212,7 +212,7 @@
                 <div class="breadcrumb">
                     <a href="dashboard.html">首页</a>
                     <i class="fas fa-chevron-right breadcrumb-separator"></i>
-                    <span>文书模板管理</span>
+                    <span>文书示例管理</span>
                 </div>
                 <div class="header-right">
                     <div class="user-menu">
@@ -228,8 +228,8 @@
             <div class="content">
                 <div class="page-header">
                     <div class="page-title-wrap">
-                        <h1>文书模板管理</h1>
-                        <p>维护各业务系统的文书模板，关联文书类型</p>
+                        <h1>文书示例管理</h1>
+                        <p>维护各业务系统的文书示例，关联文书类型</p>
                     </div>
                     <div class="business-switch">
                         <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
@@ -244,15 +244,15 @@
                     </div>
                     <div class="tpl-right">
                         <div class="tpl-toolbar">
-                            <span class="title" id="rightTitle">全部模板</span>
+                            <span class="title" id="rightTitle">全部示例</span>
                             <button class="btn btn-primary" onclick="openAddModal()">
-                                <i class="fas fa-plus"></i> 新增模板
+                                <i class="fas fa-plus"></i> 新增示例
                             </button>
                         </div>
                         <table class="tpl-table">
                             <thead>
                                 <tr>
-                                    <th>模板名</th>
+                                    <th>示例名</th>
                                     <th>所属类型</th>
                                     <th>状态</th>
                                     <th>上传时间</th>
@@ -264,7 +264,7 @@
                         </table>
                         <div id="emptyState" class="empty-state" style="display:none;">
                             <i class="fas fa-file-alt"></i>
-                            <p>暂无模板，点击「新增模板」创建</p>
+                            <p>暂无示例，点击「新增示例」创建</p>
                         </div>
                     </div>
                 </div>
@@ -275,9 +275,9 @@
     <!-- 新增/编辑弹窗 -->
     <div class="modal-mask" id="tplModal">
         <div class="modal-box">
-            <h3 id="modalTitle">新增模板</h3>
+            <h3 id="modalTitle">新增示例</h3>
             <div class="form-row">
-                <label class="form-label">模板名 <span class="required">*</span></label>
+                <label class="form-label">示例名 <span class="required">*</span></label>
                 <input type="text" class="form-input" id="tplName" placeholder="如：民事判决书（一审普通程序）">
             </div>
             <div class="form-row">
@@ -285,8 +285,8 @@
                 <select class="form-select" id="tplDocType"></select>
             </div>
             <div class="form-row">
-                <label class="form-label">模板正文</label>
-                <textarea class="form-textarea" id="tplContent" placeholder="请输入模板内容参考文本，描述文书应包含哪些内容板块/段落（如：原告诉请、被告答辩、争议焦点、事实认定、裁判结果）..." style="min-height:200px;"></textarea>
+                <label class="form-label">示例正文</label>
+                <textarea class="form-textarea" id="tplContent" placeholder="请输入示例内容参考文本，描述文书应包含哪些内容板块/段落（如：原告诉请、被告答辩、争议焦点、事实认定、裁判结果）..." style="min-height:200px;"></textarea>
                 <div class="tpl-example-row">
                     <a href="javascript:void(0)" onclick="insertTemplateExample()"><i class="fas fa-lightbulb"></i> 插入示例文本</a>
                     <span class="tpl-example-hint">（参考示例，可在此基础上修改）</span>
@@ -295,7 +295,7 @@
                     <span class="tpl-example-hint">（.txt/.doc/.docx，导入后可继续编辑）</span>
                     <input type="file" id="tplFileInput" accept=".txt,.doc,.docx" style="display:none" onchange="handleTemplateFileUpload(event)">
                 </div>
-                <div class="form-hint">模板正文作为给 AI 的内容参考文本，文书生成时 AI 据此组织文书结构</div>
+                <div class="form-hint">示例正文作为给 AI 的内容参考文本，文书生成时 AI 据此组织文书结构</div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
@@ -318,7 +318,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=65"></script>
-    <script src="../../js/admin-doc-templates.js?v=8"></script>
+    <script src="../../js/case-data.js?v=67"></script>
+    <script src="../../js/admin-doc-templates.js?v=9"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -8520,14 +8520,14 @@
         const publicCategories = [
             { id: 'law', name: '法律法规', icon: 'green', iconClass: 'fa-gavel' },
             { id: 'case', name: '案例库', icon: 'orange', iconClass: 'fa-balance-scale' },
-            { id: 'template', name: '文书模板', icon: 'purple', iconClass: 'fa-file-alt' },
+            { id: 'template', name: '文书示例', icon: 'purple', iconClass: 'fa-file-alt' },
             { id: 'local', name: '地方法规', icon: 'cyan', iconClass: 'fa-map-marker-alt' }
         ];
 
         // 个人库分类（排除我的上传）
         const personalCategories = [
             { id: 'my-favorites', name: '我的收藏', icon: 'pink', iconClass: 'fa-star' },
-            { id: 'my-templates', name: '我的模板', icon: 'teal', iconClass: 'fa-file-code' },
+            { id: 'my-templates', name: '我的示例', icon: 'teal', iconClass: 'fa-file-code' },
             { id: 'my-notes', name: '我的笔记', icon: 'purple', iconClass: 'fa-sticky-note' }
         ];
 
@@ -8542,8 +8542,8 @@
             { id: 'kb4', name: '最高法指导案例', category: 'case', description: '最高人民法院指导性案例', icon: 'orange', iconClass: 'fa-balance-scale' },
             { id: 'kb5', name: '最高检指导案例', category: 'case', description: '最高人民检察院指导性案例', icon: 'orange', iconClass: 'fa-balance-scale' },
             { id: 'kb6', name: '地方法院典型案例', category: 'case', description: '各地方法院典型案例', icon: 'orange', iconClass: 'fa-file-contract' },
-            { id: 'kb8', name: '民事判决书模板', category: 'template', description: '各类民事判决书模板', icon: 'purple', iconClass: 'fa-file-signature' },
-            { id: 'kb9', name: '裁定书与调解书模板', category: 'template', description: '裁定书、调解书模板', icon: 'purple', iconClass: 'fa-file-alt' },
+            { id: 'kb8', name: '民事判决书示例', category: 'template', description: '各类民事判决书示例', icon: 'purple', iconClass: 'fa-file-signature' },
+            { id: 'kb9', name: '裁定书与调解书示例', category: 'template', description: '裁定书、调解书示例', icon: 'purple', iconClass: 'fa-file-alt' },
             { id: 'kb10', name: '广东省地方法规', category: 'local', description: '广东省地方性法规汇编', icon: 'cyan', iconClass: 'fa-map-marker-alt' }
         ];
 
@@ -8554,9 +8554,9 @@
             { id: 'personal-kb3', name: '典型案例集锦', category: 'my-favorites', description: '具有参考价值的案例', icon: 'pink', iconClass: 'fa-star' },
             { id: 'personal-kb4', name: '劳动争议案例库', category: 'my-favorites', description: '劳动争议典型案例', icon: 'pink', iconClass: 'fa-star' },
             { id: 'personal-kb5', name: '合同纠纷裁判规则', category: 'my-favorites', description: '合同纠纷裁判规则汇总', icon: 'pink', iconClass: 'fa-star' },
-            { id: 'personal-kb6', name: '民事判决书模板', category: 'my-templates', description: '各类民事判决书模板', icon: 'teal', iconClass: 'fa-file-signature' },
-            { id: 'personal-kb7', name: '庭审笔录模板', category: 'my-templates', description: '各类庭审笔录模板', icon: 'teal', iconClass: 'fa-clipboard-list' },
-            { id: 'personal-kb8', name: '裁定书与调解书模板', category: 'my-templates', description: '裁定书、调解书模板', icon: 'teal', iconClass: 'fa-file-alt' },
+            { id: 'personal-kb6', name: '民事判决书示例', category: 'my-templates', description: '各类民事判决书示例', icon: 'teal', iconClass: 'fa-file-signature' },
+            { id: 'personal-kb7', name: '庭审笔录示例', category: 'my-templates', description: '各类庭审笔录示例', icon: 'teal', iconClass: 'fa-clipboard-list' },
+            { id: 'personal-kb8', name: '裁定书与调解书示例', category: 'my-templates', description: '裁定书、调解书示例', icon: 'teal', iconClass: 'fa-file-alt' },
             { id: 'personal-kb9', name: '办案心得笔记', category: 'my-notes', description: '办案经验总结', icon: 'purple', iconClass: 'fa-sticky-note' },
             { id: 'personal-kb10', name: '法律研究笔记', category: 'my-notes', description: '疑难法律问题研究', icon: 'purple', iconClass: 'fa-sticky-note' },
             { id: 'personal-kb11', name: '会议记录整理', category: 'my-notes', description: '会议培训记录', icon: 'purple', iconClass: 'fa-sticky-note' },
