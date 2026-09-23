@@ -401,35 +401,29 @@
         empty.style.display = 'none';
 
         tbody.innerHTML = elements.map((p, idx) => {
-            const badge = p.isBuiltin
-                ? '<span class="tpl-badge builtin">内置</span>'
-                : '<span class="tpl-badge custom">自定义</span>';
+            // V1.3.15 A21: 「来源」列已删除（同案由下取值必然相同，顶部副标题已显示整体来源）
             // 适用案字标签
             const cw = Array.isArray(p.caseWords) ? p.caseWords : [];
             const cwCell = cw.length
                 ? cw.map(w => '<span class="cw-tag">' + escapeHtml(w) + '</span>').join('')
                 : '<span class="cw-tag universal">通用</span>';
-            // v1.2: 启用/停用状态徽章与按钮
+            // v1.2: 启用/停用状态徽章与按钮（V1.3.24 A31：状态类名 status-on/off、切换类名 toggle-off/on 与示例/指令统一；灰/绿配色）
             const isEnabled = p.enabled !== false;
             const statusBadge = isEnabled
-                ? '<span class="status-badge enabled">已启用</span>'
-                : '<span class="status-badge disabled">已停用</span>';
+                ? '<span class="status-badge status-on">已启用</span>'
+                : '<span class="status-badge status-off">已停用</span>';
             const toggleBtn = isEnabled
-                ? '<button class="action-btn disable" onclick="toggleElementEnabled(' + idx + ')">停用</button>'
-                : '<button class="action-btn enable" onclick="toggleElementEnabled(' + idx + ')">启用</button>';
-            // 内置要件：可编辑（另存为自定义），不可删除
-            // 自定义要件：可编辑、可删除
+                ? '<button class="action-btn toggle-off" onclick="toggleElementEnabled(' + idx + ')">停用</button>'
+                : '<button class="action-btn toggle-on" onclick="toggleElementEnabled(' + idx + ')">启用</button>';
+            // V1.3.26 A33: 删除按钮每行常驻可用，与状态/来源解耦——内置要件的删除＝自动生成案由覆盖后单条移除（见 deleteElement），误删可经「恢复内置」还原
             const actions = '<button class="action-btn edit" onclick="editElement(' + idx + ')">编辑</button>'
                 + toggleBtn
-                + (p.isBuiltin
-                    ? '<button class="action-btn delete" disabled title="内置要件不可直接删除，如需删除请使用「恢复内置」后重新维护">删除</button>'
-                    : '<button class="action-btn delete" onclick="deleteElement(' + idx + ')">删除</button>');
+                + '<button class="action-btn delete" onclick="deleteElement(' + idx + ')">删除</button>';
             return '<tr>'
                 + '<td class="tpl-name-cell">' + escapeHtml(p.name || '') + '</td>'
                 + '<td class="tpl-desc-cell">' + escapeHtml(p.desc || '') + '</td>'
                 + '<td class="tpl-question-cell">' + escapeHtml(p.question || '') + '</td>'
                 + '<td>' + cwCell + '</td>'
-                + '<td>' + badge + '</td>'
                 + '<td>' + statusBadge + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
@@ -655,23 +649,37 @@
     };
 
     // ===== 删除 =====
+    // V1.3.26 A33: 删除按钮与状态/来源解耦，每行常驻可用
+    // - 自定义要件：直接从覆盖数组移除
+    // - 内置要件：先自动生成该案由自定义覆盖（与「停用」同 baseline 机制），再移除该条；可经「恢复内置」整组还原
     window.deleteElement = function(idx) {
+        if (!currentCause) {
+            showNotification('请先选择案由', 'error');
+            return;
+        }
         const elements = getEffectiveElements(currentOrg, currentCause);
         const p = elements[idx];
         if (!p) return;
-        if (p.isBuiltin) {
-            showNotification('内置要件不可删除', 'warning');
-            return;
-        }
+        const wasBuiltin = !!p.isBuiltin;
         showConfirm('删除要件', '确定删除要件「' + (p.name || '') + '」吗？此操作不可恢复。', () => {
             const orgData = getOrgData(currentOrg);
+            // V1.3.26 A33: 内置要件首次删除——先整组转自定义覆盖（保留其余内置条目），再移除目标条
+            if (!orgData[currentCause]) {
+                orgData[currentCause] = elements.map(e => ({
+                    name: e.name, desc: e.desc, question: e.question,
+                    caseWords: Array.isArray(e.caseWords) ? e.caseWords : [],
+                    enabled: e.enabled !== false
+                }));
+            }
             const list = (orgData[currentCause] || []).slice();
             list.splice(idx, 1);
             orgData[currentCause] = list;
             setOrgData(currentOrg, orgData);
             renderLeft();
             renderRight();
-            showNotification('要件已删除', 'success');
+            showNotification(wasBuiltin
+                ? '要件已删除（该案由已转为自定义覆盖，可通过「恢复内置」还原）'
+                : '要件已删除', 'success');
         });
     };
 
@@ -701,9 +709,9 @@
         pendingConfirmAction = onConfirm;
         const btn = document.getElementById('confirmBtn');
         btn.onclick = function() {
+            const action = pendingConfirmAction;   // V1.3 修复：先取回调再关弹窗（closeConfirm 会把 pendingConfirmAction 置空，原写法导致确认回调永不执行）
             closeConfirm();
-            if (typeof pendingConfirmAction === 'function') pendingConfirmAction();
-            pendingConfirmAction = null;
+            if (typeof action === 'function') action();
         };
         document.getElementById('confirmModal').classList.add('show');
     }

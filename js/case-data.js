@@ -241,10 +241,15 @@ function getAdminDocTypes(org) {
     const result = {};
     // 内置类型
     Object.entries(defaults).forEach(([key, cfg]) => {
+        // V1.3.27 A34: 补出 enabled——管理后台要展示「已启用/已停用」；
+        // v1.34 起停用类型会被 mergeAdminDocTypes 从 system.docTypes 删除（用户侧不可见），
+        // 但 adminDocTypes 里的原始记录仍在，故此处可如实反映停用覆盖。
+        const override = customs[key];
         result[key] = {
             name: cfg.name || key,
             icon: cfg.icon || 'fa-folder',
             isBuiltin: true,
+            enabled: !(override && override.enabled === false),
             templates: cfg.templates || []
         };
     });
@@ -254,12 +259,113 @@ function getAdminDocTypes(org) {
             result[key] = {
                 name: cfg.name || key,
                 icon: cfg.icon || 'fa-folder',
-                isBuiltin: false
+                isBuiltin: false,
+                enabled: cfg.enabled !== false
             };
         }
     });
     return result;
 }
+
+// ===== V1.3.27 A34: 文书类型写操作 =====
+// 背景：旧「文书类型管理」页（doc-types.html / admin-doc-types.js）已废弃删除，
+// 类型维护能力并入「文书流程管理」页，故写操作从 admin-doc-types.js 上移到此处，
+// 与读取函数 getAdminDocTypes 同处一层，保证"类型的读写同源"。
+// 写入目标仍是 localStorage.adminDocTypes[org][key]（历史数据结构不变，零迁移）。
+
+// 生成唯一类型 key（沿用旧 admin-doc-types.js 的规则）
+function genDocTypeKey() {
+    return 'custom-' + Date.now().toString(36);
+}
+
+// 新增或更新一个文书类型：cfg 形如 { name, enabled }
+// 内置类型被改名/停用时不改动内置定义，而是写同名覆盖项（与 v1.21 覆盖语义一致）
+function saveAdminDocType(org, key, cfg) {
+    let all = {};
+    try {
+        all = JSON.parse(localStorage.getItem('adminDocTypes')) || {};
+    } catch (e) {
+        all = {};
+    }
+    if (!all[org]) all[org] = {};
+    const prev = all[org][key] || {};
+    all[org][key] = Object.assign({}, prev, cfg);
+    localStorage.setItem('adminDocTypes', JSON.stringify(all));
+    return key;
+}
+
+// 删除一个文书类型的自定义记录（仅自定义项有意义；内置项删除 = 写一条 enabled:false 的覆盖）
+function removeAdminDocType(org, key) {
+    let all = {};
+    try {
+        all = JSON.parse(localStorage.getItem('adminDocTypes')) || {};
+    } catch (e) {
+        return;
+    }
+    if (all[org] && all[org].hasOwnProperty(key)) {
+        delete all[org][key];
+        localStorage.setItem('adminDocTypes', JSON.stringify(all));
+    }
+}
+
+// 停用/启用一个类型。内置类型停用走"覆盖 enabled:false"（mergeAdminDocTypes 会将其从运行时剔除）
+function setAdminDocTypeEnabled(org, key, enabled) {
+    saveAdminDocType(org, key, { enabled: !!enabled });
+}
+
+// 统计某文书类型被引用情况，用于删除保护
+// V1.3.29 A36: 示例与指令已回归文书类型关联，两项也计入占用（管理端删除类型时据此拦截并提示）
+function countDocTypeUsage(org, typeKey) {
+    const usage = { workflows: 0, templates: 0, prompts: 0 };
+    try {
+        getAllWorkflows(org).forEach(wf => {
+            if (wf && (wf.domain || '') === typeKey) usage.workflows++;
+        });
+    } catch (e) { /* getAllWorkflows 未就绪时忽略 */ }
+    try {
+        const sys = (typeof businessSystems !== 'undefined') ? businessSystems[org] : null;
+        if (sys && sys.docTemplates) {
+            Object.values(sys.docTemplates).forEach(t => {
+                if (t && typeof t === 'object' && (t.docType || '') === typeKey) usage.templates++;
+            });
+        }
+    } catch (e) { /* ignore */ }
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        if (Array.isArray(orgData.__items__)) {
+            orgData.__items__.forEach(p => {
+                if (p && typeof p === 'object' && resolvePromptDocType(org, p) === typeKey) usage.prompts++;
+            });
+        }
+        if (orgData.__materialized__ !== true) {
+            // 未物化：按内置分组 key 计数（旧版分组数据在此不计，清除入口已单独提供）
+            const groups = (typeof defaultRequirementTemplates !== 'undefined' && defaultRequirementTemplates[org]) || {};
+            if (Array.isArray(groups[typeKey])) usage.prompts += groups[typeKey].length;
+        }
+    } catch (e) { /* ignore */ }
+    return usage;
+}
+
+// V1.3.29 A36: 指令项 → 文书类型 key 的零迁移解析
+// 背景：A34 之前指令按 workflow 关联，历史 __items__ 里只有 workflowIds 没有 docType；
+//       若直接把缺失 docType 的项当"通用"，历史物化数据会全部退化成通用指令（每条指令在每个类型下都出现）。
+// 四级优先：① 显式 docType 字段（含空串＝通用，不再往下推）→ ② 内置 id 前缀（judgment#0 → judgment）
+//         → ③ workflowIds 首个流程的 domain → ④ 通用
+function resolvePromptDocType(org, item) {
+    if (!item || typeof item !== 'object') return '';
+    if (typeof item.docType === 'string') return item.docType;
+    const id = item.id || '';
+    const hash = id.indexOf('#');
+    if (hash > 0) return id.slice(0, hash);
+    const ids = Array.isArray(item.workflowIds) ? item.workflowIds : [];
+    for (let i = 0; i < ids.length; i++) {
+        const wf = getWorkflowById(org, ids[i]);
+        if (wf && wf.domain) return wf.domain;
+    }
+    return '';
+}
+window.resolvePromptDocType = resolvePromptDocType;
 
 // 根据文书类型获取可用模板（反查：遍历所有模板，取 docType 匹配的）
 // v1.21: 不再依赖 type.templates 数组，改为反查模板自身 docType 字段
@@ -308,54 +414,281 @@ const agentflowWorkflowList = [
     { id: 'wf-material-summary-direct', name: '材料总结-直接生成', description: '材料总结直接生成流程' }
 ];
 
-// 获取当前业务系统下某文书类型的 workflow 列表（合并内置 + 自定义）
-// typeFilter: 'step' | 'material' | undefined（不过滤）
-// 返回数组：[{id, name, type, caseWords, causes, isBuiltin}]
-// v1.37 (V1.1.10): 内置默认仅 1 个"一步生成型" workflow（全兜底），不生成内置分步型
-//                  （分步型由前端 stepConfigsByOrg 硬编码提供，仅裁判文书有）
-function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
-    // 1. 取内置 workflow（仅一步生成型，全兜底）
-    // v1.35: 内置 workflow 默认使用 DEFAULT_MODEL_ID（千问3.6）
-    const builtins = [];
-    builtins.push({
-        id: 'wf-' + docTypeKey + '-material-default',
-        name: '默认',
-        type: 'material',
-        caseWords: [],
-        causes: [],
-        modelId: DEFAULT_MODEL_ID,
-        isBuiltin: true
-    });
-    // 2. 取自定义 workflow（localStorage.adminWorkflows）
-    let customs = [];
+// ============ V1.3 待办 A2: workflow 扁平化存储 + 内置预置 ============
+// 背景：方案一去掉文书类型后，workflow 成为唯一关联节点，不再挂在文书类型下。
+// 存储：localStorage.adminWorkflows[org] 由「对象 {docTypeKey:[wf]}」改为「数组 [wf]」。
+// 兼容：旧对象结构在读取时展平其 value 数组并按 id 去重，零迁移。
+// 边界：V1.3.27（A34）起旧页 admin-doc-types.js / doc-types.html **已删除**，不再存在第二条读写路径。
+//       类型维护并入「文书流程管理」页；存储仍保持扁平数组（不恢复按类型分组）。
+// 设计详见 docs/V1.3版本PRD（人看）.md 5.2
+
+// V1.3 内置 workflow 预置（按业务系统分组）
+// 命名规范：文书名（审级·方向）——用户端流程卡片直接展示 name，副标题展示 description
+// 生成模式：新增固定一步生成型（沿用 E1，管理后台不新增分步型）；内置分步型可编辑且保留 type
+const BUILTIN_WORKFLOWS_BY_ORG = {
+    court: [
+        // V1.3 A7: domain = 文书域（对应原文书类型 key），用于：分步步骤序列取键、要件自动引入判定、
+        // 版本归档标题。用户手选流程后不再按文书类型路由。管理端新建的自定义流程不带 domain（原型限制）。
+        { id: 'wf-judgment-1st', name: '民事判决书（一审）', type: 'step', domain: 'judgment',
+          caseWords: ['民初'], causes: [], description: '一审普通程序民事判决书', isBuiltin: true },
+        { id: 'wf-judgment-2nd', name: '民事判决书（二审）', type: 'step', domain: 'judgment',
+          caseWords: ['民终'], causes: [], description: '二审民事判决书，重点审查上诉请求与新证据', isBuiltin: true },
+        { id: 'wf-judgment-retrial', name: '民事判决书（再审）', type: 'step', domain: 'judgment',
+          caseWords: ['民再'], causes: [], description: '再审民事判决书', isBuiltin: true },
+        { id: 'wf-judgment-direct', name: '民事判决书（直接生成）', type: 'material', domain: 'judgment',
+          caseWords: [], causes: [], description: '一步生成民事判决书', isBuiltin: true },
+        { id: 'wf-judgment-ruling', name: '民事裁定书', type: 'material', domain: 'ruling',
+          caseWords: [], causes: [], description: '程序性裁定（驳回起诉、管辖异议等）', isBuiltin: true },
+        { id: 'wf-judgment-mediation', name: '民事调解书', type: 'material', domain: 'mediation',
+          caseWords: [], causes: [], description: '调解协议确认', isBuiltin: true },
+        { id: 'wf-trial-outline', name: '庭审提纲', type: 'material', domain: 'trial',
+          caseWords: [], causes: [], description: '开庭前审理提纲生成', isBuiltin: true },
+        { id: 'wf-material-summary', name: '材料总结', type: 'material', domain: 'materialSummary',
+          caseWords: [], causes: [], description: '多份材料归纳总结', isBuiltin: true },
+        // V1.3 A27: 快速生成型内置流程（列表页行内「快速生成」入口恢复后的可选流程）。
+        // 此前内置 9 条里没有一条 type='quick'，恢复入口后下拉会是空的，故补齐。
+        { id: 'wf-judgment-quick', name: '民事判决书', type: 'quick', domain: 'judgment',
+          caseWords: [], causes: [], description: '快速生成民事判决书（不经过分步确认）', isBuiltin: true },
+        { id: 'wf-ruling-quick', name: '民事裁定书', type: 'quick', domain: 'ruling',
+          caseWords: [], causes: [], description: '快速生成民事裁定书', isBuiltin: true },
+        // V1.3 A6: 通用兜底流程——极简通用提示词（提示词属流程开发侧配置，原型不建字段），
+        // 仅一步生成场景固定展示（列表末尾）；getAllWorkflows 保证其恒存在
+        { id: 'wf-general-doc', name: '通用文书生成', type: 'material', domain: '',
+          caseWords: [], causes: [], description: '根据用户指令与示例生成对应文书（兜底未预设场景）', isGeneral: true, isBuiltin: true }
+    ],
+    procuratorate: [
+        { id: 'wf-prosecution-indictment', name: '起诉书', type: 'material',
+          caseWords: [], causes: [], description: '刑事起诉书', isBuiltin: true },
+        // V1.3 A27: 补快速生成型内置流程（见 court 同名注释）
+        { id: 'wf-prosecution-indictment-quick', name: '起诉书', type: 'quick',
+          caseWords: [], causes: [], description: '快速生成刑事起诉书', isBuiltin: true },
+        { id: 'wf-prosecution-decision', name: '不起诉决定书', type: 'material',
+          caseWords: [], causes: [], description: '不起诉决定书', isBuiltin: true }
+    ],
+    justice: [
+        { id: 'wf-reconsideration-decision', name: '行政复议决定书', type: 'material',
+          caseWords: [], causes: [], description: '行政复议决定书', isBuiltin: true },
+        // V1.3 A27: 补快速生成型内置流程（见 court 同名注释）
+        { id: 'wf-reconsideration-quick', name: '行政复议决定书', type: 'quick',
+          caseWords: [], causes: [], description: '快速生成行政复议决定书', isBuiltin: true }
+    ]
+};
+
+// 读取 localStorage.adminWorkflows[org]，兼容新旧两种结构，返回数组
+function readStoredWorkflows(org) {
+    let all = {};
+    try {
+        all = JSON.parse(localStorage.getItem('adminWorkflows')) || {};
+    } catch (e) {
+        console.error('[case-data] readStoredWorkflows 读取 adminWorkflows 失败:', e);
+        return [];
+    }
+    const raw = all[org];
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.slice();
+    if (typeof raw === 'object') {
+        // 旧结构：{ [docTypeKey]: [wf...] } → 展平并按 id 去重
+        const seen = new Set();
+        const out = [];
+        Object.keys(raw).forEach(key => {
+            const arr = raw[key];
+            if (!Array.isArray(arr)) return;
+            arr.forEach(wf => {
+                if (!wf || !wf.id || seen.has(wf.id)) return;
+                seen.add(wf.id);
+                out.push(wf);
+            });
+        });
+        return out;
+    }
+    return [];
+}
+
+// 返回内置 workflow 深拷贝
+function getBuiltinWorkflows(org) {
+    const list = BUILTIN_WORKFLOWS_BY_ORG[org] || [];
+    return JSON.parse(JSON.stringify(list));
+}
+
+// 获取当前业务系统全部 workflow（自定义优先，无自定义时返回内置）
+// 自定义存在时整体覆盖内置（沿用既有语义：首次保存会把内置迁入自定义数组）
+function getAllWorkflows(org) {
+    const stored = readStoredWorkflows(org);
+    let list;
+    if (stored.length > 0) {
+        list = stored.map(wf => ({
+            ...wf,
+            type: wf.type || 'step',
+            caseWords: Array.isArray(wf.caseWords) ? wf.caseWords : [],
+            causes: Array.isArray(wf.causes) ? wf.causes : []
+        }));
+    } else {
+        list = getBuiltinWorkflows(org);
+    }
+    // V1.3 A27: 快速生成型流程恒存在——自定义数组里一条 quick 都没有时，补内置 quick 流程。
+    // 背景：内置 quick 是本版新增，已有 localStorage.adminWorkflows 的浏览器上 stored 里不含它们
+    // （自定义数组整体覆盖内置），列表页「快速生成」下拉会是空的。
+    // 已知副作用：管理员把 quick 流程删光后，内置 quick 会复活（与 A6 通用兜底同一口径，原型可接受）。
+    if (stored.length > 0 && !list.some(wf => (wf.type || 'step') === 'quick')) {
+        getBuiltinWorkflows(org).filter(wf => wf.type === 'quick').forEach(wf => list.push(wf));
+    }
+    // V1.3 A6: 通用兜底流程恒存在——自定义数组覆盖/删除都不影响，缺失时自动追加到末尾
+    if (!list.some(wf => wf.isGeneral === true)) {
+        const builtinGeneral = (getBuiltinWorkflows(org) || []).find(wf => wf.isGeneral === true);
+        if (builtinGeneral) list.push(builtinGeneral);
+    }
+    // V1.3 A6 + A27: 通用兜底流程固定排在末尾。内置数组里它本就在末位，
+    // 但自定义 stored 的顺序不定（管理员保存顺序），补 quick 兜底后也可能被挤到中间，故统一排一次。
+    const gi = list.findIndex(wf => wf.isGeneral === true);
+    if (gi >= 0 && gi !== list.length - 1) {
+        const general = list.splice(gi, 1)[0];
+        list.push(general);
+    }
+    return list;
+}
+
+// 写入（扁平数组），不动其他业务系统的数据
+function saveAllWorkflows(org, list) {
     try {
         const all = JSON.parse(localStorage.getItem('adminWorkflows')) || {};
-        const orgData = all[org] || {};
-        customs = orgData[docTypeKey] || [];
+        all[org] = list;
+        localStorage.setItem('adminWorkflows', JSON.stringify(all));
+        return true;
     } catch (e) {
-        console.error('[case-data] getWorkflowsForDocType 读取 adminWorkflows 失败:', e);
+        console.error('[case-data] saveAllWorkflows 写入失败:', e);
+        return false;
     }
-    // 3. 合并：自定义存在时整体覆盖内置
-    let result;
-    if (customs.length > 0) {
-        // v1.32: 兼容旧数据——无 type 字段按 'step' 处理；补全 causes 字段；steps 字段保留但不再使用
-        result = customs.map(wf => {
-            const type = wf.type || 'step';
-            return {
-                ...wf,
-                type: type,
-                causes: Array.isArray(wf.causes) ? wf.causes : []
-            };
-        });
-    } else {
-        result = builtins;
-    }
-    // v1.28: 按类型过滤
-    if (typeFilter) {
-        return result.filter(wf => (wf.type || 'step') === typeFilter);
-    }
-    return result;
 }
+window.getAllWorkflows = getAllWorkflows;
+window.saveAllWorkflows = saveAllWorkflows;
+window.readStoredWorkflows = readStoredWorkflows;
+
+// ===== V1.3 A27：按「生成模式 + 案件上下文」取可用流程 =====
+// 原先这段过滤写在 case-files.js 的 getOrgWorkflowsForView 里（A14），列表页 cases.js 用不到
+// （两页脚本不互通）。A27 恢复列表页快速生成后需要同一套口径，故上提到数据层共用。
+//   mode: 'quick'（列表页快速生成） | 'material'（详情页材料生成） | 'step'（详情页分步生成）
+//   通用兜底流程（isGeneral）对 quick 与 material 均恒定展示——A6 定的是「一步生成场景恒在」，
+//   且它是「案字案由都没匹配上」时的保底，只按 type 过滤会把兜底语义切断。
+//   案件过滤沿用 A14 口径：caseWords / causes 为空 = 兜底流程（不设限，恒展示）；非空则要求命中。
+//   案字解析不出时 caseWord 为空 → 只留兜底 + 通用（用户 2026-09-20 拍板的严格口径）。
+function getWorkflowsForCase(org, mode, caseWord, cause) {
+    const word = caseWord || '';
+    const c = cause || '';
+    return getAllWorkflows(org).filter(wf => {
+        const t = wf.type || 'step';
+        if (wf.isGeneral === true) return (mode === 'quick' || mode === 'material');
+        return t === mode;
+    }).filter(wf => {
+        const words = Array.isArray(wf.caseWords) ? wf.caseWords : [];
+        if (words.length > 0 && words.indexOf(word) < 0) return false;
+        const causes = Array.isArray(wf.causes) ? wf.causes : [];
+        if (causes.length > 0 && causes.indexOf(c) < 0) return false;
+        return true;
+    });
+}
+
+// V1.3 A27: 未过滤的本模式流程数（区分「一个流程都没配」与「都被案件条件过滤掉了」两种空态）
+function getWorkflowsRawCount(org, mode) {
+    return getAllWorkflows(org).filter(wf => {
+        const t = wf.type || 'step';
+        if (wf.isGeneral === true) return (mode === 'quick' || mode === 'material');
+        return t === mode;
+    }).length;
+}
+window.getWorkflowsForCase = getWorkflowsForCase;
+window.getWorkflowsRawCount = getWorkflowsRawCount;
+
+// ===== V1.3 A13：workflow 删除时的关联引用统计与清理 =====
+// 背景：删除 workflow 只移除流程本身，示例/指令的 workflowIds 会残留失效 id。
+// 过滤口径为 `ids.length === 0 || ids.indexOf(workflowId) >= 0`，残留项既非通用也不可见（悬挂引用）。
+// 处理：删除前统计关联数用于二次确认，删除后剔除失效 id —— 剔除后数组为空即自动转为通用项。
+// 统计范围只含「显式存储 workflowIds」的示例与物化指令；内置指令的关联由
+// BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE 推导、不落库，流程删除后自然不再匹配，故不统计不清理。
+
+function countWorkflowRefs(org, workflowId) {
+    let templates = 0, prompts = 0;
+    try {
+        const sys = businessSystems[org];
+        if (sys && sys.docTemplates) {
+            Object.keys(sys.docTemplates).forEach(key => {
+                const t = sys.docTemplates[key];
+                if (!t || typeof t !== 'object') return;
+                if (Array.isArray(t.workflowIds) && t.workflowIds.indexOf(workflowId) >= 0) templates++;
+            });
+        }
+    } catch (e) { console.error('[case-data] countWorkflowRefs 统计示例失败:', e); }
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org];
+        if (orgData && Array.isArray(orgData.__items__)) {
+            orgData.__items__.forEach(p => {
+                if (!p || typeof p !== 'object') return;
+                if (Array.isArray(p.workflowIds) && p.workflowIds.indexOf(workflowId) >= 0) prompts++;
+            });
+        }
+    } catch (e) { console.error('[case-data] countWorkflowRefs 统计指令失败:', e); }
+    return { templates: templates, prompts: prompts };
+}
+
+function purgeWorkflowRefs(org, workflowId) {
+    let templates = 0, prompts = 0;
+    try {
+        const sys = businessSystems[org];
+        if (sys && sys.docTemplates) {
+            Object.keys(sys.docTemplates).forEach(key => {
+                const t = sys.docTemplates[key];
+                if (!t || typeof t !== 'object') return;
+                if (!Array.isArray(t.workflowIds) || t.workflowIds.indexOf(workflowId) < 0) return;
+                t.workflowIds = t.workflowIds.filter(id => id !== workflowId);
+                templates++;
+            });
+            // 剔除后 workflowIds 为空即等同通用示例（空=通用口径），无需额外打标记
+            if (templates > 0 && typeof saveBusinessSystems === 'function') saveBusinessSystems();
+        }
+    } catch (e) { console.error('[case-data] purgeWorkflowRefs 清理示例失败:', e); }
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org];
+        if (orgData && Array.isArray(orgData.__items__)) {
+            let changed = false;
+            orgData.__items__.forEach(p => {
+                if (!p || typeof p !== 'object') return;
+                if (!Array.isArray(p.workflowIds) || p.workflowIds.indexOf(workflowId) < 0) return;
+                p.workflowIds = p.workflowIds.filter(id => id !== workflowId);
+                prompts++;
+                changed = true;
+            });
+            if (changed) {
+                all[org] = orgData;
+                localStorage.setItem('adminPromptTemplates', JSON.stringify(all));
+            }
+        }
+    } catch (e) { console.error('[case-data] purgeWorkflowRefs 清理指令失败:', e); }
+    return { templates: templates, prompts: prompts };
+}
+window.countWorkflowRefs = countWorkflowRefs;
+window.purgeWorkflowRefs = purgeWorkflowRefs;
+
+// 获取 workflow 列表（V1.3 A7: 以扁平存储为唯一来源，不再按文书类型分子配置读取）
+// docTypeKey 兼容旧调用方：按文书域（domain）过滤；typeFilter: 'step' | 'material' | undefined
+function getWorkflowsForDocType(org, docTypeKey, typeFilter) {
+    let list = getAllWorkflows(org);
+    if (docTypeKey) list = list.filter(wf => (wf.domain || '') === docTypeKey);
+    if (typeFilter) list = list.filter(wf => (wf.type || 'step') === typeFilter);
+    return list;
+}
+
+// V1.3 A7: 按 id 取 workflow（含通用兜底），供用户侧卡片选中态使用
+function getWorkflowById(org, workflowId) {
+    return getAllWorkflows(org).find(wf => wf.id === workflowId) || null;
+}
+
+// V1.3 A7: 取 workflow 的文书域（domain），未配置时返回 ''
+function getWorkflowDomain(wf) {
+    return (wf && wf.domain) || '';
+}
+window.getWorkflowById = getWorkflowById;
+window.getWorkflowDomain = getWorkflowDomain;
 
 // v1.32: 通用 workflow 匹配函数（按案字+案由双维度，5 级优先级）
 // 匹配规则优先级：
@@ -541,6 +874,8 @@ function normalizeDocTemplates(org, system) {
                 val.docType = '';
             }
             if (val.content === undefined) val.content = '';
+            // V1.3 A4: 示例关联维度由文书类型改为 workflow；缺省视为「通用示例」（空数组）
+            if (!Array.isArray(val.workflowIds)) val.workflowIds = [];
             // v1.33: 不再写入 causes 字段；旧数据中的 causes 字段保留不删
         }
     });
@@ -568,6 +903,8 @@ function mergeAdminDocTemplates(org, system) {
                 system.docTemplates[key] = {
                     name: val.name || key,
                     docType: val.docType || '',
+                    // V1.3 A4: 关联 workflow（数组）；缺省视为通用示例
+                    workflowIds: Array.isArray(val.workflowIds) ? val.workflowIds.slice() : [],
                     content: val.content || ''
                 };
             }
@@ -604,6 +941,8 @@ function mergeMyDocTemplates(org, system) {
                 system.docTemplates['my-' + key] = {
                     name: val.name || key,
                     docType: val.docType || '',
+                    // V1.3 A4/A9: 用户自建示例不做流程绑定，恒为空（= 通用，所有流程均可见）
+                    workflowIds: [],
                     content: val.content || '',
                     source: 'mine'
                 };
@@ -731,6 +1070,329 @@ function getReqTemplates(org, docTypeKey) {
         console.error('[case-data] getReqTemplates 读取 myPromptTemplates 失败:', e);
     }
     return base;
+}
+
+// ===== V1.3 A4/A5: 按 workflow 过滤系统预设示例 / 指令 =====
+// 关联口径：workflowIds 为空数组 = 通用项（所有流程均可见）；否则仅在其包含的 workflow 下可见。
+
+// V1.3 A5: 内置指令按「原文书类型」映射到默认关联 workflow
+// （内置指令数据仍按文书类型分组存储在 defaultRequirementTemplates，不改动其存储结构，
+//   仅在读取时按本表推导 workflowIds；执行/出庭/通知类无对应内置流程，留空=通用）
+const BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE = {
+    court: {
+        judgment: ['wf-judgment-1st', 'wf-judgment-direct'],
+        trial: ['wf-trial-outline'],
+        execution: []
+    },
+    procuratorate: {
+        prosecution: ['wf-prosecution-indictment'],
+        nonProsecution: ['wf-prosecution-decision'],
+        court: []
+    },
+    justice: {
+        reconsideration: ['wf-reconsideration-decision'],
+        notice: []
+    }
+};
+
+// 旧版（按文书类型分组）自定义指令——**只**读分组 key，不含 __items__ 扁平数组。
+// 注意：不能用共用的 getFlatPromptItems 替代——它为了兼容用户侧 myPromptTemplates，
+// 会把 __items__ 也算进来；若在此处复用，__items__ 里的自定义指令会被重复并入一次，
+// 并且绕过 docType 过滤出现在每个类型下（V1.3.29 A36 实测踩到的重复 + 跨类型泄漏）。
+function getLegacyGroupedPromptItems(org) {
+    let orgData = {};
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        orgData = all[org] || {};
+    } catch (e) {
+        orgData = {};
+    }
+    const META = ['__items__', '__builtinDisabled__', '__builtinDisabledIds__', '__materialized__', '__legacyCleared__'];
+    const out = [];
+    Object.entries(orgData).forEach(([key, val]) => {
+        if (META.indexOf(key) >= 0) return;
+        if (Array.isArray(val)) val.forEach(p => { if (p && typeof p === 'object') out.push(p); });
+    });
+    return out;
+}
+
+// 读取管理端 / 用户侧自定义指令（扁平数组 __items__；旧 docType 分组数据保留并合并读取）
+// V1.3 A9: 用户自建指令不再绑定流程，故旧分组数据一律视为通用
+// 注意：本函数是「全量平铺」读取（含 __items__），用户侧我的指令 / 旧数据兜底用它；
+//       需要区分「新版 __items__」与「旧版分组」的场景请用 getLegacyGroupedPromptItems。
+function getFlatPromptItems(storageKey, org) {
+    let orgData = {};
+    try {
+        const all = JSON.parse(localStorage.getItem(storageKey)) || {};
+        orgData = all[org] || {};
+    } catch (e) {
+        orgData = {};
+    }
+    const out = [];
+    if (Array.isArray(orgData.__items__)) {
+        orgData.__items__.forEach(p => { if (p && typeof p === 'object') out.push(p); });
+    }
+    Object.entries(orgData).forEach(([key, val]) => {
+        if (key === '__items__' || key === '__builtinDisabled__' || key === '__builtinDisabledIds__') return;
+        // V1.3.30: 分组键即文书类型键；A9 旧数据固定分组 '__mine__' 视作通用（docType=''）
+        const dt = key === '__mine__' ? '' : key;
+        if (Array.isArray(val)) val.forEach(p => { if (p && typeof p === 'object') out.push(Object.assign({}, p, { docType: dt })); });
+    });
+    return out;
+}
+
+// V1.3 A4: 按 workflow 返回系统预设示例（不含「我的示例」，我的由调用方平铺追加）
+function getFilteredDocTemplatesByWorkflow(org, workflowId) {
+    const sys = (typeof businessSystems !== 'undefined') ? businessSystems[org] : null;
+    if (!sys || !sys.docTemplates) return [];
+    return Object.entries(sys.docTemplates)
+        .filter(([key, t]) => {
+            if (!t || typeof t !== 'object') return false;
+            if (t.source === 'mine') return false;          // 我的示例走平铺分支
+            const ids = Array.isArray(t.workflowIds) ? t.workflowIds : [];
+            return ids.length === 0 || ids.indexOf(workflowId) >= 0;
+        })
+        .map(([key, t]) => ({
+            key: key,
+            name: t.name || key,
+            content: t.content || '',
+            workflowIds: Array.isArray(t.workflowIds) ? t.workflowIds.slice() : []
+        }));
+}
+
+// V1.3 A4: 按 workflow 返回「我的示例」（用户自建不做流程绑定，恒全部返回）
+// V1.3.30: 携带 docType（item.docType，'' = 通用），供生成时按所选文书类型过滤
+function getMyDocTemplatesFlat(org) {
+    const sys = (typeof businessSystems !== 'undefined') ? businessSystems[org] : null;
+    if (!sys || !sys.docTemplates) return [];
+    return Object.entries(sys.docTemplates)
+        .filter(([key, t]) => t && typeof t === 'object' && t.source === 'mine')
+        .map(([key, t]) => ({ key: key, name: t.name || key, content: t.content || '', docType: t.docType || '' }));
+}
+
+// V1.3 A5: 按 workflow 返回指令（内置 + 管理端自定义；不含「我的指令」）
+function getReqTemplatesByWorkflow(org, workflowId) {
+    const result = [];
+    let adminCustom = null;
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        // __materialized__ = true 才代表管理端已整体接管（内置已迁入）；
+        // 仅新增过自定义项时内置指令仍走内置读取路径（V1.3 A5）
+        if (Array.isArray(orgData.__items__) && orgData.__materialized__ === true) {
+            adminCustom = orgData.__items__;
+        } else if (Array.isArray(orgData.__items__) && orgData.__items__.length > 0 && orgData.__materialized__ !== true) {
+            // 未物化但有自定义项：自定义 + 内置合并
+            adminCustom = orgData.__items__;
+        }
+    } catch (e) {
+        adminCustom = null;
+    }
+
+    if (adminCustom) {
+        adminCustom.forEach(p => {
+            if (!p || typeof p !== 'object') return;
+            if (p.enabled === false) return;
+            const ids = Array.isArray(p.workflowIds) ? p.workflowIds : [];
+            if (ids.length === 0 || ids.indexOf(workflowId) >= 0) {
+                result.push({ name: p.name || '', text: p.text || '' });
+            }
+        });
+    }
+
+    // 未物化时：内置指令仍需并入（虚拟内置，按文书类型推导默认 workflowIds）
+    if (!isMaterializedPrompts(org)) {
+        appendBuiltinPrompts(org, workflowId, result);
+    }
+    // 旧版（按文书类型分组）自定义指令：缺省视为通用并入（V1.3 A5 零迁移口径，见 5.4.2）；
+    // 管理端提供「清除旧数据」入口，清除后不再并入（只认分组 key，不含新版 __items__）
+    if (!legacyPromptsCleared(org)) {
+        getLegacyGroupedPromptItems(org).forEach(p => {
+            if (p.enabled === false) return;
+            result.push({ name: p.name || '', text: p.text || '' });
+        });
+    }
+    return result;
+}
+
+// 旧版指令分组数据是否已被管理端清除（清除动作写入 __legacyCleared__ 标记）
+function legacyPromptsCleared(org) {
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        return orgData.__legacyCleared__ === true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// 统计旧版（按文书类型分组）自定义指令条数（供管理端提示条使用）
+function countLegacyPromptGroups(org) {
+    if (legacyPromptsCleared(org)) return 0;
+    let orgData = {};
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        orgData = all[org] || {};
+    } catch (e) {
+        orgData = {};
+    }
+    let n = 0;
+    Object.entries(orgData).forEach(([key, val]) => {
+        if (key === '__items__' || key === '__builtinDisabled__' || key === '__builtinDisabledIds__' || key === '__materialized__' || key === '__legacyCleared__') return;
+        if (Array.isArray(val)) n += val.length;
+    });
+    return n;
+}
+
+// 清除旧版分组数据（保留 __items__ / 物化标记等新结构字段）
+function clearLegacyPromptGroups(org) {
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        Object.keys(orgData).forEach(key => {
+            if (key === '__items__' || key === '__materialized__' || key === '__builtinDisabled__' || key === '__builtinDisabledIds__' || key === '__legacyCleared__') return;
+            delete orgData[key];
+        });
+        orgData.__legacyCleared__ = true;
+        all[org] = orgData;
+        localStorage.setItem('adminPromptTemplates', JSON.stringify(all));
+        return true;
+    } catch (e) {
+        console.error('[case-data] clearLegacyPromptGroups 失败:', e);
+        return false;
+    }
+}
+window.countLegacyPromptGroups = countLegacyPromptGroups;
+window.clearLegacyPromptGroups = clearLegacyPromptGroups;
+
+// 判断该业务系统的管理端指令是否已物化（内置已整体迁入 __items__）
+function isMaterializedPrompts(org) {
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        return orgData.__materialized__ === true && Array.isArray(orgData.__items__);
+    } catch (e) {
+        return false;
+    }
+}
+
+// 把内置指令（未物化时）按 workflow 过滤后追加进 result
+function appendBuiltinPrompts(org, workflowId, result) {
+    let disabledMap = {};
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        const d = orgData.__builtinDisabled__;
+        if (d && typeof d === 'object') disabledMap = d;
+    } catch (e) {
+        disabledMap = {};
+    }
+    const groups = defaultRequirementTemplates[org] || {};
+    const typeMap = BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE[org] || {};
+    Object.entries(groups).forEach(([docTypeKey, arr]) => {
+        if (!Array.isArray(arr)) return;
+        const disabledArr = Array.isArray(disabledMap[docTypeKey]) ? disabledMap[docTypeKey] : [];
+        const ids = typeMap[docTypeKey] || [];
+        if (!(ids.length === 0 || ids.indexOf(workflowId) >= 0)) return;
+        arr.forEach((p, i) => {
+            if (disabledArr.indexOf(i) >= 0) return;
+            result.push({ name: p.name || '', text: p.text || '' });
+        });
+    });
+}
+
+// V1.3 A5/A9: 我的指令（不做流程绑定，恒全部返回）
+// V1.3.30: 携带 docType（分组键，'' = 通用），供生成时按所选文书类型过滤
+function getMyPromptTemplatesFlat(org) {
+    return getFlatPromptItems('myPromptTemplates', org)
+        .filter(p => p.enabled !== false)
+        .map(p => ({ name: p.name || '', text: p.text || '', source: 'mine', docType: p.docType || '' }));
+}
+
+// V1.3.30: 我的示例/指令按所选文书类型过滤——docType 命中 或 docType===''（通用）皆可见
+function filterMineByDocType(items, docTypeKey) {
+    if (!Array.isArray(items)) return [];
+    return items.filter(p => p.docType === docTypeKey || p.docType === '');
+}
+window.filterMineByDocType = filterMineByDocType;
+window.getFilteredDocTemplatesByWorkflow = getFilteredDocTemplatesByWorkflow;
+window.getMyDocTemplatesFlat = getMyDocTemplatesFlat;
+window.getReqTemplatesByWorkflow = getReqTemplatesByWorkflow;
+window.getMyPromptTemplatesFlat = getMyPromptTemplatesFlat;
+window.getFlatPromptItems = getFlatPromptItems;
+
+// ===== V1.3.29 A36: 按文书类型取示例 / 指令 =====
+// 背景：A34 起示例与指令的关联维度由 workflowIds 回到 docType，用户侧若继续按 workflow 过滤，
+//       所有写过 workflowIds 的历史项会退化成"通用"、每处都出现，等于失去筛选能力。
+// 命中口径（与管理端列表一致）：docType 为空 = 通用项，在各类型下均可见。
+function getTemplatesByDocType(org, docTypeKey) {
+    const sys = (typeof businessSystems !== 'undefined') ? businessSystems[org] : null;
+    if (!sys || !sys.docTemplates) return [];
+    return Object.entries(sys.docTemplates)
+        .filter(([key, t]) => {
+            if (!t || typeof t !== 'object') return false;
+            if (t.source === 'mine') return false;          // 我的示例走平铺分支
+            const dt = t.docType || '';
+            return dt === docTypeKey || dt === '';
+        })
+        .map(([key, t]) => ({ key: key, name: t.name || key, content: t.content || '' }));
+}
+window.getTemplatesByDocType = getTemplatesByDocType;
+
+// 指令按文书类型读取（不含「我的指令」，由调用方平铺追加，便于先标准后我的两段式渲染）
+function getReqTemplatesByDocType(org, docTypeKey) {
+    const result = [];
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        if (Array.isArray(orgData.__items__)) {
+            orgData.__items__.forEach(p => {
+                if (!p || typeof p !== 'object') return;
+                if (p.enabled === false) return;
+                const dt = resolvePromptDocType(org, p);
+                if (dt === docTypeKey || dt === '') result.push({ name: p.name || '', text: p.text || '' });
+            });
+        }
+    } catch (e) {
+        console.error('[case-data] getReqTemplatesByDocType 读取 adminPromptTemplates 失败:', e);
+    }
+    // 未物化时内置指令并入：defaultRequirementTemplates 的分组 key 本身就是文书类型 key，
+    // 不必再经 BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE 绕一道
+    if (!isMaterializedPrompts(org)) {
+        appendBuiltinPromptsByDocType(org, docTypeKey, result);
+    }
+    // 旧版（按文书类型分组）自定义指令：视为通用并入（沿用 A5 零迁移口径）
+    if (!legacyPromptsCleared(org)) {
+        getLegacyGroupedPromptItems(org).forEach(p => {
+            if (p.enabled === false) return;
+            result.push({ name: p.name || '', text: p.text || '' });
+        });
+    }
+    return result;
+}
+window.getReqTemplatesByDocType = getReqTemplatesByDocType;
+
+// 把内置指令（未物化时）按文书类型过滤后追加进 result
+function appendBuiltinPromptsByDocType(org, docTypeKey, result) {
+    let disabledMap = {};
+    try {
+        const all = JSON.parse(localStorage.getItem('adminPromptTemplates')) || {};
+        const orgData = all[org] || {};
+        const d = orgData.__builtinDisabled__;
+        if (d && typeof d === 'object') disabledMap = d;
+    } catch (e) {
+        disabledMap = {};
+    }
+    const groups = (typeof defaultRequirementTemplates !== 'undefined' && defaultRequirementTemplates[org]) || {};
+    Object.entries(groups).forEach(([groupKey, arr]) => {
+        if (!Array.isArray(arr)) return;
+        if (groupKey !== docTypeKey) return;
+        const disabledArr = Array.isArray(disabledMap[groupKey]) ? disabledMap[groupKey] : [];
+        arr.forEach((p, i) => {
+            if (disabledArr.indexOf(i) >= 0) return;
+            result.push({ name: p.name || '', text: p.text || '' });
+        });
+    });
 }
 
 // ===== 按业务系统拆分的案由树数据 =====
@@ -1118,6 +1780,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'judgment-civil-1st': {
             name: '民事判决书（一审普通程序）',
             docType: 'judgment',
+            workflowIds: ["wf-judgment-1st","wf-judgment-direct"],
             content: [
                 '1. 诉讼参加人：列明原告、被告及委托诉讼代理人的身份信息与到庭情况',
                 '2. 原告诉讼请求：按原文逐条输出原告的诉讼请求及事实理由，不总结、不遗漏',
@@ -1131,6 +1794,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'judgment-civil-simple': {
             name: '民事判决书（简易程序）',
             docType: 'judgment',
+            workflowIds: ["wf-judgment-1st","wf-judgment-direct"],
             content: [
                 '1. 诉讼参加人：简要列明原被告身份信息与到庭情况',
                 '2. 诉讼请求与答辩：概括原告请求与被告意见要点',
@@ -1142,6 +1806,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'ruling-civil': {
             name: '民事裁定书',
             docType: 'ruling',
+            workflowIds: ["wf-judgment-ruling"],
             content: [
                 '1. 申请事项：写明申请人提出的程序性申请内容',
                 '2. 事实与理由：简述作出裁定所依据的程序事实',
@@ -1152,6 +1817,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'mediation-civil': {
             name: '民事调解书',
             docType: 'mediation',
+            workflowIds: ["wf-judgment-mediation"],
             content: [
                 '1. 诉讼参加人：列明原被告及委托代理人身份信息',
                 '2. 案件事实：简述双方争议的事实背景与诉辩主张',
@@ -1162,6 +1828,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'trial-outline': {
             name: '庭审提纲',
             docType: 'trial',
+            workflowIds: ["wf-trial-outline"],
             content: [
                 '1. 庭前准备：核对当事人身份、宣布法庭纪律与诉讼权利义务',
                 '2. 法庭调查：组织举证质证，围绕要件逐项核查',
@@ -1172,6 +1839,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'court-investigation-outline': {
             name: '法庭调查提纲',
             docType: 'trial',
+            workflowIds: ["wf-trial-outline"],
             content: [
                 '1. 当事人陈述：依次听取原告主张与被告答辩',
                 '2. 证据交换与质证：按证据清单逐份举证、质证并认证',
@@ -1182,6 +1850,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'execution-notice': {
             name: '执行通知书',
             docType: 'execution',
+            workflowIds: [],
             content: [
                 '1. 执行依据：载明据以执行的生效法律文书名称与案号',
                 '2. 执行事项：责令被执行人履行的义务、履行期限与方式',
@@ -1192,6 +1861,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'property-report': {
             name: '财产报告令',
             docType: 'execution',
+            workflowIds: [],
             content: [
                 '1. 报告义务依据：载明责令报告财产的法律依据与期限',
                 '2. 报告内容范围：列明应当报告的财产类型与报告期间',
@@ -1202,6 +1872,7 @@ const BUILTIN_DOC_TEMPLATE_META = {
         'service-notice': {
             name: '送达回证',
             docType: 'execution',
+            workflowIds: [],
             content: [
                 '1. 送达文书信息：载明受送达文书名称、案号与份数',
                 '2. 受送达人信息：填写受送达人姓名或名称及送达地址',
@@ -1221,6 +1892,8 @@ function cloneBuiltinDocTemplates(org) {
         out[key] = {
             name: def.name,
             docType: def.docType,
+            // V1.3 A4: 关联 workflow（空数组 = 通用示例，所有流程均可见）
+            workflowIds: Array.isArray(def.workflowIds) ? def.workflowIds.slice() : [],
             content: def.content || ''
         };
     });
@@ -1260,6 +1933,7 @@ function applyBuiltinTemplateMeta(org, system) {
             system.docTemplates[key] = {
                 name: (typeof cur === 'string' && cur) ? cur : def.name,
                 docType: def.docType,
+                workflowIds: Array.isArray(def.workflowIds) ? def.workflowIds.slice() : [],
                 content: def.content || ''
             };
             return;
@@ -1267,6 +1941,11 @@ function applyBuiltinTemplateMeta(org, system) {
         // 对象形态：缺什么补什么（content 为空正是本次缺陷的直接表现）
         if (!cur.name) cur.name = def.name;
         if (!cur.docType) cur.docType = def.docType;
+        // V1.3 A4: workflowIds 缺失时按 META 默认关联补齐；已存在（含空数组=通用）的不覆盖，
+        //          以免管理端显式「不关联（通用）」的覆盖被兜底冲掉
+        if (!Array.isArray(cur.workflowIds)) {
+            cur.workflowIds = Array.isArray(def.workflowIds) ? def.workflowIds.slice() : [];
+        }
         if (!cur.content) cur.content = def.content || '';
     });
 }
@@ -2220,6 +2899,51 @@ function startMockParsing(caseId, fileId) {
     }, delay);
 }
 
+// V1.3.21 A28: 由 cases.js 移入，供建案与详情页「重写提取」共用
+// 生成 mock 识别结果（演示用）：刻意演示"案由识别为上级案由"问题
+// （如 房屋租赁合同纠纷 → 合同纠纷），需用户确认修改
+function generateMockParseResult(fileName) {
+    const name = fileName || '';
+    // 关键词 → 子案由映射（找到所属大类后，取大类作为 mock"识别结果"，即上级案由）
+    const causeKeywords = [
+        { kw: ['租赁', '房租'], child: '房屋租赁合同纠纷' },
+        { kw: ['借贷', '借款', '欠款'], child: '民间借贷纠纷' },
+        { kw: ['买卖', '购销'], child: '买卖合同纠纷' },
+        { kw: ['施工', '工程'], child: '建设工程施工合同纠纷' },
+        { kw: ['离婚'], child: '离婚纠纷' },
+        { kw: ['交通', '事故'], child: '机动车交通事故责任纠纷' },
+        { kw: ['劳动', '工伤'], child: '劳动争议' }
+    ];
+    let childCause = '';
+    for (const item of causeKeywords) {
+        if (item.kw.some(k => name.includes(k))) { childCause = item.child; break; }
+    }
+    if (!childCause) childCause = '民间借贷纠纷';
+
+    // 在案由树中找到该子案由的父级案由组，作为 mock 识别结果（上级案由）
+    let mockCause = '合同纠纷';
+    const tree = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentBusiness]) || [];
+    outer:
+    for (const cat of tree) {
+        for (const grp of (cat.children || [])) {
+            if ((grp.children || []).includes(childCause)) { mockCause = grp.name; break outer; }
+        }
+    }
+
+    const surnamePool = ['张', '李', '王', '刘', '陈', '赵', '周', '吴'];
+    const pick = () => surnamePool[Math.floor(Math.random() * surnamePool.length)] + '某';
+    const num = Math.floor(10000 + Math.random() * 89999);
+    const caseWords = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[currentBusiness]) || ['民初'];
+
+    return {
+        caseNumber: `（2026）京0105民初${num}号`,
+        caseWord: caseWords.includes('民初') ? '民初' : (caseWords[0] || ''),
+        cause: mockCause,
+        partyA: pick(),
+        partyB: pick()
+    };
+}
+
 // v2.23 (任务 8.9): 数据持久化失败处理
 // localStorage 写入增加 try-catch 保护，失败时展示提示并提供重试
 let _saveRetryQueue = [];
@@ -2405,11 +3129,11 @@ function addDocumentVersion(caseId, versionData) {
 
     const config = versionData.config || {};
     const docType = config.docType || 'judgment';
-    const docTypes = getCurrentDocTypes ? getCurrentDocTypes() : {};
-    const docTypeName = docTypes[docType]?.name || '法律文书';
-    // config.template 是 templateId（字符串 key），需先查模板对象再取 name
-    const templates = (typeof getDocTypeTemplates === 'function') ? getDocTypeTemplates(docType) : {};
-    const tplObj = templates[config.template];
+    // V1.3 A7: 流程化后标题优先取所选 workflow 名称（config.workflowName）；docType 仅作版本归档键
+    const docTypeName = config.workflowName || (getCurrentDocTypes ? (getCurrentDocTypes()[docType]?.name || '法律文书') : '法律文书');
+    // config.template 是 templateId（字符串 key）；流程化后示例可跨文书域（通用示例），直接查全量模板表
+    const allTpls = (typeof getCurrentTemplates === 'function') ? getCurrentTemplates() : {};
+    const tplObj = allTpls[config.template];
     const templateName = getTemplateName ? getTemplateName(tplObj) : '';
     const title = templateName ? `${docTypeName} · ${templateName}` : docTypeName;
 

@@ -77,18 +77,15 @@
         .btn-primary { background: var(--accent-primary); color: white; }
         .btn-primary:hover { background: #1d4ed8; }
 
-        .pt-list { padding: 8px 0; }
-        .pt-item { padding: 14px 18px; border-bottom: 1px solid #f3f4f6; display: flex; gap: 14px; align-items: flex-start; }
-        .pt-item:last-child { border-bottom: none; }
-        .pt-item:hover { background: var(--bg-primary); }
-        .pt-item-tag { flex-shrink: 0; min-width: 96px; padding: 4px 10px; background: var(--accent-light); color: var(--accent-primary); border-radius: 4px; font-size: 13px; font-weight: 500; text-align: center; }
-        .pt-item-tag.builtin { background: #dbeafe; color: #1e40af; }
-        .pt-item-tag.custom { background: #d1fae5; color: #065f46; }
-        .pt-item-body { flex: 1; min-width: 0; }
-        .pt-item-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 80px; overflow: hidden; position: relative; }
-        .pt-item-text.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: linear-gradient(to bottom, transparent, var(--bg-secondary)); }
-        .pt-item-meta { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
-        .pt-item-actions { flex-shrink: 0; display: flex; gap: 6px; }
+        /* V1.3.24 A31: 指令列表由卡片改为表格，与要件/示例管理统一 */
+        .tpl-table { width: 100%; border-collapse: collapse; }
+        .tpl-table thead th { background: var(--bg-primary); padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border-color); }
+        .tpl-table tbody td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .tpl-table tbody tr:last-child td { border-bottom: none; }
+        .tpl-table tbody tr:hover { background: var(--bg-primary); }
+        .tpl-name-cell { font-weight: 500; color: var(--text-primary); }
+        .tpl-action-cell { white-space: nowrap; }
+        .pt-preview-cell { font-size: 13px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; word-break: break-all; max-height: 72px; overflow: hidden; }
         .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; font-family: inherit; }
         .action-btn:hover { background: #f3f4f6; }
         .action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
@@ -99,7 +96,7 @@
         .action-btn.toggle-on:hover { background: #f0fdf4; }
         .action-btn.toggle-off { color: var(--accent-warning); border-color: #fde68a; }
         .action-btn.toggle-off:hover { background: #fffbeb; }
-        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 8px; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
         .status-badge.status-on { background: #d1fae5; color: #065f46; }
         .status-badge.status-off { background: #f3f4f6; color: #6b7280; }
 
@@ -119,6 +116,12 @@
         .form-textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; resize: vertical; min-height: 140px; box-sizing: border-box; line-height: 1.5; }
         .form-textarea:focus { outline: none; border-color: var(--accent-primary); }
         .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        /* V1.3 A5 的「关联流程多选 checkbox 组」CSS 已随 V1.3.29 A36 移除（改文书类型单选下拉，用 .form-select） */
+        .pt-wf-general { color: var(--text-muted); font-size: 12px; }
+        /* V1.3 A5: 旧版数据提示条 */
+        .legacy-bar { display: flex; align-items: center; gap: 10px; margin: 12px 18px 0; padding: 10px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; color: #92400e; }
+        .legacy-bar .legacy-hint { color: #b45309; opacity: 0.8; font-size: 12px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-cancel { background: #f3f4f6; color: #374151; }
         .btn-cancel:hover { background: #e5e7eb; }
@@ -169,8 +172,8 @@
                     <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
                     <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
-                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="workflows.html" class="nav-item"><i class="fas fa-diagram-project"></i><span>文书流程管理</span></a>
                     <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item active"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
                     <a href="user-templates.html" class="nav-item"><i class="fas fa-search"></i><span>用户示例检索</span></a>
@@ -208,14 +211,9 @@
                 <div class="page-header">
                     <div class="page-title-wrap">
                         <h1>指令管理</h1>
-                        <p>维护各文书类型的指令</p>
+                        <p>维护各业务系统的指令，按文书类型关联</p>
                     </div>
                     <div class="page-header-right">
-                        <div class="business-switch">
-                            <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
-                            <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
-                            <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
-                        </div>
                         <!-- v1.14 移除全局「恢复默认」按钮，改为单条历史版本回滚（见右侧每行的「历史」按钮） -->
                     </div>
                 </div>
@@ -229,7 +227,19 @@
                                 <i class="fas fa-plus"></i> 新增指令
                             </button>
                         </div>
-                        <div class="pt-list" id="ptList"></div>
+                        <div id="legacyBar"></div>
+                        <table class="tpl-table" id="ptTable">
+                            <thead>
+                                <tr>
+                                    <th>标签名</th>
+                                    <th>指令预览</th>
+                                    <th>文书类型</th>
+                                    <th style="width:90px;">状态</th>
+                                    <th style="width:170px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ptTbody"></tbody>
+                        </table>
                         <div id="emptyState" class="empty-state" style="display:none;">
                             <i class="fas fa-comment-dots"></i>
                             <p>暂无指令，点击「新增指令」创建</p>
@@ -244,9 +254,11 @@
     <div class="modal-mask" id="ptModal">
         <div class="modal-box">
             <h3 id="modalTitle">新增指令</h3>
+            <!-- V1.3.29 A36: 关联维度由「关联流程」回到「文书类型」单选（不指定 = 通用指令） -->
             <div class="form-row">
-                <label class="form-label">所属文书类型 <span class="required">*</span></label>
-                <select class="form-select" id="ptDocType"></select>
+                <label class="form-label">文书类型</label>
+                <select class="form-select" id="ptDocTypeSelect"></select>
+                <div class="form-hint">不指定则为「通用指令」，所有文书类型下均可见</div>
             </div>
             <div class="form-row">
                 <label class="form-label">标签名 <span class="required">*</span></label>
@@ -258,6 +270,7 @@
                 <div class="form-hint">支持 \\n 换行；空指令的标签点击后清空指令</div>
             </div>
             <div class="modal-actions">
+                <button class="btn btn-secondary" id="modalHistoryBtn" onclick="openHistoryFromModal()" style="margin-right:auto;display:none;"><i class="fas fa-history"></i> 历史版本</button>
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
                 <button class="btn btn-confirm" onclick="savePrompt()">保存</button>
             </div>
@@ -289,7 +302,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js"></script>
-    <script src="../../js/admin-prompt-templates.js?v=2"></script>
+    <script src="../../js/case-data.js?v=78"></script>
+    <script src="../../js/admin-prompt-templates.js?v=8"></script>
 </body>
 </html>

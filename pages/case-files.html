@@ -102,7 +102,7 @@
         .case-info-parse-alert .parse-alert-action:hover {
             background: #fef3c7;
         }
-        /* V1.2.21: 提示条双按钮（【信息无误】轻量确认 + 【去修改】） */
+        /* V1.2.21 / V1.3.21 A28: 提示条按钮组（【重写提取】主按钮 + 【手动编辑】次按钮） */
         .case-info-parse-alert .parse-alert-actions {
             display: flex;
             align-items: center;
@@ -115,6 +115,29 @@
         }
         .case-info-parse-alert .parse-alert-action.ghost:hover {
             background: #f3f4f6;
+        }
+        /* V1.3.21 A28: 提示条关闭按钮（X，点击后不再提示） */
+        .case-info-parse-alert .parse-alert-close {
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            margin-left: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: #92400e;
+            opacity: 0.65;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .case-info-parse-alert .parse-alert-close:hover {
+            background: #fde68a;
+            opacity: 1;
         }
         .detail-meta-tag {
             display: inline-flex;
@@ -187,6 +210,7 @@
             max-width: 44px !important;
         }
         .material-col.collapsed .material-col-header span,
+        .material-col.collapsed .aiq-entry-btn,
         .material-col.collapsed .material-search,
         .material-col.collapsed .material-col-elements-bar,
         .material-col.collapsed .material-col-toolbar,
@@ -231,6 +255,67 @@
             padding: 2px;
         }
         .material-col-header button:hover { color: var(--accent-primary); }
+
+        /* ===== V1.3 A24: AI问答入口（材料树顶部、搜索框上方，强调样式） =====
+           刻意区别于 header 要件/法条入口的"中性 + hover 主色"（V1.2.28 为避免选中态语义冲突的结论）——
+           本入口承担功能引导职责、无选中态语义，用主色渐变 + 阴影 + hover 上浮达成醒目效果 */
+        .aiq-entry-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 12px 2px;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, #5b7cfa 100%);
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: left;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+            transition: transform 0.15s, box-shadow 0.15s;
+            flex-shrink: 0;
+        }
+        .aiq-entry-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.38);
+        }
+        .aiq-entry-icon {
+            width: 34px;
+            height: 34px;
+            flex-shrink: 0;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+        }
+        .aiq-entry-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            flex: 1;
+            min-width: 0;
+        }
+        .aiq-entry-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        .aiq-entry-sub {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .aiq-entry-arrow {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            flex-shrink: 0;
+        }
 
         .material-search {
             padding: 10px 12px;
@@ -783,19 +868,15 @@
         .gen-panel { display: none; }
         .gen-panel.active { display: block; }
 
-        /* ===== V1.2.23: AI问答（中间栏第三个视图，基于本案材料的知识检索问答） ===== */
-        /* chat-mode：去掉 gen-content 默认 padding、改纵向 flex、关掉外层滚动 → 对话区内部滚动 + 输入区固定底部 */
-        .gen-content.chat-mode {
+        /* ===== V1.2.23: AI问答对话组件 =====
+           V1.3 A24: 由中间栏第三个视图迁为右侧抽屉 #aiChatDrawer（复用 .case-elements-drawer 体系）。
+           原 .gen-content.chat-mode 与 #panel-chat.active 两条规则随迁移删除；
+           抽屉内部纵向 flex（范围条 + 对话区 + 输入区）由下方 .aiq-drawer-body 承载 */
+        .aiq-drawer-body {
+            display: flex;
+            flex-direction: column;
             padding: 0;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-        #panel-chat.active {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            min-height: 0;
         }
         .aiq-wrap {
             display: flex;
@@ -1164,7 +1245,45 @@
             color: var(--text-primary);
             margin-bottom: 6px;
         }
-        /* v1.45 链 C: 案件阶段提示文案 */
+        /* V1.3.22 A29 修订: 案由/案字两列常显（值 + 来源标签 / 缺失下拉补全；工作流 hint 沿用下方 .gen-form-hint） */
+        .gen-caseinfo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .gen-caseinfo-cell {
+            min-width: 0;
+        }
+        .gen-caseinfo-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 37px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .gen-caseinfo-src {
+            font-size: 12px;
+            font-weight: 400;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        .gen-caseinfo-empty {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .gen-caseinfo-hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #d97706;
+            font-style: italic;
+        }
+        /* V1.3.22 A29: 案由/案字补全提示文案（替代 v1.45 案件阶段提示文案） */
         .gen-form-hint {
             display: inline-block;
             margin-left: 8px;
@@ -2781,6 +2900,32 @@
             padding: 12px 16px;
             position: relative;
         }
+        /* V1.3.31: 本案要件分类切换标签 */
+        .case-elements-tabs {
+            display: flex;
+            gap: 6px;
+            padding: 10px 16px 4px;
+            flex-wrap: wrap;
+        }
+        .case-elements-tab {
+            flex: 1;
+            min-width: 56px;
+            border: 1px solid var(--border, #e5e7eb);
+            background: #fff;
+            color: var(--text-secondary, #6b7280);
+            border-radius: 7px;
+            padding: 6px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background .15s, color .15s, border-color .15s;
+        }
+        .case-elements-tab:hover { border-color: var(--accent-primary, #6366f1); color: var(--accent-primary, #6366f1); }
+        .case-elements-tab.active {
+            background: var(--accent-primary, #6366f1);
+            border-color: var(--accent-primary, #6366f1);
+            color: #fff;
+            font-weight: 600;
+        }
         /* v1.51: 一键生成加载态覆盖层 */
         .case-elements-loading {
             position: absolute;
@@ -3964,7 +4109,7 @@
                 </div>
             </div>
 
-            <!-- v2.32: 案件信息解析提示条（解析中浅蓝 / 待确认浅黄+去修改），对齐实际系统截图 -->
+            <!-- v2.32/V1.3.21 A28: 案件信息解析提示条（解析中浅蓝 / 重写提取浅蓝 / 待确认浅黄+重写提取/手动编辑/关闭），对齐实际系统截图 -->
             <div class="case-info-parse-alert" id="caseInfoParseAlert" style="display:none;" data-page-node-id="rH1nO94uhU74JQJDFtw0Pz"></div>
 
             <!-- Three Column Body -->
@@ -3975,7 +4120,17 @@
                         <span data-page-node-id="YKDwHz5Vlh3cZTrA2tjxkA"><i class="fas fa-th-large" data-page-node-id="8FvI8Vru8262PUAcIqJvWT"></i> 材料树</span>
                         <button onclick="toggleMaterialCol()" title="折叠/展开" data-page-node-id="35lny073fxKla3BElyC5xG"><i class="fas fa-chevron-left" data-page-node-id="HBxc3VDLKIOmYnFAyD3SD9"></i></button>
                     </div>
-                    <!-- V1.2.26: 「本案要件」「本案法条」两个入口已迁至中间栏顶部入口带 .gen-views-bar（组A 案件资料区）；材料树顶部固定条整条移除，材料树回归纯材料列表 -->
+                    <!-- V1.2.26: 「本案要件」「本案法条」两个入口已迁至页面顶部右侧 header（.detail-header-right，
+                         案件级面板入口组）；材料树顶部固定条整条移除。V1.3 A24: 材料树顶部（搜索框上方）新增
+                         「AI问答」强调入口，点击滑出右侧抽屉（复用本案要件/本案法条抽屉体系） -->
+                    <button type="button" class="aiq-entry-btn" id="aiqEntryBtn" onclick="toggleAiChatDrawer()" title="基于本案材料的智能问答">
+                        <span class="aiq-entry-icon"><i class="fas fa-comments"></i></span>
+                        <span class="aiq-entry-text">
+                            <span class="aiq-entry-title">AI问答</span>
+                            <span class="aiq-entry-sub">基于本案材料智能问答</span>
+                        </span>
+                        <i class="fas fa-chevron-right aiq-entry-arrow"></i>
+                    </button>
                     <div class="material-search" data-page-node-id="sqIvslqtJ24MBvpdCRyKP3">
                         <div class="material-search-box" data-page-node-id="f3WtK2FGV7LDTRwCrINjGG">
                             <i class="fas fa-search" data-page-node-id="wV1ltNFfMr42oTY1b0Dxr3"></i>
@@ -4004,12 +4159,9 @@
                         <button class="core-materials-manage" onclick="scrollToMaterialTree()" data-page-node-id="dpZMrRHaIRATVvV2G7xYRX">管理</button>
                     </div>
                     <!-- V1.2.27: 「本案要件」「本案法条」两个入口已移至页面顶部右侧 header（.detail-header-right，
-                         位于「历史文书」左侧）；中间栏顶部回归纯生成方式 tab -->
+                         位于「历史文书」左侧）；中间栏顶部回归纯生成方式 tab。V1.3 A24: 「AI问答」由中间栏 tab
+                         迁出为右侧抽屉（入口在材料树顶部搜索框上方），此处仅剩「材料生成」「分步生成」两个 tab -->
                     <div class="gen-tabs" data-page-node-id="s9b8qE5D388NmqPVSsfRbK">
-                        <!-- V1.2.23 新增「AI问答」视图 / V1.2.25 移至最左 -->
-                        <button class="gen-tab" data-method="chat" onclick="switchGenMethod('chat')" data-page-node-id="wq7pLm2nRtVb5xCyD8aKfZ">
-                            <i class="fas fa-comments" data-page-node-id="aiQTb3xLmN8vQrDs6cUwPe"></i> AI问答
-                        </button>
                         <button class="gen-tab active" data-method="material" onclick="switchGenMethod('material')" data-page-node-id="lKLU5cP4CGvP0cGo7017VI">
                             <i class="fas fa-bolt" data-page-node-id="zIi0lfUQ7fFwXZlb1iUGTg"></i> 材料生成
                         </button>
@@ -4038,14 +4190,24 @@
                                 </div>
 
                                 <div class="mat-gen-controls" id="matGenControls" data-page-node-id="DIgwFtVjAzLfQC64EUpqYD">
-                                    <div class="gen-form-row" data-page-node-id="YY7P5gcjbXREISdz2kSCGM">
-                                        <label class="gen-form-label" data-page-node-id="14fhgkVCSBrV3AdQPEW990">文书类型</label>
-                                        <select class="gen-form-select" id="matDocType" onchange="onMatDocTypeChange()" data-page-node-id="Pmo0eONxA7m4ZJwWvoDCB4"></select>
+                                    <!-- V1.3.29 A36: 首项恢复「文书类型」下拉；生成流程/文书示例/指令随之联动 -->
+                                    <div class="gen-form-row">
+                                        <label class="gen-form-label">文书类型</label>
+                                        <select class="gen-form-select" id="matDocTypeSelect" onchange="selectMaterialDocType(this.value)"></select>
+                                        <div class="gen-form-hint" id="matDocTypeHint" style="display:none;"></div>
                                     </div>
-                                    <div class="gen-form-row" id="matCaseStageRow" style="display:none;" data-page-node-id="H8gg50KWKmAbJIlTIVLmkp">
-                                        <label class="gen-form-label" data-page-node-id="hNGQR9adYHg9hu9WbiUdhY">案件阶段</label>
-                                        <select class="gen-form-select" id="matCaseStage" onchange="onCaseStageChange()" data-page-node-id="W4ZbysFkPCN7nl0rgtkd1L"></select>
-                                        <span class="gen-form-hint" id="matCaseStageHint" style="display:none;" data-page-node-id="hNrpooQ7mbHUi76Jsmfwia"></span>
+                                    <!-- V1.3.22 A29 修订: 案由/案字两列常显（有值→值+来源标签，缺失→下拉补选，由 JS 渲染）；置于生成流程之前，流程随两属性联动 -->
+                                    <div class="gen-form-row">
+                                        <div class="gen-caseinfo-grid">
+                                            <div class="gen-caseinfo-cell">
+                                                <label class="gen-form-label">案由</label>
+                                                <div id="matCauseBox"></div>
+                                            </div>
+                                            <div class="gen-caseinfo-cell">
+                                                <label class="gen-form-label">案字</label>
+                                                <div id="matCaseWordBox"></div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="gen-form-row" data-page-node-id="gWasVPAQFFrPMTSx9oGFVJ">
                                         <div class="gen-form-label-row">
@@ -4072,19 +4234,26 @@
                         <!-- Step View: Step-by-Step Generation -->
                         <div class="gen-panel" id="panel-steps" data-page-node-id="phCZSFUYM89CiYGerVP7ZU">
                             <div class="step-gen-config" data-page-node-id="5SlA7zXxlAFS9hQtsPoecQ">
-                                <div class="gen-form-row" data-page-node-id="j3RxHZcyHizB0fhV6FcnFh">
-                                    <label class="gen-form-label" data-page-node-id="xgEF4wwOSsKR6J9cfEjymo">文书类型</label>
-                                    <select class="gen-form-select" id="stepDocType" onchange="onStepDocTypeChange(this.value)" data-page-node-id="FMKkqQN6cTM3dsl5vrPV9d"></select>
+                                    <!-- V1.3.29 A36: 首项恢复「文书类型」下拉；生成流程/文书示例随之联动 -->
+                                    <div class="gen-form-row">
+                                        <label class="gen-form-label">文书类型</label>
+                                        <select class="gen-form-select" id="stepDocTypeSelect" onchange="selectStepDocType(this.value)"></select>
+                                        <div class="gen-form-hint" id="stepDocTypeHint" style="display:none;"></div>
+                                    </div>
+                                <!-- V1.3.22 A29 修订: 案由/案字两列常显（有值→值+来源标签，缺失→下拉补选，由 JS 渲染）；置于生成流程之前，流程随两属性联动 -->
+                                <div class="gen-form-row">
+                                    <div class="gen-caseinfo-grid">
+                                        <div class="gen-caseinfo-cell">
+                                            <label class="gen-form-label">案由</label>
+                                            <div id="stepCauseBox"></div>
+                                        </div>
+                                        <div class="gen-caseinfo-cell">
+                                            <label class="gen-form-label">案字</label>
+                                            <div id="stepCaseWordBox"></div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="gen-form-row" id="stepCaseStageRow" style="display:none;" data-page-node-id="jE8l1HvaYtuh3B9JagTbE0">
-                                    <label class="gen-form-label" data-page-node-id="2I80X9CvCuPTKGoKOvY8D9">案件阶段</label>
-                                    <select class="gen-form-select" id="stepCaseStage" onchange="onCaseStageChange()" data-page-node-id="F5whgOCDET6rGW7PZ3DQE4"></select>
-                                    <span class="gen-form-hint" id="stepCaseStageHint" style="display:none;" data-page-node-id="DQlLpPJvmJFyvMkXQruRnX"></span>
-                                </div>
-                                <div class="gen-form-row" id="stepPlanItem" style="display:none;" data-page-node-id="oi6zruciHHwOsW6L7vQeEN">
-                                    <label class="gen-form-label" data-page-node-id="jhX5kUSN6qSnZyclpuBgeA">步骤方案</label>
-                                    <select class="gen-form-select" id="stepPlan" onchange="onStepPlanChange(this.value)" data-page-node-id="UCtXFD5HicX4AXQxggphXu"></select>
-                                </div>
+                                <!-- V1.3 A7: 「步骤方案」下拉移除——方案即所选流程本身，已在上方卡片中选 -->
                                 <div class="gen-form-row" data-page-node-id="D8XTj2UZmXbFiwWtaII4fT">
                                     <div class="gen-form-label-row">
                                         <label class="gen-form-label" data-page-node-id="ILEuS2RFXqqs4G7EMkUoHL">文书示例</label>
@@ -4114,39 +4283,6 @@
                                     <button class="gen-start-btn" id="stepNextBtn" onclick="continueStepGeneration()" data-page-node-id="94WLYQak4mNiSETnYY86HG">
                                         <i class="fas fa-file-alt" data-page-node-id="5BZ9FTYFJhyPwlFDqZ76Hi"></i> 生成文书
                                     </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- ===== V1.2.23: AI问答视图（中间栏第三个视图，基于本案材料的知识检索问答） ===== -->
-                        <div class="gen-panel" id="panel-chat" data-page-node-id="aiqPanelChat">
-                            <div class="aiq-wrap" data-page-node-id="aiqWrap">
-                                <!-- 顶部范围条（有对话记录时显示） -->
-                                <div class="aiq-topbar" id="aiqTopbar" style="display:none;" data-page-node-id="aiqTopbar">
-                                    <span class="aiq-topbar-scope" id="aiqTopbarScope" data-page-node-id="aiqTopbarScope"></span>
-                                    <button type="button" class="aiq-clear-btn" id="aiqClearBtn" onclick="clearAiChat()" title="清空当前对话" data-page-node-id="aiqClearBtn">
-                                        <i class="fas fa-trash-alt" data-page-node-id="aiqClearIcon"></i> 清空对话
-                                    </button>
-                                </div>
-                                <!-- 对话区（空态 / 对话流由 JS 渲染） -->
-                                <div class="aiq-body" id="aiqBody" data-page-node-id="aiqBody"></div>
-                                <!-- 输入区 -->
-                                <div class="aiq-input-area" data-page-node-id="aiqInputArea">
-                                    <div class="aiq-input-toolbar" data-page-node-id="aiqInputToolbar">
-                                        <!-- V1.2.25: 检索范围收敛为仅本案材料，原「通用知识库」可选 chip 移除 -->
-                                        <span class="aiq-scope-static" data-page-node-id="aiqScopeStatic">
-                                            <i class="fas fa-folder-open" data-page-node-id="aiqScopeStaticIcon"></i> 检索范围：本案材料
-                                        </span>
-                                    </div>
-                                    <div class="aiq-input-box" data-page-node-id="aiqInputBox">
-                                        <textarea class="aiq-input" id="aiqInput" rows="1" maxlength="500"
-                                            placeholder="输入你的问题，Enter 发送 / Shift+Enter 换行"
-                                            onkeydown="onAiChatInputKeydown(event)"
-                                            oninput="onAiChatInputInput()" data-page-node-id="aiqInput"></textarea>
-                                        <button type="button" class="aiq-send-btn" id="aiqSendBtn" onclick="sendAiChatMessage()" disabled title="发送" data-page-node-id="aiqSendBtn">
-                                            <i class="fas fa-arrow-up" data-page-node-id="aiqSendIcon"></i>
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4293,6 +4429,13 @@
             <button type="button" class="case-elements-drawer-close" onclick="closeElementsDrawer()" title="关闭" data-page-node-id="eYMn2z2OQbEDMpmwBnNIeT"><i class="fas fa-times" data-page-node-id="aQcw41D22zaGKzR2JqwGgU"></i></button>
         </div>
         <div class="case-elements-stats" id="caseElementsStats" data-page-node-id="avwzNNsqBkGSYyWcoI628b"></div>
+        <!-- V1.3.31: 本案要件分类切换标签（全部 / 标准 / 我的 / 个案） -->
+        <div class="case-elements-tabs" id="caseElementsTabs">
+            <button type="button" class="case-elements-tab active" data-cat="all" onclick="switchElementCategory('all')">全部</button>
+            <button type="button" class="case-elements-tab" data-cat="standard" onclick="switchElementCategory('standard')">标准</button>
+            <button type="button" class="case-elements-tab" data-cat="mine" onclick="switchElementCategory('mine')">我的</button>
+            <button type="button" class="case-elements-tab" data-cat="case" onclick="switchElementCategory('case')">个案</button>
+        </div>
         <div class="case-elements-drawer-body" id="caseElementsBody" data-page-node-id="4b90hLYHlcKcAhefiOX3mz">
             <!-- 要件列表由 JS 动态渲染（v2.31: 取消一键生成整体加载遮罩，改为单条"生成中"指示） -->
         </div>
@@ -4377,6 +4520,50 @@
         </div>
     </aside>
 
+    <!-- ===== V1.3 A24: AI问答抽屉（复用本案要件/本案法条抽屉样式体系；内容自中间栏 #panel-chat 迁移，
+         交互原样保留：空态/推荐问题/多轮对话/引用来源/存入本案要件/清空对话/仅本案材料检索范围） ===== -->
+    <div class="case-elements-overlay" id="aiChatOverlay" onclick="closeAiChatDrawer()"></div>
+    <aside class="case-elements-drawer aiq-drawer" id="aiChatDrawer" role="dialog" aria-label="AI问答">
+        <div class="case-elements-drawer-header">
+            <div class="case-elements-drawer-title">
+                <i class="fas fa-comments"></i>
+                <span>AI问答</span>
+            </div>
+            <button type="button" class="case-elements-drawer-close" onclick="closeAiChatDrawer()" title="关闭"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="case-elements-drawer-body aiq-drawer-body" id="aiChatDrawerBody">
+            <div class="aiq-wrap">
+                <!-- 顶部范围条（有对话记录时显示） -->
+                <div class="aiq-topbar" id="aiqTopbar" style="display:none;">
+                    <span class="aiq-topbar-scope" id="aiqTopbarScope"></span>
+                    <button type="button" class="aiq-clear-btn" id="aiqClearBtn" onclick="clearAiChat()" title="清空当前对话">
+                        <i class="fas fa-trash-alt"></i> 清空对话
+                    </button>
+                </div>
+                <!-- 对话区（空态 / 对话流由 JS 渲染） -->
+                <div class="aiq-body" id="aiqBody"></div>
+                <!-- 输入区 -->
+                <div class="aiq-input-area">
+                    <div class="aiq-input-toolbar">
+                        <!-- V1.2.25: 检索范围收敛为仅本案材料，原「通用知识库」可选 chip 移除 -->
+                        <span class="aiq-scope-static">
+                            <i class="fas fa-folder-open"></i> 检索范围：本案材料
+                        </span>
+                    </div>
+                    <div class="aiq-input-box">
+                        <textarea class="aiq-input" id="aiqInput" rows="1" maxlength="500"
+                            placeholder="输入你的问题，Enter 发送 / Shift+Enter 换行"
+                            onkeydown="onAiChatInputKeydown(event)"
+                            oninput="onAiChatInputInput()"></textarea>
+                        <button type="button" class="aiq-send-btn" id="aiqSendBtn" onclick="sendAiChatMessage()" disabled title="发送">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
     <!-- ===== V1.2.5: 法条库检索弹窗（手动添加） ===== -->
     <div class="modal-overlay" id="lawLibraryOverlay" onclick="closeLawLibraryModal()"></div>
     <div class="modal-dialog law-library-modal" id="lawLibraryModal" onclick="event.stopPropagation()">
@@ -4438,13 +4625,13 @@
     </div>
 
     <script src="../js/common.js?v=16"></script>
-    <script src="../js/case-data.js?v=67"></script>
+    <script src="../js/case-data.js?v=78"></script>
     <script src="../js/doc-editor.js?v=1"></script>
     <!-- V1.2.5: 全量法条库数据源（LAW_LIBRARY_ALL / LAW_RECOMMEND_RULES），需在 case-files.js 之前加载 -->
     <script src="../js/law-library.js?v=1"></script>
     <!-- V1.2.10: 案件信息编辑弹框公共组件（详情页内弹出，不跳列表页） -->
     <script src="../js/case-edit-dialog.js?v=1"></script>
-    <script src="../js/case-files.js?v=142"></script>
+    <script src="../js/case-files.js?v=155"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {

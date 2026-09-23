@@ -86,20 +86,16 @@
         .tpl-table tbody tr:hover { background: var(--bg-primary); }
         .tpl-table td { vertical-align: middle; }
         .tpl-name-cell { font-weight: 500; color: var(--text-primary); }
-        .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 6px; }
-        .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
-        .tpl-badge.custom { background: #d1fae5; color: #065f46; }
         .tpl-action-cell { white-space: nowrap; }
-        .tpl-time-cell { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
-        .tpl-time-empty { color: var(--text-muted); }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .status-badge.status-on { background: #d1fae5; color: #065f46; }
+        .status-badge.status-off { background: #f3f4f6; color: #6b7280; }
         .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; margin-right: 4px; font-family: inherit; }
         .action-btn:hover { background: #f3f4f6; }
         .action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
         .action-btn.edit:hover { background: var(--accent-light); }
         .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
         .action-btn.delete:hover { background: #fef2f2; }
-        .action-btn.view { color: var(--text-secondary); border-color: var(--border-color); }
-        .action-btn.view:hover { background: #f3f4f6; }
         .action-btn:disabled,
         .action-btn.disabled {
             opacity: 0.5; cursor: not-allowed; pointer-events: none;
@@ -155,6 +151,18 @@
         .form-textarea:focus { outline: none; border-color: var(--accent-primary); }
         .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
+        /* V1.3 A4: 关联流程多选 checkbox 组 */
+        .wf-check-list {
+            border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px;
+            max-height: 168px; overflow-y: auto; background: var(--bg-secondary);
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .wf-check-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; font-size: 13px; color: #374151; cursor: pointer; }
+        .wf-check-item:hover { background: var(--bg-primary); }
+        .wf-check-item input { cursor: pointer; }
+        .wf-check-empty { font-size: 12px; color: var(--text-muted); padding: 6px; }
+        .tpl-wf-general { color: var(--text-muted); font-size: 13px; }
+
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-cancel { background: #f3f4f6; color: #374151; }
         .btn-cancel:hover { background: #e5e7eb; }
@@ -190,8 +198,8 @@
                     <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
                     <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
-                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="workflows.html" class="nav-item"><i class="fas fa-diagram-project"></i><span>文书流程管理</span></a>
                     <a href="doc-templates.html" class="nav-item active"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
                     <a href="user-templates.html" class="nav-item"><i class="fas fa-search"></i><span>用户示例检索</span></a>
@@ -229,12 +237,7 @@
                 <div class="page-header">
                     <div class="page-title-wrap">
                         <h1>文书示例管理</h1>
-                        <p>维护各业务系统的文书示例，关联文书类型</p>
-                    </div>
-                    <div class="business-switch">
-                        <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
-                        <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
-                        <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
+                        <p>维护各业务系统的文书示例，关联生成流程</p>
                     </div>
                 </div>
 
@@ -253,10 +256,8 @@
                             <thead>
                                 <tr>
                                     <th>示例名</th>
-                                    <th>所属类型</th>
+                                    <th>文书类型</th>
                                     <th>状态</th>
-                                    <th>上传时间</th>
-                                    <th>更新时间</th>
                                     <th style="width:200px;">操作</th>
                                 </tr>
                             </thead>
@@ -281,8 +282,9 @@
                 <input type="text" class="form-input" id="tplName" placeholder="如：民事判决书（一审普通程序）">
             </div>
             <div class="form-row">
-                <label class="form-label">所属文书类型 <span class="required">*</span></label>
-                <select class="form-select" id="tplDocType"></select>
+                <label class="form-label">文书类型</label>
+                <select class="form-input" id="tplDocTypeSelect"></select>
+                <div class="form-hint">决定该示例归属的文书类型；不指定则为「通用示例」，在所有文书类型下均可见</div>
             </div>
             <div class="form-row">
                 <label class="form-label">示例正文</label>
@@ -318,7 +320,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=67"></script>
-    <script src="../../js/admin-doc-templates.js?v=9"></script>
+    <script src="../../js/case-data.js?v=78"></script>
+    <script src="../../js/admin-doc-templates.js?v=15"></script>
 </body>
 </html>

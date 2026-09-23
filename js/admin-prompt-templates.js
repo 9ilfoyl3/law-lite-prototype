@@ -1,18 +1,27 @@
 // ============ Admin Prompt Templates Management ============
 // v1.0 指令管理：维护各文书类型的指令
-// 数据持久化：localStorage.adminPromptTemplates（按业务系统×文书类型分组）
-// 用户侧联动：case-data.js getReqTemplates 优先读此 key，为空回退到 defaultRequirementTemplates
-// v1.2: 移除全局「恢复默认」按钮；新增单条历史版本记录（最多 10 条快照，支持一键恢复）
+// v1.3 V1.3 A5: 关联维度由「文书类型」改为「关联 workflow」（多选，空=通用指令）。
+//     存储改为扁平数组 adminPromptTemplates[org].__items__ = [{id, name, text, workflowIds, enabled, history}]；
+//     旧 docType 分组数据保留不删（case-data.js getReqTemplatesByWorkflow 合并读取，视为通用）；
+//     内置指令仍存于 defaultRequirementTemplates（按文书类型分组），读取时按
+//     BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE 推导默认关联；首次编辑/停用内置项时整体物化为 __items__。
+//     依据 docs/V1.3版本PRD（人看）.md 5.4
+// v1.2: 单条历史版本记录（最多 10 条快照，支持一键恢复）——机制保留
+// v1.4 V1.3.29 A36: 关联维度由「关联 workflow」回到「文书类型 docType」（单选，空=通用指令）。
+//     左栏改为「全部 / 通用指令 / 各文书类型」；列表列「关联流程」改为「文书类型」；
+//     编辑弹窗的流程多选框改为类型单选下拉 ptDocTypeSelect。
+//     零迁移：历史 __items__ 只有 workflowIds 没有 docType，由 case-data.js 的 resolvePromptDocType
+//     统一解析（docType 字段 → 内置 id 前缀 → workflowIds 首个流程的 domain → 通用），管理端与用户侧共用。
+//     workflowIds 字段继续保留在存储里，界面不再展示也不再读写。依据 5.2.18
 
 (function() {
     'use strict';
 
     // ===== 状态 =====
     let currentOrg = 'court';
-    let currentDocTypeFilter = ''; // '' = 全部
-    let editingDocType = null;    // 编辑模式下当前所属文书类型 key
-    let editingIndex = -1;        // 编辑模式下数组下标
-    let editingIsBuiltin = false; // 编辑的是内置指令
+    let currentDocTypeFilter = '';   // V1.3.29 A36: '' = 全部；'general' = 通用；其余 = 文书类型 key
+    let editingId = null;         // 编辑中的指令 id（内置为 docType#index 形态；新增为 null）
+    let editingIsBuiltin = false;
     let pendingConfirmAction = null;
 
     // ===== 存储 =====
@@ -36,44 +45,100 @@
         saveStorage(all);
     }
 
-    // 获取当前业务系统的文书类型映射（v1.21: 统一走 getAdminDocTypes 合并源）
-    function getDocTypes(org) {
-        return getAdminDocTypes(org) || {};
+    // v1.2 历史版本管理工具
+    const HISTORY_MAX = 10;
+    function pushHistory(prevHistory, snapshot) {
+        const arr = Array.isArray(prevHistory) ? prevHistory.slice() : [];
+        arr.unshift(snapshot);  // 头部追加（最新在前）
+        if (arr.length > HISTORY_MAX) arr.length = HISTORY_MAX;  // 截断
+        return arr;
     }
 
-    // 获取当前业务系统下被停用的内置指令索引字典
-    // 存于 adminPromptTemplates[org].__builtinDisabled__，结构：{ docTypeKey: [index1, index2] }
+    // ===== 内置指令（虚拟项）=====
+    // V1.3 A5: 内置指令按文书类型分组存储不变，读取时推导 id 与默认 workflowIds
     function getBuiltinDisabledMap(org) {
         const orgData = getOrgData(org);
-        return (orgData.__builtinDisabled__ && typeof orgData.__builtinDisabled__ === 'object') ? orgData.__builtinDisabled__ : {};
+        const d = orgData.__builtinDisabled__;
+        return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
     }
 
-    // 获取当前业务系统+文书类型下的指令列表（内置 + 自定义）
-    // 返回统一结构：[{name, text, isBuiltin, index, enabled, history}]
-    function getAllPrompts(org, docTypeKey) {
-        const defaults = (defaultRequirementTemplates[org] && defaultRequirementTemplates[org][docTypeKey]) || [];
-        const customs = (getOrgData(org)[docTypeKey]) || [];
+    function getBuiltinItems(org) {
+        const groups = (typeof defaultRequirementTemplates !== 'undefined')
+            ? (defaultRequirementTemplates[org] || {}) : {};
+        const typeMap = (typeof BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE !== 'undefined')
+            ? (BUILTIN_PROMPT_WORKFLOW_IDS_BY_DOCTYPE[org] || {}) : {};
+        const disabledMap = getBuiltinDisabledMap(org);
+        const out = [];
+        Object.entries(groups).forEach(([docTypeKey, arr]) => {
+            if (!Array.isArray(arr)) return;
+            const disabledArr = Array.isArray(disabledMap[docTypeKey]) ? disabledMap[docTypeKey] : [];
+            const workflowIds = Array.isArray(typeMap[docTypeKey]) ? typeMap[docTypeKey].slice() : [];
+            arr.forEach((p, i) => {
+                out.push({
+                    id: docTypeKey + '#' + i,
+                    name: p.name || '',
+                    text: p.text || '',
+                    workflowIds: workflowIds,
+                    // V1.3.29 A36: 内置指令按文书类型分组存储，分组 key 本身就是类型 key
+                    docType: docTypeKey,
+                    enabled: disabledArr.indexOf(i) < 0,
+                    history: [],
+                    isBuiltin: true
+                });
+            });
+        });
+        return out;
+    }
 
-        // 若该文书类型已有自定义数据，自定义完全覆盖内置
-        if (customs.length > 0) {
-            return customs.map((p, i) => ({
-                name: p.name || '',
-                text: p.text || '',
-                isBuiltin: false,
-                index: i,
-                enabled: p.enabled !== false,
-                history: Array.isArray(p.history) ? p.history : []
-            }));
+    // ===== 全部指令（内置虚拟 + 已物化自定义）=====
+    // 物化标记：__materialized__ = true 表示内置已全部迁入 __items__；
+    // 未物化时（管理员只是新增/删除自定义项）内置项仍以虚拟形式参与展示与用户侧读取，
+    // 避免新增一条自定义指令就把全部内置指令"挤没"。
+    function getAllItems(org) {
+        const orgData = getOrgData(org);
+        const hasItems = Array.isArray(orgData.__items__);
+        const materialized = hasItems && orgData.__materialized__ === true;
+        const out = [];
+        if (hasItems) {
+            orgData.__items__.forEach((p, i) => {
+                out.push({
+                    id: p.id || ('custom#' + i),
+                    name: p.name || '',
+                    text: p.text || '',
+                    workflowIds: Array.isArray(p.workflowIds) ? p.workflowIds.slice() : [],
+                    // V1.3.29 A36: 历史数据缺 docType 时按四级规则反推（见 case-data.js resolvePromptDocType）
+                    docType: (typeof resolvePromptDocType === 'function') ? resolvePromptDocType(org, p) : '',
+                    enabled: p.enabled !== false,
+                    history: Array.isArray(p.history) ? p.history : [],
+                    isBuiltin: false,
+                    index: i
+                });
+            });
         }
-        const disabledArr = getBuiltinDisabledMap(org)[docTypeKey] || [];
-        return defaults.map((p, i) => ({
-            name: p.name || '',
-            text: p.text || '',
-            isBuiltin: true,
-            index: i,
-            enabled: !disabledArr.includes(i),
-            history: []  // 内置未编辑过时无历史
-        }));
+        if (!materialized) {
+            getBuiltinItems(org).forEach(p => out.push(p));
+        }
+        return out;
+    }
+
+    // 物化：把内置指令全部迁入 __items__（保留停用状态），返回 orgData（幂等）
+    function materialize(org) {
+        const orgData = getOrgData(org);
+        if (orgData.__materialized__ === true && Array.isArray(orgData.__items__)) return orgData;
+        const prevItems = Array.isArray(orgData.__items__) ? orgData.__items__ : [];
+        const builtin = getBuiltinItems(org);
+        // 内置排前、已有自定义排后，顺序稳定（与虚拟展示顺序一致）
+        orgData.__items__ = builtin.map(p => ({
+            id: p.id, name: p.name, text: p.text,
+            workflowIds: p.workflowIds,
+            // V1.3.29 A36: 物化时把内置项的文书类型一并落库（分组 key），历史回滚亦据此保持类型不变
+            docType: p.docType || '',
+            enabled: p.enabled, history: []
+        })).concat(prevItems.filter(p => p && typeof p === 'object'));
+        orgData.__materialized__ = true;
+        // 清理旧停用字典（已随物化转为 enabled 字段）
+        delete orgData.__builtinDisabled__;
+        return orgData;
     }
 
     // ===== 通知 =====
@@ -104,158 +169,194 @@
         renderRight();
     };
 
-    // ===== 渲染左侧 =====
+    // ===== 筛选口径（V1.3.29 A36: 回到文书类型，与示例管理页完全一致——含通用项）=====
+    function matchesFilter(item) {
+        if (currentDocTypeFilter === '') return true;
+        const dt = item.docType || '';
+        if (currentDocTypeFilter === 'general') return dt === '';
+        return dt === '' || dt === currentDocTypeFilter;   // 通用指令在任何类型下都可见
+    }
+    function matchesFilterWith(item, dtKey) {
+        const dt = item.docType || '';
+        return dt === '' || dt === dtKey;
+    }
+
+    // 取文书类型显示名（未指定 = 通用）
+    function docTypeName(org, key) {
+        if (!key) return '通用';
+        let docTypes = {};
+        if (typeof getAdminDocTypes === 'function') docTypes = getAdminDocTypes(org) || {};
+        return (docTypes[key] && docTypes[key].name) || key;
+    }
+
+    // ===== 渲染左侧（V1.3.29 A36: 全部 / 通用指令 / 各文书类型）=====
     function renderLeft() {
-        const docTypes = getDocTypes(currentOrg);
-        let totalCount = 0;
-        Object.keys(docTypes).forEach(key => {
-            totalCount += getAllPrompts(currentOrg, key).length;
-        });
+        const items = getAllItems(currentOrg);
+        const generalCount = items.filter(p => (p.docType || '') === '').length;
+        let docTypes = {};
+        if (typeof getAdminDocTypes === 'function') docTypes = getAdminDocTypes(currentOrg) || {};
 
         const leftEl = document.getElementById('ptLeft');
-        let html = '<div class="pt-left-item' + (currentDocTypeFilter === '' ? ' active' : '') + '" onclick="selectDocType(\'\')">'
-            + '<i class="fas fa-layer-group"></i><span>全部</span><span class="count">' + totalCount + '</span></div>';
+        let html = '<div class="pt-left-item' + (currentDocTypeFilter === '' ? ' active' : '') + '" onclick="selectDocTypeFilter(\'\')">'
+            + '<i class="fas fa-layer-group"></i><span>全部</span><span class="count">' + items.length + '</span></div>';
+        html += '<div class="pt-left-item' + (currentDocTypeFilter === 'general' ? ' active' : '') + '" onclick="selectDocTypeFilter(\'general\')">'
+            + '<i class="fas fa-globe"></i><span>通用指令</span><span class="count">' + generalCount + '</span></div>';
 
-        Object.entries(docTypes).forEach(([key, cfg]) => {
-            const count = getAllPrompts(currentOrg, key).length;
-            html += '<div class="pt-left-item' + (currentDocTypeFilter === key ? ' active' : '') + '" onclick="selectDocType(\'' + key + '\')">'
-                + '<i class="fas ' + (cfg.icon || 'fa-folder') + '"></i>'
-                + '<span>' + escapeHtml(cfg.name) + '</span>'
+        Object.keys(docTypes).forEach(dtKey => {
+            const count = items.filter(p => matchesFilterWith(p, dtKey)).length;
+            html += '<div class="pt-left-item' + (currentDocTypeFilter === dtKey ? ' active' : '') + '" onclick="selectDocTypeFilter(\'' + escapeHtml(dtKey) + '\')">'
+                + '<i class="fas fa-folder"></i>'
+                + '<span>' + escapeHtml(docTypes[dtKey].name || dtKey) + '</span>'
                 + '<span class="count">' + count + '</span></div>';
         });
         leftEl.innerHTML = html;
     }
-    window.selectDocType = function(key) {
+    window.selectDocTypeFilter = function(key) {
         currentDocTypeFilter = key;
         renderLeft();
         renderRight();
     };
+    // 兼容旧命名（避免其他页面残留调用报错）
+    window.selectWf = window.selectDocTypeFilter;
+    window.selectDocType = window.selectDocTypeFilter;
 
     // ===== 渲染右侧 =====
     function renderRight() {
-        const docTypes = getDocTypes(currentOrg);
         const rightTitle = document.getElementById('rightTitle');
-        if (currentDocTypeFilter) {
-            rightTitle.textContent = (docTypes[currentDocTypeFilter] || {}).name || '指令列表';
+        if (currentDocTypeFilter === 'general') {
+            rightTitle.textContent = '通用指令';
+        } else if (currentDocTypeFilter) {
+            const dtCfg = (typeof getAdminDocTypes === 'function' ? getAdminDocTypes(currentOrg) : {})[currentDocTypeFilter];
+            rightTitle.textContent = dtCfg ? dtCfg.name : '指令列表';
         } else {
             rightTitle.textContent = '全部指令';
         }
 
-        const list = document.getElementById('ptList');
+        const tbody = document.getElementById('ptTbody');
+        const table = document.getElementById('ptTable');
         const empty = document.getElementById('emptyState');
+        const legacyBox = document.getElementById('legacyBar');
+        const items = getAllItems(currentOrg).filter(matchesFilter);
 
-        const docTypeKeys = currentDocTypeFilter ? [currentDocTypeFilter] : Object.keys(docTypes);
-        const groups = docTypeKeys.map(key => ({
-            docTypeKey: key,
-            docTypeName: (docTypes[key] || {}).name || key,
-            items: getAllPrompts(currentOrg, key)
-        })).filter(g => g.items.length > 0);
+        // V1.3 A5: 旧版（按文书类型分组）数据提示条——用户侧按「通用指令」兜底读取，可一键清除
+        let legacyBar = '';
+        const legacyCount = (typeof countLegacyPromptGroups === 'function') ? countLegacyPromptGroups(currentOrg) : 0;
+        if (legacyCount > 0) {
+            legacyBar = '<div class="legacy-bar"><i class="fas fa-database"></i>'
+                + '<span>检测到 <strong>' + legacyCount + '</strong> 条旧版（按文书类型分组）指令，用户侧将按「通用指令」继续生效。</span>'
+                + '<button class="action-btn" onclick="clearLegacyPrompts()">清除旧数据</button>'
+                + '<span class="legacy-hint">清除前请确认已在新版中重建所需指令</span></div>';
+        }
+        legacyBox.innerHTML = legacyBar;
 
-        if (groups.length === 0 || groups.every(g => g.items.length === 0)) {
-            list.innerHTML = '';
+        if (items.length === 0 && legacyCount === 0) {
+            table.style.display = 'none';
             empty.style.display = 'block';
             return;
         }
         empty.style.display = 'none';
+        table.style.display = '';
 
-        let html = '';
-        groups.forEach(g => {
-            // 全部视图下显示文书类型分组标题
-            if (!currentDocTypeFilter) {
-                html += '<div style="padding:10px 18px 4px; font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px;">'
-                    + escapeHtml(g.docTypeName) + '</div>';
-            }
-            g.items.forEach(item => {
-                const text = item.text || '';
-                const preview = text.length > 200 ? text.slice(0, 200) : text;
-                const needCollapse = text.length > 80;
-                const tagClass = item.isBuiltin ? 'builtin' : 'custom';
-                const tagText = item.isBuiltin ? '内置' : '自定义';
-                const isEnabled = item.enabled !== false;
-                const statusBadge = isEnabled
-                    ? '<span class="status-badge status-on">已启用</span>'
-                    : '<span class="status-badge status-off">已停用</span>';
-                const toggleBtn = isEnabled
-                    ? '<button class="action-btn toggle-off" onclick="togglePromptEnabled(\'' + g.docTypeKey + '\',' + item.index + ')">停用</button>'
-                    : '<button class="action-btn toggle-on" onclick="togglePromptEnabled(\'' + g.docTypeKey + '\',' + item.index + ')">启用</button>';
-                // v1.2 历史按钮：history 长度为 0 时置灰
-                const histCount = (item.history && item.history.length) || 0;
-                const histBtn = histCount > 0
-                    ? '<button class="action-btn history" title="历史版本（' + histCount + '）" onclick="openHistoryModal(\'' + g.docTypeKey + '\',' + item.index + ')">历史<span class="hist-count">' + histCount + '</span></button>'
-                    : '<button class="action-btn history" disabled title="暂无历史版本">历史</button>';
-                const actions = item.isBuiltin
-                    ? '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>' + histBtn + toggleBtn
-                    : '<button class="action-btn edit" onclick="editPrompt(\'' + g.docTypeKey + '\',' + item.index + ')">编辑</button>'
-                      + histBtn
-                      + toggleBtn
-                      + '<button class="action-btn delete" onclick="deletePrompt(\'' + g.docTypeKey + '\',' + item.index + ')">删除</button>';
-                html += '<div class="pt-item">'
-                    + '<div class="pt-item-tag ' + tagClass + '">' + tagText + '</div>'
-                    + '<div class="pt-item-body">'
-                    + '<div class="pt-item-text' + (needCollapse ? ' collapsed' : '') + '">' + (escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空指令）</span>') + '</div>'
-                    + '<div class="pt-item-meta"><span>标签：' + escapeHtml(item.name) + '</span>' + statusBadge + '</div>'
-                    + '</div>'
-                    + '<div class="pt-item-actions">' + actions + '</div>'
-                    + '</div>';
-            });
+        // V1.3.24 A31: 卡片改表格，状态独立列、操作栏统一【编辑/启用·停用/删除】
+        const rows = items.map(item => {
+            const text = item.text || '';
+            const preview = text.length > 200 ? text.slice(0, 200) + '…' : text;
+            const previewCell = escapeHtml(preview) || '<span style="color:var(--text-muted);font-style:italic;">（空指令）</span>';
+            const isEnabled = item.enabled !== false;
+            const statusBadge = isEnabled
+                ? '<span class="status-badge status-on">已启用</span>'
+                : '<span class="status-badge status-off">已停用</span>';
+            const toggleBtn = isEnabled
+                ? '<button class="action-btn toggle-off" onclick="togglePromptEnabled(\'' + item.id + '\')">停用</button>'
+                : '<button class="action-btn toggle-on" onclick="togglePromptEnabled(\'' + item.id + '\')">启用</button>';
+            // v1.2 历史版本入口已迁至编辑弹窗（A31），列表不再渲染历史按钮
+            // V1.3.29 A36: 列回归「文书类型」（未指定类型的指令显示为「通用」）
+            const dtKey = item.docType || '';
+            const dtText = dtKey
+                ? escapeHtml(docTypeName(currentOrg, dtKey))
+                : '<span class="pt-wf-general">通用</span>';
+            const actions = item.isBuiltin
+                ? '<button class="action-btn edit" onclick="editPrompt(\'' + item.id + '\')">编辑</button>' + toggleBtn
+                : '<button class="action-btn edit" onclick="editPrompt(\'' + item.id + '\')">编辑</button>'
+                  + toggleBtn
+                  + '<button class="action-btn delete" onclick="deletePrompt(\'' + item.id + '\')">删除</button>';
+            return '<tr>'
+                + '<td class="tpl-name-cell">' + escapeHtml(item.name) + '</td>'
+                + '<td class="pt-preview-cell">' + previewCell + '</td>'
+                + '<td>' + dtText + '</td>'
+                + '<td>' + statusBadge + '</td>'
+                + '<td class="tpl-action-cell">' + actions + '</td>'
+                + '</tr>';
         });
-        list.innerHTML = html;
+        tbody.innerHTML = rows.join('');
     }
 
     // ===== 新增/编辑弹窗 =====
     window.openAddModal = function() {
-        editingDocType = null;
-        editingIndex = -1;
+        editingId = null;
         editingIsBuiltin = false;
         document.getElementById('modalTitle').textContent = '新增指令';
         document.getElementById('ptName').value = '';
         document.getElementById('ptText').value = '';
-        fillDocTypeSelect(currentDocTypeFilter || '');
-        document.getElementById('ptDocType').disabled = false;
+        fillDocTypeSelect('');
+        // V1.3.24 A31: 新增态无历史版本，隐藏弹窗内「历史版本」按钮
+        const hb = document.getElementById('modalHistoryBtn');
+        if (hb) hb.style.display = 'none';
         document.getElementById('ptModal').classList.add('show');
         setTimeout(() => document.getElementById('ptName').focus(), 50);
     };
 
-    window.editPrompt = function(docTypeKey, index) {
-        const items = getAllPrompts(currentOrg, docTypeKey);
-        const item = items[index];
+    window.editPrompt = function(id) {
+        const item = getAllItems(currentOrg).find(p => p.id === id);
         if (!item) return;
-        editingDocType = docTypeKey;
-        editingIndex = index;
+        editingId = id;
         editingIsBuiltin = !!item.isBuiltin;
         document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置指令（另存为自定义）' : '编辑指令';
         document.getElementById('ptName').value = item.name;
         document.getElementById('ptText').value = item.text;
-        fillDocTypeSelect(docTypeKey);
-        // 编辑内置时禁用文书类型切换，避免逻辑歧义（内置只能在原类型上覆盖）
-        document.getElementById('ptDocType').disabled = editingIsBuiltin;
+        fillDocTypeSelect(item.docType || '');
+        // V1.3.24 A31: 编辑态显示「历史版本」入口（列表历史按钮已移除）
+        const hb = document.getElementById('modalHistoryBtn');
+        if (hb) hb.style.display = '';
         document.getElementById('ptModal').classList.add('show');
+    };
+
+    // V1.3.24 A31: 编辑弹窗内的「历史版本」入口（替代列表行历史按钮）
+    window.openHistoryFromModal = function() {
+        if (editingId) openHistoryModal(editingId);
     };
 
     window.closeModal = function() {
         document.getElementById('ptModal').classList.remove('show');
-        editingDocType = null;
-        editingIndex = -1;
+        editingId = null;
         editingIsBuiltin = false;
     };
 
+    // V1.3.29 A36: 文书类型单选下拉（不选 = 通用指令）——与示例管理页 tplDocTypeSelect 同版式
     function fillDocTypeSelect(selected) {
-        const docTypes = getDocTypes(currentOrg);
-        const sel = document.getElementById('ptDocType');
-        sel.innerHTML = '<option value="">请选择...</option>' + Object.entries(docTypes).map(([key, cfg]) =>
-            '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + escapeHtml(cfg.name) + '</option>'
-        ).join('');
+        const sel = document.getElementById('ptDocTypeSelect');
+        if (!sel) return;
+        let docTypes = {};
+        if (typeof getAdminDocTypes === 'function') docTypes = getAdminDocTypes(currentOrg) || {};
+        let html = '<option value="">通用指令（不指定类型）</option>';
+        Object.keys(docTypes).forEach(key => {
+            html += '<option value="' + escapeHtml(key) + '">' + escapeHtml(docTypes[key].name || key) + '</option>';
+        });
+        sel.innerHTML = html;
+        sel.value = selected || '';
+    }
+
+    function readDocType() {
+        const sel = document.getElementById('ptDocTypeSelect');
+        return sel ? (sel.value || '') : '';
     }
 
     window.savePrompt = function() {
-        const docType = document.getElementById('ptDocType').value;
         const name = document.getElementById('ptName').value.trim();
         const text = document.getElementById('ptText').value;
+        const workflowIds = [];        // V1.3.29 A36: workflowIds 停止读写（字段保留，零迁移）
+        const docType = readDocType();
 
-        if (!docType) {
-            showNotification('请选择所属文书类型', 'error');
-            return;
-        }
         if (!name) {
             showNotification('请填写标签名', 'error');
             document.getElementById('ptName').focus();
@@ -265,129 +366,112 @@
         if (!text && !confirm('指令正文为空，用户点击该标签会清空指令输入框。确认保存？')) {
             return;
         }
+        // V1.3.29 A36: 文书类型可为空（空 = 通用指令，各类型下均可见），不再强制必选
 
-        const orgData = getOrgData(currentOrg);
-        // 确保该文书类型有数组（编辑内置时也需创建自定义数组覆盖）
-        if (!Array.isArray(orgData[docType])) {
-            orgData[docType] = [];
-        }
-
-        // v1.2 历史版本管理工具
-        const HISTORY_MAX = 10;
-        function pushHistory(prevHistory, snapshot) {
-            const arr = Array.isArray(prevHistory) ? prevHistory.slice() : [];
-            arr.unshift(snapshot);  // 头部追加（最新在前）
-            if (arr.length > HISTORY_MAX) arr.length = HISTORY_MAX;  // 截断
-            return arr;
-        }
-
-        // 编辑内置指令：把内置数据全部拷贝为自定义，再修改对应项
-        if (editingIsBuiltin && editingDocType === docType) {
-            const defaults = (defaultRequirementTemplates[currentOrg] && defaultRequirementTemplates[currentOrg][docType]) || [];
-            const disabledArr = getBuiltinDisabledMap(currentOrg)[docType] || [];
-            // v1.2 拷贝内置数组，保留原停用状态与已有 history（首次编辑时 history 为空）
-            orgData[docType] = defaults.map((p, i) => ({
-                name: p.name,
-                text: p.text,
-                enabled: !disabledArr.includes(i),
-                history: []
-            }));
-            // v1.2 被编辑的项：原内置内容入栈 history，再覆盖为新内容
-            const origBuiltin = defaults[editingIndex] || { name: '', text: '' };
+        // 编辑内置指令：先物化全部内置为 __items__
+        if (editingIsBuiltin) {
+            const orgData = materialize(currentOrg);
+            const idx = orgData.__items__.findIndex(p => p.id === editingId);
+            if (idx < 0) { showNotification('指令不存在', 'error'); return; }
+            const cur = orgData.__items__[idx];
             const newHistory = pushHistory([], {
                 savedAt: Date.now(),
-                name: origBuiltin.name || '',
-                text: origBuiltin.text || ''
+                name: cur.name || '',
+                text: cur.text || ''
             });
-            orgData[docType][editingIndex] = {
+            orgData.__items__[idx] = {
+                id: editingId,
                 name: name,
                 text: text,
-                enabled: !disabledArr.includes(editingIndex),
+                workflowIds: workflowIds,     // 字段保留不再读
+                docType: docType,
+                enabled: cur.enabled !== false,
                 history: newHistory
             };
-            // 清理 __builtinDisabled__ 中该 docTypeKey（已全部转为自定义）
-            if (orgData.__builtinDisabled__ && orgData.__builtinDisabled__[docType]) {
-                delete orgData.__builtinDisabled__[docType];
-            }
-        } else if (editingDocType !== null && !editingIsBuiltin && editingDocType === docType) {
-            // 编辑自定义指令（同文书类型）：保留原 enabled；v1.2 编辑前内容入栈 history
-            const origItem = orgData[docType][editingIndex];
-            const origEnabled = (origItem && origItem.enabled !== false);
-            const origHistory = (origItem && Array.isArray(origItem.history)) ? origItem.history : [];
-            const newHistory = pushHistory(origHistory, {
+            setOrgData(currentOrg, orgData);
+        } else if (editingId) {
+            // 编辑自定义指令
+            const orgData = getOrgData(currentOrg);
+            if (!Array.isArray(orgData.__items__)) orgData.__items__ = [];
+            const idx = orgData.__items__.findIndex(p => p.id === editingId);
+            if (idx < 0) { showNotification('指令不存在', 'error'); return; }
+            const cur = orgData.__items__[idx];
+            const newHistory = pushHistory(cur.history, {
                 savedAt: Date.now(),
-                name: (origItem && origItem.name) || '',
-                text: (origItem && origItem.text) || ''
+                name: cur.name || '',
+                text: cur.text || ''
             });
-            orgData[docType][editingIndex] = { name: name, text: text, enabled: origEnabled, history: newHistory };
-        } else if (editingDocType !== null && !editingIsBuiltin && editingDocType !== docType) {
-            // 编辑自定义指令但改了文书类型：先从原数组移除，再追加到新数组（保留 enabled）
-            const oldArr = orgData[editingDocType] || [];
-            const origItem = oldArr[editingIndex];
-            const origEnabled = (origItem && origItem.enabled !== false);
-            const origHistory = (origItem && Array.isArray(origItem.history)) ? origItem.history : [];
-            // v1.2 跨文书类型编辑也入栈 history
-            const newHistory = pushHistory(origHistory, {
-                savedAt: Date.now(),
-                name: (origItem && origItem.name) || '',
-                text: (origItem && origItem.text) || ''
-            });
-            oldArr.splice(editingIndex, 1);
-            orgData[editingDocType] = oldArr;
-            orgData[docType].push({ name: name, text: text, enabled: origEnabled, history: newHistory });
+            orgData.__items__[idx] = {
+                id: editingId,
+                name: name,
+                text: text,
+                workflowIds: workflowIds,     // 字段保留不再读
+                docType: docType,
+                enabled: cur.enabled !== false,
+                history: newHistory
+            };
+            setOrgData(currentOrg, orgData);
         } else {
-            // 新增（无 history）
-            orgData[docType].push({ name: name, text: text, enabled: true, history: [] });
+            // 新增
+            const orgData = getOrgData(currentOrg);
+            if (!Array.isArray(orgData.__items__)) orgData.__items__ = [];
+            orgData.__items__.push({
+                id: 'custom-' + Date.now().toString(36) + Math.floor(Math.random() * 100),
+                name: name,
+                text: text,
+                workflowIds: workflowIds,     // 字段保留不再读
+                docType: docType,
+                enabled: true,
+                history: []
+            });
+            setOrgData(currentOrg, orgData);
         }
 
-        setOrgData(currentOrg, orgData);
         closeModal();
         renderLeft();
         renderRight();
-        showNotification(editingDocType !== null ? '指令已更新' : '指令已新增', 'success');
+        showNotification(editingId ? '指令已更新' : '指令已新增', 'success');
+    };
+
+    // V1.3 A5: 清除旧版分组数据
+    window.clearLegacyPrompts = function() {
+        const n = (typeof countLegacyPromptGroups === 'function') ? countLegacyPromptGroups(currentOrg) : 0;
+        showConfirm('清除旧版指令数据', '将删除 ' + n + ' 条旧版（按文书类型分组）指令数据，此操作不可恢复。确认清除？', () => {
+            if (typeof clearLegacyPromptGroups === 'function') clearLegacyPromptGroups(currentOrg);
+            renderLeft();
+            renderRight();
+            showNotification('旧版数据已清除', 'success');
+        });
     };
 
     // ===== 启用/停用切换 =====
-    window.togglePromptEnabled = function(docTypeKey, index) {
-        const items = getAllPrompts(currentOrg, docTypeKey);
-        const item = items[index];
+    window.togglePromptEnabled = function(id) {
+        const items = getAllItems(currentOrg);
+        const item = items.find(p => p.id === id);
         if (!item) return;
         const newEnabled = item.enabled === false; // 反转
         if (item.isBuiltin) {
-            // 内置指令：操作 __builtinDisabled__ 字典
-            const orgData = getOrgData(currentOrg);
-            if (!orgData.__builtinDisabled__ || typeof orgData.__builtinDisabled__ !== 'object') {
-                orgData.__builtinDisabled__ = {};
-            }
-            if (!Array.isArray(orgData.__builtinDisabled__[docTypeKey])) {
-                orgData.__builtinDisabled__[docTypeKey] = [];
-            }
-            const arr = orgData.__builtinDisabled__[docTypeKey];
-            const i = arr.indexOf(index);
-            if (newEnabled) {
-                // 启用：从停用列表移除
-                if (i >= 0) arr.splice(i, 1);
-            } else {
-                // 停用：加入列表
-                if (i < 0) arr.push(index);
-            }
+            // 内置指令：物化后改 enabled（V1.3 A5 统一机制）
+            const orgData = materialize(currentOrg);
+            const idx = orgData.__items__.findIndex(p => p.id === id);
+            if (idx >= 0) orgData.__items__[idx].enabled = newEnabled;
             setOrgData(currentOrg, orgData);
         } else {
-            // 自定义指令：直接修改 enabled 字段
             const orgData = getOrgData(currentOrg);
-            if (Array.isArray(orgData[docTypeKey]) && orgData[docTypeKey][index]) {
-                orgData[docTypeKey][index].enabled = newEnabled;
+            if (Array.isArray(orgData.__items__)) {
+                const idx = orgData.__items__.findIndex(p => p.id === id);
+                if (idx >= 0) orgData.__items__[idx].enabled = newEnabled;
                 setOrgData(currentOrg, orgData);
             }
         }
+        renderLeft();
         renderRight();
         showNotification(newEnabled ? '指令已启用' : '指令已停用', 'success');
     };
 
     // ===== 删除 =====
-    window.deletePrompt = function(docTypeKey, index) {
-        const items = getAllPrompts(currentOrg, docTypeKey);
-        const item = items[index];
+    window.deletePrompt = function(id) {
+        const item = getAllItems(currentOrg).find(p => p.id === id);
         if (!item) return;
         if (item.isBuiltin) {
             showNotification('内置指令不可删除', 'warning');
@@ -395,9 +479,9 @@
         }
         showConfirm('删除指令', '确定删除标签「' + item.name + '」吗？此操作不可恢复。', () => {
             const orgData = getOrgData(currentOrg);
-            if (Array.isArray(orgData[docTypeKey])) {
-                orgData[docTypeKey].splice(index, 1);
-                if (orgData[docTypeKey].length === 0) delete orgData[docTypeKey];
+            if (Array.isArray(orgData.__items__)) {
+                const idx = orgData.__items__.findIndex(p => p.id === id);
+                if (idx >= 0) orgData.__items__.splice(idx, 1);
                 setOrgData(currentOrg, orgData);
             }
             renderLeft();
@@ -407,7 +491,7 @@
     };
 
     // ===== v1.2 历史版本管理 =====
-    let historyContext = null;  // { docTypeKey, index }
+    let historyContext = null;  // 指令 id
 
     function formatTime(ts) {
         const d = new Date(ts);
@@ -416,16 +500,15 @@
             + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
     }
 
-    window.openHistoryModal = function(docTypeKey, index) {
-        const items = getAllPrompts(currentOrg, docTypeKey);
-        const item = items[index];
+    window.openHistoryModal = function(id) {
+        const item = getAllItems(currentOrg).find(p => p.id === id);
         if (!item) return;
         const history = Array.isArray(item.history) ? item.history : [];
         if (history.length === 0) {
             showNotification('该指令暂无历史版本', 'warning');
             return;
         }
-        historyContext = { docTypeKey: docTypeKey, index: index };
+        historyContext = id;
         document.getElementById('historyModalTitle').textContent = '历史版本 · ' + item.name;
         const listEl = document.getElementById('historyList');
         listEl.innerHTML = history.map((h, i) => {
@@ -449,17 +532,18 @@
 
     window.restoreHistory = function(histIdx) {
         if (!historyContext) return;
-        const { docTypeKey, index } = historyContext;
+        const id = historyContext;
         const orgData = getOrgData(currentOrg);
-        if (!Array.isArray(orgData[docTypeKey])) {
+        if (!Array.isArray(orgData.__items__)) {
             closeHistoryModal();
             return;
         }
-        const cur = orgData[docTypeKey][index];
-        if (!cur) {
+        const idx = orgData.__items__.findIndex(p => p.id === id);
+        if (idx < 0) {
             closeHistoryModal();
             return;
         }
+        const cur = orgData.__items__[idx];
         const history = Array.isArray(cur.history) ? cur.history : [];
         const target = history[histIdx];
         if (!target) {
@@ -467,8 +551,6 @@
             return;
         }
         showConfirm('恢复历史版本', '确定将当前内容回滚至「' + formatTime(target.savedAt) + '」的版本吗？当前内容会自动入栈为新历史。', () => {
-            // v1.2 当前内容入栈 history，再用历史版本覆盖当前
-            const HISTORY_MAX = 10;
             const newHistory = history.slice();
             newHistory.unshift({
                 savedAt: Date.now(),
@@ -476,11 +558,13 @@
                 text: cur.text || ''
             });
             if (newHistory.length > HISTORY_MAX) newHistory.length = HISTORY_MAX;
-            // 同时移除被恢复的那个历史项（避免重复）
-            // 注意：不删，保留更直观——下次想再回到当前内容可从最新一条恢复
-            orgData[docTypeKey][index] = {
+            orgData.__items__[idx] = {
+                id: id,
                 name: target.name || '',
                 text: target.text || '',
+                workflowIds: Array.isArray(cur.workflowIds) ? cur.workflowIds : [],
+                // V1.3.29 A36: 回滚不改动文书类型（历史快照只记录 name/text）
+                docType: typeof cur.docType === 'string' ? cur.docType : '',
                 enabled: cur.enabled !== false,
                 history: newHistory
             };
@@ -499,9 +583,9 @@
         pendingConfirmAction = onConfirm;
         const btn = document.getElementById('confirmBtn');
         btn.onclick = function() {
+            const action = pendingConfirmAction;   // V1.3 修复：先取回调再关弹窗（closeConfirm 会把 pendingConfirmAction 置空，原写法导致确认回调永不执行）
             closeConfirm();
-            if (typeof pendingConfirmAction === 'function') pendingConfirmAction();
-            pendingConfirmAction = null;
+            if (typeof action === 'function') action();
         };
         document.getElementById('confirmModal').classList.add('show');
     }
@@ -542,5 +626,5 @@
         init();
     }
 
-    window.AdminPromptTemplates = { getAllPrompts, getOrgData, setOrgData };
+    window.AdminPromptTemplates = { getAllItems, getOrgData, setOrgData };
 })();

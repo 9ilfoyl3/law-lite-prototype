@@ -45,7 +45,13 @@ let resultDocVersionNo = 1;
 let pendingUploadFiles = [];
 let pendingElementConfirmCallback = null;   // 要素确认回调（V1.2：指向抽屉生成模式的确认回调）
 let currentEditingStepId = null;            // 当前正在编辑材料的步骤ID
-let stepDocType = '';                       // 分步生成视图中的文书类型
+let matWorkflowId = '';                     // V1.3 A7: 一步生成选中的 workflow id
+let stepWorkflowId = '';                    // V1.3 A7: 分步生成选中的 workflow id
+// V1.3.29 A36: 表单首项的「文书类型」选中值（'' = 通用；与所选 workflow 的 domain 一致）
+// null = 尚未初始化：首次渲染时取第一个具名类型，避免打开页面就停在「通用」只看得到兜底流程；
+// 用户一旦显式选过（含选「通用」）就固化为字符串，不再被重置。
+let matDocType = null;
+let stepDocType = null;
 let stepTemplate = '';                      // 分步生成视图中的文书模板
 let stepRequirement = '';                   // 分步生成视图中的指令
 
@@ -84,7 +90,7 @@ const stepMaterialHints = {
 //   - V1.1 分步生成仅裁判文书（judgment），其他文书类型不展示分步生成 Tab
 //   - judgment 按案件阶段分组：first=一审（5 步），second=二审（6 步）
 //     由 case-data.js 的 resolveStepsByCaseStage(entry, caseStage) 解析
-//     v1.45 链 C: 由"按案字判断"改为"按案件阶段判断"，案件阶段来源：有案字时按案字→阶段映射，无案字时用户在生成配置区选择
+// v1.45 链 C: 由"按案字判断"改为"按案件阶段判断"，案件阶段由案字按映射推导（V1.3.22 A29 起无用户可见阶段选择器，案字缺失时用户经案字补全行选择）
 const stepConfigsByOrg = {
     court: {
         // 裁判文书分步生成（按案件阶段区分一审/二审）
@@ -307,7 +313,7 @@ function initPage() {
     (caseItem.files || []).forEach(f => {
         if (f.parseStatus === 'parsing') startMockParsing(caseId, f.id);
     });
-    // v2.32: 渲染案件信息解析提示条（解析中浅蓝 / 待确认浅黄+去修改）
+    // v2.32/V1.3.21 A28: 渲染案件信息解析提示条（解析中浅蓝 / 重写提取浅蓝 / 待确认浅黄+重写提取/手动编辑/关闭）
     renderCaseInfoParseAlert();
 
     // v1.36: 监听文件解析状态更新事件，自动刷新材料树（mock 解析完成后触发）
@@ -364,6 +370,10 @@ function initPage() {
             const lawLibModal = document.getElementById('lawLibraryModal');
             if (lawLibModal && lawLibModal.classList.contains('show')) {
                 closeLawLibraryModal();
+            }
+            // V1.3.18 A24: AI问答抽屉 ESC 关闭
+            if (aiChatDrawerOpen) {
+                closeAiChatDrawer();
             }
         }
     });
@@ -448,12 +458,30 @@ function initPage() {
     updateDocFormatBtnState();
 }
 
-// ===== v2.32: 案件信息解析提示条（PRD 第九章） =====
+// ===== v2.32 / V1.3.21 A28: 案件信息解析提示条（PRD 第九章） =====
 // 状态 1 解析中：浅蓝「正在从材料中提取案件信息」，无按钮
-// 状态 2 待确认：浅黄「案件信息已提取，请确认是否准确」+【去修改】，编辑保存后不再显示
+// 状态 2 重写提取中：浅蓝「正在重新提取案件信息，请稍候…」，无按钮
+// 状态 3 待确认：浅黄「案件信息已提取，请确认是否准确」+【重写提取】【手动编辑】+ 关闭按钮（关闭后不再提示）
+// V1.3.21 A28: 重写提取进行中标记（模块级暂存，不落案件数据，刷新后自动复位）
+let rewriteExtracting = false;
+let rewriteExtractTimer = null;
+const CASE_INFO_ALERT_DISMISS_KEY = 'caseInfoParseAlertDismissed';
+
 function renderCaseInfoParseAlert() {
     const alertEl = document.getElementById('caseInfoParseAlert');
     if (!alertEl || !caseItem) return;
+
+    // V1.3.21 A28: 【重写提取】进行中
+    if (rewriteExtracting) {
+        alertEl.className = 'case-info-parse-alert parsing';
+        alertEl.innerHTML = `
+            <div class="parse-alert-text">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>正在重新提取案件信息，请稍候…</span>
+            </div>`;
+        alertEl.style.display = 'flex';
+        return;
+    }
 
     const stats = getCaseParseStats(caseItem);
     if (stats.parsing > 0) {
@@ -467,23 +495,33 @@ function renderCaseInfoParseAlert() {
         return;
     }
     if (caseItem.firstParsePending && stats.total > 0) {
+        // V1.3.21 A28: 用户曾点击关闭 → 静默完成确认（等效【信息无误】），不再打扰
+        if (localStorage.getItem(CASE_INFO_ALERT_DISMISS_KEY) === '1') {
+            caseItem.firstParsePending = false;
+            delete caseItem.parseResult;
+            caseItem.updatedAt = new Date().toISOString().split('T')[0];
+            saveBusinessSystems();
+            alertEl.style.display = 'none';
+            return;
+        }
         alertEl.className = 'case-info-parse-alert confirm';
         alertEl.innerHTML = `
             <div class="parse-alert-text">
                 <i class="fas fa-exclamation-triangle"></i>
-                <span>案件信息已提取，请确认是否准确；识别无误可直接确认，有误则点击"去修改"调整</span>
+                <span>案件信息已提取，请确认是否准确；如需调整可重新提取或手动编辑</span>
             </div>
             <div class="parse-alert-actions">
-                <button class="parse-alert-action ghost" onclick="confirmCaseInfoNoError()">信息无误</button>
-                <button class="parse-alert-action" onclick="gotoEditCaseInfo()">去修改</button>
-            </div>`;
+                <button class="parse-alert-action" onclick="rewriteCaseInfoExtract()">重写提取</button>
+                <button class="parse-alert-action ghost" onclick="gotoEditCaseInfo()">手动编辑</button>
+            </div>
+            <button type="button" class="parse-alert-close" onclick="dismissCaseInfoParseAlert()" title="关闭，下次不再提示"><i class="fas fa-times"></i></button>`;
         alertEl.style.display = 'flex';
         return;
     }
     alertEl.style.display = 'none';
 }
 
-// v2.32: 提示条【去修改】→ 在当前详情页内直接弹出编辑弹框（V1.2.10），不再跳列表页
+// v2.32/V1.3.21 A28: 提示条【手动编辑】→ 在当前详情页内直接弹出编辑弹框（V1.2.10），不再跳列表页
 // 保存后回调：刷新提示条 + 案件信息（案号/案字/案由等）+ 标题栏
 function gotoEditCaseInfo() {
     openCaseEditDialog(caseId, {
@@ -501,33 +539,46 @@ function gotoEditCaseInfo() {
     });
 }
 
-// V1.2.21: 提示条【信息无误】——轻量确认路径（识别正确时无需进编辑弹框即可完成确认）
-// 与【编辑→保存】等效：置 firstParsePending=false、清除 parseResult、隐藏提示条；
-// 列表页「待确认」标识随下次列表渲染同步消失（「新」标识由建案日期独立控制，不受影响）
-function confirmCaseInfoNoError() {
-    if (!caseItem || !caseItem.firstParsePending) return;
-    caseItem.firstParsePending = false;
-    delete caseItem.parseResult;
-    caseItem.updatedAt = new Date().toISOString().split('T')[0];
-    saveBusinessSystems();
+// V1.3.21 A28: 提示条【重写提取】——重新生成 mock 识别结果（parseResult）并回到待确认态
+// 不重跑材料文件解析（文件解析状态保持不变，由 startMockParsing 管理）
+function rewriteCaseInfoExtract() {
+    if (!caseItem || rewriteExtracting) return;
+    rewriteExtracting = true;
     renderCaseInfoParseAlert();
-    showNotification('案件信息已确认', 'success');
+    const firstFile = (caseItem.files || [])[0];
+    const fileName = (firstFile && firstFile.name) || caseItem.caseName || '';
+    rewriteExtractTimer = setTimeout(function () {
+        rewriteExtracting = false;
+        caseItem.parseResult = generateMockParseResult(fileName);
+        caseItem.firstParsePending = true;
+        saveBusinessSystems();
+        renderCaseInfoParseAlert();
+        showNotification('案件信息已重新提取，请确认', 'success');
+    }, 1800 + Math.floor(Math.random() * 1200));
+}
+
+// V1.3.21 A28: 提示条关闭按钮——本次视为已确认（等效【信息无误】），并记录 localStorage 永久不再提示
+function dismissCaseInfoParseAlert() {
+    try { localStorage.setItem(CASE_INFO_ALERT_DISMISS_KEY, '1'); } catch (e) { /* 忽略存储异常 */ }
+    if (caseItem) {
+        caseItem.firstParsePending = false;
+        delete caseItem.parseResult;
+        caseItem.updatedAt = new Date().toISOString().split('T')[0];
+        saveBusinessSystems();
+    }
+    renderCaseInfoParseAlert();
+    showNotification('已关闭，后续不再提示', 'success');
 }
 
 // v2.23 (任务 9.1): 应用 sessionStorage 中的生成配置
 function applyListGenConfig(cfg) {
-    const docTypeSelect = document.getElementById('matDocType');
-    if (docTypeSelect && cfg.docType) {
-        const docTypes = getCurrentDocTypes();
-        if (docTypes[cfg.docType]) {
-            docTypeSelect.value = cfg.docType;
-            onMatDocTypeChange(false);
-        }
+    // V1.3 A7: 文书类型维度已移除，按 config.workflowId（旧数据按 docType 映射）选中流程
+    if (cfg.workflowId || cfg.docType) {
+        selectMaterialWorkflow(cfg.workflowId || defaultMaterialWorkflowIdForDocType(cfg.docType), false);
     }
     const templateSelect = document.getElementById('matTemplate');
-    const effectiveDocType = docTypeSelect ? docTypeSelect.value : cfg.docType;
     if (templateSelect && cfg.template) {
-        const templates = getDocTypeTemplates(effectiveDocType);
+        const templates = getDocTypeTemplateOptions(matDocType);
         if (templates[cfg.template]) {
             templateSelect.value = cfg.template;
         }
@@ -536,13 +587,7 @@ function applyListGenConfig(cfg) {
     if (requirementTextarea && cfg.requirement) {
         requirementTextarea.value = cfg.requirement;
     }
-    // v1.45 链 C: 若列表页已传 caseStage，则设置到生成配置区（详情页能自动判定时忽略列表页值，由详情页自动判定）
-    if (cfg.caseStage) {
-        const matCaseStageSel = document.getElementById('matCaseStage');
-        if (matCaseStageSel) matCaseStageSel.value = cfg.caseStage;
-        const stepCaseStageSel = document.getElementById('stepCaseStage');
-        if (stepCaseStageSel) stepCaseStageSel.value = cfg.caseStage;
-    }
+    // V1.3.22 A29: 案件阶段不再作为用户可见选择项传递（详情页按案字自动判定阶段）
     syncStepConfigFromMaterial();
     // 自动定位到一步生成 Tab（默认已在一步生成，确保激活）
     document.querySelectorAll('.gen-tab').forEach(t => t.classList.toggle('active', t.dataset.method === 'material'));
@@ -558,19 +603,14 @@ function applyListGenParams() {
     const template = getUrlParam('template');
     const requirement = getUrlParam('requirement');
 
-    const docTypeSelect = document.getElementById('matDocType');
-    if (docTypeSelect && docType) {
-        const docTypes = getCurrentDocTypes();
-        if (docTypes[docType]) {
-            docTypeSelect.value = docType;
-            onMatDocTypeChange(false);
-        }
+    // V1.3 A7: 文书类型维度已移除，按 docType 映射默认流程
+    if (docType) {
+        selectMaterialWorkflow(defaultMaterialWorkflowIdForDocType(docType), false);
     }
 
     const templateSelect = document.getElementById('matTemplate');
-    const effectiveDocType = docTypeSelect ? docTypeSelect.value : docType;
     if (templateSelect && template) {
-        const templates = getDocTypeTemplates(effectiveDocType);
+        const templates = getDocTypeTemplateOptions(matDocType);
         if (templates[template]) {
             templateSelect.value = template;
         }
@@ -822,7 +862,7 @@ function updateMatGenerateButtonState() {
     // 超限时由 checkMaterialLimit 统一置灰整个表单，此处不再覆盖
     if (controls && controls.classList.contains('disabled')) return;
 
-    const docType = document.getElementById('matDocType')?.value || '';
+    const docType = ''; // V1.3 A7: 文书类型维度已移除，流程选中态由 matWorkflowId 承担
     // v2.22: 可用材料=已选且 parseStatus==='success'；全部异常时置灰
     const availableCount = getSelectedFiles().length;
     const stats = getCaseParseStats(caseItem);
@@ -832,20 +872,9 @@ function updateMatGenerateButtonState() {
         btn.title = '无可用材料，请先上传并解析文件';
         return;
     }
-    // v1.45 链 C: 案件阶段未选时置灰（仅裁判文书类型校验，有选项且未选时）
-    if (docType === 'judgment') {
-        const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-        const stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
-        const currentStage = getCurrentCaseStage();
-        if (stageOptions.length > 0 && !currentStage) {
-            btn.disabled = true;
-            btn.title = '请先选择案件阶段';
-            return;
-        }
-    }
-    const canGenerate = availableCount > 0 && docType !== '';
+    const canGenerate = availableCount > 0 && !!matWorkflowId;
     btn.disabled = !canGenerate;
-    btn.title = canGenerate ? '' : (availableCount === 0 ? '请先在左侧勾选材料' : '请选择文书类型');
+    btn.title = canGenerate ? '' : (availableCount === 0 ? '请先在左侧勾选材料' : '当前文书类型下暂无可用生成流程，请补全案件案由/案字或切换文书类型');
 }
 
 function renderCoreMaterialsAlert() {
@@ -906,27 +935,13 @@ function getCurrentModel() {
 }
 
 // v2.20: 模型由 workflow 的 modelId 决定（agentflow 平台镜像），用户侧不可修改
-// 在文书类型/生成方式/初始化/修改生成设置等时机调用，刷新模型下拉为只读展示
+// V1.3 A7: 直接取当前选中流程的 modelId（不再按文书类型+案字+案由匹配）
+// 在流程切换/生成方式/初始化/修改生成设置等时机调用，刷新模型下拉为只读展示
 function refreshModelFromWorkflow() {
     const modelSelect = document.getElementById('modelSelect');
     if (!modelSelect) return;
-    const docTypeKey = (currentGenMethod === 'steps')
-        ? (document.getElementById('stepDocType') ? document.getElementById('stepDocType').value : '')
-        : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
-    if (!docTypeKey || typeof getWorkflowModelId !== 'function') {
-        // 兜底：使用默认模型
-        const m = getModelById(DEFAULT_MODEL_ID);
-        modelSelect.innerHTML = `<option value="${m.id}" selected>${m.name}（${formatNumber(m.limit)}）</option>`;
-        modelSelect.disabled = true;
-        modelSelect.title = '系统由流程配置决定，不可手动修改';
-        localStorage.setItem('ai_current_model', m.id);
-        updateContextUsageHint();
-        checkMaterialLimit();
-        return;
-    }
-    const caseWord = extractCaseWordFromCaseNumber();
-    const cause = extractCauseFromCase();
-    const modelId = getWorkflowModelId(org, docTypeKey, caseWord, cause, currentGenMethod);
+    const wf = getSelectedWorkflow(currentGenMethod === 'steps');
+    const modelId = (wf && wf.modelId) ? wf.modelId : DEFAULT_MODEL_ID;
     const model = getModelById(modelId);
     modelSelect.innerHTML = `<option value="${model.id}" selected>${model.name}（${formatNumber(model.limit)}）</option>`;
     modelSelect.disabled = true;
@@ -979,11 +994,9 @@ function switchToStepView(options = {}) {
     stepsConfig.forEach(s => {
         stepData[s.id] = { items: [], materials: new Set() };
     });
-    // V1.2.23: 统一清空三个视图的 active（覆盖新的 AI问答视图），并退出 chat-mode
+    // V1.3 A24: AI问答已迁出为右侧抽屉，中间栏仅剩材料生成/分步生成两个视图
     document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-steps').classList.add('active');
-    const genContentEl = document.querySelector('.gen-content');
-    if (genContentEl) genContentEl.classList.remove('chat-mode');
     currentGenMethod = 'steps';
 
     // 更新顶部 Tab 激活状态
@@ -1002,8 +1015,8 @@ function switchToStepView(options = {}) {
     // v2.25: 分步生成 tab 隐藏顶部"核心材料"提示条（分步生成每步独立选材料，与材料树全局勾选无关）
     const coreAlert = document.getElementById('coreMaterialsAlert');
     if (coreAlert) coreAlert.style.display = 'none';
-    // v1.45 链 C: 进入分步视图时刷新案件阶段行显隐 + 「开始生成」按钮状态
-    updateCaseStageRowVisibility();
+    // V1.3.22 A29: 进入分步视图时刷新案由/案字两列常显区（替代 v1.45 案件阶段行）
+    renderCaseInfoBoxes();
     updateStartStepsButtonState();
 }
 
@@ -1043,11 +1056,9 @@ function backToMainView() {
         }
     }
     syncMaterialConfigFromStep();
-    // V1.2.23: 统一清空三个视图的 active（覆盖新的 AI问答视图），并退出 chat-mode
+    // V1.3 A24: AI问答已迁出为右侧抽屉，中间栏仅剩材料生成/分步生成两个视图
     document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-main').classList.add('active');
-    const genContentEl = document.querySelector('.gen-content');
-    if (genContentEl) genContentEl.classList.remove('chat-mode');
     currentGenMethod = 'material';
 
     // 更新顶部 Tab 激活状态
@@ -1055,8 +1066,7 @@ function backToMainView() {
 
     const autoAlert = document.getElementById('autoSwitchAlert');
     if (autoAlert) autoAlert.classList.remove('show');
-    // v1.28: 切换回材料生成 tab 时，刷新材料型 workflow 匹配（用户侧不感知）
-    refreshMaterialWorkflow();
+    // V1.3 A7: 流程由用户在卡片上手选，切回一步生成视图不再重新匹配（原 refreshMaterialWorkflow 已移除）
 
     // v2.25: 恢复显示顶部"核心材料"提示条
     const coreAlert = document.getElementById('coreMaterialsAlert');
@@ -1101,19 +1111,11 @@ function reconfigWithLatestSnapshot() {
 
     // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 refreshModelFromWorkflow 自动刷新）
 
-    // 2. 文书类型 / 模板 / 指令（材料生成视图）
-    if (cfg.docType) {
-        const matDocTypeEl = document.getElementById('matDocType');
-        if (matDocTypeEl) {
-            const docTypes = getCurrentDocTypes();
-            matDocTypeEl.innerHTML = Object.entries(docTypes).map(([key, docCfg]) =>
-                `<option value="${key}" ${key === cfg.docType ? 'selected' : ''}>${docCfg.name}</option>`
-            ).join('');
-        }
-        onMatDocTypeChange(false);
+    // 2. 生成流程 / 模板 / 指令（材料生成视图）——V1.3 A7: 按 config.workflowId（旧数据按 docType 映射）回填
+    if (cfg.docType || cfg.workflowId) {
+        selectMaterialWorkflow(cfg.workflowId || defaultMaterialWorkflowIdForDocType(cfg.docType), false);
         const matTemplateEl = document.getElementById('matTemplate');
         if (matTemplateEl && cfg.template) matTemplateEl.value = cfg.template;
-        renderMatReqTemplates(cfg.docType);
         renderMatTplPreview();   // V1.2.29: 回填最近一次生成的模板后同步预览
     }
     if (cfg.prompt !== undefined) {
@@ -1244,10 +1246,9 @@ function updateStepsTabVisibility() {
 
 function switchGenMethod(method) {
     if (method === currentGenMethod) return;
-    // V1.2.23: 新增第三个视图 'chat'（AI问答）
-    if (method === 'chat') {
-        switchToChatView();
-    } else if (method === 'steps') {
+    // V1.3 A24: 「AI问答」已由中间栏 tab 迁出为右侧抽屉（入口在材料树顶部搜索框上方，见 openAiChatDrawer），
+    // 此处仅剩「材料生成」「分步生成」两个视图
+    if (method === 'steps') {
         switchToStepView({ auto: false });
     } else {
         backToMainView();
@@ -1258,115 +1259,318 @@ function switchGenMethod(method) {
 }
 
 // ===== 方法1 - 材料生成 =====
-function initMaterialGen() {
-    // v1.45 链 C: 先初始化案件阶段选择项
-    initCaseStageSelect();
-    const docTypes = getCurrentDocTypes();
-    const docTypeSelect = document.getElementById('matDocType');
-    docTypeSelect.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
-        `<option value="${key}">${cfg.name}</option>`
-    ).join('');
+// ===== V1.3 A7/A8: workflow 平铺选择 =====
+// 一步生成 tab：type='material' 的流程卡片单选（通用兜底流程固定末尾）；
+// 分步生成 tab：type='step' 的流程卡片单选。选完流程后再出示例/指令（按流程过滤 + 通用 + 我的）。
 
-    // 默认选第一个
-    const firstKey = Object.keys(docTypes)[0];
-    if (firstKey) {
-        docTypeSelect.value = firstKey;
-        onMatDocTypeChange(false);
+// V1.3 A27: 过滤逻辑上提到 case-data.js 的 getWorkflowsForCase，列表页快速生成复用同一口径
+// （口径说明见 case-data.js：mode 过滤 + 通用兜底恒展示 + A14 案字/案由过滤）
+// V1.3.22 A29 修订: 案由、案字任一缺失 → 仅保留通用兜底流程（isGeneral），补齐后恢复完整过滤
+// V1.3.29 A36: 拆两层——先按 mode + 案件过滤（不按类型），再按表单首项选中的文书类型过滤。
+//   未过滤层 getOrgWorkflowsUnfiltered 供「文书类型」下拉取可用并集；
+//   过滤层 getOrgWorkflowsForView 供「生成流程」下拉使用。
+function getOrgWorkflowsUnfiltered(isSteps) {
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const caseWord = (typeof extractCaseWordFromCaseNumber === 'function') ? extractCaseWordFromCaseNumber() : '';
+    const cause = (typeof currentCase !== 'undefined' && currentCase && currentCase.cause)
+        || (typeof caseItem !== 'undefined' && caseItem && caseItem.cause)
+        || '';
+    let list = (typeof getWorkflowsForCase === 'function')
+        ? getWorkflowsForCase(org, isSteps ? 'step' : 'material', caseWord, cause)
+        : [];
+    if (!caseWord || !cause) list = list.filter(wf => wf.isGeneral === true);
+    return list;
+}
+
+// 当前视图选中类型的 key（'' = 通用）
+function currentDocTypeKey(isSteps) {
+    return isSteps ? stepDocType : matDocType;
+}
+
+// V1.3.29 A36: 当前生成方式下有可用流程的文书类型列表。
+//   只列「确实有流程可跑」的类型——全量列出会把空类型也摆出来，选完拿到空流程下拉等于让用户试错。
+//   具名类型按管理端 getAdminDocTypes 顺序，通用排末位（与流程列表里通用兜底恒在末位一致）。
+function getAvailableDocTypes(isSteps) {
+    const list = getOrgWorkflowsUnfiltered(isSteps);
+    const set = {};
+    list.forEach(wf => { set[wf.domain || ''] = true; });
+    let types = {};
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    if (typeof getAdminDocTypes === 'function') types = getAdminDocTypes(org) || {};
+    const out = [];
+    Object.keys(types).forEach(k => { if (set[k]) out.push({ key: k, name: types[k].name || k }); });
+    // domain 存在但已被管理员删掉类型的流程：兜底显示 key 本身
+    Object.keys(set).forEach(k => { if (k && !types[k]) out.push({ key: k, name: k }); });
+    if (set['']) out.push({ key: '', name: '通用' });
+    return out;
+}
+
+// 渲染「文书类型」下拉（首项）。选中值失效（类型下已无可用流程）时回落到第一个。
+function renderDocTypeSelect(isSteps) {
+    const sel = document.getElementById(isSteps ? 'stepDocTypeSelect' : 'matDocTypeSelect');
+    const hint = document.getElementById(isSteps ? 'stepDocTypeHint' : 'matDocTypeHint');
+    if (!sel) return;
+    const types = getAvailableDocTypes(isSteps);
+    let current = currentDocTypeKey(isSteps);
+
+    if (!types.length) {
+        sel.innerHTML = '<option value="">暂无可用文书类型</option>';
+        sel.value = '';
+        sel.disabled = true;
+        if (isSteps) stepDocType = ''; else matDocType = '';
+        if (hint) {
+            hint.textContent = getOrgWorkflowRawCount(isSteps) > 0
+                ? '当前案件的案号/案由没有匹配的生成流程，请补全案件信息，或在管理后台配置不限制案字案由的流程'
+                : '当前业务系统暂无可用流程，请先在管理后台「文书流程管理」中配置';
+            hint.style.display = 'block';
+        }
+        return;
+    }
+
+    // null = 未初始化：优先落到第一个具名类型（通用排在最末，不会被优先选中）
+    if (current === null || !types.some(t => t.key === current)) current = types[0].key;
+    if (isSteps) stepDocType = current; else matDocType = current;
+
+    sel.disabled = false;
+    sel.innerHTML = types.map(t =>
+        '<option value="' + escapeHtmlForStreaming(t.key) + '"' + (t.key === current ? ' selected' : '') + '>'
+        + escapeHtmlForStreaming(t.name) + '</option>'
+    ).join('');
+    if (hint) { hint.textContent = ''; hint.style.display = 'none'; }
+}
+
+// 切换文书类型 → 重选该类型下第一个流程，并级联刷新流程/示例/指令
+function selectMaterialDocType(key) {
+    matDocType = key || '';
+    renderDocTypeSelect(false);
+    const list = getOrgWorkflowsForView(false);
+    selectMaterialWorkflow(list.length ? list[0].id : '', false);
+}
+
+function selectStepDocType(key) {
+    stepDocType = key || '';
+    renderDocTypeSelect(true);
+    const list = getOrgWorkflowsForView(true);
+    selectStepWorkflow(list.length ? list[0].id : '');
+}
+window.selectMaterialDocType = selectMaterialDocType;
+window.selectStepDocType = selectStepDocType;
+
+function getOrgWorkflowsForView(isSteps) {
+    const key = currentDocTypeKey(isSteps);
+    return getOrgWorkflowsUnfiltered(isSteps).filter(wf => (wf.domain || '') === key);
+}
+
+// V1.3 A14: 未过滤的本模式流程数（用于区分「一个流程都没有」与「都被案件条件过滤掉了」两种空态）
+// V1.3 A27: 同样改调 case-data.js
+function getOrgWorkflowRawCount(isSteps) {
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    return (typeof getWorkflowsRawCount === 'function')
+        ? getWorkflowsRawCount(org, isSteps ? 'step' : 'material')
+        : 0;
+}
+
+function getSelectedWorkflow(isSteps) {
+    const id = isSteps ? stepWorkflowId : matWorkflowId;
+    if (!id) return null;
+    return getOrgWorkflowsForView(isSteps).find(wf => wf.id === id) || null;
+}
+
+// 按原文书类型 key 找默认一步生成流程（旧版本/列表页参数兼容：历史 config 只存了 docType）
+// V1.3.29 A36: 参数允许跨类型选中，故按未过滤列表查找；命中则同步类型下拉（渲染由调用方触发）
+function defaultMaterialWorkflowIdForDocType(docTypeKey) {
+    const list = getOrgWorkflowsUnfiltered(false);
+    if (docTypeKey) {
+        const hit = list.find(wf => (wf.domain || '') === docTypeKey);
+        if (hit) {
+            matDocType = docTypeKey;
+            renderDocTypeSelect(false);
+            return hit.id;
+        }
+    }
+    return list.length ? list[0].id : '';
+}
+
+// V1.3.30: 可见「生成流程」下拉已移除——后台配置规则为（文书类型 + 生成方式 + 案字/案由）唯一确定一条 workflow，
+//   选定文书类型后流程已唯一，由 selectMaterialDocType / selectStepDocType 内部经 getOrgWorkflowsForView 自动解析并写入
+//   matWorkflowId / stepWorkflowId，不再向用户展示流程下拉。原 renderWorkflowSelect 整段删除。
+
+// V1.3.29 A36: 示例改按文书类型组装（类型项 + 通用项；我的示例平铺在后）
+//   此前按 workflowId 过滤：管理端 A34 起已停止写入 workflowIds，所有示例都会退化成"通用"、
+//   在每个流程下都出现，筛选能力等于失效。
+function getDocTypeTemplateOptions(docTypeKey) {
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const out = {};
+    (typeof getTemplatesByDocType === 'function')
+        ? getTemplatesByDocType(org, docTypeKey).forEach(t => { out[t.key] = { name: t.name, content: t.content }; })
+        : null;
+    (typeof getMyDocTemplatesFlat === 'function')
+        ? (typeof filterMineByDocType === 'function' ? filterMineByDocType(getMyDocTemplatesFlat(org), docTypeKey) : getMyDocTemplatesFlat(org))
+            .forEach(t => { out[t.key] = { name: t.name, content: t.content, source: 'mine' }; })
+        : null;
+    return out;
+}
+
+// 一步生成：选中流程后刷新示例/指令/模型/按钮态（V1.3.22 A29 起无案件阶段行，改用案由/案字补全行）
+function selectMaterialWorkflow(workflowId, shouldSync = true) {
+    matWorkflowId = workflowId || '';
+    // V1.3.30: 可见流程下拉已移除，仅维护内部 matWorkflowId 并刷新下游（示例/指令/模型/按钮态）
+    const templateSelect = document.getElementById('matTemplate');
+    const templates = getDocTypeTemplateOptions(matDocType);
+    const templateKeys = Object.keys(templates);
+    if (templateSelect) {
+        templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
+        if (templateKeys.length) templateSelect.value = templateKeys[0];
+    }
+    renderMatReqTemplates(matDocType);
+    renderMatTplPreview();
+    refreshStepsConfig();
+    refreshModelFromWorkflow();
+    renderCaseInfoBoxes();
+    updateMatGenerateButtonState();
+    if (shouldSync) syncStepConfigFromMaterial();
+}
+
+// 分步生成：选中流程后刷新步骤序列/示例
+function selectStepWorkflow(workflowId) {
+    stepWorkflowId = workflowId || '';
+    const wf = getSelectedWorkflow(true);
+    stepDocType = wf ? (getWorkflowDomain(wf) || 'judgment') : '';
+    // V1.3.30: 可见流程下拉已移除，仅维护内部 stepWorkflowId 并刷新下游
+    const templateSelect = document.getElementById('stepTemplate');
+    const templates = getDocTypeTemplateOptions(stepDocType);
+    const templateKeys = Object.keys(templates);
+    if (templateSelect) {
+        templateSelect.innerHTML = buildTemplateSelectHtml(templates, stepTemplate);
+        if (templates[stepTemplate]) {
+            templateSelect.value = stepTemplate;
+        } else if (templateKeys.length) {
+            stepTemplate = templateKeys[0];
+            templateSelect.value = stepTemplate;
+        }
+    }
+    refreshStepsConfig();
+    renderCaseInfoBoxes();
+    updateStartStepsButtonState();
+    renderSteps();
+    renderStepTplPreview();
+}
+
+function initMaterialGen() {
+    // V1.3.22 A29: 先渲染案由/案字两列常显区（替代 v1.45 案件阶段选择项）
+    renderCaseInfoBoxes();
+    // V1.3.29 A36: 先定文书类型（下拉初始化会顺带确定 matDocType），再在该类型下选第一条流程
+    renderDocTypeSelect(false);
+    // V1.3 A7: 一步生成改为 workflow 平铺卡片单选，默认选第一个
+    const list = getOrgWorkflowsForView(false);
+    if (list.length) {
+        selectMaterialWorkflow(list[0].id, false);
     } else {
-        renderMatReqTemplates('');
+        // V1.3.30: 可见流程下拉已移除；无可用流程时仅清空态（matWorkflowId 保持空，生成按钮置灰）
+        renderMatReqTemplates(matDocType);
     }
     syncStepConfigFromMaterial();
     renderMatTplPreview();   // V1.2.29: 初始化后渲染模板预览
 }
 
-// v1.45 链 C: 初始化案件阶段选择项
-// 仅裁判文书(judgment)类型才显示案件阶段行；有案字能自动判定时隐藏整行，无法判定时才显示让用户选
-function initCaseStageSelect() {
+// V1.3.22 A29 修订 / V1.3.31 修正: 案由/案字两列常显（替代 v1.45 案件阶段选择项）
+// V1.3.31: 推翻 A29「有值只读 + 灰字『来自案件信息』」——两列恒为下拉，当前值预选，用户随时可改；来源灰字删除
+function renderCaseInfoBoxes() {
+    const cause = (typeof extractCauseFromCase === 'function') ? extractCauseFromCase() : '';
+    const caseWord = currentCaseWordValue();
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
-    // 一步生成视图与分步生成视图共用同一逻辑
-    ['matCaseStage', 'stepCaseStage'].forEach(selectId => {
-        const sel = document.getElementById(selectId);
-        if (!sel) return;
-        // 构建选项
-        let html = '<option value="">请选择案件阶段</option>';
-        options.forEach(o => {
-            html += `<option value="${o.value}">${o.label}</option>`;
-        });
-        sel.innerHTML = html;
-        sel.value = '';
-        sel.disabled = false;
+    const words = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[org]) || [];
+    const causeHtml = buildCaseInfoSelectHtml('cause', cause, buildCauseOptionsHtml());
+    const wordHtml = words.length > 0
+        ? buildCaseInfoSelectHtml('word', caseWord, words.map(w => `<option value="${escapeHtmlForStreaming(w)}">${escapeHtmlForStreaming(w)}</option>`).join(''))
+        : `<div class="gen-caseinfo-value gen-caseinfo-empty">—</div>`;
+    [['matCauseBox', causeHtml], ['stepCauseBox', causeHtml], ['matCaseWordBox', wordHtml], ['stepCaseWordBox', wordHtml]].forEach(([id, html]) => {
+        const box = document.getElementById(id);
+        if (box) box.innerHTML = html;
     });
-    // 初始按当前文书类型刷新显隐
-    updateCaseStageRowVisibility();
 }
 
-// v1.45 链 C: 更新案件阶段行的显隐与值
-// 规则：仅裁判文书(judgment)类型显示；能按案字自动判定时隐藏整行（值已设置）；无法判定时显示让用户选
-function updateCaseStageRowVisibility() {
+// V1.3.31: 案由/案字恒为下拉（替代 A29 只读展示）。当前值预选；值不在选项列表时追加为首项可选（避免选不中已识别值）
+function buildCaseInfoSelectHtml(field, value, optionsHtml) {
+    const placeholder = field === 'cause' ? '请选择案由' : '请选择案字';
+    const escVal = escapeHtmlForStreaming(value || '');
+    let html = `<select class="gen-form-select" onchange="onMaterialCaseInfoSelect('${field}', this.value)"><option value="">${placeholder}</option>`;
+    const inOptions = !!(value && (optionsHtml || '').indexOf(`value="${escVal}"`) !== -1);
+    if (value && !inOptions) {
+        html += `<option value="${escVal}" selected>${escVal}</option>`;
+    }
+    html += (optionsHtml || '').replace(/<option value="([^"]*)"/g, function (m, v) {
+        return `<option value="${v}"${v === escVal ? ' selected' : ''}`;
+    });
+    html += '</select>';
+    return html;
+}
+
+// V1.3.22 A29: 构建案由下拉选项（optgroup=案由分类；组名与叶子均可选，叶子加缩进前缀）
+function buildCauseOptionsHtml() {
     const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
-    const caseWord = extractCaseWordFromCaseNumber();
-    const autoStage = caseWord && typeof getCaseStageByCaseWord === 'function'
-        ? getCaseStageByCaseWord(caseWord) : '';
-
-    // 一步生成视图与分步生成视图共用同一逻辑
-    [
-        { rowId: 'matCaseStageRow', selectId: 'matCaseStage', hintId: 'matCaseStageHint' },
-        { rowId: 'stepCaseStageRow', selectId: 'stepCaseStage', hintId: 'stepCaseStageHint' }
-    ].forEach(({ rowId, selectId, hintId }) => {
-        const row = document.getElementById(rowId);
-        const sel = document.getElementById(selectId);
-        const hintEl = document.getElementById(hintId);
-        if (!row || !sel) return;
-
-        // 当前文书类型（一步生成用 matDocType，分步生成用 stepDocType）
-        const isStepsView = selectId === 'stepCaseStage';
-        const docTypeKey = isStepsView
-            ? (typeof stepDocType !== 'undefined' ? stepDocType : '')
-            : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
-        const isJudgment = docTypeKey === 'judgment';
-
-        if (!isJudgment) {
-            // 非裁判文书：隐藏整行，清空值
-            row.style.display = 'none';
-            sel.value = '';
-            if (hintEl) hintEl.style.display = 'none';
-            return;
-        }
-
-        // 裁判文书类型
-        if (autoStage) {
-            // 能自动判定：隐藏整行，值已设置
-            row.style.display = 'none';
-            sel.value = autoStage;
-            if (hintEl) hintEl.style.display = 'none';
-        } else if (options.length === 0) {
-            // 检察院/司法局取值待定，无选项可显示：隐藏整行（不阻塞生成）
-            row.style.display = 'none';
-            sel.value = '';
-            if (hintEl) hintEl.style.display = 'none';
-        } else {
-            // 无法自动判定且有选项：显示让用户选
-            row.style.display = '';
-            sel.value = '';
-            if (hintEl) {
-                hintEl.textContent = caseWord
-                    ? `案字「${caseWord}」无法判定阶段，请选择`
-                    : '本案无案字，请选择';
-                hintEl.style.display = 'inline-block';
+    const tree = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[org]) || [];
+    let html = '';
+    tree.forEach(cat => {
+        let inner = '';
+        (cat.children || []).forEach(child => {
+            if (typeof child === 'string') {
+                inner += `<option value="${escapeHtmlForStreaming(child)}">${escapeHtmlForStreaming(child)}</option>`;
+            } else if (child && typeof child === 'object') {
+                inner += `<option value="${escapeHtmlForStreaming(child.name)}">${escapeHtmlForStreaming(child.name)}</option>`;
+                (child.children || []).forEach(leaf => {
+                    inner += `<option value="${escapeHtmlForStreaming(leaf)}">　└ ${escapeHtmlForStreaming(leaf)}</option>`;
+                });
             }
-        }
+        });
+        if (inner) html += `<optgroup label="${escapeHtmlForStreaming(cat.name)}">${inner}</optgroup>`;
     });
+    return html;
 }
 
-// v1.45 链 C: 案件阶段选择变更
-function onCaseStageChange() {
-    // 切换案件阶段后需重新解析分步步骤序列
+// V1.3.22 A29: 取案件案字——优先案件已保存的 caseWord 字段（补全/编辑后），回退案号解析
+function currentCaseWordValue() {
+    if (typeof caseItem !== 'undefined' && caseItem && caseItem.caseWord) return caseItem.caseWord;
+    if (typeof currentCase !== 'undefined' && currentCase && currentCase.caseWord) return currentCase.caseWord;
+    return (typeof extractCaseWordFromCaseNumber === 'function') ? extractCaseWordFromCaseNumber() : '';
+}
+
+// V1.3.22 A29: 案由/案字补全选择（材料生成与分步生成视图共用）
+// 选中即写回案件数据并持久化，随后联动刷新两视图的流程下拉与步骤序列
+function onMaterialCaseInfoSelect(field, val) {
+    if (!val) return;
+    const target = (typeof caseItem !== 'undefined' && caseItem)
+        ? caseItem
+        : (typeof currentCase !== 'undefined' && currentCase) || null;
+    if (!target) return;
+    if (field === 'cause') target.cause = val;
+    if (field === 'word') target.caseWord = val;
+    target.updatedAt = new Date().toISOString().split('T')[0];
+    if (typeof saveBusinessSystems === 'function') saveBusinessSystems();
+    showNotification(field === 'cause' ? '案由已补全' : '案字已补全', 'success');
+    refreshAfterCaseInfoChange();
+}
+
+// V1.3.22 A29: 案由/案字补全后的联动刷新
+// 两视图的流程下拉按新案由/案字重过滤：选中流程仍有效则仅刷新选项，否则回落第一个并级联下游
+function refreshAfterCaseInfoChange() {
+    renderCaseInfoBoxes();
+    // V1.3.29 A36: 先按新案由/案字重算可用文书类型（选中失效则回落，连带设定选中类型）
+    renderDocTypeSelect(false);
+    renderDocTypeSelect(true);
+    // 材料生成视图：案由/案字变化后，若当前流程仍在该类型可用列表内则维持，否则回落首条
+    const matList = getOrgWorkflowsForView(false);
+    if (!matList.some(w => w.id === matWorkflowId)) {
+        selectMaterialWorkflow(matList.length ? matList[0].id : '', false);
+    }
+    // 分步生成视图同理
+    const stepList = getOrgWorkflowsForView(true);
+    if (!stepList.some(w => w.id === stepWorkflowId)) {
+        selectStepWorkflow(stepList.length ? stepList[0].id : '');
+    }
+    // 步骤序列依赖案字推导的案件阶段，必须重解析
     refreshStepsConfig();
     renderSteps();
-    updateMatGenerateButtonState();
-    updateStartStepsButtonState();
 }
 
 // v1.46 链 D: 「开始生成」按钮已移除，此函数保留为空操作避免调用点报错
@@ -1388,8 +1592,9 @@ function buildTemplateSelectHtml(templates, selectedKey) {
         const opt = `<option value="${key}" ${sel}>${name}</option>`;
         if (val && val.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
     });
+    // V1.3 A8: 两段式——系统预设（按所选流程过滤 + 通用）在前，我的示例平铺在后
     if (stdOpts.length && myOpts.length) {
-        return `<optgroup label="标准示例">${stdOpts.join('')}</optgroup><optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
+        return `<optgroup label="系统预设">${stdOpts.join('')}</optgroup><optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
     } else if (stdOpts.length) {
         return stdOpts.join('');
     } else if (myOpts.length) {
@@ -1493,30 +1698,23 @@ function renderStepTplPreview() {
     renderTemplatePreviewInto('stepTplPreview', sel ? sel.value : '');
 }
 
-function onMatDocTypeChange(shouldSync = true) {
-    const docTypeKey = document.getElementById('matDocType').value;
-    const templates = getDocTypeTemplates(docTypeKey);
-    const templateSelect = document.getElementById('matTemplate');
-    const templateKeys = Object.keys(templates);
-    templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
-    if (templateKeys.length) {
-        templateSelect.value = templateKeys[0];
+// V1.3 A7: onMatDocTypeChange 已由 selectMaterialWorkflow 取代（保留空函数避免旧调用点报错）
+function onMatDocTypeChange() {
+    if (typeof selectMaterialWorkflow === 'function') {
+        selectMaterialWorkflow(matWorkflowId, false);
     }
-    renderMatReqTemplates(docTypeKey);
-    renderMatTplPreview();   // V1.2.29: 切换文书类型后刷新模板预览
-    refreshStepsConfig();
-    // v1.28: 材料生成 tab 切换文书类型时，同步匹配材料型 workflow（用户侧不感知）
-    refreshMaterialWorkflow();
-    // v1.45 链 C: 切换文书类型后刷新案件阶段行显隐
-    updateCaseStageRowVisibility();
-    updateMatGenerateButtonState();
-    if (shouldSync) syncStepConfigFromMaterial();
 }
 
+// V1.3.29 A36: 指令改按文书类型读取（类型项 + 通用项），我的指令平铺在后
 function renderMatReqTemplates(docTypeKey) {
     const container = document.getElementById('matReqTemplates');
-    // v2.15: 合并 admin + my 数据（getReqTemplates 内部处理）；source='mine' 加 .mine 样式
-    const templates = getReqTemplates(org, docTypeKey);
+    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
+    const std = (typeof getReqTemplatesByDocType === 'function') ? getReqTemplatesByDocType(org, docTypeKey) : [];
+    // V1.3.30: 我的指令按所选文书类型过滤（含通用项）
+    const mine = (typeof getMyPromptTemplatesFlat === 'function')
+        ? (typeof filterMineByDocType === 'function' ? filterMineByDocType(getMyPromptTemplatesFlat(org), docTypeKey) : getMyPromptTemplatesFlat(org))
+        : [];
+    const templates = [...std, ...mine];
     if (!templates.length) {
         container.innerHTML = '';
         container.style.display = 'none';
@@ -1524,8 +1722,6 @@ function renderMatReqTemplates(docTypeKey) {
     }
     container.style.display = 'flex';
     // v1.24: 先标准后我的，两类同时存在时中间插分隔线
-    const std = templates.filter(t => t.source !== 'mine');
-    const mine = templates.filter(t => t.source === 'mine');
     const renderTag = t => {
         const cls = t.source === 'mine' ? 'req-template-tag mine' : 'req-template-tag';
         return `<button type="button" class="${cls}" onclick="applyMatReqTemplate(this)" data-text="${(t.text || '').replace(/"/g, '&quot;')}">${t.name}</button>`;
@@ -1547,28 +1743,19 @@ function applyMatReqTemplate(btn) {
 }
 
 function syncStepConfigFromMaterial() {
-    const matDocTypeEl = document.getElementById('matDocType');
+    // V1.3 A7: 两 tab 流程各自独立选择，不再同步文书类型；仅同步模板与指令
     const matTemplateEl = document.getElementById('matTemplate');
     const matRequirementEl = document.getElementById('matRequirement');
-    stepDocType = matDocTypeEl ? matDocTypeEl.value : stepDocType;
     stepTemplate = matTemplateEl ? matTemplateEl.value : stepTemplate;
     stepRequirement = matRequirementEl ? matRequirementEl.value : stepRequirement;
 }
 
 function syncMaterialConfigFromStep() {
-    const matDocTypeEl = document.getElementById('matDocType');
     const matTemplateEl = document.getElementById('matTemplate');
     const matRequirementEl = document.getElementById('matRequirement');
-    if (!matDocTypeEl) return;
 
-    // 重建文书类型下拉（确保包含当前 stepDocType）
-    const docTypes = getCurrentDocTypes();
-    matDocTypeEl.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
-        `<option value="${key}" ${key === stepDocType ? 'selected' : ''}>${cfg.name}</option>`
-    ).join('');
-
-    // 重建模板下拉并保留分步视图选中的模板
-    const templates = getDocTypeTemplates(stepDocType);
+    // V1.3 A7: 仅回同步模板与指令（流程选择两 tab 独立）
+    const templates = getDocTypeTemplateOptions(matDocType);
     const templateKeys = Object.keys(templates);
     if (matTemplateEl) {
         matTemplateEl.innerHTML = buildTemplateSelectHtml(templates, stepTemplate);
@@ -1580,71 +1767,30 @@ function syncMaterialConfigFromStep() {
     }
 
     if (matRequirementEl) matRequirementEl.value = stepRequirement || '';
-    renderMatReqTemplates(stepDocType);
+    renderMatReqTemplates(matDocType);
     renderMatTplPreview();   // V1.2.29: 由分步视图回同步后刷新模板预览
 }
 
 function renderStepGenConfig() {
-    const docTypeSelect = document.getElementById('stepDocType');
     const templateSelect = document.getElementById('stepTemplate');
-    if (!docTypeSelect || !templateSelect) return;
+    if (!templateSelect) return;
 
-    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    const docTypes = getCurrentDocTypes();
-    // v2.21: 分步生成 tab 文书类型下拉仅展示在 stepConfigsByOrg 中有配置的类型（V1.1 仅裁判文书 judgment）
-    // v1.36: 兼容 stepConfigsByOrg 为对象（按案字分组）的结构
-    const stepConfigOrg = (typeof stepConfigsByOrg !== 'undefined' && stepConfigsByOrg[org]) || {};
-    const filteredEntries = Object.entries(docTypes).filter(([key]) => {
-        const entry = stepConfigOrg[key];
-        if (Array.isArray(entry)) return entry.length > 0;
-        if (entry && typeof entry === 'object') {
-            return Object.keys(entry).some(k => Array.isArray(entry[k]) && entry[k].length > 0);
-        }
-        return false;
-    });
-    const filteredKeys = filteredEntries.map(([key]) => key);
+    // V1.3.29 A36: 先渲染文书类型下拉（顺带确定 stepDocType），再渲染该类型下的流程
+    renderDocTypeSelect(true);
 
-    // 当前 stepDocType 不在过滤后列表中时，重置为第一个可用类型
-    if (filteredKeys.length === 0) {
-        docTypeSelect.innerHTML = '<option value="">暂无可用类型</option>';
+    // V1.3 A7: 分步生成改为 workflow 平铺卡片单选（仅 type='step' 的裁判文书类流程）
+    const workflows = getOrgWorkflowsForView(true);
+    if (!workflows.length) {
+        // V1.3.30: 可见流程下拉已移除；无可用流程时仅清空态
         templateSelect.innerHTML = '';
+        stepWorkflowId = '';
         return;
     }
-    if (filteredKeys.indexOf(stepDocType) < 0) {
-        stepDocType = filteredKeys[0];
+    if (!workflows.find(wf => wf.id === stepWorkflowId)) {
+        selectStepWorkflow(workflows[0].id);
+        return;
     }
-    const currentDocType = stepDocType || filteredKeys[0];
-    if (!stepDocType) stepDocType = currentDocType;
-
-    docTypeSelect.innerHTML = filteredEntries.map(([key, cfg]) =>
-        `<option value="${key}" ${key === currentDocType ? 'selected' : ''}>${cfg.name}</option>`
-    ).join('');
-
-    const templates = getDocTypeTemplates(currentDocType);
-    const templateKeys = Object.keys(templates);
-    templateSelect.innerHTML = buildTemplateSelectHtml(templates, stepTemplate);
-    if (templateKeys.length && !templates[stepTemplate]) {
-        stepTemplate = templateKeys[0];
-        templateSelect.value = stepTemplate;
-    }
-    renderStepTplPreview();   // V1.2.29: 分步生成配置重建后刷新模板预览
-}
-
-function onStepDocTypeChange(docTypeKey) {
-    stepDocType = docTypeKey;
-    currentStepPlanId = '';  // 重置步骤方案，让 refreshStepsConfig 重新按案字匹配默认值
-    const templates = getDocTypeTemplates(docTypeKey);
-    const templateSelect = document.getElementById('stepTemplate');
-    const templateKeys = Object.keys(templates);
-    templateSelect.innerHTML = buildTemplateSelectHtml(templates, null);
-    stepTemplate = templateKeys[0] || '';
-    if (stepTemplate) templateSelect.value = stepTemplate;
-    refreshStepsConfig();
-    // v1.45 链 C: 切换文书类型后刷新案件阶段行显隐 + 「开始生成」按钮状态
-    updateCaseStageRowVisibility();
-    updateStartStepsButtonState();
-    renderSteps();
-    renderStepTplPreview();   // V1.2.29: 切换文书类型后刷新模板预览
+    selectStepWorkflow(stepWorkflowId);
 }
 
 function onStepTemplateChange(templateKey) {
@@ -1654,17 +1800,7 @@ function onStepTemplateChange(templateKey) {
 
 function generateByMaterial() {
     if (guardReadOnly('generateByMaterial')) return;
-    // v1.45 链 C: 校验案件阶段已选（仅裁判文书类型校验，防止 UI 禁用被绕过）
-    const _matDocType0 = document.getElementById('matDocType')?.value || '';
-    if (_matDocType0 === 'judgment') {
-        const _org0 = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-        const _stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(_org0) : [];
-        const _currentStage = getCurrentCaseStage();
-        if (_stageOptions.length > 0 && !_currentStage) {
-            showNotification('请先选择案件阶段', 'warning');
-            return;
-        }
-    }
+    // V1.3.22 A29: 材料生成无案件阶段概念，案由/案字补全行仅为可选补全，不强制校验
     // v2.22: 全部文件异常时阻止生成
     const stats = getCaseParseStats(caseItem);
     if (stats.total > 0 && stats.success === 0) {
@@ -1686,7 +1822,9 @@ function generateByMaterial() {
     const _cw = parseCaseWord(caseItem.caseNumber, _org);
     const allPresets = mergeCaseElements(getAllElementPresets(caseItem.cause, _org, _cw), caseItem.id);
     // v1.27: 要件仅在「裁判文书」(judgment) 时才询问引入
-    const _matDocType = document.getElementById('matDocType')?.value || '';
+    // V1.3 A7: 文书类型维度已移除，改由所选流程的文书域（domain）判定是否为裁判文书
+    const _matWf = getSelectedWorkflow(false);
+    const _matDocType = _matWf ? (getWorkflowDomain(_matWf) || '') : '';
     const _hasElements = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
     // V1.2.4（清单 1/3）: 全部文书类型均需先经法条确认，再由法条确认回调触发文书渲染
     const proceedToLawConfirm = (answers) => {
@@ -1724,10 +1862,11 @@ function autoGenerateWithAllElements() {
     const _cw2 = parseCaseWord(caseItem.caseNumber, _org2);
     const allPresets = mergeCaseElements(getAllElementPresets(caseItem.cause, _org2, _cw2), caseItem.id);
     const hasPresets = (allPresets.standard && allPresets.standard.length > 0) || (allPresets.mine && allPresets.mine.length > 0) || (allPresets.case && allPresets.case.length > 0);
-    // v1.27: 要件仅在「裁判文书」(judgment) 时才自动引入
-    const _autoDocType = document.getElementById('matDocType')?.value || getUrlParam('docType') || '';
+    // v1.27: 要件仅在「裁判文书」(judgment) 时才自动引入——V1.3 A7: 以所选流程的文书域判定
+    const _autoWf = getSelectedWorkflow(false);
+    const _autoIsJudgment = !!(_autoWf && getWorkflowDomain(_autoWf) === 'judgment');
 
-    if (_autoDocType === 'judgment' && hasPresets) {
+    if (_autoIsJudgment && hasPresets) {
         // v1.48: 列表页直接引入所有可用要件，不弹框确认
         const all = [
             ...((allPresets.standard || []).map(p => ({ ...p, source: 'standard' }))),
@@ -1764,11 +1903,12 @@ function getSelectedMaterialCharCount() {
 }
 
 // v2.23 (任务 8.6/9.6): workflow 超限异常决策辅助弹框
-function showWorkflowOverflowModal(docType) {
+// V1.3 A7: 参数由 docType 改为所选 workflow 对象
+function showWorkflowOverflowModal(workflow) {
     const charCount = getSelectedMaterialCharCount();
     const charWan = (charCount / 10000).toFixed(1);
     const suggestWan = 8; // 硬编码建议上限
-    const isJudgment = docType === 'judgment';
+    const isJudgment = !!(workflow && getWorkflowDomain(workflow) === 'judgment');
 
     // 移除已有弹框
     const old = document.getElementById('workflowOverflowOverlay');
@@ -1841,38 +1981,28 @@ function closeOverflowAndSwitchStep() {
 }
 
 function doGenerateByMaterial(elementAnswers, confirmedLaws) {
-    const docType = document.getElementById('matDocType').value;
-    if (!docType) {
-        showNotification('请选择文书类型', 'warning');
+    // V1.3 A7: 以所选流程为生成入口（不再按文书类型+案字+案由自动匹配）
+    const wf = getSelectedWorkflow(false);
+    if (!wf) {
+        showNotification('请选择生成流程', 'warning');
         return;
     }
 
     // v2.23 (任务 8.2/9.6): mock workflow 超限异常（材料字数 > 8万 时触发）
     const charCount = getSelectedMaterialCharCount();
     if (charCount > 80000) {
-        showWorkflowOverflowModal(docType);
+        showWorkflowOverflowModal(wf);
         return;
     }
 
     // v2.23 (任务 8.8/9.5): 流式输出展示
     const template = document.getElementById('matTemplate').value;
-    const docTypeName = getCurrentDocTypes()[docType]?.name || '';
     const templateObj = getCurrentTemplates()[template] || {};
     const templateName = templateObj.name || '';
     // V1.1.2: 取模板 content（内容参考文本）作为第一步生成的结构指引
     const templateContent = templateObj.content || '';
-    // V1.1.2: 匹配当前文书类型+案字+案由对应的【一步生成型】workflow，取 workflowId 用于第二步套格式骨架
-    const caseWord = extractCaseWordFromCaseNumber();
-    const cause = extractCauseFromCase();
-    let workflowId = '';
-    try {
-        const matchedWf = (typeof getMaterialWorkflowByCaseWord === 'function')
-            ? getMaterialWorkflowByCaseWord(org, docType, caseWord, cause)
-            : null;
-        workflowId = (matchedWf && matchedWf.id) ? matchedWf.id : '';
-    } catch (e) { /* ignore */ }
     // V1.2.4: 法条确认环节已确认的适用法条一并传入，作为「法律适用依据」并入正文
-    const fullContent = generateMockDocument(caseItem, org, docTypeName, templateName, elementAnswers, templateContent, workflowId, confirmedLaws);
+    const fullContent = generateMockDocument(caseItem, org, wf, templateName, elementAnswers, templateContent, confirmedLaws);
 
     startStreamingOutput(fullContent, templateName);
 }
@@ -1891,7 +2021,10 @@ function buildLawSectionHtml(confirmedLaws) {
 // 生成 Mock 文书内容
 // V1.1.2: 两步生成流程——第一步按模板 content 内容指引生成；第二步按匹配 workflow 的格式骨架套版填充占位符
 // V1.2.4: 新增 confirmedLaws 参数（法条确认环节结果）；输出统一使用 script-render-doc 脚本渲染样式
-function generateMockDocument(caseData, orgType, docTypeName, templateName, elementAnswers, templateContent, workflowId, confirmedLaws) {
+// V1.3 A7: 第三参数由 docTypeName 改为所选 workflow 对象（标题取流程名，材料总结分支按文书域判定）
+function generateMockDocument(caseData, orgType, workflow, templateName, elementAnswers, templateContent, confirmedLaws) {
+    const docTypeName = (workflow && workflow.name) || '法律文书';
+    const workflowId = (workflow && workflow.id) || '';
     const cause = caseData.cause || '纠纷';
     const caseName = caseData.caseName || caseData.caseNumber || '';
     const caseNumber = caseData.caseNumber || '';
@@ -1903,7 +2036,7 @@ function generateMockDocument(caseData, orgType, docTypeName, templateName, elem
     // v1.71: 正文不再包含「已引入案由要件辅助生成」提示条，生成结果即为实际可用文书
 
     // ===== 特殊类型分支：材料总结（保持原有逻辑，不参与两步生成）=====
-    if (docTypeName === '材料总结') {
+    if (workflow && getWorkflowDomain(workflow) === 'materialSummary') {
         return `<div class="result-doc script-render-doc">
             <h2>${title}</h2>
             <div class="result-doc-meta">案件：${caseName} | 生成时间：${new Date().toLocaleString('zh-CN')}</div>
@@ -2202,8 +2335,8 @@ function initStepsGen() {
     renderStepGenConfig();
     resetStepFlowUI();
     renderSteps();
-    // v1.45 链 C: 分步生成视图初始化后刷新案件阶段行显隐 + 「开始生成」按钮状态
-    updateCaseStageRowVisibility();
+    // V1.3.22 A29: 分步生成视图初始化后刷新案由/案字两列常显区（替代 v1.45 案件阶段行）
+    renderCaseInfoBoxes();
     updateStartStepsButtonState();
 }
 
@@ -2216,19 +2349,17 @@ function resetStepFlowUI() {
 }
 
 function refreshStepsConfig() {
-    const docTypeKey = currentGenMethod === 'steps'
-        ? stepDocType
-        : (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '');
+    // V1.3 A7: 步骤序列按所选分步流程的文书域（判决书类）+ 案件阶段解析；
+    // 「步骤方案」下拉已由流程卡片取代，currentStepPlanId 直接取所选流程
+    const wf = getSelectedWorkflow(true);
+    const docTypeKey = wf ? (getWorkflowDomain(wf) || 'judgment') : '';
+    currentStepPlanId = stepWorkflowId;
     const caseWord = extractCaseWordFromCaseNumber();
     const cause = extractCauseFromCase();
     // v1.45 链 C: 获取当前案件阶段，按案件阶段解析步骤序列
     const caseStage = getCurrentCaseStage();
-    // v1.22: 渲染步骤方案下拉（多 workflow 时显示），并按选中 workflow 取步骤
-    // v1.28: 仅匹配分步型 workflow（材料型由材料生成 tab 单独处理）
-    // v1.32: 匹配维度升级为案字+案由
-    renderStepPlanSelect(docTypeKey, caseWord, cause);
-    // v1.46 链 D: 判决书类型案件阶段未明确时（无案字且用户未选）不展示步骤序列
-    // 等用户选了案件阶段后才展示对应的 5步/6步序列
+    // v1.46 链 D: 判决书类型案件阶段未明确时（无案字）不展示步骤序列
+    // 用户经案字补全行选择案字后自动渲染对应的 5步/6步序列（V1.3.22 A29）
     // v1.46: 再审暂不支持分步生成，同样置空步骤序列
     if (docTypeKey === 'judgment' && (!caseStage || caseStage === 'retrial')) {
         stepsConfig = [];
@@ -2241,75 +2372,12 @@ function refreshStepsConfig() {
     stepData = {};
 }
 
-// v1.22: 渲染步骤方案下拉（仅多 workflow 时显示）
-// v1.28: 仅匹配分步型 workflow（type='step'）
-// v1.32: 匹配维度升级为案字+案由
-function renderStepPlanSelect(docTypeKey, caseWord, cause) {
-    const planItem = document.getElementById('stepPlanItem');
-    const planSelect = document.getElementById('stepPlan');
-    if (!planItem || !planSelect) return;
-    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    // v1.28: 仅取分步型 workflow
-    const workflows = (typeof getWorkflowsForDocType === 'function')
-        ? getWorkflowsForDocType(org, docTypeKey, 'step') : [];
-    if (workflows.length <= 1) {
-        planItem.style.display = 'none';
-        currentStepPlanId = workflows[0] ? workflows[0].id : '';
-        return;
-    }
-    // 多 workflow：显示下拉，默认选中案字+案由匹配项
-    planItem.style.display = '';
-    const defaultWf = (typeof getWorkflowByCaseWord === 'function')
-        ? getWorkflowByCaseWord(org, docTypeKey, caseWord, cause) : workflows[0];
-    const defaultId = defaultWf ? defaultWf.id : workflows[0].id;
-    if (!currentStepPlanId || !workflows.find(w => w.id === currentStepPlanId)) {
-        currentStepPlanId = defaultId;
-    }
-    planSelect.innerHTML = workflows.map(wf =>
-        `<option value="${wf.id}" ${wf.id === currentStepPlanId ? 'selected' : ''}>${wf.name}步骤</option>`
-    ).join('');
-}
-
-// v1.22: 切换步骤方案
-function onStepPlanChange(wfId) {
-    currentStepPlanId = wfId;
-    const caseWord = extractCaseWordFromCaseNumber();
-    const cause = extractCauseFromCase();
-    // v1.45 链 C: 获取当前案件阶段
-    const caseStage = getCurrentCaseStage();
-    stepsConfig = getStepsConfigForDocTypeWithFallback(stepDocType, caseWord, cause, currentStepPlanId, caseStage);
-    stepStates = stepsConfig.map(() => 'waiting');
-    stepData = {};
-    expandedStepIndex = -1;
-    renderSteps();
-}
-
-// v1.28: 材料生成 tab 切换/初始化时，按案字匹配材料型 workflow（用户侧不感知，仅用于内部流程选择）
-// v1.32: 匹配维度升级为案字+案由
-// 不返回任何 UI 反馈，仅记录到 currentMaterialWorkflowId（如需后续日志/调试使用）
-let currentMaterialWorkflowId = '';
-function refreshMaterialWorkflow() {
-    const docTypeKey = (document.getElementById('matDocType') ? document.getElementById('matDocType').value : '')
-        || (document.getElementById('stepDocType') ? document.getElementById('stepDocType').value : '');
-    const caseWord = extractCaseWordFromCaseNumber();
-    const cause = extractCauseFromCase();
-    if (!docTypeKey) {
-        currentMaterialWorkflowId = '';
-        return;
-    }
-    const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-    if (typeof getMaterialWorkflowByCaseWord !== 'function') {
-        currentMaterialWorkflowId = '';
-        return;
-    }
-    const wf = getMaterialWorkflowByCaseWord(org, docTypeKey, caseWord, cause);
-    currentMaterialWorkflowId = wf ? wf.id : '';
-    // 调试用：console.log('[case-files] 材料生成匹配 workflow:', currentMaterialWorkflowId);
-}
-
 // v1.22: 从当前案件案号提取案字（如 民初/民终/刑初...）
+// V1.3.22 A29: 优先读案件已保存的 caseWord 字段（补全/案号编辑后），再扫描案号
 function extractCaseWordFromCaseNumber() {
     try {
+        if (typeof caseItem !== 'undefined' && caseItem && caseItem.caseWord) return caseItem.caseWord;
+        if (typeof currentCase !== 'undefined' && currentCase && currentCase.caseWord) return currentCase.caseWord;
         const cn = (typeof currentCaseNumber !== 'undefined' && currentCaseNumber)
             || (typeof currentCase !== 'undefined' && currentCase && currentCase.caseNumber)
             || (typeof caseItem !== 'undefined' && caseItem && caseItem.caseNumber)
@@ -2324,20 +2392,10 @@ function extractCaseWordFromCaseNumber() {
     return '';
 }
 
-// v1.45 链 C: 获取当前案件阶段
-// 优先级：1. 生成配置区的案件阶段选择项值（用户手选，无案字时必选）
-//        2. 按案字映射自动判定（有案字时）
-// 返回: 'first' / 'second' / 'retrial' / '' (空表示未确定，无案字且用户未选)
+// v1.45 链 C: 获取当前案件阶段（V1.3.22 A29 起为内部逻辑，无用户可见选择器）
+// 仅按案字→阶段映射自动判定（案字优先取案件已保存的 caseWord 字段）
+// 返回: 'first' / 'second' / 'retrial' / '' (空表示未确定，无案字)
 function getCurrentCaseStage() {
-    // 1. 优先从生成配置区选择项获取
-    const stageSelect = currentGenMethod === 'steps'
-        ? document.getElementById('stepCaseStage')
-        : document.getElementById('matCaseStage');
-    if (stageSelect) {
-        const selected = stageSelect.value;
-        if (selected) return selected;
-    }
-    // 2. 按案字映射
     const caseWord = extractCaseWordFromCaseNumber();
     if (caseWord && typeof getCaseStageByCaseWord === 'function') {
         return getCaseStageByCaseWord(caseWord);
@@ -2485,20 +2543,19 @@ function renderSteps() {
     // v1.46 链 D: step-view-hint 显隐控制
     const viewHint = document.getElementById('stepViewHint');
     if (!stepsConfig.length) {
-        // v1.46 链 D: 案件阶段未明确时给出友好提示，并隐藏 step-view-hint
-        const docTypeKey = (typeof stepDocType !== 'undefined') ? stepDocType : '';
-        const isJudgment = docTypeKey === 'judgment';
+        // V1.3.22 A29: 案字未识别时给出友好提示，并隐藏 step-view-hint
+        // V1.3 A7: 以选中分步流程的文书域判定（分步流程均为判决书类）
+        const wf = (typeof getSelectedWorkflow === 'function') ? getSelectedWorkflow(true) : null;
+        const isJudgment = !!(wf && getWorkflowDomain(wf) === 'judgment');
         const stage = (typeof getCurrentCaseStage === 'function') ? getCurrentCaseStage() : '';
-        const org = (typeof currentBusiness !== 'undefined') ? currentBusiness : 'court';
-        const stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
         let hint = '暂无步骤配置';
         let hideHint = false;
         if (isJudgment && stage === 'retrial') {
             // v1.46: 再审暂不支持分步生成
             hint = '再审案件暂不支持分步生成，请使用材料生成';
             hideHint = true;
-        } else if (isJudgment && stageOptions.length > 0 && !stage) {
-            hint = '请先选择案件阶段，系统将按案件阶段展示对应步骤序列（一审 5 步 / 二审 6 步）';
+        } else if (isJudgment && !stage) {
+            hint = '请先选择案字，系统将按案字判定审理阶段并展示对应步骤序列（一审 5 步 / 二审 6 步）';
             hideHint = true;
         }
         list.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">${hint}</div>`;
@@ -3522,7 +3579,9 @@ function doCompileSteps(elementAnswers, confirmedLaws) {
     // V1.2.4: 已确认法条作为「法律适用依据」章节并入正文（脚本匹配渲染）
     const lawSectionHtml = buildLawSectionHtml(confirmedLaws);
     const templateName = getTemplateName(getCurrentTemplates()[stepTemplate]);
-    const docTypeName = getCurrentDocTypes()[stepDocType]?.name || '法律文书';
+    // V1.3 A7: 标题取所选分步流程名
+    const _stepWf = (typeof getSelectedWorkflow === 'function') ? getSelectedWorkflow(true) : null;
+    const docTypeName = (_stepWf && _stepWf.name) || '法律文书';
     const title = templateName ? `${docTypeName}（${templateName}）` : docTypeName;
     const reqHint = stepRequirement ? `<div style="margin-bottom:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;"><i class="fas fa-info-circle"></i> 生成需求：${stepRequirement}</div>` : '';
     const content = `<div class="result-doc script-render-doc">
@@ -3817,6 +3876,8 @@ function toggleLawsDrawer() {
 function openLawsDrawer() {
     // 与要件抽屉互斥（同一时刻只打开一个）
     if (caseElementsDrawerOpen && !drawerGenerateMode) closeElementsDrawer();
+    // V1.3.18 A24: 与 AI问答抽屉互斥
+    if (aiChatDrawerOpen) closeAiChatDrawer();
     renderLawsList();
     document.getElementById('caseLawsOverlay').classList.add('show');
     document.getElementById('caseLawsDrawer').classList.add('show');
@@ -4760,12 +4821,15 @@ function saveResult() {
 
     // 记录当前生成配置
     const isStep = currentGenMethod === 'steps';
-    const docTypeEl = document.getElementById(isStep ? 'stepDocType' : 'matDocType');
     const templateEl = document.getElementById(isStep ? 'stepTemplate' : 'matTemplate');
     const requirementEl = document.getElementById(isStep ? 'stepRequirement' : 'matRequirement');
-    const docType = docTypeEl ? docTypeEl.value : '';
     const template = templateEl ? templateEl.value : '';
     const requirement = requirementEl ? requirementEl.value : '';
+    // V1.3 A7: 生成配置以所选流程为准（workflowId/workflowName 入版本快照；docType=流程文书域，仅作归档键）
+    const _wf = (typeof getSelectedWorkflow === 'function') ? getSelectedWorkflow(isStep) : null;
+    const workflowId = _wf ? _wf.id : '';
+    const workflowName = _wf ? _wf.name : '';
+    const docType = _wf ? (getWorkflowDomain(_wf) || '') : '';
 
     // v2.31: 保存策略
     // - 首次保存（无 lastSavedVersionId）：调用 addDocumentVersion 追加新版本
@@ -4805,6 +4869,8 @@ function saveResult() {
         content: resultContent,
         createdBy: getCurrentUserName(),
         config: {
+            workflowId,
+            workflowName,
             docType,
             template,
             prompt: requirement,
@@ -4879,10 +4945,11 @@ function refineResult() {
         return;
     }
     // 未保存：通过 localStorage 传递临时内容
-    const matDocType = document.getElementById('matDocType');
     const matTemplate = document.getElementById('matTemplate');
     const matRequirement = document.getElementById('matRequirement');
-    const docTypeName = matDocType ? (getCurrentDocTypes()[matDocType.value]?.name || '') : '';
+    // V1.3 A7: 标题取所选流程名
+    const _refineWf = (typeof getSelectedWorkflow === 'function') ? getSelectedWorkflow(currentGenMethod === 'steps') : null;
+    const docTypeName = (_refineWf && _refineWf.name) || '';
     const templateName = matTemplate ? getTemplateName(getCurrentTemplates()[matTemplate.value]) : '';
     const title = docTypeName ? (templateName ? `${docTypeName} · ${templateName}` : docTypeName) : (templateName || '法律文书');
     const ctx = {
@@ -4927,7 +4994,8 @@ function renderHistoryTasks() {
         return isNaN(d.getTime()) ? iso : d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     };
     list.innerHTML = versions.map(v => {
-        const docTypeName = docTypes[v.docType]?.name || '法律文书';
+        // V1.3 A7: 版本标题优先取生成时的流程名（旧版本回退按 docType 查文书类型名）
+        const docTypeName = (v.config && v.config.workflowName) || docTypes[v.docType]?.name || '法律文书';
         const versionNo = `v${v.versionTotal - v.versionIndex + 1}`;
         return `
             <div class="history-task-item">
@@ -4982,20 +5050,11 @@ function applyRegenerateConfig() {
 
     // v2.20: 模型由 workflow 决定，不再从历史文书恢复（恢复 docType 后由 onMatDocTypeChange/refreshModelFromWorkflow 自动刷新）
 
-    // 恢复材料生成视图配置
-    if (d.docType) {
-        stepDocType = d.docType;
-        const matDocTypeEl = document.getElementById('matDocType');
-        if (matDocTypeEl) {
-            const docTypes = getCurrentDocTypes();
-            matDocTypeEl.innerHTML = Object.entries(docTypes).map(([key, cfg]) =>
-                `<option value="${key}" ${key === d.docType ? 'selected' : ''}>${cfg.name}</option>`
-            ).join('');
-        }
-        onMatDocTypeChange(false);
+    // 恢复材料生成视图配置（V1.3 A7: 按 workflowId / docType 映射回填流程）
+    if (d.docType || d.workflowId) {
+        selectMaterialWorkflow(d.workflowId || defaultMaterialWorkflowIdForDocType(d.docType), false);
         const matTemplateEl = document.getElementById('matTemplate');
         if (matTemplateEl && d.template) matTemplateEl.value = d.template;
-        renderMatReqTemplates(d.docType);
         renderMatTplPreview();   // V1.2.29: 恢复历史版本配置后同步预览
     }
     if (d.requirement !== undefined) {
@@ -5495,9 +5554,15 @@ function toggleElementsDrawer() {
         openElementsDrawer();
     }
 }
+let caseElementsFilter = 'all'; // V1.3.31: 本案要件分类标签过滤（all/standard/mine/case）
+
 function openElementsDrawer() {
+    // V1.3.18 A24: 与 AI问答抽屉互斥
+    if (aiChatDrawerOpen) closeAiChatDrawer();
+    caseElementsFilter = 'all';
     loadCaseElementsAll();
     renderElementsList();
+    syncElementCategoryTabs();
     document.getElementById('caseElementsOverlay').classList.add('show');
     document.getElementById('caseElementsDrawer').classList.add('show');
     caseElementsDrawerOpen = true;
@@ -5519,9 +5584,13 @@ function renderElementsList() {
     const body = document.getElementById('caseElementsBody');
     if (!body) return;
     const data = caseElementsCache || { standard: [], mine: [], case: [] };
-    const standard = data.standard || [];
-    const mine = data.mine || [];
-    const caseC = data.case || [];
+    let standard = data.standard || [];
+    let mine = data.mine || [];
+    let caseC = data.case || [];
+    // V1.3.31: 分类标签过滤（'all' 保留三组堆叠）
+    if (caseElementsFilter === 'standard') { mine = []; caseC = []; }
+    else if (caseElementsFilter === 'mine') { standard = []; caseC = []; }
+    else if (caseElementsFilter === 'case') { standard = []; mine = []; }
 
     // 统计条
     const statsEl = document.getElementById('caseElementsStats');
@@ -5549,10 +5618,12 @@ function renderElementsList() {
     }
 
     if (standard.length === 0 && mine.length === 0 && caseC.length === 0) {
+        const emptyTitle = caseElementsFilter === 'all' ? '本案暂无可用要件'
+            : `「${caseElementsFilter === 'standard' ? '标准' : caseElementsFilter === 'mine' ? '我的' : '个案'}」分类下暂无要件`;
         body.innerHTML = `
             <div class="case-elements-empty">
                 <i class="fas fa-inbox"></i>
-                <div>本案暂无可用要件</div>
+                <div>${emptyTitle}</div>
                 <div style="font-size:11px;margin-top:6px;">可在下方新增个案要件，或前往"管理我的要件"维护</div>
             </div>
         `;
@@ -5568,6 +5639,21 @@ function renderElementsList() {
     updateAiSummarizeBtnState(standard.length + mine.length + caseC.length);
     // V1.2: 生成模式下，列表渲染后同步刷新确认生成按钮计数（覆盖编辑/重新生成/优化/新增删除等变更）
     if (drawerGenerateMode) updateDrawerGenerateBtn();
+}
+
+// V1.3.31: 本案要件分类标签切换
+function switchElementCategory(cat) {
+    caseElementsFilter = cat;
+    syncElementCategoryTabs();
+    renderElementsList();
+    if (drawerGenerateMode) updateDrawerGenerateBtn();
+}
+
+// V1.3.31: 同步分类标签高亮态
+function syncElementCategoryTabs() {
+    document.querySelectorAll('.case-elements-tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-cat') === caseElementsFilter);
+    });
 }
 
 // v2.29: 一键生成按钮可用性控制——无可用要件时置灰并提示
@@ -6230,8 +6316,9 @@ function collectDrawerElementAnswers() {
 }
 
 // =====================================================================================
-// V1.2.23: AI问答（中间栏第三个视图）
-// 定位：案件详情页内、基于本案材料的知识检索问答。与「一步生成」「分步生成」同级并列；
+// V1.3.18 A24: AI问答（右侧抽屉视图，由 V1.2.23「中间栏第三个视图」迁出）
+// 定位：案件详情页内、基于本案材料的知识检索问答。入口位于材料树顶部、搜索框上方，
+//       点击滑出右侧抽屉（与本案要件/本案法条抽屉同体系，三抽屉同一时刻只开一个）。
 //       不要求先生成文书；与「文书精修」链路完全独立（并存，互不影响）。
 // 数据：对话仅存内存（aiChatMessages），刷新页面重置；切换案件自动清空。
 // =====================================================================================
@@ -6240,6 +6327,7 @@ let aiChatMessages = [];                     // [{ role:'user'|'ai', content, to
 let aiChatGenerating = false;                // 回答生成中（防并发提问）
 let aiChatTimer = null;                      // mock 生成计时器
 let aiChatCaseId = null;                     // 用于检测案件切换后重置对话
+let aiChatDrawerOpen = false;                // AI问答抽屉开合状态（V1.3.18 A24）
 // V1.2.25: 检索范围固定为「仅本案材料」，原 aiChatScope 的知识库维度已移除
 
 // 推荐问题（演示用）
@@ -6278,8 +6366,13 @@ const AIQ_ANSWER_FALLBACK = {
     text: '已检索本案材料并生成回答。\n\n当前为原型演示内容，接入真实检索能力后，此处将展示基于本案材料的具体分析与结论。'
 };
 
-// ---- 视图切换 ----
-function switchToChatView() {
+// ---- 抽屉开关（V1.3.18 A24: 由中间栏 tab 迁出为右侧抽屉） ----
+function toggleAiChatDrawer() {
+    if (aiChatDrawerOpen) closeAiChatDrawer();
+    else openAiChatDrawer();
+}
+
+function openAiChatDrawer() {
     // 切换案件时重置对话（避免把上个案件的问答带到当前案件）
     const cid = (typeof caseItem !== 'undefined' && caseItem) ? caseItem.id : null;
     if (aiChatCaseId !== cid) {
@@ -6288,18 +6381,27 @@ function switchToChatView() {
         aiChatGenerating = false;
         if (aiChatTimer) { clearTimeout(aiChatTimer); aiChatTimer = null; }
     }
-    document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
-    const panel = document.getElementById('panel-chat');
-    if (panel) panel.classList.add('active');
-    const genContent = document.querySelector('.gen-content');
-    if (genContent) genContent.classList.add('chat-mode');
-    currentGenMethod = 'chat';
-    // Tab 激活态
-    document.querySelectorAll('.gen-tab').forEach(t => t.classList.toggle('active', t.dataset.method === 'chat'));
+    // 三抽屉互斥：同一时刻只打开一个（要件抽屉生成模式下不被打断，口径与法条抽屉一致）
+    if (caseElementsDrawerOpen && !drawerGenerateMode) closeElementsDrawer();
+    if (caseLawsDrawerOpen) closeLawsDrawer();
     // 隐藏自动切换提示条（与分步视图保持一致）
     const autoAlert = document.getElementById('autoSwitchAlert');
     if (autoAlert) autoAlert.classList.remove('show');
     renderAiChat();
+    document.getElementById('aiChatOverlay').classList.add('show');
+    document.getElementById('aiChatDrawer').classList.add('show');
+    aiChatDrawerOpen = true;
+    // 抽屉滑入后聚焦输入框
+    setTimeout(function () {
+        const input = document.getElementById('aiqInput');
+        if (input && aiChatDrawerOpen) input.focus();
+    }, 320);
+}
+
+function closeAiChatDrawer() {
+    document.getElementById('aiChatOverlay').classList.remove('show');
+    document.getElementById('aiChatDrawer').classList.remove('show');
+    aiChatDrawerOpen = false;
 }
 
 // ---- 检索范围（V1.2.25: 固定为仅本案材料，不可切换） ----

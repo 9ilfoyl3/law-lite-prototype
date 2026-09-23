@@ -842,8 +842,8 @@
                     <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
                     <a href="knowledge-base.html" class="nav-item active"><i class="fas fa-book"></i><span>知识库管理</span></a>
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
-                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="workflows.html" class="nav-item"><i class="fas fa-diagram-project"></i><span>文书流程管理</span></a>
                     <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
                     <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
@@ -923,7 +923,7 @@
                             <i class="fas fa-book"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-value" id="kbCount">12</div>
+                            <div class="stat-value" id="kbCount">10</div>
                             <div class="stat-label">知识库数量</div>
                         </div>
                     </div>
@@ -1059,12 +1059,16 @@
         });
     })();
         // 全员公开库分类数据
+        // V1.29: 移除预置分类「文书示例」（template）——文书示例由「文书示例管理」模块独立维护，不在知识库分类中重复呈现
         let categories = JSON.parse(localStorage.getItem('adminKbCategories')) || [
             { id: 'law', name: '法律法规', icon: 'green', iconClass: 'fa-gavel', count: 6, status: 'active', desc: '各类法律法规条文汇编' },
             { id: 'case', name: '案例库', icon: 'orange', iconClass: 'fa-balance-scale', count: 3, status: 'active', desc: '典型案例及裁判文书' },
-            { id: 'template', name: '文书示例', icon: 'purple', iconClass: 'fa-file-signature', count: 2, status: 'active', desc: '标准法律文书示例' },
             { id: 'local', name: '地方法规', icon: 'cyan', iconClass: 'fa-map-marker-alt', count: 1, status: 'active', desc: '各地方法规规章' }
         ];
+        // V1.29 兼容：若浏览器已固化过旧分类数据，剔除已下线的 template 分类。
+        // 仅改默认值在已固化的浏览器上不生效（数据加载层级规则）；此处不回写 localStorage，
+        // 代价是管理员无法再新建 id 为 template 的分类（原型阶段可接受）。
+        categories = categories.filter(function(c) { return c.id !== 'template'; });
 
         // 当前编辑的分类ID
         let editingId = null;

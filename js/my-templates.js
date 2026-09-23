@@ -151,37 +151,13 @@
         document.querySelectorAll('.business-switch-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.type === type);
         });
-        renderLeft();
-        renderList();
-    };
-
-    // ===== 渲染左侧文书类型列表 =====
-    function renderLeft() {
-        const docTypes = getDocTypes(currentOrg);
-        const orgData = getOrgData(currentOrg);
-        const totalCount = Object.keys(orgData).length;
-
-        const leftEl = document.getElementById('leftList');
-        let html = '<div class="left-item' + (currentDocTypeFilter === '' ? ' active' : '') + '" onclick="selectDocType(\'\')">'
-            + '<span>全部</span><span class="count">' + totalCount + '</span></div>';
-
-        Object.entries(docTypes).forEach(([key, cfg]) => {
-            const count = Object.entries(orgData).filter(([k, v]) => v.docType === key).length;
-            html += '<div class="left-item' + (currentDocTypeFilter === key ? ' active' : '') + '" onclick="selectDocType(\'' + key + '\')">'
-                + '<span>' + escapeHtml(cfg.name) + '</span>'
-                + '<span class="count">' + count + '</span></div>';
-        });
-        leftEl.innerHTML = html;
-    }
-    window.selectDocType = function(key) {
-        currentDocTypeFilter = key;
-        renderLeft();
         renderList();
     };
 
     // 渲染单个示例卡片（非编辑态）
     function renderCard(key, t, docTypes) {
-        const docTypeName = (docTypes[t.docType] || {}).name || '-';
+        // V1.3.30: 恢复所属文书类型展示（通用 = 未绑定具体类型）
+        const docTypeName = t.docType ? ((docTypes[t.docType] || {}).name || t.docType) : '通用';
         const isEnabled = t.enabled !== false; // 缺省视为 true
         const statusBadge = isEnabled
             ? '<span class="item-badge status-on">已启用</span>'
@@ -206,8 +182,8 @@
             + '<div>'
             + '<span class="item-name">' + escapeHtml(t.name || key) + '</span>'
             + '<span class="item-badge">我的</span>'
+            + '<span class="item-badge doc-type-badge">' + escapeHtml(docTypeName) + '</span>'
             + statusBadge
-            + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
             + timeMeta
             + '</div>'
             + '<div class="item-actions">'
@@ -247,14 +223,11 @@
         showToast(isEnabled ? '已停用' : '已启用', 'success');
     };
 
-    // ===== 渲染右侧列表 =====
+    // ===== 渲染列表 =====
+    // V1.3.17 A23: 左栏已删除，右侧内容区标题（原「全部我的示例」）一并取消——与页面大标题重复
     function renderList() {
         const docTypes = getDocTypes(currentOrg);
         const orgData = getOrgData(currentOrg);
-        const contentTitle = document.getElementById('contentTitle');
-        contentTitle.textContent = currentDocTypeFilter
-            ? ((docTypes[currentDocTypeFilter] || {}).name || '示例列表')
-            : '全部我的示例';
 
         const list = Object.entries(orgData).filter(([k, v]) => {
             return !currentDocTypeFilter || v.docType === currentDocTypeFilter;
@@ -327,11 +300,14 @@
 
     function renderEditForm(key, t) {
         const isNew = key === '__new__';
-        const docTypes = getDocTypes(currentOrg);
-        const docTypeOptions = Object.entries(docTypes).map(([k, cfg]) =>
-            '<option value="' + k + '"' + (t && t.docType === k ? ' selected' : '') + '>' + escapeHtml(cfg.name) + '</option>'
-        ).join('');
         const name = (t && t.name) || '';
+        // V1.3.30: 恢复与文书类型绑定——新建/编辑必选所属文书类型（通用为可选值）
+        const docTypes = getDocTypes(currentOrg);
+        const curDocType = (t && t.docType) || '';
+        const docTypeOptions = '<option value=""' + (curDocType === '' ? ' selected' : '') + '>通用</option>'
+            + Object.keys(docTypes).map(k =>
+                '<option value="' + escapeHtml(k) + '"' + (k === curDocType ? ' selected' : '') + '>' + escapeHtml(docTypes[k].name || k) + '</option>'
+            ).join('');
         // v1.4 直接以 textarea 为内容主入口，文件上传作为可选导入方式
         const contentValue = (t && t.content) || '';
         const exampleRow = '<div class="tpl-example-row">'
@@ -348,6 +324,7 @@
             + '<label class="form-label">示例名 <span class="required">*</span></label>'
             + '<input type="text" class="form-input" id="formName" value="' + escapeHtml(name) + '" placeholder="如：我的民事判决书示例">'
             + '</div>'
+            // V1.3.30: 恢复所属文书类型必选下拉（通用为可选值，默认选中）
             + '<div class="form-group">'
             + '<label class="form-label">所属文书类型 <span class="required">*</span></label>'
             + '<select class="form-select" id="formDocType">' + docTypeOptions + '</select>'
@@ -367,17 +344,15 @@
 
     window.saveItem = function(existingKey) {
         const name = document.getElementById('formName').value.trim();
-        const docType = document.getElementById('formDocType').value;
+        // V1.3.30: 恢复必选所属文书类型——编辑时回填、新增由表单必选下拉确定（默认通用）
+        const docTypeSel = document.getElementById('formDocType');
+        const docType = docTypeSel ? (docTypeSel.value || '') : '';
         // v1.4 直接从 textarea 读取内容
         const content = document.getElementById('formContent').value;
 
         if (!name) {
             showToast('请填写示例名', 'error');
             document.getElementById('formName').focus();
-            return;
-        }
-        if (!docType) {
-            showToast('请选择所属文书类型', 'error');
             return;
         }
 
@@ -404,7 +379,6 @@
         setOrgData(currentOrg, orgData);
 
         editingKey = null;
-        renderLeft();
         renderList();
         showToast(existingKey ? '示例已更新' : '示例已新增', 'success');
     };
@@ -462,7 +436,6 @@
         if (!confirm('确定删除示例「' + (t.name || key) + '」吗？此操作不可恢复。')) return;
         delete orgData[key];
         setOrgData(currentOrg, orgData);
-        renderLeft();
         renderList();
         showToast('示例已删除', 'success');
     };
@@ -478,7 +451,6 @@
                 btn.classList.toggle('active', btn.dataset.type === orgParam);
             });
         }
-        renderLeft();
         renderList();
     }
     if (document.readyState === 'loading') {

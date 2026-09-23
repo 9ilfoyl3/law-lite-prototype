@@ -49,34 +49,13 @@
         }
         .business-switch-btn.active { background: var(--accent-primary); color: white; }
 
-        .main-layout { display: flex; gap: 20px; }
-        .left-sidebar {
-            width: 220px; flex-shrink: 0;
-            background: var(--bg-primary); border: 1px solid var(--border-color);
-            border-radius: 12px; overflow: hidden;
-        }
-        .sidebar-header {
-            padding: 14px 16px; font-size: 14px; font-weight: 600;
-            border-bottom: 1px solid var(--border-color); background: var(--bg-secondary);
-        }
-        .left-list { max-height: calc(100vh - 280px); overflow-y: auto; }
-        .left-item {
-            padding: 10px 14px; font-size: 13px; cursor: pointer;
-            border-bottom: 1px solid var(--border-color); transition: all 0.15s;
-            display: flex; justify-content: space-between; align-items: center; gap: 6px;
-        }
-        .left-item:last-child { border-bottom: none; }
-        .left-item:hover { background: var(--bg-secondary); }
-        .left-item.active { background: var(--accent-light); color: var(--accent-primary); font-weight: 500; }
-        .left-item .count { font-size: 11px; color: var(--text-muted); background: var(--bg-tertiary); padding: 1px 6px; border-radius: 8px; }
-        .left-item.active .count { background: #dbeafe; color: var(--accent-primary); }
-
-        .content-area { flex: 1; min-width: 0; }
+        /* V1.3.17 A23: 左栏（仅剩「全部」一项）已删除，页面改为单列 */
+        .main-layout { display: block; }
+        .content-area { width: 100%; }
         .content-header {
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex; justify-content: flex-end; align-items: center;
             margin-bottom: 14px;
         }
-        .content-title { font-size: 16px; font-weight: 600; }
         .btn {
             padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
             border: none; transition: all 0.15s; font-family: inherit;
@@ -102,6 +81,7 @@
         }
         .item-badge.status-on { background: #d1fae5; color: #065f46; }
         .item-badge.status-off { background: #f3f4f6; color: #6b7280; }
+        .item-badge.doc-type-badge { background: #ede9fe; color: #6d28d9; }
         .item-meta { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
         .item-text-preview {
             font-size: 12px; color: var(--text-secondary); margin-top: 6px;
@@ -173,13 +153,9 @@
         </div>
 
         <div class="main-layout">
-            <div class="left-sidebar">
-                <div class="sidebar-header">文书类型</div>
-                <div class="left-list" id="leftList"></div>
-            </div>
             <div class="content-area">
+                <!-- V1.3.17 A23: 左栏与「全部我的指令」标题已删除（无分组维度，且标题与页面大标题重复） -->
                 <div class="content-header">
-                    <span class="content-title" id="contentTitle">全部我的指令</span>
                     <button class="btn btn-primary" onclick="openAddForm()">
                         <i class="fas fa-plus"></i> 新增指令
                     </button>
@@ -196,7 +172,7 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="../js/case-data.js?v=67"></script>
-    <script src="../js/my-prompts.js?v=1"></script>
+    <script src="../js/case-data.js?v=78"></script>
+    <script src="../js/my-prompts.js?v=4"></script>
 </body>
 </html>

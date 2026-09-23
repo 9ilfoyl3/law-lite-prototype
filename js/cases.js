@@ -13,7 +13,7 @@
 
 // ===== 状态 =====
 let selectedCaseIds = new Set();
-let quickState = { caseId: '', model: '', docType: '', template: '', requirement: '', document: null, materialsCount: 3, caseStage: '' };
+let quickState = { caseId: '', model: '', docType: '', workflowId: '', template: '', requirement: '', document: null, materialsCount: 3 };
 let batchState = { docType: '', template: '', results: [], totalElapsed: 0, timerInterval: null, completedCount: 0, failedCount: 0, ocrStrategy: 'skip' };
 let refineState = { caseId: '', docId: '', messages: [], originalContent: '', revisedContent: '', activeTab: 'original' };
 let documentsCaseId = '';
@@ -29,9 +29,15 @@ function getFirstDocType() {
     return Object.keys(types)[0] || '';
 }
 
+// V1.3.29 A36: 默认示例改按「该类型 + 通用」口径取第一个（原 getDocTypeTemplates 只做精确匹配，
+// 会把通用示例漏掉，导致下拉默认值为空）
 function getFirstTemplate(docTypeKey) {
-    const templates = getDocTypeTemplates(docTypeKey);
-    return Object.keys(templates)[0] || '';
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    if (typeof getTemplatesByDocType === 'function') {
+        const list = getTemplatesByDocType(org, docTypeKey);
+        if (list.length) return list[0].key;
+    }
+    return Object.keys(getDocTypeTemplates(docTypeKey))[0] || '';
 }
 
 // 渲染指令内置模板标签（快速生成 / 批量生成共用）
@@ -39,8 +45,11 @@ function renderReqTemplates(containerId, docTypeKey, textareaId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const org = localStorage.getItem('currentBusiness') || 'court';
-    // v1.20: 合并 admin + my 数据（getReqTemplates 内部处理）；source='mine' 加 .mine 样式
-    const templates = getReqTemplates(org, docTypeKey);
+    // V1.3.29 A36: 指令改按文书类型读取（类型项 + 通用项），我的指令平铺在后。
+    //   原 getReqTemplates 只认旧版分组存储，管理端 __items__ 里的自定义指令读不到。
+    const templates = (typeof getReqTemplatesByDocType === 'function')
+        ? [...getReqTemplatesByDocType(org, docTypeKey), ...(typeof filterMineByDocType === 'function' ? filterMineByDocType(getMyPromptTemplatesFlat(org), docTypeKey) : getMyPromptTemplatesFlat(org))]
+        : getReqTemplates(org, docTypeKey);
     if (templates.length === 0) {
         container.innerHTML = '';
         container.style.display = 'none';
@@ -337,13 +346,8 @@ function renderCaseList(cases = getCurrentCases()) {
         const docBadge = docCount > 0
             ? `<span class="case-doc-badge" onclick="event.stopPropagation();openCaseDocuments('${c.id}')" title="已生成 ${docCount} 份文书，点击查看"><i class="fas fa-file-alt"></i> ${docCount}</span>`
             : '';
-        // v2.22 + v2.23: 生成文书按钮置灰条件（任务 3.4 + 1.2 解析中拦截）
-        const noMaterials = stats.total === 0;
-        const allError = stats.total > 0 && stats.success === 0;
-        const genDisabled = noMaterials || allError || parsing;
-        const genTitle = parsing ? '材料解析中，请稍候'
-            : (noMaterials ? '请先上传材料'
-            : (allError ? '无可用材料，请先上传并解析文件' : '生成文书'));
+        // V1.3 A10: 「批量生成」入口已取消（生成统一收拢至案件工作台）；openGenModal / 批量生成代码保留不删。
+        // V1.3 A27: 行内「快速生成」按钮已恢复（用户 2026-09-20 要求），仅批量生成入口仍不恢复。
         return `
         <div class="case-item" data-case-id="${c.id}">
             <div class="case-checkbox-col">
@@ -367,7 +371,8 @@ function renderCaseList(cases = getCurrentCases()) {
                 <button class="case-action-btn" title="文件上传" onclick="openSupplementUpload('${c.id}')">
                     <i class="fas fa-upload"></i> 文件上传
                 </button>
-                <button class="case-action-btn quick-gen-btn${genDisabled ? ' disabled' : ''}" title="${genTitle}"${genDisabled ? ' disabled' : ''} onclick="openGenModal('${c.id}')">
+                <!-- V1.3 A27: 行内「快速生成」按钮恢复（A10 曾下线，用户 2026-09-20 要求恢复） -->
+                <button class="case-action-btn quick-gen-btn" title="快速生成文书" onclick="openGenModal('${c.id}')">
                     <i class="fas fa-bolt"></i> 快速生成
                 </button>
                 <div class="case-action-more-wrap">
@@ -820,10 +825,63 @@ function resolveWorkflowModelForCase(caseItem, docTypeKey) {
     if (!caseItem || !docTypeKey) return DEFAULT_MODEL_ID;
     if (typeof getWorkflowModelId !== 'function') return DEFAULT_MODEL_ID;
     const _org = localStorage.getItem('currentBusiness') || 'court';
-    const _cw = parseCaseWord(caseItem.caseNumber, _org);
+    // V1.3.22 A29: 案字优先读案件已保存的 caseWord 字段，再回退案号解析
+    const _cw = getCaseWordOfCase(caseItem);
     const _cause = caseItem.cause || '';
     // 列表页快速生成固定走一步生成型 workflow（material）
     return getWorkflowModelId(_org, docTypeKey, _cw, _cause, 'material');
+}
+
+// V1.3.22 A29: 取案件案字——优先案件已保存的 caseWord 字段（补全/案号编辑后），回退案号解析
+function getCaseWordOfCase(caseItem) {
+    if (caseItem && caseItem.caseWord) return caseItem.caseWord;
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    return (caseItem && typeof parseCaseWord === 'function')
+        ? parseCaseWord(caseItem.caseNumber || '', org)
+        : '';
+}
+
+// ===== V1.3 A27：列表页快速生成的流程取值 =====
+// 复用 case-data.js 的 getWorkflowsForCase（与详情页同一口径）：仅 quick 型 + 通用兜底，
+// 并按当前案件的案字 / 案由过滤。案件案字解析不出时只剩兜底 + 通用（A14 严格口径）。
+// V1.3.22 A29 修订：案由、案字任一缺失 → 仅保留通用兜底流程（isGeneral），补齐后恢复完整过滤
+function getQuickWorkflows(caseItem) {
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    // V1.3.22 A29: 案字优先读案件已保存的 caseWord 字段
+    const caseWord = caseItem ? getCaseWordOfCase(caseItem) : '';
+    const cause = (caseItem && (caseItem.cause || '')) || '';
+    let list = (typeof getWorkflowsForCase === 'function')
+        ? getWorkflowsForCase(org, 'quick', caseWord, cause)
+        : [];
+    if (!caseWord || !cause) list = list.filter(wf => wf.isGeneral === true);
+    return list;
+}
+
+// V1.3 A27: 未过滤的 quick 模式流程数（区分「没配流程」与「都被案件条件过滤掉」两种空态）
+function getQuickWorkflowRawCount() {
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    return (typeof getWorkflowsRawCount === 'function') ? getWorkflowsRawCount(org, 'quick') : 0;
+}
+
+// V1.3.29 A36: 快速生成可用的文书类型——取当前案件可用 quick 流程的 domain 并集，
+// 只列确实有流程可跑的类型（具名类型按管理端顺序，通用排末位）
+function getQuickAvailableDocTypes(caseItem) {
+    const list = getQuickWorkflows(caseItem);
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    let types = {};
+    if (typeof getAdminDocTypes === 'function') types = getAdminDocTypes(org) || {};
+    const set = {};
+    list.forEach(wf => { set[wf.domain || ''] = true; });
+    const out = [];
+    Object.keys(types).forEach(k => { if (set[k]) out.push({ key: k, name: types[k].name || k }); });
+    Object.keys(set).forEach(k => { if (k && !types[k]) out.push({ key: k, name: k }); });
+    if (set['']) out.push({ key: '', name: '通用' });
+    return out;
+}
+
+// V1.3.29 A36: 按当前选中文书类型过滤后的 quick 流程（类型下拉联动的最下游）
+function getQuickWorkflowsOfDocType(caseItem, docTypeKey) {
+    return getQuickWorkflows(caseItem).filter(wf => (wf.domain || '') === docTypeKey);
 }
 
 function openGenModal(caseId) {
@@ -844,12 +902,17 @@ function openGenModal(caseId) {
         showNotification('无可用材料，请先上传并解析文件', 'warning');
         return;
     }
-    const firstDocType = getFirstDocType();
+    // V1.3.29 A36: 先定文书类型（取第一个可用类型），再在该类型下选第一条快速生成流程
+    const availTypes = getQuickAvailableDocTypes(c);
+    const docType = availTypes.length ? availTypes[0].key : '';
+    const quickWfs = getQuickWorkflowsOfDocType(c, docType);
+    const firstWf = quickWfs[0] || null;
+    quickState.workflowId = firstWf ? firstWf.id : '';
     quickState.caseId = caseId;
     // v1.24: 模型由 workflow 决定，按案件 + 文书类型 匹配
-    quickState.model = resolveWorkflowModelForCase(c, firstDocType);
-    quickState.docType = firstDocType;
-    quickState.template = getFirstTemplate(firstDocType);
+    quickState.model = resolveWorkflowModelForCase(c, docType);
+    quickState.docType = docType;
+    quickState.template = getFirstTemplate(docType);
     quickState.requirement = '';
     quickState.document = null;
     quickState.materialsCount = (c.files || []).length;
@@ -864,15 +927,21 @@ function closeGenModal() {
     document.getElementById('genModal').classList.remove('show');
 }
 
+// V1.3.29 A36: 切换文书类型 → 该类型下重选第一条流程，示例/指令/模型随之刷新
 function onGenDocTypeChange(docType) {
-    quickState.docType = docType;
-    quickState.template = getFirstTemplate(docType);
+    quickState.docType = docType || '';
+    const c = getCurrentCases().find(x => x.id === quickState.caseId);
+    const list = getQuickWorkflowsOfDocType(c, quickState.docType);
+    quickState.workflowId = list.length ? list[0].id : '';
+    quickState.template = getFirstTemplate(quickState.docType);
     quickState.requirement = '';
     // v1.24: 文书类型变化后重新计算 workflow 模型
-    const c = getCurrentCases().find(x => x.id === quickState.caseId);
-    if (c) quickState.model = resolveWorkflowModelForCase(c, docType);
+    if (c) quickState.model = resolveWorkflowModelForCase(c, quickState.docType);
     renderGenModalBody();
 }
+
+// V1.3.30: onGenWorkflowChange 已删除——可见「生成流程」下拉移除后，流程由文书类型内部自动解析，
+//   切换文书类型时由 onGenDocTypeChange 解析写入 quickState.workflowId，无需用户选择流程。
 
 // v1.24: onGenModelChange 已废弃，模型改为只读，保留为 no-op 防止报错
 function onGenModelChange(modelId) {
@@ -895,7 +964,7 @@ function updateGenContextHint() {
         ? `<br><span style="color:#d97706;font-size:12px;"><i class="fas fa-exclamation-triangle"></i> 已排除 ${stats.error} 个解析失败的材料，仅使用 ${stats.success} 个已解析成功的材料</span>`
         : '';
     hint.className = 'gen-context-hint ok';
-    hint.innerHTML = `当前案件可用材料 ${stats.success} 份${stats.parsing > 0 ? `，${stats.parsing} 份解析中` : ''}。将默认使用全部可用材料生成，如材料量过大将在生成时提示。${excludeNote}`;
+    hint.innerHTML = `当前案件可用材料 ${stats.success} 份${stats.parsing > 0 ? `，${stats.parsing} 份解析中` : ''}。${excludeNote}`;
 }
 
 function renderGenModalBody() {
@@ -922,7 +991,7 @@ function renderGenModalBody() {
 
     updateGenModalFooter(false);
     updateGenContextHint();
-    // v1.45 链 C: 案件阶段行渲染后刷新「开始生成」按钮状态
+    // V1.3.22 A29: 案由/案字两列常显（替代 v1.45 案件阶段选择行），渲染后刷新「开始生成」按钮状态
     updateGenModalStartBtnState();
 
     try { renderReqTemplates('genReqTemplates', quickState.docType, 'genRequirement'); } catch (e) {}
@@ -934,19 +1003,38 @@ function buildGenElementHintHtml(caseItem) {
 }
 
 function buildGenConfigHtml() {
-    const docTypes = getCurrentDocTypes();
-    // v1.22: 模板不再按 cause 过滤，直接按所属文书类型展示
-    const templates = getFilteredDocTypeTemplates(quickState.docType);
-    const docTypeOptions = Object.entries(docTypes)
-        .map(([k, v]) => `<option value="${k}" ${k === quickState.docType ? 'selected' : ''}>${v.name}</option>`)
-        .join('');
-    // v1.24: 模板按来源分组（标准 / 我的）
-    const stdOpts = [], myOpts = [];
-    Object.entries(templates).forEach(([k, v]) => {
-        const name = getTemplateName(v);
-        const opt = `<option value="${k}" ${k === quickState.template ? 'selected' : ''}>${name}</option>`;
-        if (v && v.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
-    });
+    // V1.3.29 A36: 示例按文书类型取「该类型 + 通用」，我的示例平铺在后
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    const stdTpls = (typeof getTemplatesByDocType === 'function') ? getTemplatesByDocType(org, quickState.docType) : [];
+    // V1.3.30: 我的示例按所选文书类型过滤（含通用项）
+    const myTpls = (typeof getMyDocTemplatesFlat === 'function')
+        ? (typeof filterMineByDocType === 'function' ? filterMineByDocType(getMyDocTemplatesFlat(org), quickState.docType) : getMyDocTemplatesFlat(org))
+        : [];
+    // V1.3.29 A36: 首项为「文书类型」下拉，其后再选「生成流程」——先定产出什么文书，再定怎么生成
+    const c0 = getCurrentCases().find(x => x.id === quickState.caseId);
+    const availTypes = getQuickAvailableDocTypes(c0);
+    if (!availTypes.some(t => t.key === quickState.docType)) {
+        quickState.docType = availTypes.length ? availTypes[0].key : '';
+    }
+    const dtSelectHtml = availTypes.length
+        ? availTypes.map(t => `<option value="${t.key}" ${t.key === quickState.docType ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')
+        : '<option value="">暂无可用文书类型</option>';
+    const quickWfs = getQuickWorkflowsOfDocType(c0, quickState.docType);
+    // V1.3.30: 可见「生成流程」下拉已移除——后台（文书类型 + 生成方式 + 案字/案由）唯一确定流程，
+    //   选定文书类型后流程已唯一，此处仅内部确认 workflowId 仍有效（失效则回落首条），不再渲染下拉。
+    let wfHintHtml = '';
+    if (!quickWfs.length) {
+        quickState.workflowId = '';
+        wfHintHtml = getQuickWorkflowRawCount() > 0
+            ? '当前案件的案号/案由没有匹配的快速生成流程。请补全案件案号，或在管理后台配置不限制案字案由的流程'
+            : '当前业务系统暂无可用快速生成流程，请先在管理后台「文书流程管理」中配置';
+    } else if (!quickWfs.some(wf => wf.id === quickState.workflowId)) {
+        quickState.workflowId = quickWfs[0].id;
+    }
+    let stdOpts = [], myOpts = [];
+    const optHtml = (k, name) => `<option value="${k}" ${k === quickState.template ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+    stdTpls.forEach(t => stdOpts.push(optHtml(t.key, t.name)));
+    myTpls.forEach(t => myOpts.push(optHtml(t.key, t.name)));
     let templateSelectHtml;
     if (stdOpts.length && myOpts.length) {
         templateSelectHtml = `<optgroup label="标准示例">${stdOpts.join('')}</optgroup><optgroup label="我的示例">${myOpts.join('')}</optgroup>`;
@@ -958,18 +1046,20 @@ function buildGenConfigHtml() {
         templateSelectHtml = `<option value="">暂无可用示例</option>`;
     }
 
-    // v1.45 链 C: 案件阶段选择项（仅裁判文书类型显示，能自动判定时隐藏，无法判定时显示）
-    const caseStageRowHtml = buildGenCaseStageRowHtml();
+    // V1.3.22 A29: 案由/案字两列常显（置于生成流程之前，流程选项随两属性联动）
+    const caseInfoRowHtml = buildGenCaseInfoRowHtml();
 
     return `
         <div class="gen-form-group">
             <label class="gen-form-label">文书类型</label>
-            <select class="gen-form-select" id="genDocType" onchange="onGenDocTypeChange(this.value)">
-                ${docTypeOptions}
+            <select class="gen-form-select" id="genDocType" onchange="onGenDocTypeChange(this.value)" ${availTypes.length ? '' : 'disabled'}>
+                ${dtSelectHtml}
             </select>
         </div>
 
-        ${caseStageRowHtml}
+        ${caseInfoRowHtml}
+
+        ${wfHintHtml ? `<div class="gen-form-hint" style="margin-top:6px;font-size:12px;color:var(--text-muted);font-style:italic;">${wfHintHtml}</div>` : ''}
 
         <div class="gen-form-group">
             <label class="gen-form-label">文书示例</label>
@@ -983,74 +1073,99 @@ function buildGenConfigHtml() {
             <div id="genReqTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
             <textarea class="gen-form-textarea" id="genRequirement"
                       placeholder="可选：描述特殊要求或关注点，帮助系统更好理解需求"
-                      onchange="quickState.requirement=this.value"></textarea>
+                      onchange="quickState.requirement=this.value">${escapeHtml(quickState.requirement || '')}</textarea>
         </div>
     `;
 }
 
-// v1.45 链 C: 构建案件列表页弹框的案件阶段选择行 HTML
-// 规则：仅裁判文书(judgment)类型显示；能按案字自动判定时隐藏整行；无法判定时显示让用户选
-function buildGenCaseStageRowHtml() {
-    // 仅裁判文书类型才显示
-    if (quickState.docType !== 'judgment') return '';
+// V1.3.22 A29: 案由/案字两列常显（替代 v1.45 案件阶段选择行）
+// 有值 → 值 + 「来自案件信息」标签（只读展示）；缺失 → 下拉补选；任一缺失时流程下拉仅剩通用兜底
+function buildGenCaseInfoRowHtml() {
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     if (!c) return '';
     const org = localStorage.getItem('currentBusiness') || 'court';
-    const caseWord = (typeof parseCaseWord === 'function') ? parseCaseWord(c.caseNumber, org) : '';
-    const autoStage = (typeof getCaseStageByCaseWord === 'function') ? getCaseStageByCaseWord(caseWord, org) : '';
-    // 能自动判定：隐藏整行（不渲染），但记录到 quickState 供传递
-    if (autoStage) {
-        quickState.caseStage = autoStage;
-        return '';
-    }
-    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
-    // 检察院/司法局无选项：隐藏整行，不阻塞
-    if (options.length === 0) {
-        quickState.caseStage = '';
-        return '';
-    }
-    // 无法判定：渲染选择项
-    quickState.caseStage = '';
-    const optsHtml = '<option value="">请选择案件阶段</option>' +
-        options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-    const hintText = caseWord
-        ? `案字「${caseWord}」无法判定阶段，请选择`
-        : '本案无案字，请选择';
+    const words = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[org]) || [];
+    const cause = c.cause || '';
+    const word = getCaseWordOfCase(c);
+    const causeCell = cause
+        ? `<div class="gen-caseinfo-value">${escapeHtml(cause)}<span class="gen-caseinfo-src">来自案件信息</span></div>`
+        : `<select class="gen-form-select" id="genCause" onchange="onGenCaseInfoSelect('cause', this.value)"><option value="">请选择案由</option>${buildCauseOptionsHtml()}</select>
+           <div class="gen-caseinfo-hint">本案未识别出案由，请选择</div>`;
+    const wordCell = word
+        ? `<div class="gen-caseinfo-value">${escapeHtml(word)}<span class="gen-caseinfo-src">来自案件信息</span></div>`
+        : (words.length > 0
+            ? `<select class="gen-form-select" id="genCaseWord" onchange="onGenCaseInfoSelect('word', this.value)">
+                <option value="">请选择案字</option>
+                ${words.map(w => `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`).join('')}
+               </select>
+               <div class="gen-caseinfo-hint">本案未识别出案字，请选择</div>`
+            : `<div class="gen-caseinfo-value gen-caseinfo-empty">—</div>`);
     return `
-        <div class="gen-form-group" id="genCaseStageGroup">
-            <label class="gen-form-label">案件阶段</label>
-            <select class="gen-form-select" id="genCaseStage" onchange="onGenCaseStageChange(this.value)">
-                ${optsHtml}
-            </select>
-            <div class="gen-form-hint" style="display:block;margin-top:6px;font-size:12px;color:var(--text-muted);font-style:italic;">${hintText}</div>
-        </div>
-    `;
+        <div class="gen-form-group">
+            <div class="gen-caseinfo-grid">
+                <div class="gen-caseinfo-cell">
+                    <label class="gen-form-label">案由</label>
+                    ${causeCell}
+                </div>
+                <div class="gen-caseinfo-cell">
+                    <label class="gen-form-label">案字</label>
+                    ${wordCell}
+                </div>
+            </div>
+        </div>`;
 }
 
-// v1.45 链 C: 案件列表页弹框 - 案件阶段选择变更
-function onGenCaseStageChange(stage) {
-    quickState.caseStage = stage;
-    updateGenModalStartBtnState();
+// V1.3.22 A29: 构建案由下拉选项（optgroup=案由分类；组名与叶子均可选，叶子加缩进前缀）
+function buildCauseOptionsHtml() {
+    const org = localStorage.getItem('currentBusiness') || 'court';
+    const tree = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[org]) || [];
+    let html = '';
+    tree.forEach(cat => {
+        let inner = '';
+        (cat.children || []).forEach(child => {
+            if (typeof child === 'string') {
+                inner += `<option value="${escapeHtml(child)}">${escapeHtml(child)}</option>`;
+            } else if (child && typeof child === 'object') {
+                inner += `<option value="${escapeHtml(child.name)}">${escapeHtml(child.name)}</option>`;
+                (child.children || []).forEach(leaf => {
+                    inner += `<option value="${escapeHtml(leaf)}">　└ ${escapeHtml(leaf)}</option>`;
+                });
+            }
+        });
+        if (inner) html += `<optgroup label="${escapeHtml(cat.name)}">${inner}</optgroup>`;
+    });
+    return html;
 }
 
-// v1.45 链 C: 案件列表页弹框 - 更新「开始生成」按钮状态
+// V1.3.22 A29: 快速生成弹框 - 案由/案字补全选择（缺失列下拉选中后回写并重渲染）
+function onGenCaseInfoSelect(field, val) {
+    if (!val) return;
+    const c = getCurrentCases().find(x => x.id === quickState.caseId);
+    if (!c) return;
+    if (field === 'cause') c.cause = val;
+    if (field === 'word') c.caseWord = val;
+    c.updatedAt = new Date().toISOString().split('T')[0];
+    saveBusinessSystems();
+    // V1.3.29 A36: 补全后按新案由/案字重算可用类型；类型失效则回落第一个，再在该类型下重选流程
+    const availTypes = getQuickAvailableDocTypes(c);
+    if (!availTypes.some(t => t.key === quickState.docType)) {
+        quickState.docType = availTypes.length ? availTypes[0].key : '';
+    }
+    const quickWfs = getQuickWorkflowsOfDocType(c, quickState.docType);
+    if (!quickWfs.some(wf => wf.id === quickState.workflowId)) {
+        quickState.workflowId = quickWfs.length ? quickWfs[0].id : '';
+        quickState.template = getFirstTemplate(quickState.docType);
+        quickState.model = resolveWorkflowModelForCase(c, quickState.docType);
+    }
+    showNotification(field === 'cause' ? '案由已补全' : '案字已补全', 'success');
+    renderGenModalBody();
+}
+
+// V1.3.22 A29 修订: 案由/案字缺失时流程下拉仅剩通用兜底仍可生成，不再强制禁用开始按钮
 function updateGenModalStartBtnState() {
     const btn = document.getElementById('genModalStartBtn');
     if (!btn) return;
-    // 仅裁判文书类型才校验案件阶段
-    if (quickState.docType !== 'judgment') {
-        btn.disabled = false;
-        return;
-    }
-    // 检察院/司法局无选项时不校验
-    const org = localStorage.getItem('currentBusiness') || 'court';
-    const options = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
-    if (options.length === 0) {
-        btn.disabled = false;
-        return;
-    }
-    const stage = quickState.caseStage || '';
-    btn.disabled = !stage;
+    btn.disabled = false;
 }
 
 function updateGenModalFooter(exceeded) {
@@ -1066,21 +1181,14 @@ function updateGenModalFooter(exceeded) {
 }
 
 function startQuickGen() {
-    if (!quickState.docType) {
-        showNotification('请选择文书类型', 'warning');
+    // V1.3.30: 文书类型下拉存在、流程由类型内部解析；workflowId 为空仅发生在该类型下无可用流程的异常态
+    if (!quickState.workflowId) {
+        showNotification('当前文书类型下暂无可用生成流程，请补全案件案由/案字或切换文书类型', 'warning');
         return;
     }
+    // V1.3.22 A29 修订: 案由/案字缺失时流程下拉仅剩通用兜底，兜底流程可直接生成，不再强制补全
     const c = getCurrentCases().find(x => x.id === quickState.caseId);
     if (!c) return;
-    // v1.45 链 C: 裁判文书类型校验案件阶段
-    if (quickState.docType === 'judgment') {
-        const org = localStorage.getItem('currentBusiness') || 'court';
-        const stageOptions = (typeof getCaseStageOptions === 'function') ? getCaseStageOptions(org) : [];
-        if (stageOptions.length > 0 && !quickState.caseStage) {
-            showNotification('请先选择案件阶段', 'warning');
-            return;
-        }
-    }
     // v2.23 (任务 8.2): 移除 Token 超限前置判断，直接跳转详情页生成
 
     // 跳转案件详情页，默认使用全部材料并自动触发生成，与详情页配置生成文书的体验统一
@@ -1092,9 +1200,7 @@ function startQuickGen() {
         template: quickState.template,
         requirement: quickState.requirement || '',
         autoGen: true,
-        autoIntroduceElements: quickState.docType === 'judgment',
-        // v1.45 链 C: 案件阶段传递给详情页
-        caseStage: quickState.caseStage || ''
+        autoIntroduceElements: quickState.docType === 'judgment'
     };
     sessionStorage.setItem('listGenConfig', JSON.stringify(genConfig));
     window.location.href = `case-files.html?caseId=${encodeURIComponent(quickState.caseId)}`;
@@ -1246,18 +1352,22 @@ function renderBatchConfig() {
     const selectedCases = getCurrentCases().filter(c => selectedCaseIds.has(c.id));
     const current = getCurrentBusiness();
     const docTypes = getCurrentDocTypes();
-    const templates = getDocTypeTemplates(batchState.docType);
+    // V1.3.29 A36: 批量生成同样按「该类型 + 通用」取系统预设示例，我的示例平铺在后
+    const batchOrg = localStorage.getItem('currentBusiness') || 'court';
+    const batchStdTpls = (typeof getTemplatesByDocType === 'function') ? getTemplatesByDocType(batchOrg, batchState.docType) : [];
+    // V1.3.30: 我的示例按所选文书类型过滤（含通用项）
+    const batchMyTpls = (typeof getMyDocTemplatesFlat === 'function')
+        ? (typeof filterMineByDocType === 'function' ? filterMineByDocType(getMyDocTemplatesFlat(batchOrg), batchState.docType) : getMyDocTemplatesFlat(batchOrg))
+        : [];
     const container = document.getElementById('batchFsContainer');
     const docTypeOptions = Object.entries(docTypes)
         .map(([k, v]) => '<option value="' + k + '" ' + (k === batchState.docType ? 'selected' : '') + '>' + v.name + '</option>')
         .join('');
     // v1.24: 模板按来源分组（标准 / 我的）
     const stdOpts = [], myOpts = [];
-    Object.entries(templates).forEach(([k, v]) => {
-        const name = getTemplateName(v);
-        const opt = '<option value="' + k + '" ' + (k === batchState.template ? 'selected' : '') + '>' + name + '</option>';
-        if (v && v.source === 'mine') myOpts.push(opt); else stdOpts.push(opt);
-    });
+    const batchOpt = (k, name) => '<option value="' + k + '" ' + (k === batchState.template ? 'selected' : '') + '>' + escapeHtml(name) + '</option>';
+    batchStdTpls.forEach(t => stdOpts.push(batchOpt(t.key, t.name)));
+    batchMyTpls.forEach(t => myOpts.push(batchOpt(t.key, t.name)));
     let batchTemplateSelectHtml;
     if (stdOpts.length && myOpts.length) {
         batchTemplateSelectHtml = '<optgroup label="标准示例">' + stdOpts.join('') + '</optgroup><optgroup label="我的示例">' + myOpts.join('') + '</optgroup>';
@@ -2099,51 +2209,6 @@ function submitCreateCase() {
     const newFileIds = newCase.files.map(f => f.id);
     showNotification(`已上传 ${uploadedFiles.length} 个文件，正在解析...`, 'success');
     newFileIds.forEach(fid => startMockParsing(caseIdForParse, fid));
-}
-
-// v2.32: 生成 mock 识别结果（演示用）
-// 刻意演示"案由识别为上级案由"问题（如 房屋租赁合同纠纷 → 合同纠纷），
-// 呼应 2026-09-07 演示评审实际案例：案由识别错误将导致要件匹配错误，需用户确认修改
-function generateMockParseResult(fileName) {
-    const name = fileName || '';
-    // 关键词 → 子案由映射（找到所属大类后，取大类作为 mock"识别结果"，即上级案由）
-    const causeKeywords = [
-        { kw: ['租赁', '房租'], child: '房屋租赁合同纠纷' },
-        { kw: ['借贷', '借款', '欠款'], child: '民间借贷纠纷' },
-        { kw: ['买卖', '购销'], child: '买卖合同纠纷' },
-        { kw: ['施工', '工程'], child: '建设工程施工合同纠纷' },
-        { kw: ['离婚'], child: '离婚纠纷' },
-        { kw: ['交通', '事故'], child: '机动车交通事故责任纠纷' },
-        { kw: ['劳动', '工伤'], child: '劳动争议' }
-    ];
-    let childCause = '';
-    for (const item of causeKeywords) {
-        if (item.kw.some(k => name.includes(k))) { childCause = item.child; break; }
-    }
-    if (!childCause) childCause = '民间借贷纠纷';
-
-    // 在案由树中找到该子案由的父级案由组，作为 mock 识别结果（上级案由）
-    let mockCause = '合同纠纷';
-    const tree = (typeof causeTreeDataByOrg !== 'undefined' && causeTreeDataByOrg[currentBusiness]) || [];
-    outer:
-    for (const cat of tree) {
-        for (const grp of (cat.children || [])) {
-            if ((grp.children || []).includes(childCause)) { mockCause = grp.name; break outer; }
-        }
-    }
-
-    const surnamePool = ['张', '李', '王', '刘', '陈', '赵', '周', '吴'];
-    const pick = () => surnamePool[Math.floor(Math.random() * surnamePool.length)] + '某';
-    const num = Math.floor(10000 + Math.random() * 89999);
-    const caseWords = (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[currentBusiness]) || ['民初'];
-
-    return {
-        caseNumber: `（2026）京0105民初${num}号`,
-        caseWord: caseWords.includes('民初') ? '民初' : (caseWords[0] || ''),
-        cause: mockCause,
-        partyA: pick(),
-        partyB: pick()
-    };
 }
 
 // v2.32: 页面加载时续接未完成的 mock 解析（覆盖刷新/切页中断的 parsing 文件）

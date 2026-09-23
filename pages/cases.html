@@ -1301,6 +1301,44 @@
             resize: vertical;
             line-height: 1.6;
         }
+        /* V1.3.22 A29: 案由/案字两列常显（值 + 来源标签 / 缺失下拉） */
+        .gen-caseinfo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .gen-caseinfo-cell {
+            min-width: 0;
+        }
+        .gen-caseinfo-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 39px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .gen-caseinfo-src {
+            font-size: 12px;
+            font-weight: 400;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        .gen-caseinfo-empty {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .gen-caseinfo-hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #d97706;
+            font-style: italic;
+        }
         .gen-context-hint {
             padding: 12px 14px;
             border-radius: 8px;
@@ -3575,9 +3613,7 @@
                     <span>已选 <span class="count" id="selectedCount">0</span> 件案件</span>
                 </div>
                 <div class="batch-bar-right">
-                    <button class="batch-bar-btn primary" onclick="openBatchFullscreen()">
-                        <i class="fas fa-boxes"></i> 批量生成
-                    </button>
+                    <!-- V1.3 A10: 「批量生成」入口移除，生成统一收拢至案件工作台；openBatchFullscreen 代码保留 -->
                     <button class="batch-bar-btn danger" id="batchDeleteBtn" onclick="confirmBatchDeleteCases()">
                         <i class="fas fa-trash-alt"></i> <span id="batchDeleteBtnText">批量删除</span>
                     </button>
@@ -4113,8 +4149,8 @@
     </div>
 
     <script src="../js/common.js?v=30"></script>
-    <script src="../js/case-data.js?v=67"></script>
-    <script src="../js/cases.js?v=95"></script>
+    <script src="../js/case-data.js?v=78"></script>
+    <script src="../js/cases.js?v=104"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
         function logout() {

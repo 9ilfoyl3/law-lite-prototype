@@ -1,9 +1,12 @@
 // ============ Admin Doc Templates Management ============
 // v1.0 文书示例管理：维护各业务系统示例，关联文书类型
+// v1.6 V1.3 A4: 关联维度由「所属文书类型」改为「关联 workflow」（多选，空=通用示例）；
+//     左侧筛选改为「全部 / 通用 / 各 workflow」；表格列「所属类型」改为「关联流程」。
+//     旧字段 docType 保留不读（零迁移），编辑保存后不再写入。依据 docs/V1.3版本PRD（人看）.md 5.4
 // v1.1 移除「关联案由」字段：示例作为所属文书类型的下属，案由匹配通过文书类型→workflow 链路间接实现
 // v1.2 示例正文交互改造：① 示例正文从 textarea 在线编辑改为文件上传；② 新增/编辑弹窗提供示例下载；③ 列表新增「预览」「下载」「重新上传」三个操作按钮；④ 未上传正文时预览/下载置灰；⑤ 上传内容以纯文本持久化到 content 字段
 // v1.3 内置示例预置默认正文：内置示例 content 赋予 TEMPLATE_EXAMPLE_TEXT，使预览/下载按钮默认可用（自定义示例未上传正文时仍置灰）
-// v1.4 示例表格新增「上传时间」「更新时间」两列：保存时记录 createdAt / updatedAt（新增两者相同，编辑/重新上传仅更新 updatedAt）；内置示例无持久化时间显示为空
+// 注：v1.4 曾新增「上传时间」「更新时间」两列并记录 createdAt/updatedAt；V1.3.25 A32 用户反馈其他模块无此列，整列与时间记录逻辑、nowTime() 一并移除（旧 localStorage 多出的时间字段忽略即可，零迁移）
 // v1.5 V1.1.2 定位调整：示例 content 语义从「带占位符的格式骨架」改为「给 AI 的内容参考文本」，录入方式从仅文件上传改回大文本框在线编辑为主（可选文件上传导入）；移除独立的「重新上传」操作按钮（合并到编辑）；内置示例默认 content 改为简短内容参考示例（不再强约束占位符）；格式骨架约束移至 workflow 子配置
 // 数据持久化：localStorage.adminDocTemplates（按业务系统分组）
 // 用户侧联动：case-data.js mergeAdminDocTemplates 在加载时合并到 system.docTemplates
@@ -13,7 +16,7 @@
 
     // ===== 状态 =====
     let currentOrg = 'court';
-    let currentDocTypeFilter = ''; // '' = 全部
+    let currentWfFilter = '';      // '' = 全部；'general' = 通用（未关联任何流程）；其余 = workflow id
     let editingKey = null;        // 当前编辑的示例 key（编辑模式时非空）
     let editingIsBuiltin = false; // 编辑的是内置示例（编辑后转为自定义）
     let pendingConfirmAction = null;
@@ -175,38 +178,43 @@
         setOrgData(org, orgData);
     }
 
-    // 获取当前业务系统的全部示例（内置 + 自定义）
-    // 返回统一对象结构：{key: {name, docType, content, isBuiltin, enabled}}
+    // V1.3 A4: 内置示例的 workflowIds 取自 BUILTIN_DOC_TEMPLATE_META（唯一真相源，见 case-data.js）
+    function getBuiltinWorkflowIds(org, key) {
+        const meta = (typeof BUILTIN_DOC_TEMPLATE_META !== 'undefined') ? (BUILTIN_DOC_TEMPLATE_META[org] || {}) : {};
+        const def = meta[key];
+        return (def && Array.isArray(def.workflowIds)) ? def.workflowIds.slice() : [];
+    }
+
+    // 获取当前业务系统全部示例（内置 + 自定义）
+    // 返回统一对象结构：{key: {name, workflowIds, content, isBuiltin, enabled}}
     function getAllTemplates(org) {
-        const docTypes = getDocTypes(org);
         const builtins = getBuiltinTemplates(org);
         const customs = getOrgData(org);
         const builtinDisabled = getBuiltinDisabled(org);
 
-        // 反查表：示例 key → 文书类型 key
-        const tplToDocType = {};
-        Object.entries(docTypes).forEach(([typeKey, typeCfg]) => {
-            (typeCfg.templates || []).forEach(tplKey => {
-                tplToDocType[tplKey] = typeKey;
-            });
-        });
-
         const result = {};
-        // 内置示例（字符串）
-        // v1.5 内置示例 content 赋予简短内容参考示例（不再强约束占位符格式骨架）
+        // V1.3.27 A34: 内置示例的文书类型反查表 { templateKey: docTypeKey }
+        const builtinDocTypeMap = {};
+        Object.entries(defaultDocTypesByOrg[org] || {}).forEach(([dtKey, cfg]) => {
+            (cfg.templates || []).forEach(t => { builtinDocTypeMap[t] = dtKey; });
+        });
+        // 内置示例（字符串 / 对象两种形态）
         Object.entries(builtins).forEach(([key, val]) => {
-            const dtKey = tplToDocType[key] || '';
             // V1.2.29: 内置示例在 case-data.js 中已由「名称字符串」升级为「{name, content, ...} 对象」，
             //   此处兼容两种形态——不兼容时 name 会渲染成 [object Object]。
-            //   content 取值优先级：模板自身 content（与用户侧生成/预览同源）→ 按文书类型分档示例 → 判决书通用文本
+            //   content 取值优先级：模板自身 content（与用户侧生成/预览同源）→ 判决书通用文本
             const isObj = val && typeof val === 'object';
             const name = isObj ? (val.name || key) : val;
-            const content = (isObj && val.content)
-                ? val.content
-                : (BUILTIN_EXAMPLE_BY_DOCTYPE[dtKey] || TEMPLATE_EXAMPLE_TEXT);
+            const content = (isObj && val.content) ? val.content : TEMPLATE_EXAMPLE_TEXT;
+            const workflowIds = (isObj && Array.isArray(val.workflowIds))
+                ? val.workflowIds.slice()
+                : getBuiltinWorkflowIds(org, key);
             result[key] = {
                 name: name,
-                docType: dtKey,
+                workflowIds: workflowIds,
+                // V1.3.27 A34: 回归文书类型维度。内置示例由 defaultDocTypesByOrg 的 templates 数组反查，
+                // 自定义覆盖优先（val.docType），查不到则视为通用示例。
+                docType: val.docType || builtinDocTypeMap[key] || '',
                 content: content,
                 isBuiltin: true,
                 enabled: !builtinDisabled.includes(key)
@@ -218,22 +226,21 @@
             if (val && typeof val === 'object') {
                 result[key] = {
                     name: val.name || key,
-                    docType: val.docType || tplToDocType[key] || '',
+                    // V1.3 A4: workflowIds 缺省视为「通用示例」（空数组）
+                    workflowIds: Array.isArray(val.workflowIds) ? val.workflowIds.slice() : [],
+                    docType: val.docType || '',
                     content: val.content || '',
                     isBuiltin: false,
-                    enabled: val.enabled !== false,
-                    createdAt: val.createdAt || '', // v1.4 上传/创建时间
-                    updatedAt: val.updatedAt || ''  // v1.4 最近更新时间
+                    enabled: val.enabled !== false
                 };
             }
         });
         return result;
     }
 
-    // 生成唯一 key
-    function genTemplateKey(name, docType) {
-        const base = (docType || 'tpl') + '-' + Date.now().toString(36);
-        return base;
+    // 生成唯一 key（V1.3 A4: 不再依赖文书类型，统一以 tpl 前缀）
+    function genTemplateKey(name, workflowIds) {
+        return 'tpl-' + Date.now().toString(36);
     }
 
     // v1.2 通用工具：下载文本内容为文件
@@ -281,7 +288,7 @@
     window.switchBusiness = function(type) {
         if (type === currentOrg) return;
         currentOrg = type;
-        currentDocTypeFilter = '';
+        currentWfFilter = '';
         document.querySelectorAll('.business-switch-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.type === type);
         });
@@ -289,45 +296,65 @@
         renderRight();
     };
 
-    // ===== 渲染左侧文书类型列表 =====
+    // ===== 渲染左侧筛选列表（V1.3 A4: 全部 / 通用 / 各 workflow）=====
+    function matchesFilter(t) {
+        if (currentWfFilter === '') return true;
+        const dt = t.docType || '';
+        if (currentWfFilter === 'general') return dt === '';
+        return dt === '' || dt === currentWfFilter;   // 通用示例在任何类型下都可见
+    }
+
     function renderLeft() {
-        const docTypes = getDocTypes(currentOrg);
         const allTemplates = getAllTemplates(currentOrg);
         const totalCount = Object.keys(allTemplates).length;
+        const generalCount = Object.values(allTemplates).filter(t => (t.workflowIds || []).length === 0).length;
+        let docTypes = {};
+        if (typeof getAdminDocTypes === 'function') docTypes = getAdminDocTypes(currentOrg) || {};
 
         const leftEl = document.getElementById('tplLeft');
-        let html = '<div class="tpl-left-item' + (currentDocTypeFilter === '' ? ' active' : '') + '" onclick="selectDocType(\'\')">'
+        let html = '<div class="tpl-left-item' + (currentWfFilter === '' ? ' active' : '') + '" onclick="selectWf(\'\')">'
             + '<i class="fas fa-layer-group"></i><span>全部</span><span class="count">' + totalCount + '</span></div>';
+        html += '<div class="tpl-left-item' + (currentWfFilter === 'general' ? ' active' : '') + '" onclick="selectWf(\'general\')">'
+            + '<i class="fas fa-globe"></i><span>通用示例</span><span class="count">' + generalCount + '</span></div>';
 
-        Object.entries(docTypes).forEach(([key, cfg]) => {
-            const count = Object.values(allTemplates).filter(t => t.docType === key).length;
-            html += '<div class="tpl-left-item' + (currentDocTypeFilter === key ? ' active' : '') + '" onclick="selectDocType(\'' + key + '\')">'
-                + '<i class="fas ' + (cfg.icon || 'fa-folder') + '"></i>'
-                + '<span>' + cfg.name + '</span>'
+        Object.keys(docTypes).forEach(dtKey => {
+            const count = Object.values(allTemplates).filter(t => matchesFilterWith(t, dtKey)).length;
+            html += '<div class="tpl-left-item' + (currentWfFilter === dtKey ? ' active' : '') + '" onclick="selectWf(\'' + escapeHtml(dtKey) + '\')">'
+                + '<i class="fas fa-folder"></i>'
+                + '<span>' + escapeHtml(docTypes[dtKey].name || dtKey) + '</span>'
                 + '<span class="count">' + count + '</span></div>';
         });
         leftEl.innerHTML = html;
     }
-    window.selectDocType = function(key) {
-        currentDocTypeFilter = key;
+    function matchesFilterWith(t, dtKey) {
+        const dt = t.docType || '';
+        return dt === '' || dt === dtKey;
+    }
+    window.selectWf = function(key) {
+        currentWfFilter = key;
         renderLeft();
         renderRight();
     };
+    // 兼容旧命名（避免其他页面残留调用报错）
+    window.selectDocType = window.selectWf;
 
     // ===== 渲染右侧表格 =====
     function renderRight() {
-        const docTypes = getDocTypes(currentOrg);
         const allTemplates = getAllTemplates(currentOrg);
+        const workflows = (typeof getAllWorkflows === 'function') ? getAllWorkflows(currentOrg) : [];
+        const wfNameMap = {};
+        workflows.forEach(wf => { wfNameMap[wf.id] = wf.name; });
         const rightTitle = document.getElementById('rightTitle');
-        if (currentDocTypeFilter) {
-            rightTitle.textContent = (docTypes[currentDocTypeFilter] || {}).name || '示例列表';
+        if (currentWfFilter === 'general') {
+            rightTitle.textContent = '通用示例';
+        } else if (currentWfFilter) {
+            const dtCfg = (typeof getAdminDocTypes === 'function' ? getAdminDocTypes(currentOrg) : {})[currentWfFilter];
+            rightTitle.textContent = dtCfg ? dtCfg.name : '示例列表';
         } else {
             rightTitle.textContent = '全部示例';
         }
 
-        const list = Object.entries(allTemplates).filter(([key, t]) => {
-            return !currentDocTypeFilter || t.docType === currentDocTypeFilter;
-        });
+        const list = Object.entries(allTemplates).filter(([key, t]) => matchesFilter(t));
 
         const tbody = document.getElementById('tplTbody');
         const empty = document.getElementById('emptyState');
@@ -339,10 +366,14 @@
         empty.style.display = 'none';
 
         tbody.innerHTML = list.map(([key, t]) => {
-            const docTypeName = (docTypes[t.docType] || {}).name || '-';
-            const badge = t.isBuiltin
-                ? '<span class="tpl-badge builtin">内置</span>'
-                : '<span class="tpl-badge custom">自定义</span>';
+            // V1.3.27 A34: 列回归「文书类型」（未关联类型的示例显示为「通用」）
+            const dtKey = t.docType || '';
+            const wfText = dtKey
+                ? escapeHtml(docTypeName(currentOrg, dtKey))
+                : '<span class="tpl-wf-general">通用</span>';
+            // V1.3.14 A20: 隐藏「内置」标签（无标签即内置）；V1.3.23 A30: 按用户拍板隐藏「自定义」标签，
+            // 示例页「内置/自定义」来源信号全部取消（归属人由「用户示例检索」区分）。isBuiltin 字段保留不动。
+            const badge = '';
             const isEnabled = t.enabled !== false;
             const statusBadge = isEnabled
                 ? '<span class="status-badge status-on">已启用</span>'
@@ -350,27 +381,16 @@
             const toggleBtn = isEnabled
                 ? '<button class="action-btn toggle-off" onclick="toggleTemplateEnabled(\'' + key + '\')">停用</button>'
                 : '<button class="action-btn toggle-on" onclick="toggleTemplateEnabled(\'' + key + '\')">启用</button>';
-            const hasContent = (t.content || '').trim().length > 0;
-            const viewDisabled = hasContent ? '' : ' disabled';
-            // v1.5 移除独立的「重新上传」按钮，合并到编辑入口
-            const contentActions = '<button class="action-btn view"' + viewDisabled + ' onclick="previewTemplateContent(\'' + key + '\')">预览</button>'
-                  + '<button class="action-btn view"' + viewDisabled + ' onclick="downloadTemplateByKey(\'' + key + '\')">下载</button>';
+            // V1.3.24 A31: 列表「预览/下载」按钮按拍板移除（内容在编辑弹窗内可见/可编辑），操作栏统一【编辑/启用·停用/删除】
             const actions = t.isBuiltin
-                ? contentActions
-                  + '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>' + toggleBtn
-                : contentActions
-                  + '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
+                ? '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>' + toggleBtn
+                : '<button class="action-btn edit" onclick="editTemplate(\'' + key + '\')">编辑</button>'
                   + toggleBtn
                   + '<button class="action-btn delete" onclick="deleteTemplate(\'' + key + '\')">删除</button>';
-            // v1.4 上传时间/更新时间（内置示例无持久化时间，显示为空）
-            const createdAt = t.createdAt || '';
-            const updatedAt = t.updatedAt || '';
             return '<tr>'
                 + '<td class="tpl-name-cell">' + escapeHtml(t.name) + badge + '</td>'
-                + '<td>' + escapeHtml(docTypeName) + '</td>'
+                + '<td>' + wfText + '</td>'
                 + '<td>' + statusBadge + '</td>'
-                + '<td class="tpl-time-cell">' + (createdAt ? escapeHtml(createdAt) : '<span class="tpl-time-empty">-</span>') + '</td>'
-                + '<td class="tpl-time-cell">' + (updatedAt ? escapeHtml(updatedAt) : '<span class="tpl-time-empty">-</span>') + '</td>'
                 + '<td class="tpl-action-cell">' + actions + '</td>'
                 + '</tr>';
         }).join('');
@@ -381,13 +401,7 @@
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    // v1.4 时间工具：返回格式化时间（YYYY-MM-DD HH:mm）
-    function nowTime() {
-        const d = new Date();
-        const p = n => (n < 10 ? '0' + n : '' + n);
-        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
-            + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
-    }
+    // V1.3.25 A32: 时间记录逻辑已移除，nowTime() 一同删除
 
     // v1.5 弹窗中文本框为内容主入口，文件导入仅作为可选导入方式（导入后写入 textarea）
     // 不再需要 refreshTplUploadUI 切换显示
@@ -399,7 +413,6 @@
         document.getElementById('modalTitle').textContent = '新增示例';
         document.getElementById('tplName').value = '';
         fillDocTypeSelect('');
-        document.getElementById('tplDocType').disabled = false;
         document.getElementById('tplContent').value = ''; // v1.5 清空文本框
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
@@ -413,9 +426,7 @@
         editingIsBuiltin = !!t.isBuiltin;
         document.getElementById('modalTitle').textContent = editingIsBuiltin ? '编辑内置示例（另存为自定义）' : '编辑示例';
         document.getElementById('tplName').value = t.name;
-        fillDocTypeSelect(t.docType);
-        // 编辑内置时禁用文书类型切换，避免逻辑歧义（内置只能在原类型上覆盖）
-        document.getElementById('tplDocType').disabled = editingIsBuiltin;
+        fillDocTypeSelect(t.docType || '');
         // v1.5 将已有 content 回填到 textarea（内置示例回填默认示例文本，用户可基于此修改）
         document.getElementById('tplContent').value = t.content || '';
         document.getElementById('tplModal').classList.add('show');
@@ -464,17 +475,37 @@
         editingIsBuiltin = false;
     };
 
+    // V1.3.27 A34: 文书类型单选下拉（不选 = 通用示例）
     function fillDocTypeSelect(selected) {
-        const docTypes = getDocTypes(currentOrg);
-        const sel = document.getElementById('tplDocType');
-        sel.innerHTML = '<option value="">请选择...</option>' + Object.entries(docTypes).map(([key, cfg]) =>
-            '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + escapeHtml(cfg.name) + '</option>'
-        ).join('');
+        const sel = document.getElementById('tplDocTypeSelect');
+        if (!sel) return;
+        let docTypes = {};
+        if (typeof getAdminDocTypes === 'function') docTypes = getAdminDocTypes(currentOrg) || {};
+        let html = '<option value="">通用示例（不指定类型）</option>';
+        Object.keys(docTypes).forEach(key => {
+            html += '<option value="' + escapeHtml(key) + '">' + escapeHtml(docTypes[key].name || key) + '</option>';
+        });
+        sel.innerHTML = html;
+        sel.value = selected || '';
+    }
+
+    function readDocType() {
+        const sel = document.getElementById('tplDocTypeSelect');
+        return sel ? (sel.value || '') : '';
+    }
+
+    // 取文书类型显示名（未指定 = 通用）
+    function docTypeName(org, key) {
+        if (!key) return '通用';
+        let docTypes = {};
+        if (typeof getAdminDocTypes === 'function') docTypes = getAdminDocTypes(org) || {};
+        return (docTypes[key] && docTypes[key].name) || key;
     }
 
     window.saveTemplate = function() {
         const name = document.getElementById('tplName').value.trim();
-        const docType = document.getElementById('tplDocType').value;
+        const workflowIds = [];          // V1.3.27 A34: workflowIds 停止读写（字段保留，零迁移）
+        const docType = readDocType();
         // v1.5 直接从 textarea 读取内容
         const content = document.getElementById('tplContent').value;
 
@@ -483,10 +514,7 @@
             document.getElementById('tplName').focus();
             return;
         }
-        if (!docType) {
-            showNotification('请选择所属文书类型', 'error');
-            return;
-        }
+        // V1.3 A4: 关联流程可为空（空 = 通用示例，所有流程均可见），不再强制必选
 
         const orgData = getOrgData(currentOrg);
 
@@ -500,8 +528,8 @@
             key = editingKey;
         } else {
             // 新增：生成新 key（确保不与内置 key 冲突）
-            key = genTemplateKey(name, docType);
-            while (orgData[key]) key = genTemplateKey(name, docType) + Math.floor(Math.random() * 100);
+            key = genTemplateKey(name, workflowIds);
+            while (orgData[key]) key = genTemplateKey(name, workflowIds) + Math.floor(Math.random() * 100);
         }
 
         // 编辑时继承原启用状态；新增默认启用
@@ -512,18 +540,13 @@
             if (origT) origEnabled = origT.enabled !== false;
         }
 
-        // v1.4 记录上传/更新时间：新增时两者相同；编辑时保留原 createdAt，仅更新 updatedAt
-        const now = nowTime();
-        const prevTemplate = orgData[key];
-        const createdAt = (editingKey && prevTemplate && prevTemplate.createdAt) ? prevTemplate.createdAt : now;
-
         orgData[key] = {
             name: name,
-            docType: docType,
             content: content,
-            enabled: origEnabled,
-            createdAt: createdAt,
-            updatedAt: now
+            // V1.3 A4: 关联 workflow（空数组 = 通用示例）；不再写入 docType
+            workflowIds: workflowIds,     // 字段保留不再读
+            docType: docType,
+            enabled: origEnabled
         };
 
         // 编辑内置示例后，该 key 变为自定义；从 __builtinDisabled__ 清理冗余 key
@@ -542,21 +565,7 @@
         showNotification(editingKey ? '示例已更新' : '示例已新增', 'success');
     };
 
-    // v1.2 列表操作：预览示例正文
-    window.previewTemplateContent = function(key) {
-        const all = getAllTemplates(currentOrg);
-        const t = all[key];
-        if (!t || !(t.content || '').trim()) return;
-        previewTextInWindow('示例预览：' + t.name, t.content);
-    };
-
-    // v1.2 列表操作：下载示例正文
-    window.downloadTemplateByKey = function(key) {
-        const all = getAllTemplates(currentOrg);
-        const t = all[key];
-        if (!t || !(t.content || '').trim()) return;
-        downloadTextFile(t.content, (t.name || '示例正文') + '.txt');
-    };
+    // V1.3.24 A31: 列表「预览/下载」按钮已移除（内容在编辑弹窗内可见/可编辑），对应函数 previewTemplateContent/downloadTemplateByKey 一并删除避免死代码。
 
     // ===== 启用/停用切换 =====
     window.toggleTemplateEnabled = function(key) {
@@ -611,9 +620,9 @@
         pendingConfirmAction = onConfirm;
         const btn = document.getElementById('confirmBtn');
         btn.onclick = function() {
+            const action = pendingConfirmAction;   // V1.3 修复：先取回调再关弹窗（closeConfirm 会把 pendingConfirmAction 置空，原写法导致确认回调永不执行）
             closeConfirm();
-            if (typeof pendingConfirmAction === 'function') pendingConfirmAction();
-            pendingConfirmAction = null;
+            if (typeof action === 'function') action();
         };
         document.getElementById('confirmModal').classList.add('show');
     }

@@ -1,6 +1,8 @@
 // ============ My Prompts (用户侧自定义指令) ============
 // v1.0 个人指令维护，按文书类型分组
-// 数据持久化：localStorage.myPromptTemplates（按业务系统×文书类型分组）
+// v1.5 (V1.3 A9) 去掉文书类型绑定：新建/编辑表单不再选择「所属文书类型」，
+//   新指令统一落入固定分组键 MY_BUCKET；旧数据仍留在原 docType 分组（零迁移，读取时统一展平）。
+// 数据持久化：localStorage.myPromptTemplates（按业务系统分组）
 // 用户侧联动：case-data.js getReqTemplates 在返回时追加 my 数据（标记 source='mine'）
 // v1.2: 新增历史版本记录（与 admin-prompt-templates.js 同步，最多 10 条，支持一键恢复）
 
@@ -11,7 +13,9 @@
     let currentOrg = 'court';
     let currentDocTypeFilter = ''; // '' = 全部
     // 编辑状态：{ docType, index }；index === -1 表示新增；null 表示未在编辑
+    // V1.3 A9: docType 仅作存储分组键（新内容统一用 MY_BUCKET），不再是用户可选项
     let editingState = null;
+    const MY_BUCKET = '__mine__';   // V1.3 A9: 无类型绑定内容的固定分组键
 
     // ===== 存储 =====
     function getStorage() {
@@ -33,9 +37,7 @@
         saveStorage(all);
     }
 
-    function getDocTypes(org) {
-        return getAdminDocTypes(org) || {};
-    }
+    // V1.3.17 A23: getDocTypes() 已无调用方（左栏与内容区标题取消后不再需要文书类型映射），删除
 
     function escapeHtml(s) {
         if (s === undefined || s === null) return '';
@@ -60,44 +62,11 @@
         document.querySelectorAll('.business-switch-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.type === type);
         });
-        renderLeft();
-        renderList();
-    };
-
-    // ===== 渲染左侧文书类型列表 =====
-    function renderLeft() {
-        const docTypes = getDocTypes(currentOrg);
-        const orgData = getOrgData(currentOrg);
-        // 统计总数与每个文书类型下的数量
-        let totalCount = 0;
-        const countByDocType = {};
-        Object.entries(orgData).forEach(([docType, arr]) => {
-            const n = Array.isArray(arr) ? arr.length : 0;
-            countByDocType[docType] = n;
-            totalCount += n;
-        });
-
-        const leftEl = document.getElementById('leftList');
-        let html = '<div class="left-item' + (currentDocTypeFilter === '' ? ' active' : '') + '" onclick="selectDocType(\'\')">'
-            + '<span>全部</span><span class="count">' + totalCount + '</span></div>';
-
-        Object.entries(docTypes).forEach(([key, cfg]) => {
-            const count = countByDocType[key] || 0;
-            html += '<div class="left-item' + (currentDocTypeFilter === key ? ' active' : '') + '" onclick="selectDocType(\'' + key + '\')">'
-                + '<span>' + escapeHtml(cfg.name) + '</span>'
-                + '<span class="count">' + count + '</span></div>';
-        });
-        leftEl.innerHTML = html;
-    }
-    window.selectDocType = function(key) {
-        currentDocTypeFilter = key;
-        editingState = null;
-        renderLeft();
         renderList();
     };
 
     // 渲染单个指令卡片（非编辑态）
-    function renderCard(docType, index, item, docTypeName) {
+    function renderCard(docType, index, item) {
         const name = (item && item.name) || '';
         const text = (item && item.text) || '';
         const previewText = text.length > 200 ? text.slice(0, 200) + '…' : text;
@@ -113,13 +82,17 @@
         const histBtn = histCount > 0
             ? '<button class="action-btn history" title="历史版本（' + histCount + '）" onclick="openHistoryModal(\'' + docType + '\',' + index + ')">历史<span class="hist-count">' + histCount + '</span></button>'
             : '<button class="action-btn history" disabled title="暂无历史版本">历史</button>';
+        // V1.3.30: 恢复所属文书类型展示（通用 = 未绑定具体类型 / A9 旧数据 __mine__）
+        const docTypeName = (docType === MY_BUCKET || !docType)
+            ? '通用'
+            : ((getAdminDocTypes(currentOrg)[docType] || {}).name || docType);
         return '<div class="item-card">'
             + '<div class="item-row">'
             + '<div>'
             + '<span class="item-name">' + escapeHtml(name) + '</span>'
             + '<span class="item-badge">我的</span>'
+            + '<span class="item-badge doc-type-badge">' + escapeHtml(docTypeName) + '</span>'
             + statusBadge
-            + '<div class="item-meta">所属类型：' + escapeHtml(docTypeName) + '</div>'
             + (previewText ? '<div class="item-text-preview">' + escapeHtml(previewText) + '</div>' : '')
             + '</div>'
             + '<div class="item-actions">'
@@ -145,14 +118,10 @@
         showToast(isEnabled ? '已停用' : '已启用', 'success');
     };
 
-    // ===== 渲染右侧列表 =====
+    // ===== 渲染列表 =====
+    // V1.3.17 A23: 左栏已删除，内容区标题（原「全部我的指令」）一并取消——与页面大标题重复
     function renderList() {
-        const docTypes = getDocTypes(currentOrg);
         const orgData = getOrgData(currentOrg);
-        const contentTitle = document.getElementById('contentTitle');
-        contentTitle.textContent = currentDocTypeFilter
-            ? ((docTypes[currentDocTypeFilter] || {}).name || '指令列表')
-            : '全部我的指令';
 
         // 收集需要展示的项：[{ docType, index, item }]
         const items = [];
@@ -185,8 +154,7 @@
             if (editingState && editingState.docType === it.docType && editingState.index === it.index) {
                 return renderEditForm(it);
             }
-            const docTypeName = (docTypes[it.docType] || {}).name || it.docType;
-            return renderCard(it.docType, it.index, it.item, docTypeName);
+            return renderCard(it.docType, it.index, it.item);
         }).join('');
         listEl.innerHTML = html;
     }
@@ -197,10 +165,8 @@
             showToast('请先保存或取消当前编辑', 'error');
             return;
         }
-        // 新增时默认 docType：若当前筛选了某 docType，则用它；否则用第一个
-        const docTypes = getDocTypes(currentOrg);
-        const defaultDocType = currentDocTypeFilter || Object.keys(docTypes)[0] || '';
-        editingState = { docType: defaultDocType, index: -1 };
+        // V1.3.30: 恢复必选所属文书类型——新增默认通用（表单必选下拉确定）
+        editingState = { docType: '', index: -1 };
         renderList();
         document.getElementById('itemList').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
@@ -220,22 +186,25 @@
     };
 
     function renderEditForm(it) {
-        const docTypes = getDocTypes(currentOrg);
-        const docTypeOptions = Object.entries(docTypes).map(([k, cfg]) =>
-            '<option value="' + k + '"' + (it && it.docType === k ? ' selected' : '') + '>' + escapeHtml(cfg.name) + '</option>'
-        ).join('');
         const name = (it && it.item && it.item.name) || '';
         const text = (it && it.item && it.item.text) || '';
-        const isNew = !it || !it.item;
+        // V1.3.30: 恢复与文书类型绑定——新建/编辑必选所属文书类型（通用为可选值）
+        const docTypes = getAdminDocTypes(currentOrg) || {};
+        const curDocType = (it && it.docType && it.docType !== MY_BUCKET) ? it.docType : '';
+        const docTypeOptions = '<option value=""' + (curDocType === '' ? ' selected' : '') + '>通用</option>'
+            + Object.keys(docTypes).map(k =>
+                '<option value="' + escapeHtml(k) + '"' + (k === curDocType ? ' selected' : '') + '>' + escapeHtml(docTypes[k].name || k) + '</option>'
+            ).join('');
 
         return '<div class="item-card editing">'
             + '<div class="form-group">'
-            + '<label class="form-label">所属文书类型 <span class="required">*</span></label>'
-            + '<select class="form-select" id="formDocType">' + docTypeOptions + '</select>'
-            + '</div>'
-            + '<div class="form-group">'
             + '<label class="form-label">标签名 <span class="required">*</span></label>'
             + '<input type="text" class="form-input" id="formName" value="' + escapeHtml(name) + '" placeholder="如：我的支持诉请">'
+            + '</div>'
+            // V1.3.30: 恢复所属文书类型必选下拉（通用为可选值，默认选中）
+            + '<div class="form-group">'
+            + '<label class="form-label">所属文书类型 <span class="required">*</span></label>'
+            + '<select class="form-select" id="formDocType">' + docTypeOptions + '</select>'
             + '</div>'
             + '<div class="form-group">'
             + '<label class="form-label">指令正文 <span class="required">*</span></label>'
@@ -251,14 +220,12 @@
 
     window.saveItem = function() {
         if (!editingState) return;
-        const newDocType = document.getElementById('formDocType').value;
+        // V1.3.30: 恢复必选所属文书类型——新增/编辑均由表单必选下拉确定（默认通用）
+        const docTypeSel = document.getElementById('formDocType');
+        const newDocType = docTypeSel ? (docTypeSel.value || '') : '';
         const newName = document.getElementById('formName').value.trim();
         const newText = document.getElementById('formText').value.trim();
 
-        if (!newDocType) {
-            showToast('请选择所属文书类型', 'error');
-            return;
-        }
         if (!newName) {
             showToast('请填写标签名', 'error');
             document.getElementById('formName').focus();
@@ -319,7 +286,6 @@
         setOrgData(currentOrg, orgData);
 
         editingState = null;
-        renderLeft();
         renderList();
         showToast(oldIndex === -1 ? '指令已新增' : '指令已更新', 'success');
     };
@@ -404,7 +370,6 @@
         };
         setOrgData(currentOrg, orgData);
         closeHistoryModal();
-        renderLeft();
         renderList();
         showToast('已恢复至历史版本', 'success');
     };
@@ -419,7 +384,6 @@
         orgData[docType].splice(index, 1);
         setOrgData(currentOrg, orgData);
         editingState = null;
-        renderLeft();
         renderList();
         showToast('指令已删除', 'success');
     };
@@ -435,7 +399,6 @@
                 btn.classList.toggle('active', btn.dataset.type === orgParam);
             });
         }
-        renderLeft();
         renderList();
     }
     if (document.readyState === 'loading') {

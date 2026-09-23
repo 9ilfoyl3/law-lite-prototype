@@ -166,9 +166,8 @@
         .tpl-name-cell { font-weight: 500; color: var(--text-primary); }
         .tpl-question-cell { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
         .tpl-desc-cell { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
-        .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
-        .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
-        .tpl-badge.custom { background: #fef3c7; color: #92400e; }
+        /* V1.3.19 A25: .tpl-badge*（内置/自定义徽章样式）随 A21「来源」列删除后已无人引用，清理；
+           注意该页旧的 .custom 为黄色，与示例/指令/流程三页的绿色相反，勿再复用 */
         .tpl-action-cell { white-space: nowrap; }
         .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; margin-right: 4px; font-family: inherit; }
         .action-btn:hover { background: #f3f4f6; }
@@ -177,14 +176,14 @@
         .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
         .action-btn.delete:hover { background: #fef2f2; }
         .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        /* v1.2: 启用/停用状态徽章与按钮 */
+        /* v1.2: 启用/停用状态徽章与按钮（V1.3.24 A31：类名与配色与示例/指令统一） */
         .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
-        .status-badge.enabled { background: #d1fae5; color: #065f46; }
-        .status-badge.disabled { background: #fee2e2; color: #991b1b; }
-        .action-btn.disable { color: var(--accent-warning); border-color: #fde68a; }
-        .action-btn.disable:hover { background: #fef3c7; }
-        .action-btn.enable { color: var(--accent-success); border-color: #a7f3d0; }
-        .action-btn.enable:hover { background: #d1fae5; }
+        .status-badge.status-on { background: #d1fae5; color: #065f46; }
+        .status-badge.status-off { background: #f3f4f6; color: #6b7280; }
+        .action-btn.toggle-off { color: var(--accent-warning); border-color: #fde68a; }
+        .action-btn.toggle-off:hover { background: #fffbeb; }
+        .action-btn.toggle-on { color: var(--accent-success); border-color: #bbf7d0; }
+        .action-btn.toggle-on:hover { background: #f0fdf4; }
 
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
@@ -241,8 +240,8 @@
                     <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
                     <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
                     <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
-                    <a href="doc-types.html" class="nav-item"><i class="fas fa-folder-tree"></i><span>文书类型管理</span></a>
                     <a href="element-presets.html" class="nav-item active"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="workflows.html" class="nav-item"><i class="fas fa-diagram-project"></i><span>文书流程管理</span></a>
                     <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
                     <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
                     <a href="user-templates.html" class="nav-item"><i class="fas fa-search"></i><span>用户示例检索</span></a>
@@ -281,11 +280,6 @@
                     <div class="page-title-wrap">
                         <h1>要件管理</h1>
                         <p>维护各业务系统的标准要件，按案由分组；用户侧生成文书时与「我的要件」合并展示</p>
-                    </div>
-                    <div class="business-switch">
-                        <button class="business-switch-btn active" data-type="court" onclick="switchBusiness('court')">法院</button>
-                        <button class="business-switch-btn" data-type="procuratorate" onclick="switchBusiness('procuratorate')">检察院</button>
-                        <button class="business-switch-btn" data-type="justice" onclick="switchBusiness('justice')">司法局</button>
                     </div>
                 </div>
                 <div style="margin-bottom:16px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;display:flex;align-items:center;gap:8px;">
@@ -330,7 +324,6 @@
                                     <th style="width:18%;">说明</th>
                                     <th style="width:24%;">问题</th>
                                     <th style="width:12%;">适用案字</th>
-                                    <th style="width:7%;">来源</th>
                                     <th style="width:9%;">状态</th>
                                     <th style="width:150px;">操作</th>
                                 </tr>
@@ -391,7 +384,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=67"></script>
-    <script src="../../js/admin-element-presets.js?v=3"></script>
+    <script src="../../js/case-data.js?v=78"></script>
+    <script src="../../js/admin-element-presets.js?v=7"></script>
 </body>
 </html>
