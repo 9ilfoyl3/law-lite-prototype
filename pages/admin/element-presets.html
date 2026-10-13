@@ -149,6 +149,28 @@
         /* 表格案字标签 */
         .cw-tag { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin: 1px 2px; background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-color); }
         .cw-tag.universal { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+        /* V1.3.32 B1: 工具栏案字筛选 */
+        .filter-select { padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; }
+        .filter-select:focus { outline: none; border-color: var(--accent-primary); }
+        /* V1.3.32 B4: 继承开关栏 */
+        .inherit-bar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--border-color); background: #f8fafc; flex-wrap: wrap; }
+        .inherit-bar .ih-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+        .inherit-bar .ih-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-primary); cursor: pointer; user-select: none; }
+        .inherit-bar .ih-switch input { cursor: pointer; }
+        .inherit-bar .ih-hint { font-size: 11px; color: var(--text-muted); }
+        /* V1.3.32 B2: 分组聚合行 */
+        .group-row td { background: var(--bg-primary); padding: 7px 14px !important; border-bottom: 1px solid var(--border-color); }
+        .group-name { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.3px; }
+        .group-count { font-size: 11px; color: var(--text-muted); margin-left: 8px; background: var(--bg-secondary); padding: 1px 6px; border-radius: 8px; }
+        .group-select { width: 100%; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 12px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; }
+        /* 分组单元格左右内边距收紧，避免「程序性信息」等 5 字组名被 select 截断 */
+        .tpl-table tbody td.tpl-group-cell { padding-left: 6px; padding-right: 6px; }
+        .group-select:focus { outline: none; border-color: var(--accent-primary); }
+        /* V1.3.32 B4: 继承行标签（灰色系，与内置/自定义的状态色体系区隔） */
+        .inherit-tag { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 500; background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; vertical-align: middle; }
+        /* V1.3.32 B3: 组内上移/下移 */
+        .sort-cell { display: inline-flex; gap: 2px; margin-left: 6px; }
+        .action-btn.sort-btn { padding: 4px 7px; }
         .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
         .btn-primary { background: var(--accent-primary); color: white; }
         .btn-primary:hover { background: #1d4ed8; }
@@ -304,6 +326,8 @@
                         <div class="tpl-toolbar">
                             <span class="title" id="rightTitle">全部要件<span class="sub" id="rightSub"></span></span>
                             <div class="toolbar-right">
+                                <!-- V1.3.32 B1: 案字筛选下拉（取值与「适配案字」栏同源，见 renderCaseWordFilter） -->
+                                <select id="caseWordFilter" class="filter-select" style="display:none;" onchange="onCaseWordFilterChange(this.value)" title="按案字筛选要件列表"></select>
                                 <button class="btn btn-ghost-danger" id="resetCauseBtn" onclick="resetCurrentCause()" style="display:none;" title="清除该案由的自定义覆盖，恢复内置要件">
                                     <i class="fas fa-undo"></i> 恢复内置
                                 </button>
@@ -317,15 +341,21 @@
                             <div class="cw-chips" id="caseWordChips"></div>
                             <span class="cw-hint">勾选该案由适用的案字；不勾选则适配全部</span>
                         </div>
+                        <div class="inherit-bar" id="inheritBar" style="display:none;">
+                            <span class="ih-label">继承上级案由：</span>
+                            <label class="ih-switch"><input type="checkbox" id="inheritToggle" onchange="toggleInherit()"><span>开启合并</span></label>
+                            <span class="ih-hint" id="inheritHint"></span>
+                        </div>
                         <table class="tpl-table">
                             <thead>
                                 <tr>
-                                    <th style="width:14%;">要件名</th>
-                                    <th style="width:18%;">说明</th>
-                                    <th style="width:24%;">问题</th>
-                                    <th style="width:12%;">适用案字</th>
-                                    <th style="width:9%;">状态</th>
-                                    <th style="width:150px;">操作</th>
+                                    <th style="width:13%;">要件名</th>
+                                    <th style="width:15%;">分组</th>
+                                    <th style="width:11%;">说明</th>
+                                    <th style="width:21%;">问题</th>
+                                    <th style="width:11%;">适用案字</th>
+                                    <th style="width:8%;">状态</th>
+                                    <th style="width:170px;">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="tplTbody"></tbody>
@@ -359,6 +389,11 @@
                 <div class="form-hint">每个要件仅包含一个问题；用户在生成文书时可对该问题预生成答案</div>
             </div>
             <div class="form-row">
+                <label class="form-label">要件分组</label>
+                <select class="form-select" id="tplGroup" onchange="onModalGroupChange(this.value)"></select>
+                <div class="form-hint">用于后台归类与组内排序；预设为主体信息 / 程序性信息 / 事实认定，可在下拉中新建自定义分组</div>
+            </div>
+            <div class="form-row">
                 <label class="form-label">适用案字</label>
                 <div id="modalCaseWords" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);min-height:40px;"></div>
                 <div class="form-hint">勾选该要件适用的案字；不勾选 = 通用（该案由下所有案字适用）</div>
@@ -384,7 +419,7 @@
 
     <div id="notificationContainer"></div>
 
-    <script src="../../js/case-data.js?v=78"></script>
-    <script src="../../js/admin-element-presets.js?v=7"></script>
+    <script src="../../js/case-data.js?v=79"></script>
+    <script src="../../js/admin-element-presets.js?v=9"></script>
 </body>
 </html>

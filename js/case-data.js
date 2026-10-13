@@ -1983,6 +1983,27 @@ const defaultDocTemplatesByOrg = {
 };
 
 // 要素生成预设要件，按案由分组
+// V1.3.32 B2：内置要件分组预置
+// 评审补强 B-3——存量要件（15 个叶子案由 × 5 条内置）均无 group 字段，若不由代码预置，
+// 分组功能上线当天全表落为「未分组」，痛点一天没解决，且每个演示环境都要实施人工重标一遍。
+// 因此在此给出名称→分组的静态映射；未命中者一律归入「事实认定」（三个预设组中，
+// 会议真正的诉求是把「主体信息」「程序性信息」识别出来，其余本就属于事实认定）。
+const ELEMENT_GROUP_PRESETS = ['主体信息', '程序性信息', '事实认定'];
+const DEFAULT_ELEMENT_GROUP = '事实认定';
+const BUILTIN_ELEMENT_GROUP = {
+    // 主体信息：当事人/主体的身份与资格
+    '婚姻关系': '主体信息', '劳动关系': '主体信息', '主体责任': '主体信息',
+    '犯罪主体': '主体信息', '被害人': '主体信息', '行政行为合法性': '主体信息', '许可主体': '主体信息',
+    // 程序性信息：时效、程序、管辖类
+    '诉讼时效': '程序性信息', '仲裁时效': '程序性信息', '程序正当': '程序性信息', '审查程序': '程序性信息'
+};
+// 读取要件分组：自身 group 优先（管理端可改），否则用内置映射，最后兜底「事实认定」
+function getElementGroup(el) {
+    if (!el) return DEFAULT_ELEMENT_GROUP;
+    if (el.group) return el.group;
+    return BUILTIN_ELEMENT_GROUP[el.name] || DEFAULT_ELEMENT_GROUP;
+}
+
 const elementPresetsByCause = {
     '民间借贷纠纷': [
         { name: '借款合意', desc: '借贷双方是否存在借款协议或借条', question: '借款协议/借条签订时间、地点、金额分别是？' },
@@ -2144,19 +2165,41 @@ function filterElementsByCaseWord(elements, caseWord) {
 
 // v1.25: 要件按案字分组 + 继承查找
 // cause: 案由名；org: 业务系统；caseWord: 案字（可选）
-// 查找顺序：当前案由admin覆盖 → 祖先案由admin覆盖 → 内置 → 无案由返回空数组
-// 每层都按案字过滤
+// 查找顺序：当前案由admin覆盖（+继承开关开启时合并祖先链）→ 祖先案由admin覆盖 → 内置 → 无案由返回空数组
+// V1.3.32 B4：子案由开继承后「先合并祖先链、后统一按案字过滤」——
+//   先合并再过滤，才能保证祖先的「通用要件」与自身要件按同一案字口径出现；
+//   若分层各自过滤再拼，祖先通用要件的行为会和自身通用要件不一致。
 function getElementPresets(cause, org, caseWord) {
-    // 1. 当前案由的 admin 覆盖
     if (cause && org) {
         try {
             const adminData = JSON.parse(localStorage.getItem('adminElementPresets') || '{}');
             const orgData = adminData[org] || {};
-            if (orgData[cause]) {
-                return filterElementsByCaseWord(orgData[cause], caseWord);
-            }
-            // 2. 继承：向上查找祖先案由的配置
+            const inheritData = JSON.parse(localStorage.getItem('adminElementInherit') || '{}');
+            const inheritOrg = inheritData[org] || {};
+            // 祖先链：顺序为 顶级 → … → 直接父级，故「后写入者覆盖先写入者」= 近者优先
             const ancestors = getAncestorCauses(org, cause);
+            if (orgData[cause]) {
+                const own = orgData[cause];
+                if (inheritOrg[cause] && ancestors.length) {
+                    // 继承开关开启：合并全部祖先链配置 + 子案由自身，同名近者优先
+                    const map = new Map();
+                    ancestors.forEach(anc => {
+                        if (orgData[anc]) {
+                            orgData[anc].forEach(e => {
+                                if (map.has(e.name)) map.delete(e.name);
+                                map.set(e.name, e);
+                            });
+                        }
+                    });
+                    own.forEach(e => {
+                        if (map.has(e.name)) map.delete(e.name);
+                        map.set(e.name, e);
+                    });
+                    return filterElementsByCaseWord(Array.from(map.values()), caseWord);
+                }
+                return filterElementsByCaseWord(own, caseWord);
+            }
+            // 2. 无自身覆盖：继承最近的祖先案由配置（既有逻辑不变）
             for (const anc of ancestors) {
                 if (orgData[anc]) {
                     return filterElementsByCaseWord(orgData[anc], caseWord);

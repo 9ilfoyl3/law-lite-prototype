@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文书流程管理 - AI法官助理管理后台</title>
+    <link href="../../libs/font-awesome-all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-primary: #2563eb;
+            --accent-light: #eff6ff;
+            --accent-danger: #dc2626;
+            --accent-warning: #f59e0b;
+            --accent-success: #10b981;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .admin-layout { display: flex; min-height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-logo { width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .sidebar-logo i { color: white; font-size: 20px; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-subtitle { font-size: 12px; color: var(--text-muted); }
+        .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 12px; margin-bottom: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 16px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-item:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent-primary); }
+        .nav-item i { width: 20px; margin-right: 12px; font-size: 16px; }
+
+        /* 主内容区 */
+        .main-content { flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; }
+        .header { height: var(--header-height); background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 50; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--accent-primary); }
+        .breadcrumb-separator { color: var(--text-muted); font-size: 10px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-menu { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+        .user-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+        .user-role { font-size: 12px; color: var(--text-muted); }
+
+        .content { padding: 24px 32px; flex: 1; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .page-title-wrap h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .page-title-wrap p { font-size: 14px; color: var(--text-secondary); margin: 4px 0 0; }
+        .business-switch { display: flex; gap: 4px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; }
+        /* V1.3.27 A34: 文书类型区块（业务系统切换已移除，锁定法院） */
+        .dt-section { margin-bottom: 20px; }
+        .dt-hint { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+        .dt-row-selected { background: var(--accent-light); }
+        .dt-count-zero { color: var(--text-muted); }
+        .dt-row { cursor: pointer; }
+
+        /* 表格容器 */
+        .tpl-right { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .tpl-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+        .tpl-toolbar .title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .tpl-toolbar .hint { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--accent-primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+
+        .tpl-table { width: 100%; border-collapse: collapse; }
+        .tpl-table thead th { background: var(--bg-primary); padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border-color); }
+        .tpl-table tbody td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .tpl-table tbody tr:last-child td { border-bottom: none; }
+        .tpl-table tbody tr:hover { background: var(--bg-primary); }
+        .wf-name-cell { font-weight: 500; color: var(--text-primary); }
+        .tpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-left: 6px; }
+        .tpl-badge.builtin { background: #dbeafe; color: #1e40af; }
+        .tpl-badge.custom { background: #d1fae5; color: #065f46; }
+        .tpl-badge.general { background: #fef3c7; color: #92400e; }
+        .wf-desc-cell { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-top: 4px; }
+        .wf-desc-cell.muted { color: #cbd5e1; }
+        .tpl-action-cell { white-space: nowrap; }
+        .action-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: #374151; transition: all 0.15s; margin-right: 4px; font-family: inherit; }
+        .action-btn:hover { background: #f3f4f6; }
+        .action-btn.edit { color: var(--accent-primary); border-color: #bfdbfe; }
+        .action-btn.edit:hover { background: var(--accent-light); }
+        .action-btn.delete { color: var(--accent-danger); border-color: #fecaca; }
+        .action-btn.delete:hover { background: #fef2f2; }
+
+        .wf-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .wf-type-badge.step { background: #dbeafe; color: #1e40af; }
+        .wf-type-badge.material { background: #ede9fe; color: #5b21b6; }
+        .wf-type-badge.quick { background: #fef3c7; color: #92400e; }
+        .case-word-tag { display: inline-block; padding: 2px 8px; background: var(--accent-light); color: var(--accent-primary); border-radius: 4px; font-size: 11px; margin-right: 4px; }
+        .case-word-fallback { font-size: 12px; color: var(--accent-warning); font-weight: 500; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; color: var(--border-color); }
+        .empty-state p { font-size: 14px; margin: 0; }
+
+        /* 弹窗 */
+        .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-mask.show { display: flex; }
+        .modal-box { background: var(--bg-secondary); border-radius: 10px; padding: 24px; width: 680px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--text-primary); }
+        .form-row { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-label .required { color: var(--accent-danger); }
+        .form-input { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; }
+        .form-input:focus { outline: none; border-color: var(--accent-primary); }
+        .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { background: #f3f4f6; color: #374151; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-confirm { background: var(--accent-primary); color: white; }
+        .btn-confirm:hover { background: #1d4ed8; }
+        .btn-confirm.danger { background: var(--accent-danger); }
+        .btn-confirm.danger:hover { background: #b91c1c; }
+
+        /* workflow id 下拉框 */
+        .wf-id-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; box-sizing: border-box; cursor: pointer; }
+        .wf-id-select:focus { outline: none; border-color: var(--accent-primary); }
+        .wf-id-select:disabled { background: var(--bg-primary); cursor: not-allowed; color: var(--text-muted); }
+
+        /* A18: 环节弹窗（只读） */
+        .wf-steps-body { max-height: 420px; overflow-y: auto; padding: 4px 2px; }
+        .wf-step-item { display: flex; gap: 12px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); }
+        .wf-step-seq { flex: 0 0 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; background: var(--accent-light); color: var(--accent-primary); font-size: 12px; font-weight: 600; }
+        .wf-step-main { flex: 1; min-width: 0; }
+        .wf-step-name { font-size: 14px; font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+        .wf-step-meta { margin-top: 4px; font-size: 12px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 10px; }
+        .wf-step-code { font-family: Consolas, Monaco, monospace; color: var(--text-secondary); }
+        .wf-step-manual { color: var(--text-muted); }
+        .wf-step-dep { color: #92400e; }
+        .wf-step-produce { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; background: #dbeafe; color: #1e40af; font-weight: 400; }
+        .wf-steps-empty { text-align: center; padding: 28px 10px; color: var(--text-muted); }
+        .wf-steps-empty i { font-size: 26px; margin-bottom: 8px; }
+        .wf-steps-empty p { margin: 4px 0; font-size: 13px; }
+        .wf-steps-empty .muted { font-size: 12px; color: var(--text-muted); }
+        .wf-steps-mocktip { padding: 6px 10px; margin-bottom: 10px; border-left: 3px solid var(--accent-warning); background: #fffbeb; font-size: 12px; color: #92400e; border-radius: 4px; }
+        .wf-steps-footnote { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+        .action-btn.steps { color: var(--accent-primary); }
+
+        /* A17: 筛选行 */
+        .wf-filter-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); flex-wrap: wrap; }
+        .wf-filter-label { font-size: 13px; color: var(--text-muted); }
+        .wf-filter-select { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; cursor: pointer; }
+        .wf-filter-select:focus { outline: none; border-color: var(--accent-primary); }
+        .wf-filter-reset { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; font-family: inherit; }
+        .wf-search-input { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; cursor: text; width: 200px; box-sizing: border-box; }
+        .wf-filter-reset:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+
+        /* A17: 内置流程不显示标签，仅自定义项标「自定义」 */
+        /* V1.3 A27: .wf-mode-hint-quick 警告色已删——列表页「快速生成」入口恢复，quick 不再是警示态 */
+
+        /* 案字/案由选择 */
+        .case-word-option { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; cursor: pointer; background: var(--bg-secondary); color: var(--text-secondary); user-select: none; }
+        .case-word-option:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .case-word-option.selected { background: var(--accent-light); border-color: var(--accent-primary); color: var(--accent-primary); }
+        .case-word-option input { margin: 0; }
+        .picker-empty { font-size: 12px; color: var(--text-muted); }
+
+        .cause-picker-wrap { max-height: 200px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); }
+        .cause-tree-node { margin-bottom: 4px; }
+        .cause-tree-node-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; font-size: 13px; cursor: pointer; }
+        .cause-tree-node-row:hover { background: var(--bg-secondary); }
+        .cause-tree-node-row.selected { background: var(--accent-light); border: 1px solid var(--accent-primary); }
+        .cause-tree-node-row.selected .cause-tree-label { color: var(--accent-primary); }
+        .cause-tree-toggle { width: 16px; cursor: pointer; color: var(--text-muted); font-size: 10px; }
+        .cause-tree-checkbox { margin: 0; }
+        .cause-tree-label { color: var(--text-primary); }
+        .cause-tree-children { margin-left: 20px; display: none; }
+        .cause-tree-children.expanded { display: block; }
+
+        .notification { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; background: var(--bg-secondary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 2000; font-size: 14px; display: flex; align-items: center; gap: 8px; animation: slideIn 0.2s ease; max-width: 360px; }
+        .notification.success { border-left: 4px solid var(--accent-success); color: #065f46; }
+        .notification.error { border-left: 4px solid var(--accent-danger); color: #991b1b; }
+        .notification.warning { border-left: 4px solid var(--accent-warning); color: #92400e; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-balance-scale"></i></div>
+                <div>
+                    <div class="sidebar-title">AI法官助理</div>
+                    <div class="sidebar-subtitle">管理后台</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主菜单</div>
+                    <a href="dashboard.html" class="nav-item"><i class="fas fa-home"></i><span>控制台</span></a>
+                    <a href="users.html" class="nav-item"><i class="fas fa-users"></i><span>用户管理</span></a>
+                    <a href="cases.html" class="nav-item"><i class="fas fa-folder-open"></i><span>案件管理</span></a>
+                    <a href="system-report.html" class="nav-item"><i class="fas fa-chart-bar"></i><span>系统运行报告</span></a>
+                    <a href="knowledge-base.html" class="nav-item"><i class="fas fa-book"></i><span>知识库管理</span></a>
+                    <a href="cause-management.html" class="nav-item"><i class="fas fa-sitemap"></i><span>案由管理</span></a>
+                    <a href="element-presets.html" class="nav-item"><i class="fas fa-puzzle-piece"></i><span>要件管理</span></a>
+                    <a href="workflows.html" class="nav-item active"><i class="fas fa-diagram-project"></i><span>文书流程管理</span></a>
+                    <a href="doc-templates.html" class="nav-item"><i class="fas fa-file-alt"></i><span>文书示例管理</span></a>
+                    <a href="prompt-templates.html" class="nav-item"><i class="fas fa-comment-dots"></i><span>指令管理</span></a>
+                    <a href="risk-audit.html" class="nav-item"><i class="fas fa-shield-alt"></i><span>风控与审计</span></a>
+                    <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i><span>系统初始化配置</span></a>
+                    <a href="model-management.html" class="nav-item" style="display:none;"><i class="fas fa-server"></i><span>模型配置与用量</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">组织架构</div>
+                    <a href="court-tree.html" class="nav-item"><i class="fas fa-sitemap"></i><span>法院维护</span></a>
+                    <a href="department.html" class="nav-item"><i class="fas fa-building"></i><span>部门维护</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="breadcrumb">
+                    <a href="dashboard.html">首页</a>
+                    <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                    <span>文书流程管理</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-avatar">管</div>
+                        <div>
+                            <div class="user-name">管理员</div>
+                            <div class="user-role">系统管理员</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="page-header">
+                    <div class="page-title-wrap">
+                        <h1>文书流程管理</h1>
+                        <p>维护各业务系统的文书生成流程（workflow）。流程是示例与指令的唯一关联节点，用户端按案件案由案字平铺展示</p>
+                    </div>
+                </div>
+
+                <!-- V1.3.27 A34: 文书类型区块（原「文书类型管理」页的维护能力并入本页，列表版式照旧） -->
+                <div class="dt-section">
+                    <div class="tpl-toolbar">
+                        <span>
+                            <span class="title">文书类型</span>
+                            <span class="hint">同一文书类型下可挂三种生成方式的流程；点击某行即按该类型筛选下方流程</span>
+                        </span>
+                        <button class="btn btn-primary" onclick="openAddDocTypeModal()">
+                            <i class="fas fa-plus"></i> 新增类型
+                        </button>
+                    </div>
+                    <table class="tpl-table">
+                        <thead>
+                            <tr>
+                                <th>类型名称</th>
+                                <th style="width:90px;">流程数</th>
+                                <th style="width:90px;">示例数</th>
+                                <th style="width:90px;">指令数</th>
+                                <th style="width:90px;">状态</th>
+                                <th style="width:180px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dtTbody"></tbody>
+                    </table>
+                </div>
+
+                <div class="tpl-right">
+                    <div class="tpl-toolbar">
+                        <span>
+                            <span class="title" id="rightTitle">法院文书流程</span>
+                            <span class="hint">同一案由案字下可配置多个流程，用户端并列展示由法官选择</span>
+                        </span>
+                        <button class="btn btn-primary" onclick="openAddWfModal()">
+                            <i class="fas fa-plus"></i> 新增 workflow
+                        </button>
+                    </div>
+                    <!-- A17: 筛选行（生成模式 / 匹配案字 / 匹配案由，默认全展示） -->
+                    <div class="wf-filter-bar">
+                        <span class="wf-filter-label">筛选</span>
+                        <select class="wf-filter-select" id="wfFilterDocType" onchange="onWfFilterChange()">
+                            <option value="">文书类型：全部</option>
+                        </select>
+                        <select class="wf-filter-select" id="wfFilterMode" onchange="onWfFilterChange()">
+                            <option value="">生成模式：全部</option>
+                            <option value="quick">快速生成型</option>
+                            <option value="material">材料生成型</option>
+                            <option value="step">分步生成型</option>
+                        </select>
+                        <select class="wf-filter-select" id="wfFilterCaseWord" onchange="onWfFilterChange()">
+                            <option value="">匹配案字：全部</option>
+                        </select>
+                        <select class="wf-filter-select" id="wfFilterCause" onchange="onWfFilterChange()">
+                            <option value="">匹配案由：全部</option>
+                        </select>
+                        <input type="text" class="wf-search-input" id="wfSearch" placeholder="搜索流程名称" oninput="onWfSearchInput()">
+                        <button class="wf-filter-reset" onclick="resetWfFilters()">重置</button>
+                    </div>
+                    <table class="tpl-table">
+                        <thead>
+                            <tr>
+                                <th>流程名称</th>
+                                <th style="width:120px;">文书类型</th>
+                                <th style="width:110px;">生成模式</th>
+                                <th style="width:180px;">匹配案字</th>
+                                <th style="width:220px;">匹配案由</th>
+                                <th style="width:140px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wfTbody"></tbody>
+                    </table>
+                    <div id="emptyState" class="empty-state" style="display:none;">
+                        <i class="fas fa-diagram-project"></i>
+                        <p id="emptyText">暂无 workflow，点击「新增 workflow」创建</p>
+                        <button class="wf-filter-reset" id="emptyResetBtn" style="display:none;margin-top:10px;" onclick="resetWfFilters()">重置筛选</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑 workflow 弹窗 -->
+    <div class="modal-mask" id="wfModal">
+        <div class="modal-box">
+            <h3 id="wfModalTitle">新增 workflow</h3>
+            <div class="form-row">
+                <label class="form-label">文书类型 <span class="required">*</span></label>
+                <select class="wf-id-select" id="wfDocTypeSelect" onchange="onWfDocTypeChange()">
+                    <option value="">请选择文书类型</option>
+                </select>
+                <div class="form-hint">决定该流程归属的大分类；同一类型下同一生成方式中，案由／案字不可重复（通用类型不受此限制）</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">workflow id <span class="required">*</span></label>
+                <select class="wf-id-select" id="wfId" onchange="onWfIdChange()">
+                    <option value="">请从 agentflow 平台已编排的 workflow 中选择</option>
+                </select>
+                <div class="form-hint">数据来源于 agentflow 平台；同一业务系统下不可重复；编辑内置 workflow 时只读</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">流程名称 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="wfName" placeholder="如：民事判决书（二审·改判）">
+                <div class="form-hint">命名规范：<strong>文书名（审级·方向）</strong>。该名称直接作为用户端流程卡片标题，请使用业务语言</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">生成模式</label>
+                <select class="wf-id-select" id="wfModeSelect" onchange="onWfModeChange()">
+                    <option value="quick">快速生成型（案件列表页 · 快速生成）</option>
+                    <option value="material">材料生成型（案件详情页 · 材料生成）</option>
+                    <option value="step">分步生成型（案件详情页 · 分步生成）</option>
+                </select>
+                <div class="form-hint" id="wfModeHint">决定该流程出现在用户侧哪个生成入口</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">流程说明</label>
+                <input type="text" class="form-input" id="wfDesc" placeholder="如：适用于二审改判场景，重点审查新证据">
+                <div class="form-hint">一句话说明，展示在用户端流程卡片副标题；不填则卡片只显示名称</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">匹配案由（不选 = 案由兜底）</label>
+                <div id="wfCausesPicker" class="cause-picker-wrap"></div>
+                <div class="form-hint">从当前业务系统案由树中选择（3 级）；不选任何案由 = 兜底。⚠ 标记表示已有其他流程匹配了该案由，<strong>仅为提示，仍可勾选</strong>——同案由案字下允许多个流程，用户端将并列展示</div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">匹配案字（不选 = 案字兜底）</label>
+                <div id="wfCaseWordsPicker" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);"></div>
+                <div class="form-hint">案字从案件案号自动识别；不选任何案字 = 兜底。⚠ 标记表示已有其他流程匹配了该案字，<strong>仅为提示，仍可勾选</strong>；按已选案由联动过滤，未选案由时展示全部案字</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeWfModal()">取消</button>
+                <button class="btn btn-confirm" onclick="saveWorkflow()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V1.3.27 A34: 新增/编辑文书类型弹窗（复用页面已有的 #confirmModal 做二次确认） -->
+    <div class="modal-mask" id="dtModal">
+        <div class="modal-box" style="width:440px;">
+            <h3 id="dtModalTitle">新增类型</h3>
+            <div class="form-row">
+                <label class="form-label">类型名称 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="dtName" placeholder="如：司法建议书">
+                <div class="form-hint" id="dtNameHint">作为文书流程、示例与指令的分类容器，不可与现有类型重名</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeDocTypeModal()">取消</button>
+                <button class="btn btn-confirm" onclick="saveDocType()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- A18: 编辑环节弹窗（只读展示编排端环节结构） -->
+    <div class="modal-mask" id="wfStepsModal">
+        <div class="modal-box" style="width:640px;">
+            <h3 id="wfStepsTitle">编辑环节</h3>
+            <p id="wfStepsSub" style="font-size:13px; color:var(--text-muted); margin-bottom:14px;"></p>
+            <div id="wfStepsBody" class="wf-steps-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeWfStepsModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-mask" id="confirmModal">
+        <div class="modal-box" style="width:400px;">
+            <h3 id="confirmTitle">确认操作</h3>
+            <p id="confirmText" style="font-size:14px; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;"></p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirm()">取消</button>
+                <button class="btn btn-confirm danger" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script src="../../js/case-data.js?v=79"></script>
+    <script src="../../js/admin-workflows.js?v=13"></script>
+</body>
+</html>

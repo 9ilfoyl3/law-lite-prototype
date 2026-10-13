@@ -14,6 +14,8 @@
     let editingIndex = -1;          // 当前编辑的要件下标，-1 = 新增
     let editingIsBuiltin = false;   // 编辑的是内置要件（保存后整体覆盖到自定义）
     let pendingConfirmAction = null;
+    let caseWordFilter = '';        // V1.3.32 B1：案字筛选值（'' = 全部）
+    let promoteIndex = -1;          // V1.3.32 B4：正在被提升为本案由要件的「继承行」下标
 
     // ===== 工具函数 =====
     const STORAGE_KEY = 'adminElementPresets';
@@ -68,6 +70,48 @@
         return (typeof caseWordListByOrg !== 'undefined' && caseWordListByOrg[org]) || [];
     }
 
+    // ===== V1.3.32 B4：继承开关存储（按业务系统 × 案由） =====
+    // 与 adminElementPresets 覆盖数组解耦：开关不写进要件数据本体，避免污染覆盖 diff。
+    // 存量无该 key 一律视为「关闭」——保证已配了子案由覆盖的案由升级后不会突然多出一堆祖先要件。
+    const INHERIT_KEY = 'adminElementInherit';
+    function getInheritData() {
+        try { return JSON.parse(localStorage.getItem(INHERIT_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function getCauseInherit(org, cause) {
+        if (!cause) return false;
+        return !!(getInheritData()[org] || {})[cause];
+    }
+    function setCauseInherit(org, cause, on) {
+        const all = getInheritData();
+        if (!all[org]) all[org] = {};
+        if (on) { all[org][cause] = true; } else { delete all[org][cause]; }
+        localStorage.setItem(INHERIT_KEY, JSON.stringify(all));
+    }
+
+    // ===== V1.3.32 B2：自定义分组存储（按业务系统，跨案由共享） =====
+    const GROUP_KEY = 'adminElementGroups';
+    function getGroupStorage() {
+        try { return JSON.parse(localStorage.getItem(GROUP_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function getCustomGroups(org) {
+        return getGroupStorage()[org] || [];
+    }
+    function addCustomGroup(org, name) {
+        if (!name) return false;
+        const all = getGroupStorage();
+        if (!all[org]) all[org] = [];
+        if (all[org].indexOf(name) >= 0) return false;
+        all[org].push(name);
+        localStorage.setItem(GROUP_KEY, JSON.stringify(all));
+        return true;
+    }
+
+    // 该案由是否存在祖先（顶级案由无祖先，不展示继承开关）
+    function hasAncestors(org, cause) {
+        if (!cause) return false;
+        return (typeof getAncestorCauses === 'function') && getAncestorCauses(org, cause).length > 0;
+    }
+
     // 当前业务系统的案由树（直接返回 causeTreeDataByOrg[org]，保留 3 级结构）
     function getCauseTree(org) {
         return causeTreeDataByOrg[org] || [];
@@ -118,26 +162,78 @@
     }
 
     // 获取某案由下的"生效"要件列表（自定义覆盖优先，否则内置）
-    // 返回数组，每项追加 isBuiltin 标记用于 UI 显示；保留 caseWords 字段
+    // 返回数组：**前半为「自身/覆盖线」要件，后半为继承开关打开时合并进来的祖先要件**（isInherited=true）
+    // 每项追加 isBuiltin / isInherited / group 标记供 UI 使用；保留 caseWords 字段
+    function normalizeRow(p) {
+        return {
+            ...p,
+            group: (typeof getElementGroup === 'function') ? getElementGroup(p) : DEFAULT_FALLBACK_GROUP,
+            caseWords: Array.isArray(p.caseWords) ? p.caseWords : []
+        };
+    }
+    // 取某个祖先案由自身的要件（覆盖优先，否则内置）——不做递归，链式合并在 getEffectiveElements 中完成
+    function getAncestorEffective(org, anc) {
+        const orgData = getOrgData(org);
+        if (orgData[anc]) return (orgData[anc] || []).map(p => ({ ...p, isBuiltin: false }));
+        if (elementPresetsByCause[anc]) return elementPresetsByCause[anc].map(p => ({ ...p, isBuiltin: true, caseWords: p.caseWords || [] }));
+        return [];
+    }
     function getEffectiveElements(org, cause) {
         const orgData = getOrgData(org);
+        let own;
         if (orgData[cause]) {
             // 已有自定义覆盖
-            return (orgData[cause] || []).map(p => ({ ...p, isBuiltin: false }));
+            own = (orgData[cause] || []).map(p => ({ ...p, isBuiltin: false }));
+        } else if (cause && elementPresetsByCause[cause]) {
+            // 回退到内置（内置要件无 caseWords 字段，视为通用）
+            own = elementPresetsByCause[cause].map(p => ({ ...p, isBuiltin: true, caseWords: p.caseWords || [] }));
+        } else {
+            // 通用要件（仅当 cause 不在内置表中时）
+            own = [
+                { name: '主体资格', desc: '相关主体的资格及身份认定', question: '各方主体名称、身份及主体资格情况？' },
+                { name: '事实认定', desc: '案件事实的认定及证据', question: '需要认定的核心事实有哪些？' },
+                { name: '法律适用', desc: '适用的法律法规', question: '本案应适用的法律、法规及具体条款？' },
+                { name: '程序合法', desc: '相关程序是否符合法律规定', question: '已履行的程序有哪些？' },
+                { name: '处理结果', desc: '处理决定的内容及依据', question: '拟作出的处理结果？' }
+            ].map(p => ({ ...p, isBuiltin: true }));
         }
-        // 回退到内置（内置要件无 caseWords 字段，视为通用）
-        if (cause && elementPresetsByCause[cause]) {
-            return elementPresetsByCause[cause].map(p => ({ ...p, isBuiltin: true, caseWords: p.caseWords || [] }));
+        own = own.map(p => ({ ...normalizeRow(p), isInherited: false }));
+        const ownNames = own.map(p => p.name);
+        let inherited = [];
+        if (getCauseInherit(org, cause)) {
+            // 合并全部祖先链：祖先顺序为 顶级 → … → 直接父级，后写入者覆盖先写入者 = 近者优先
+            const ancestors = (typeof getAncestorCauses === 'function') ? getAncestorCauses(org, cause) : [];
+            const map = new Map();
+            ancestors.forEach(anc => {
+                getAncestorEffective(org, anc).forEach(e => {
+                    if (map.has(e.name)) map.delete(e.name);
+                    map.set(e.name, e);
+                });
+            });
+            // 自身已存在同名要件时不再重复展示继承版本（同名以子案由自身的版本为准）
+            inherited = Array.from(map.values())
+                .filter(e => ownNames.indexOf(e.name) < 0)
+                .map(e => ({ ...normalizeRow(e), isInherited: true, isBuiltin: false }));
         }
-        // 通用要件（仅当 cause 不在内置表中时）
-        return [
-            { name: '主体资格', desc: '相关主体的资格及身份认定', question: '各方主体名称、身份及主体资格情况？' },
-            { name: '事实认定', desc: '案件事实的认定及证据', question: '需要认定的核心事实有哪些？' },
-            { name: '法律适用', desc: '适用的法律法规', question: '本案应适用的法律、法规及具体条款？' },
-            { name: '程序合法', desc: '相关程序是否符合法律规定', question: '已履行的程序有哪些？' },
-            { name: '处理结果', desc: '处理决定的内容及依据', question: '拟作出的处理结果？' }
-        ].map(p => ({ ...p, isBuiltin: true }));
+        return own.concat(inherited);
     }
+
+    // 自身线要件（继承来的不落盘到本案由）——保存 baseline 一律基于此
+    function getOwnElements(org, cause) {
+        return getEffectiveElements(org, cause).filter(p => !p.isInherited);
+    }
+    // 将自身线数组持久化为该案由的自定义覆盖
+    function persistOwn(org, cause, ownList) {
+        const orgData = getOrgData(org);
+        orgData[cause] = ownList.map(p => ({
+            name: p.name, desc: p.desc, question: p.question,
+            caseWords: Array.isArray(p.caseWords) ? p.caseWords : [],
+            enabled: p.enabled !== false,
+            group: (typeof getElementGroup === 'function') ? getElementGroup(p) : DEFAULT_FALLBACK_GROUP
+        }));
+        setOrgData(org, orgData);
+    }
+    const DEFAULT_FALLBACK_GROUP = '事实认定';
 
     // 当前案由是否已有自定义覆盖
     function hasOverride(org, cause) {
@@ -166,6 +262,7 @@
         if (type === currentOrg) return;
         currentOrg = type;
         currentCause = '';
+        caseWordFilter = '';
         searchKeyword = '';
         const searchInput = document.getElementById('causeSearchInput');
         if (searchInput) searchInput.value = '';
@@ -319,6 +416,7 @@
 
     window.selectCause = function(name) {
         currentCause = name || '';
+        caseWordFilter = '';   // V1.3.32 B1: 切换案由重置筛选，避免带着上一个案由的案字看空表
         renderLeft();
         renderRight();
     };
@@ -373,6 +471,8 @@
             addBtn.disabled = true;
             resetBtn.style.display = 'none';
             cwBar.style.display = 'none';
+            renderCaseWordFilter();
+            renderInheritBar();
             tbody.innerHTML = '';
             empty.style.display = 'block';
             emptyText.textContent = '请先在左侧选择一个案由';
@@ -384,51 +484,214 @@
         const overridden = hasOverride(currentOrg, currentCause);
 
         rightTitle.firstChild.nodeValue = currentCause;
-        rightSub.textContent = '共 ' + elements.length + ' 项' + (overridden ? ' · 已自定义覆盖' : ' · 内置');
         addBtn.disabled = false;
         resetBtn.style.display = overridden ? 'inline-flex' : 'none';
 
-        // 渲染案字适配栏
+        // 渲染案字适配栏 / 继承开关栏 / 案字筛选
         renderCaseWordBar();
+        renderInheritBar();
+        renderCaseWordFilter();
 
-        if (elements.length === 0) {
+        // V1.3.32 B1: 案字筛选——先由继承合并出整表，再统一过滤（祖先的通用要件同样参与）
+        const view = caseWordFilter
+            ? elements.filter(p => {
+                const cw = Array.isArray(p.caseWords) ? p.caseWords : [];
+                return cw.length === 0 || cw.indexOf(caseWordFilter) >= 0;
+            })
+            : elements;
+
+        rightSub.textContent = '共 ' + elements.length + ' 项' + (overridden ? ' · 已自定义覆盖' : ' · 内置')
+            + (caseWordFilter ? ' · ' + caseWordFilter + ' 下 ' + view.length + ' 项' : '');
+
+        if (view.length === 0) {
             tbody.innerHTML = '';
             empty.style.display = 'block';
-            emptyText.textContent = '该案由暂无要件';
-            emptyHint.textContent = '点击「新增要件」为该案由添加标准要件';
+            if (elements.length === 0) {
+                emptyText.textContent = '该案由暂无要件';
+                emptyHint.textContent = '点击「新增要件」为该案由添加标准要件';
+            } else {
+                emptyText.textContent = '案字「' + caseWordFilter + '」下暂无要件';
+                emptyHint.textContent = '切换其它案字，或新增适用该案字的要件';
+            }
             return;
         }
         empty.style.display = 'none';
+        tbody.innerHTML = renderGroupedRows(elements, view);
+    }
 
-        tbody.innerHTML = elements.map((p, idx) => {
-            // V1.3.15 A21: 「来源」列已删除（同案由下取值必然相同，顶部副标题已显示整体来源）
-            // 适用案字标签
-            const cw = Array.isArray(p.caseWords) ? p.caseWords : [];
-            const cwCell = cw.length
-                ? cw.map(w => '<span class="cw-tag">' + escapeHtml(w) + '</span>').join('')
-                : '<span class="cw-tag universal">通用</span>';
-            // v1.2: 启用/停用状态徽章与按钮（V1.3.24 A31：状态类名 status-on/off、切换类名 toggle-off/on 与示例/指令统一；灰/绿配色）
-            const isEnabled = p.enabled !== false;
-            const statusBadge = isEnabled
-                ? '<span class="status-badge status-on">已启用</span>'
-                : '<span class="status-badge status-off">已停用</span>';
+    const GROUP_OTHER = '未分组';
+
+    // V1.3.32 B1: 案字筛选下拉——取值走案由大类白名单（与「适配案字」栏同源），
+    // 避免民事案由下冒出「刑初」「执」等无关案字，两处口径打架
+    function renderCaseWordFilter() {
+        const sel = document.getElementById('caseWordFilter');
+        if (!sel) return;
+        if (!currentCause) { sel.style.display = 'none'; return; }
+        const allowed = (typeof getAllowedCaseWordsForCause === 'function')
+            ? getAllowedCaseWordsForCause(currentOrg, currentCause)
+            : getCaseWordList(currentOrg);
+        if (!allowed.length) { sel.style.display = 'none'; return; }
+        sel.style.display = 'inline-block';
+        sel.innerHTML = '<option value="">全部案字</option>'
+            + allowed.map(w => '<option value="' + escapeHtml(w) + '"' + (w === caseWordFilter ? ' selected' : '') + '>' + escapeHtml(w) + '</option>').join('');
+    }
+    window.onCaseWordFilterChange = function(value) {
+        caseWordFilter = value || '';
+        renderRight();
+    };
+
+    // V1.3.32 B4: 继承开关栏——仅祖先存在的案由显示（顶级案由无祖先）
+    function renderInheritBar() {
+        const bar = document.getElementById('inheritBar');
+        if (!bar) return;
+        if (!currentCause || !hasAncestors(currentOrg, currentCause)) { bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+        const checkbox = document.getElementById('inheritToggle');
+        if (checkbox) checkbox.checked = getCauseInherit(currentOrg, currentCause);
+        const hint = document.getElementById('inheritHint');
+        if (hint) {
+            const ancestors = (typeof getAncestorCauses === 'function') ? getAncestorCauses(currentOrg, currentCause) : [];
+            hint.textContent = '开启后合并上级案由（' + ancestors.join(' / ') + '）的要件，与本案由要件一并展示和下发';
+        }
+    }
+    window.toggleInherit = function() {
+        const checkbox = document.getElementById('inheritToggle');
+        const on = !!(checkbox && checkbox.checked);
+        setCauseInherit(currentOrg, currentCause, on);
+        renderLeft();
+        renderRight();
+        showNotification(on ? '已开启继承，合并展示上级案由要件' : '已关闭继承', 'success');
+    };
+
+    // V1.3.32 B2: 分组顺序——预设组固定序 → 自定义组（新建先后）→ 未分组置底
+    function getGroupOrder(list) {
+        const seen = [];
+        list.forEach(p => {
+            const g = getElementGroup(p) || GROUP_OTHER;
+            if (seen.indexOf(g) < 0) seen.push(g);
+        });
+        const presets = (typeof ELEMENT_GROUP_PRESETS !== 'undefined')
+            ? ELEMENT_GROUP_PRESETS : ['主体信息', '程序性信息', '事实认定'];
+        const customs = getCustomGroups(currentOrg).filter(g => seen.indexOf(g) >= 0);
+        const rest = seen.filter(g => presets.indexOf(g) < 0 && g !== GROUP_OTHER && customs.indexOf(g) < 0);
+        const tail = seen.indexOf(GROUP_OTHER) >= 0 ? [GROUP_OTHER] : [];
+        return presets.concat(customs, rest, tail);
+    }
+    function renderGroupedRows(all, view) {
+        let html = '';
+        getGroupOrder(all).forEach(g => {
+            const items = all.map((p, idx) => ({ p: p, idx: idx })).filter(x => (getElementGroup(x.p) || GROUP_OTHER) === g);
+            if (!items.length) return;
+            const visible = items.filter(x => view.indexOf(x.p) >= 0);
+            html += '<tr class="group-row"><td colspan="7">'
+                + '<span class="group-name">' + escapeHtml(g) + '</span>'
+                + '<span class="group-count">' + visible.length + '/' + items.length + '</span>'
+                + '</td></tr>';
+            visible.forEach(x => { html += renderRow(x.p, x.idx); });
+        });
+        return html;
+    }
+    function groupOptionsHtml(sel) {
+        const presets = (typeof ELEMENT_GROUP_PRESETS !== 'undefined')
+            ? ELEMENT_GROUP_PRESETS : ['主体信息', '程序性信息', '事实认定'];
+        const list = presets.concat(getCustomGroups(currentOrg), [GROUP_OTHER]);
+        return list.map(g => '<option value="' + escapeHtml(g) + '"' + (g === sel ? ' selected' : '') + '>' + escapeHtml(g) + '</option>').join('')
+            + '<option value="__new__">＋ 新建分组…</option>';
+    }
+    function renderRow(p, idx) {
+        // V1.3.15 A21: 「来源」列已删除（同案由下取值必然相同，顶部副标题已显示整体来源）
+        const cw = Array.isArray(p.caseWords) ? p.caseWords : [];
+        const cwCell = cw.length
+            ? cw.map(w => '<span class="cw-tag">' + escapeHtml(w) + '</span>').join('')
+            : '<span class="cw-tag universal">通用</span>';
+        // v1.2: 启用/停用状态徽章（V1.3.24 A31：status-on/off 与示例/指令统一；灰/绿配色）
+        const isEnabled = p.enabled !== false;
+        const statusBadge = isEnabled
+            ? '<span class="status-badge status-on">已启用</span>'
+            : '<span class="status-badge status-off">已停用</span>';
+        const nameCell = escapeHtml(p.name || '')
+            + (p.isInherited ? ' <span class="inherit-tag" title="继承自上级案由，编辑/删除只影响本案由">继承</span>' : '');
+        // B2: 每行分组下拉——存量要件全无 group，逐条进弹窗改属太低效，必须支持行内直改
+        const groupCell = '<select class="group-select" onchange="changeElementGroup(' + idx + ', this.value)">'
+            + groupOptionsHtml(getElementGroup(p)) + '</select>';
+        let actions;
+        if (p.isInherited) {
+            // 继承行：编辑=提升为本案由要件；删除=写同名停用屏蔽项；停用/排序交给上级案由
+            actions = '<button class="action-btn edit" onclick="editElement(' + idx + ')" title="将提升为本案由要件">编辑</button>'
+                + '<button class="action-btn" disabled title="继承项不支持停用，请到上级案由操作">停用</button>'
+                + '<button class="action-btn delete" onclick="deleteElement(' + idx + ')" title="屏蔽该继承要件">删除</button>';
+        } else {
             const toggleBtn = isEnabled
                 ? '<button class="action-btn toggle-off" onclick="toggleElementEnabled(' + idx + ')">停用</button>'
                 : '<button class="action-btn toggle-on" onclick="toggleElementEnabled(' + idx + ')">启用</button>';
-            // V1.3.26 A33: 删除按钮每行常驻可用，与状态/来源解耦——内置要件的删除＝自动生成案由覆盖后单条移除（见 deleteElement），误删可经「恢复内置」还原
-            const actions = '<button class="action-btn edit" onclick="editElement(' + idx + ')">编辑</button>'
+            // V1.3.26 A33: 删除按钮每行常驻可用，与状态/来源解耦
+            actions = '<button class="action-btn edit" onclick="editElement(' + idx + ')">编辑</button>'
                 + toggleBtn
                 + '<button class="action-btn delete" onclick="deleteElement(' + idx + ')">删除</button>';
-            return '<tr>'
-                + '<td class="tpl-name-cell">' + escapeHtml(p.name || '') + '</td>'
-                + '<td class="tpl-desc-cell">' + escapeHtml(p.desc || '') + '</td>'
-                + '<td class="tpl-question-cell">' + escapeHtml(p.question || '') + '</td>'
-                + '<td>' + cwCell + '</td>'
-                + '<td>' + statusBadge + '</td>'
-                + '<td class="tpl-action-cell">' + actions + '</td>'
-                + '</tr>';
-        }).join('');
+        }
+        // B3: 组内上移/下移（继承行禁用——其位置由上级案由决定，允许排序会与"提升为覆盖"语义冲突）
+        const sortCell = p.isInherited
+            ? '<span class="sort-cell"><button class="action-btn" disabled title="继承项不支持排序，请到上级案由调整">↑</button><button class="action-btn" disabled title="继承项不支持排序，请到上级案由调整">↓</button></span>'
+            : '<span class="sort-cell"><button class="action-btn sort-btn" onclick="moveElement(' + idx + ', -1)" title="上移（仅组内）">↑</button><button class="action-btn sort-btn" onclick="moveElement(' + idx + ', 1)" title="下移（仅组内）">↓</button></span>';
+        return '<tr>'
+            + '<td class="tpl-name-cell">' + nameCell + '</td>'
+            + '<td class="tpl-group-cell">' + groupCell + '</td>'
+            + '<td class="tpl-desc-cell">' + escapeHtml(p.desc || '') + '</td>'
+            + '<td class="tpl-question-cell">' + escapeHtml(p.question || '') + '</td>'
+            + '<td>' + cwCell + '</td>'
+            + '<td>' + statusBadge + '</td>'
+            + '<td class="tpl-action-cell">' + actions + sortCell + '</td>'
+            + '</tr>';
     }
+
+    // B2: 直接改某行分组（不进弹窗）
+    window.changeElementGroup = function(idx, value) {
+        if (!currentCause) return;
+        const own = getOwnElements(currentOrg, currentCause);
+        if (!own[idx]) return;
+        if (value === '__new__') {
+            const name = (window.prompt('请输入新分组名称', '') || '').trim();
+            if (!name) { renderRight(); return; }
+            if (!addCustomGroup(currentOrg, name)) {
+                showNotification('分组「' + name + '」已存在', 'warning');
+                renderRight();
+                return;
+            }
+            value = name;
+        }
+        const wasOverride = hasOverride(currentOrg, currentCause);
+        const arr = own.slice();
+        arr[idx] = { ...arr[idx], group: value };
+        persistOwn(currentOrg, currentCause, arr);
+        renderRight();
+        showNotification('已调整分组为「' + value + '」' + (wasOverride ? '' : '（该案由已转为自定义覆盖）'), 'success');
+    };
+
+    // B3: 组内上移/下移，不跨组（跨组归属只能通过改 group 实现）
+    window.moveElement = function(idx, dir) {
+        if (!currentCause) return;
+        const own = getOwnElements(currentOrg, currentCause);
+        const row = own[idx];
+        if (!row) return;
+        const g = getElementGroup(row);
+        const arr = own.slice();
+        let target = -1;
+        for (let j = idx + dir; j >= 0 && j < arr.length; j += dir) {
+            if (getElementGroup(arr[j]) === g) { target = j; break; }
+        }
+        if (target < 0) {
+            showNotification('已在「' + g + '」组的' + (dir < 0 ? '首' : '末') + '位', 'warning');
+            return;
+        }
+        const tmp = arr[idx];
+        arr[idx] = arr[target];
+        arr[target] = tmp;
+        const wasOverride = hasOverride(currentOrg, currentCause);
+        persistOwn(currentOrg, currentCause, arr);
+        renderLeft();
+        renderRight();
+        showNotification(wasOverride ? '已调整组内顺序' : '已调整组内顺序（该案由已转为自定义覆盖）', 'success');
+    };
 
     // ===== 渲染案字适配栏 =====
     function renderCaseWordBar() {
@@ -493,6 +756,7 @@
         document.getElementById('tplDesc').value = '';
         document.getElementById('tplQuestion').value = '';
         renderModalCaseWords([]);
+        renderModalGroup(DEFAULT_FALLBACK_GROUP);
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
     };
@@ -501,14 +765,25 @@
         const elements = getEffectiveElements(currentOrg, currentCause);
         const p = elements[idx];
         if (!p) return;
-        editingIndex = idx;
-        editingIsBuiltin = !!p.isBuiltin;
-        document.getElementById('modalTitle').firstChild.nodeValue = editingIsBuiltin ? '编辑内置要件（另存为自定义）' : '编辑要件';
+        if (p.isInherited) {
+            // B4: 编辑继承行 = 提升为本案由要件（editingIndex=-2 为提升模式哨兵），上级案由数据不动
+            promoteIndex = idx;
+            editingIndex = -2;
+            editingIsBuiltin = false;
+        } else {
+            promoteIndex = -1;
+            editingIndex = idx;
+            editingIsBuiltin = !!p.isBuiltin;
+        }
+        document.getElementById('modalTitle').firstChild.nodeValue = p.isInherited
+            ? '编辑继承要件（另存为本案由要件）'
+            : (editingIsBuiltin ? '编辑内置要件（另存为自定义）' : '编辑要件');
         document.getElementById('modalCauseBadge').textContent = '· ' + currentCause;
         document.getElementById('tplName').value = p.name || '';
         document.getElementById('tplDesc').value = p.desc || '';
         document.getElementById('tplQuestion').value = p.question || '';
         renderModalCaseWords(Array.isArray(p.caseWords) ? p.caseWords : []);
+        renderModalGroup(getElementGroup(p));
         document.getElementById('tplModal').classList.add('show');
         setTimeout(() => document.getElementById('tplName').focus(), 50);
     };
@@ -550,10 +825,36 @@
         return Array.from(chips).map(c => c.getAttribute('data-cw') || '');
     }
 
+    // ===== V1.3.32 B2：弹窗内的分组下拉 =====
+    function renderModalGroup(sel) {
+        const el = document.getElementById('tplGroup');
+        if (!el) return;
+        el.innerHTML = groupOptionsHtml(sel || DEFAULT_FALLBACK_GROUP);
+    }
+    window.onModalGroupChange = function(value) {
+        const el = document.getElementById('tplGroup');
+        if (value === '__new__') {
+            const name = (window.prompt('请输入新分组名称', '') || '').trim();
+            if (!name) { if (el) el.value = DEFAULT_FALLBACK_GROUP; return; }
+            if (!addCustomGroup(currentOrg, name)) {
+                showNotification('分组「' + name + '」已存在', 'warning');
+                if (el) el.value = DEFAULT_FALLBACK_GROUP;
+                return;
+            }
+            renderModalGroup(name);
+            return;
+        }
+    };
+    function collectModalGroup() {
+        const el = document.getElementById('tplGroup');
+        return (el && el.value && el.value !== '__new__') ? el.value : DEFAULT_FALLBACK_GROUP;
+    }
+
     window.closeModal = function() {
         document.getElementById('tplModal').classList.remove('show');
         editingIndex = -1;
         editingIsBuiltin = false;
+        promoteIndex = -1;
     };
 
     window.saveElement = function() {
@@ -576,36 +877,41 @@
             return;
         }
 
-        const orgData = getOrgData(currentOrg);
-        // 取生效列表作为基线（若已有覆盖则在覆盖基础上修改；否则基于内置另存为完整覆盖）
-        // v1.2: 保留原 enabled 状态
-        const baseline = getEffectiveElements(currentOrg, currentCause).map(p => ({
+        const modalCw = collectModalCaseWords();
+        const group = collectModalGroup();
+        // baseline 只取「自身线」——继承来的要件属于上级案由，不能落盘到本案由
+        const own = getOwnElements(currentOrg, currentCause);
+        const baseline = own.map(p => ({
             name: p.name, desc: p.desc, question: p.question,
             caseWords: Array.isArray(p.caseWords) ? p.caseWords : [],
-            enabled: p.enabled !== false
+            enabled: p.enabled !== false,
+            group: getElementGroup(p)
         }));
 
-        const modalCw = collectModalCaseWords();
-
-        if (editingIndex >= 0) {
+        let msg;
+        if (editingIndex === -2) {
+            // 提升模式：原本是继承行 → 追加为本案由自身要件（同名即在继承视图中取代祖先版本）
+            baseline.push({ name: name, desc: desc, question: question, caseWords: modalCw, enabled: true, group: group });
+            msg = '继承要件已另存为本案由要件（上级案由不受影响）';
+        } else if (editingIndex >= 0) {
             // 编辑：替换指定下标，保留原 enabled 状态
             baseline[editingIndex] = {
-                name: name, desc: desc, question: question,
-                caseWords: modalCw,
-                enabled: baseline[editingIndex].enabled
+                ...baseline[editingIndex],
+                name: name, desc: desc, question: question, caseWords: modalCw, group: group
             };
+            msg = '要件已更新（已另存为自定义覆盖）';
         } else {
             // 新增：追加，默认启用
-            baseline.push({ name: name, desc: desc, question: question, caseWords: modalCw, enabled: true });
+            baseline.push({ name: name, desc: desc, question: question, caseWords: modalCw, enabled: true, group: group });
+            msg = '要件已新增';
         }
 
-        orgData[currentCause] = baseline;
-        setOrgData(currentOrg, orgData);
+        persistOwn(currentOrg, currentCause, baseline);
 
         closeModal();
         renderLeft();
         renderRight();
-        showNotification(editingIndex >= 0 ? '要件已更新（已另存为自定义覆盖）' : '要件已新增', 'success');
+        showNotification(msg, 'success');
     };
 
     // v1.2: 启用/停用要件
@@ -617,19 +923,21 @@
             showNotification('请先选择案由', 'error');
             return;
         }
-        const elements = getEffectiveElements(currentOrg, currentCause);
-        const p = elements[idx];
+        const own = getOwnElements(currentOrg, currentCause);
+        const p = own[idx];
         if (!p) return;
         const isEnabled = p.enabled !== false;
         const orgData = getOrgData(currentOrg);
-        const hasOverride = !!orgData[currentCause];
+        const existing = !!orgData[currentCause];
 
-        if (!hasOverride) {
+        if (!existing) {
             // 内置要件首次停用：生成自定义覆盖数组（保留所有内置要件，仅修改目标项的 enabled）
-            const baseline = elements.map(e => ({
+            // V1.3.32：只取自身线，避免把继承来的祖先要件误落盘为本案由覆盖
+            const baseline = own.map(e => ({
                 name: e.name, desc: e.desc, question: e.question,
                 caseWords: Array.isArray(e.caseWords) ? e.caseWords : [],
-                enabled: true
+                enabled: true,
+                group: getElementGroup(e)
             }));
             baseline[idx].enabled = false;
             orgData[currentCause] = baseline;
@@ -660,21 +968,37 @@
         const elements = getEffectiveElements(currentOrg, currentCause);
         const p = elements[idx];
         if (!p) return;
-        const wasBuiltin = !!p.isBuiltin;
-        showConfirm('删除要件', '确定删除要件「' + (p.name || '') + '」吗？此操作不可恢复。', () => {
-            const orgData = getOrgData(currentOrg);
-            // V1.3.26 A33: 内置要件首次删除——先整组转自定义覆盖（保留其余内置条目），再移除目标条
-            if (!orgData[currentCause]) {
-                orgData[currentCause] = elements.map(e => ({
+        // V1.3.32 B4: 删除继承行——不能走"提升后再删"（祖先仍在，刷新后会继承回来，表现为删除无效），
+        // 改为写入同名 enabled:false 的屏蔽项，沿用既有停用机制，不新增概念
+        if (p.isInherited) {
+            showConfirm('屏蔽继承要件', '确定屏蔽继承要件「' + (p.name || '') + '」吗？本案由将不再继承该条，上级案由数据不受影响。', () => {
+                const own = getOwnElements(currentOrg, currentCause);
+                const baseline = own.map(e => ({
                     name: e.name, desc: e.desc, question: e.question,
                     caseWords: Array.isArray(e.caseWords) ? e.caseWords : [],
-                    enabled: e.enabled !== false
+                    enabled: e.enabled !== false,
+                    group: getElementGroup(e)
                 }));
-            }
-            const list = (orgData[currentCause] || []).slice();
-            list.splice(idx, 1);
-            orgData[currentCause] = list;
-            setOrgData(currentOrg, orgData);
+                baseline.push({ name: p.name, desc: p.desc, question: p.question, caseWords: [], enabled: false, group: getElementGroup(p) });
+                persistOwn(currentOrg, currentCause, baseline);
+                renderLeft();
+                renderRight();
+                showNotification('已屏蔽继承要件「' + (p.name || '') + '」（本案由转为已停用）', 'success');
+            });
+            return;
+        }
+        const wasBuiltin = !!p.isBuiltin;
+        showConfirm('删除要件', '确定删除要件「' + (p.name || '') + '」吗？此操作不可恢复。', () => {
+            const own = getOwnElements(currentOrg, currentCause);
+            // V1.3.26 A33: 内置要件首次删除——整组转自定义覆盖（保留其余条目），再移除目标条
+            const baseline = own.map(e => ({
+                name: e.name, desc: e.desc, question: e.question,
+                caseWords: Array.isArray(e.caseWords) ? e.caseWords : [],
+                enabled: e.enabled !== false,
+                group: getElementGroup(e)
+            }));
+            baseline.splice(idx, 1);   // 自身行在数组前段，list idx == own idx
+            persistOwn(currentOrg, currentCause, baseline);
             renderLeft();
             renderRight();
             showNotification(wasBuiltin
@@ -694,6 +1018,8 @@
             const orgData = getOrgData(currentOrg);
             delete orgData[currentCause];
             setOrgData(currentOrg, orgData);
+            // V1.3.32 B4: 一并清除继承开关，否则会出现"覆盖清了但开关还开着"的不一致状态
+            setCauseInherit(currentOrg, currentCause, false);
             // 同时清理该案由的案字适配配置
             setCauseCaseWords(currentOrg, currentCause, []);
             renderLeft();
