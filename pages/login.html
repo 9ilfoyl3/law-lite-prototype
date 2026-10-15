@@ -526,7 +526,7 @@
     <script>
         // v1.1 角色：超级管理员 / 法院管理员（普通用户登录走业务端，不进入管理后台）
         // super_admin: 全部菜单
-        // court_admin: 仅用户管理、部门维护、控制台、系统运行报告、案件管理（仅本法院）
+        // court_admin: 仅用户管理、部门维护、控制台、数据统计、案件管理（仅本法院）
         const ROLE_PERMISSIONS = {
             super_admin: ['dashboard', 'users', 'court-tree', 'department', 'cases', 'system-report', 'knowledge-base', 'knowledge-documents', 'cause-management', 'doc-types', 'element-presets', 'doc-templates', 'prompt-templates', 'risk-audit', 'settings', 'model-management'],
             court_admin: ['dashboard', 'users', 'department', 'cases', 'system-report']

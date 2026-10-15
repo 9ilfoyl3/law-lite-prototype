@@ -2526,76 +2526,83 @@
                     <input type="text" placeholder="搜索任务类型……" id="taskSearchInput">
                 </div>
                 <div class="selector-body-content">
-                    <!-- 办案任务组 -->
+                    <!-- 办案任务组（V1.3.36: 同步 AgentFlow  chatbot 预设） -->
                     <div class="task-group">
                         <div class="task-group-title">
                             <i class="fas fa-briefcase"></i>
                             办案任务
                         </div>
                         <div class="selector-grid">
-                            <div class="selector-item" data-task="庭审提纲" onclick="selectTask('庭审提纲', 'case')">
-                                <div class="selector-item-icon blue"><i class="fas fa-clipboard-list"></i></div>
+                            <div class="selector-item" data-task="执行裁定书" onclick="selectTask('执行裁定书', 'case')">
+                                <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">庭审提纲</div>
-                                    <div class="selector-item-desc">庭审、提纲、审理</div>
+                                    <div class="selector-item-title">执行裁定书</div>
+                                    <div class="selector-item-desc">执行、裁定、实施</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="争议焦点" onclick="selectTask('争议焦点', 'case')" style="display:none">
-                                <div class="selector-item-icon green"><i class="fas fa-crosshairs"></i></div>
+                            <div class="selector-item" data-task="文书AI评查" onclick="selectTask('文书AI评查', 'case')">
+                                <div class="selector-item-icon blue"><i class="fas fa-clipboard-list"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">争议焦点</div>
-                                    <div class="selector-item-desc">争议、焦点、分歧</div>
+                                    <div class="selector-item-title">文书AI评查</div>
+                                    <div class="selector-item-desc">评查、质检、文书质量</div>
                                 </div>
                             </div>
                             <div class="selector-item" data-task="裁判文书" onclick="selectTask('裁判文书', 'case')">
-                                <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
+                                <div class="selector-item-icon orange"><i class="fas fa-pen-fancy"></i></div>
                                 <div class="selector-item-info">
                                     <div class="selector-item-title">裁判文书</div>
                                     <div class="selector-item-desc">裁判、文书、判决、裁定</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="类案检索" onclick="selectTask('类案检索', 'case')">
-                                <div class="selector-item-icon purple"><i class="fas fa-search"></i></div>
+                            <div class="selector-item" data-task="五步法二审文书" onclick="selectTask('五步法二审文书', 'case')">
+                                <div class="selector-item-icon green"><i class="fas fa-diagram-project"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">类案检索</div>
-                                    <div class="selector-item-desc">类案、检索、相似、案例</div>
-                                </div>
-                            </div>
-                            <div class="selector-item" data-task="法条适用" onclick="selectTask('法条适用', 'case')">
-                                <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
-                                <div class="selector-item-info">
-                                    <div class="selector-item-title">法条适用</div>
-                                    <div class="selector-item-desc">法条、适用、法律、条文</div>
+                                    <div class="selector-item-title">五步法二审文书</div>
+                                    <div class="selector-item-desc">二审、五步法、上诉</div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- 通用任务组 (V1.0隐藏) -->
-                    <div class="task-group" style="display:none">
+                    <!-- 通用任务组（V1.3.36: 由隐藏改为显示） -->
+                    <div class="task-group">
                         <div class="task-group-title">
                             <i class="fas fa-globe"></i>
                             通用任务
                         </div>
                         <div class="selector-grid">
-                            <div class="selector-item" data-task="文本总结" onclick="selectTask('文本总结', 'general')">
-                                <div class="selector-item-icon cyan"><i class="fas fa-compress-alt"></i></div>
-                                <div class="selector-item-info">
-                                    <div class="selector-item-title">文本总结</div>
-                                    <div class="selector-item-desc">总结、概括、摘要、精简</div>
-                                </div>
-                            </div>
-                            <div class="selector-item" data-task="文本润色" onclick="selectTask('文本润色', 'general')">
+                            <div class="selector-item" data-task="公文写作流程" onclick="selectTask('公文写作流程', 'general')">
                                 <div class="selector-item-icon blue"><i class="fas fa-pen-fancy"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">文本润色</div>
-                                    <div class="selector-item-desc">润色、优化、修改、改写</div>
+                                    <div class="selector-item-title">公文写作流程</div>
+                                    <div class="selector-item-desc">公文、写作 · 基础版</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="票据汇总" onclick="selectTask('票据汇总', 'general')">
-                                <div class="selector-item-icon green"><i class="fas fa-calculator"></i></div>
+                            <div class="selector-item" data-task="案由生成" onclick="selectTask('案由生成', 'general')">
+                                <div class="selector-item-icon purple"><i class="fas fa-diagram-project"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">票据汇总</div>
-                                    <div class="selector-item-desc">票据、汇总、统计、整理</div>
+                                    <div class="selector-item-title">案由生成</div>
+                                    <div class="selector-item-desc">案由、生成 · 去除caseId版本</div>
+                                </div>
+                            </div>
+                            <div class="selector-item" data-task="庭审提纲" onclick="selectTask('庭审提纲', 'general')">
+                                <div class="selector-item-icon green"><i class="fas fa-clipboard-list"></i></div>
+                                <div class="selector-item-info">
+                                    <div class="selector-item-title">庭审提纲</div>
+                                    <div class="selector-item-desc">庭审、提纲 · 去除caseId版本</div>
+                                </div>
+                            </div>
+                            <div class="selector-item" data-task="类案检索" onclick="selectTask('类案检索', 'general')">
+                                <div class="selector-item-icon purple"><i class="fas fa-search"></i></div>
+                                <div class="selector-item-info">
+                                    <div class="selector-item-title">类案检索</div>
+                                    <div class="selector-item-desc">类案、检索 · 去除caseId版本</div>
+                                </div>
+                            </div>
+                            <div class="selector-item" data-task="法条适用" onclick="selectTask('法条适用', 'general')">
+                                <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
+                                <div class="selector-item-info">
+                                    <div class="selector-item-title">法条适用</div>
+                                    <div class="selector-item-desc">法条、适用、法律、条文</div>
                                 </div>
                             </div>
                         </div>
@@ -2626,11 +2633,11 @@
                             <div class="selector-item-desc">生成判决书、裁定书等法律文书</div>
                         </div>
                     </div>
-                    <div class="selector-item" data-task="文本总结" onclick="selectSmartTask('文本总结', 'general')" style="display:none">
-                        <div class="selector-item-icon cyan"><i class="fas fa-compress-alt"></i></div>
+                    <div class="selector-item" data-task="法条适用" onclick="selectSmartTask('法条适用', 'general')" style="display:none">
+                        <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
                         <div class="selector-item-info">
-                            <div class="selector-item-title">文本总结</div>
-                            <div class="selector-item-desc">总结概括文本要点、提取关键信息</div>
+                            <div class="selector-item-title">法条适用</div>
+                            <div class="selector-item-desc">输入案件事实或法律问题，查找适用法条</div>
                         </div>
                     </div>
                 </div>
@@ -2652,76 +2659,83 @@
                     我无法理解您的输入，您可以选择以下任务继续：
                 </p>
                 <div class="selector-body-content">
-                    <!-- 办案任务组 -->
+                    <!-- 办案任务组（V1.3.36: 同步 chatbot 预设） -->
                     <div class="task-group">
                         <div class="task-group-title">
                             <i class="fas fa-briefcase"></i>
                             办案任务
                         </div>
                         <div class="selector-grid">
-                            <div class="selector-item" data-task="庭审提纲" onclick="selectAllTasksItem('庭审提纲', 'case')">
-                                <div class="selector-item-icon blue"><i class="fas fa-clipboard-list"></i></div>
+                            <div class="selector-item" data-task="执行裁定书" onclick="selectAllTasksItem('执行裁定书', 'case')">
+                                <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">庭审提纲</div>
-                                    <div class="selector-item-desc">庭审、提纲、审理</div>
+                                    <div class="selector-item-title">执行裁定书</div>
+                                    <div class="selector-item-desc">执行、裁定、实施</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="争议焦点" onclick="selectAllTasksItem('争议焦点', 'case')" style="display:none">
-                                <div class="selector-item-icon green"><i class="fas fa-crosshairs"></i></div>
+                            <div class="selector-item" data-task="文书AI评查" onclick="selectAllTasksItem('文书AI评查', 'case')">
+                                <div class="selector-item-icon blue"><i class="fas fa-clipboard-list"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">争议焦点</div>
-                                    <div class="selector-item-desc">争议、焦点、分歧</div>
+                                    <div class="selector-item-title">文书AI评查</div>
+                                    <div class="selector-item-desc">评查、质检、文书质量</div>
                                 </div>
                             </div>
                             <div class="selector-item" data-task="裁判文书" onclick="selectAllTasksItem('裁判文书', 'case')">
-                                <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
+                                <div class="selector-item-icon orange"><i class="fas fa-pen-fancy"></i></div>
                                 <div class="selector-item-info">
                                     <div class="selector-item-title">裁判文书</div>
                                     <div class="selector-item-desc">裁判、文书、判决、裁定</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="类案检索" onclick="selectAllTasksItem('类案检索', 'case')">
-                                <div class="selector-item-icon purple"><i class="fas fa-search"></i></div>
+                            <div class="selector-item" data-task="五步法二审文书" onclick="selectAllTasksItem('五步法二审文书', 'case')">
+                                <div class="selector-item-icon green"><i class="fas fa-diagram-project"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">类案检索</div>
-                                    <div class="selector-item-desc">类案、检索、相似、案例</div>
-                                </div>
-                            </div>
-                            <div class="selector-item" data-task="法条适用" onclick="selectAllTasksItem('法条适用', 'case')">
-                                <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
-                                <div class="selector-item-info">
-                                    <div class="selector-item-title">法条适用</div>
-                                    <div class="selector-item-desc">法条、适用、法律、条文</div>
+                                    <div class="selector-item-title">五步法二审文书</div>
+                                    <div class="selector-item-desc">二审、五步法、上诉</div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- 通用任务组 (V1.0隐藏) -->
-                    <div class="task-group" style="display:none">
+                    <!-- 通用任务组（V1.3.36: 由隐藏改为显示） -->
+                    <div class="task-group">
                         <div class="task-group-title">
                             <i class="fas fa-globe"></i>
                             通用任务
                         </div>
                         <div class="selector-grid">
-                            <div class="selector-item" data-task="文本总结" onclick="selectAllTasksItem('文本总结', 'general')">
-                                <div class="selector-item-icon cyan"><i class="fas fa-compress-alt"></i></div>
-                                <div class="selector-item-info">
-                                    <div class="selector-item-title">文本总结</div>
-                                    <div class="selector-item-desc">总结、概括、摘要、精简</div>
-                                </div>
-                            </div>
-                            <div class="selector-item" data-task="文本润色" onclick="selectAllTasksItem('文本润色', 'general')">
+                            <div class="selector-item" data-task="公文写作流程" onclick="selectAllTasksItem('公文写作流程', 'general')">
                                 <div class="selector-item-icon blue"><i class="fas fa-pen-fancy"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">文本润色</div>
-                                    <div class="selector-item-desc">润色、优化、修改、改写</div>
+                                    <div class="selector-item-title">公文写作流程</div>
+                                    <div class="selector-item-desc">公文、写作 · 基础版</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="票据汇总" onclick="selectAllTasksItem('票据汇总', 'general')">
-                                <div class="selector-item-icon green"><i class="fas fa-calculator"></i></div>
+                            <div class="selector-item" data-task="案由生成" onclick="selectAllTasksItem('案由生成', 'general')">
+                                <div class="selector-item-icon purple"><i class="fas fa-diagram-project"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">票据汇总</div>
-                                    <div class="selector-item-desc">票据、汇总、统计、整理</div>
+                                    <div class="selector-item-title">案由生成</div>
+                                    <div class="selector-item-desc">案由、生成 · 去除caseId版本</div>
+                                </div>
+                            </div>
+                            <div class="selector-item" data-task="庭审提纲" onclick="selectAllTasksItem('庭审提纲', 'general')">
+                                <div class="selector-item-icon green"><i class="fas fa-clipboard-list"></i></div>
+                                <div class="selector-item-info">
+                                    <div class="selector-item-title">庭审提纲</div>
+                                    <div class="selector-item-desc">庭审、提纲 · 去除caseId版本</div>
+                                </div>
+                            </div>
+                            <div class="selector-item" data-task="类案检索" onclick="selectAllTasksItem('类案检索', 'general')">
+                                <div class="selector-item-icon purple"><i class="fas fa-search"></i></div>
+                                <div class="selector-item-info">
+                                    <div class="selector-item-title">类案检索</div>
+                                    <div class="selector-item-desc">类案、检索 · 去除caseId版本</div>
+                                </div>
+                            </div>
+                            <div class="selector-item" data-task="法条适用" onclick="selectAllTasksItem('法条适用', 'general')">
+                                <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
+                                <div class="selector-item-info">
+                                    <div class="selector-item-title">法条适用</div>
+                                    <div class="selector-item-desc">法条、适用、法律、条文</div>
                                 </div>
                             </div>
                         </div>
@@ -3008,8 +3022,8 @@
                                         <span>案由</span>
                                     </button>
                                 </div>
-                                <!-- 案件选择 -->
-                                <div class="dropdown-wrapper" id="caseWrapper" style="display: none;">
+                                <!-- 案件选择（V1.3.36: 独立入口，未选 chatbot 时常驻显示） -->
+                                <div class="dropdown-wrapper" id="caseWrapper" style="position: relative;">
                                     <button class="toolbar-btn" id="caseBtn" onclick="openCaseSelector()">
                                         <i class="fas fa-folder"></i>
                                         <span>案件</span>
@@ -4096,6 +4110,7 @@
     </div>
 
     <script src="../js/common.js"></script>
+    <script src="../js/usage-events.js?v=2"></script>
     <script src="../js/chat.js"></script>
     <script>
         // 退出登录（入口位于左侧导航栏底部头像菜单）
@@ -4133,16 +4148,17 @@
             document.getElementById('taskSelectorModal').classList.remove('active');
         }
 
-        // 任务类型对应的输入指令
+        // 任务类型对应的输入指令（V1.3.36: 同步 9 个 chatbot 预设）
         const taskPlaceholders = {
+            '执行裁定书': '输入执行案件信息或指令，我来帮您生成执行裁定书',
+            '文书AI评查': '上传待评查文书，我来帮您进行文书质量评查',
+            '裁判文书': '输入案件材料与指令，我来帮您生成裁判文书',
+            '五步法二审文书': '上传二审案件材料，按五步法流程生成二审文书',
+            '公文写作流程': '输入公文写作需求，我来帮您按流程生成公文',
+            '案由生成': '输入案件事实，我来帮您生成案由',
             '庭审提纲': '上传案件材料，输入您的庭审要求，我来帮您生成庭审提纲',
-            '争议焦点': '上传案件材料，我来帮您分析争议焦点',
-            '裁判文书': '上传案件材料，输入您的指令，我来帮您生成裁判文书',
             '类案检索': '输入案件描述或关键词，我来帮您检索相关类似案例',
-            '法条适用': '输入案件事实或法律问题，我来帮您查找适用法条',
-            '文本总结': '输入需要总结的文本内容，我来帮您提取要点',
-            '文本润色': '输入需要润色的文本，我来帮您优化表达',
-            '票据汇总': '上传票据材料，我来帮您汇总整理'
+            '法条适用': '输入案件事实或法律问题，我来帮您查找适用法条'
         };
 
         function selectTask(taskName, taskType) {
@@ -4158,16 +4174,11 @@
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
-            // 只有当选择"庭审提纲"或"裁判文书"时，才显示案由和案件选择
-            const showCaseOptions = taskName === '庭审提纲' || taskName === '裁判文书';
-            document.getElementById('causeWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            document.getElementById('caseWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            
-            // 如果不需要显示案由和案件，清除已选择的案由和案件
-            if (!showCaseOptions) {
-                clearCause();
-                clearCase();
-            }
+            // V1.3.36: 选择 chatbot 后案由/案件选择入口隐藏（chatbot 路径不带案件），并清除已选值
+            document.getElementById('causeWrapper').style.display = 'none';
+            document.getElementById('caseWrapper').style.display = 'none';
+            clearCause();
+            clearCase();
             
             // 更新发送按钮状态
             updateSendButtonState();
@@ -4184,9 +4195,9 @@
             // 恢复默认指令
             document.getElementById('inputField').placeholder = '请选择任务类型，我会为您提供帮助……';
             
-            // 隐藏案由和案件选择，并清除已选择的案由和案件
+            // V1.3.36: 清除任务后恢复独立的案件选择入口（案由入口保持隐藏）
             document.getElementById('causeWrapper').style.display = 'none';
-            document.getElementById('caseWrapper').style.display = 'none';
+            document.getElementById('caseWrapper').style.display = 'block';
             clearCause();
             clearCase();
             
@@ -4388,16 +4399,16 @@
             if (currentSelection.task) {
                 let taskIcon = 'fa-tasks';
                 let taskClass = 'task';
-                if (currentSelection.task === '裁判文书') taskIcon = 'fa-gavel';
+                // V1.3.36: 图标映射同步 9 个 chatbot 预设
+                if (currentSelection.task === '执行裁定书') taskIcon = 'fa-gavel';
+                else if (currentSelection.task === '裁判文书') taskIcon = 'fa-pen-fancy';
+                else if (currentSelection.task === '五步法二审文书') taskIcon = 'fa-diagram-project';
                 else if (currentSelection.task === '庭审提纲') taskIcon = 'fa-clipboard-list';
-                else if (currentSelection.task === '案件分析') taskIcon = 'fa-search';
                 else if (currentSelection.task === '类案检索') taskIcon = 'fa-search';
                 else if (currentSelection.task === '法条适用') taskIcon = 'fa-balance-scale';
-                else if (currentSelection.task === '法条推荐') taskIcon = 'fa-book';
-                else if (currentSelection.task === '争议焦点') taskIcon = 'fa-crosshairs';
-                else if (currentSelection.task === '文本总结') taskIcon = 'fa-compress-alt';
-                else if (currentSelection.task === '文本润色') taskIcon = 'fa-pen-fancy';
-                else if (currentSelection.task === '票据汇总') taskIcon = 'fa-calculator';
+                else if (currentSelection.task === '案由生成') taskIcon = 'fa-diagram-project';
+                else if (currentSelection.task === '公文写作流程') taskIcon = 'fa-pen-fancy';
+                else if (currentSelection.task === '文书AI评查') taskIcon = 'fa-clipboard-list';
                 
                 tagsHtml += `<span class="msg-tag ${taskClass}"><i class="fas ${taskIcon}"></i> ${escapeHtml(currentSelection.task)}</span>`;
             }
@@ -4478,24 +4489,24 @@
                         <div class="ai-message-text">检测到您的需求涉及多个任务，请选择一个任务继续：</div>
                         <div class="selector-grid" style="margin-top: 16px; grid-template-columns: 1fr;">
                             <div class="selector-item" data-task="裁判文书" onclick="selectTaskFromChat('裁判文书', 'case')">
-                                <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
+                                <div class="selector-item-icon orange"><i class="fas fa-pen-fancy"></i></div>
                                 <div class="selector-item-info">
                                     <div class="selector-item-title">裁判文书</div>
                                     <div class="selector-item-desc">裁判、文书、判决、裁定</div>
                                 </div>
                             </div>
-                            <div class="selector-item" data-task="文本总结" onclick="selectTaskFromChat('文本总结', 'general')" style="display:none">
-                                <div class="selector-item-icon cyan"><i class="fas fa-compress-alt"></i></div>
+                            <div class="selector-item" data-task="法条适用" onclick="selectTaskFromChat('法条适用', 'general')" style="display:none">
+                                <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
                                 <div class="selector-item-info">
-                                    <div class="selector-item-title">文本总结</div>
-                                    <div class="selector-item-desc">总结、概括、摘要、精简</div>
+                                    <div class="selector-item-title">法条适用</div>
+                                    <div class="selector-item-desc">法条、适用、法律、条文</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 `;
             } else {
-                // 所有任务选择 - 分为办案任务和通用任务
+                // 所有任务选择 - 分为办案任务和通用任务（V1.3.36: 同步 chatbot 预设）
                 content = `
                     <div class="ai-message-card">
                         <div class="ai-message-text">我无法理解您的问题，您可以选择以下任务执行：</div>
@@ -4507,69 +4518,76 @@
                                     办案任务
                                 </div>
                                 <div class="selector-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                                    <div class="selector-item" onclick="selectTaskFromChat('庭审提纲', 'case')">
-                                        <div class="selector-item-icon blue"><i class="fas fa-clipboard-list"></i></div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('执行裁定书', 'case')">
+                                        <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
                                         <div class="selector-item-info">
-                                            <div class="selector-item-title">庭审提纲</div>
-                                            <div class="selector-item-desc">庭审、提纲、审理</div>
+                                            <div class="selector-item-title">执行裁定书</div>
+                                            <div class="selector-item-desc">执行、裁定、实施</div>
                                         </div>
                                     </div>
-                                    <div class="selector-item" onclick="selectTaskFromChat('争议焦点', 'case')" style="display:none">
-                                        <div class="selector-item-icon green"><i class="fas fa-crosshairs"></i></div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('文书AI评查', 'case')">
+                                        <div class="selector-item-icon blue"><i class="fas fa-clipboard-list"></i></div>
                                         <div class="selector-item-info">
-                                            <div class="selector-item-title">争议焦点</div>
-                                            <div class="selector-item-desc">争议、焦点、分歧</div>
+                                            <div class="selector-item-title">文书AI评查</div>
+                                            <div class="selector-item-desc">评查、质检、文书质量</div>
                                         </div>
                                     </div>
                                     <div class="selector-item" onclick="selectTaskFromChat('裁判文书', 'case')">
-                                        <div class="selector-item-icon orange"><i class="fas fa-gavel"></i></div>
+                                        <div class="selector-item-icon orange"><i class="fas fa-pen-fancy"></i></div>
                                         <div class="selector-item-info">
                                             <div class="selector-item-title">裁判文书</div>
                                             <div class="selector-item-desc">裁判、文书、判决、裁定</div>
                                         </div>
                                     </div>
-                                    <div class="selector-item" onclick="selectTaskFromChat('类案检索', 'case')" style="display:none">
-                                        <div class="selector-item-icon purple"><i class="fas fa-search"></i></div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('五步法二审文书', 'case')">
+                                        <div class="selector-item-icon green"><i class="fas fa-diagram-project"></i></div>
                                         <div class="selector-item-info">
-                                            <div class="selector-item-title">类案检索</div>
-                                            <div class="selector-item-desc">类案、检索、相似、案例</div>
-                                        </div>
-                                    </div>
-                                    <div class="selector-item" onclick="selectTaskFromChat('法条适用', 'case')">
-                                        <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
-                                        <div class="selector-item-info">
-                                            <div class="selector-item-title">法条适用</div>
-                                            <div class="selector-item-desc">法条、适用、法律、条文</div>
+                                            <div class="selector-item-title">五步法二审文书</div>
+                                            <div class="selector-item-desc">二审、五步法、上诉</div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- 通用任务组 (V1.0隐藏) -->
-                            <div class="task-group" style="margin-top: 20px; display:none">
+                            <!-- 通用任务组（V1.3.36: 由隐藏改为显示） -->
+                            <div class="task-group" style="margin-top: 20px;">
                                 <div class="task-group-title" style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-globe"></i>
                                     通用任务
                                 </div>
                                 <div class="selector-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                                    <div class="selector-item" onclick="selectTaskFromChat('文本总结', 'general')">
-                                        <div class="selector-item-icon cyan"><i class="fas fa-compress-alt"></i></div>
-                                        <div class="selector-item-info">
-                                            <div class="selector-item-title">文本总结</div>
-                                            <div class="selector-item-desc">总结、概括、摘要、精简</div>
-                                        </div>
-                                    </div>
-                                    <div class="selector-item" onclick="selectTaskFromChat('文本润色', 'general')">
+                                    <div class="selector-item" onclick="selectTaskFromChat('公文写作流程', 'general')">
                                         <div class="selector-item-icon blue"><i class="fas fa-pen-fancy"></i></div>
                                         <div class="selector-item-info">
-                                            <div class="selector-item-title">文本润色</div>
-                                            <div class="selector-item-desc">润色、优化、修改、改写</div>
+                                            <div class="selector-item-title">公文写作流程</div>
+                                            <div class="selector-item-desc">公文、写作 · 基础版</div>
                                         </div>
                                     </div>
-                                    <div class="selector-item" onclick="selectTaskFromChat('票据汇总', 'general')">
-                                        <div class="selector-item-icon green"><i class="fas fa-calculator"></i></div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('案由生成', 'general')">
+                                        <div class="selector-item-icon purple"><i class="fas fa-diagram-project"></i></div>
                                         <div class="selector-item-info">
-                                            <div class="selector-item-title">票据汇总</div>
-                                            <div class="selector-item-desc">票据、汇总、统计、整理</div>
+                                            <div class="selector-item-title">案由生成</div>
+                                            <div class="selector-item-desc">案由、生成 · 去除caseId版本</div>
+                                        </div>
+                                    </div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('庭审提纲', 'general')">
+                                        <div class="selector-item-icon green"><i class="fas fa-clipboard-list"></i></div>
+                                        <div class="selector-item-info">
+                                            <div class="selector-item-title">庭审提纲</div>
+                                            <div class="selector-item-desc">庭审、提纲 · 去除caseId版本</div>
+                                        </div>
+                                    </div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('类案检索', 'general')">
+                                        <div class="selector-item-icon purple"><i class="fas fa-search"></i></div>
+                                        <div class="selector-item-info">
+                                            <div class="selector-item-title">类案检索</div>
+                                            <div class="selector-item-desc">类案、检索 · 去除caseId版本</div>
+                                        </div>
+                                    </div>
+                                    <div class="selector-item" onclick="selectTaskFromChat('法条适用', 'general')">
+                                        <div class="selector-item-icon red"><i class="fas fa-balance-scale"></i></div>
+                                        <div class="selector-item-info">
+                                            <div class="selector-item-title">法条适用</div>
+                                            <div class="selector-item-desc">法条、适用、法律、条文</div>
                                         </div>
                                     </div>
                                 </div>
@@ -7101,16 +7119,11 @@
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
-            // 只有当选择"庭审提纲"或"裁判文书"时，才显示案由和案件选择
-            const showCaseOptions = taskName === '庭审提纲' || taskName === '裁判文书';
-            document.getElementById('causeWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            document.getElementById('caseWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            
-            // 如果不需要显示案由和案件，清除已选择的案由和案件
-            if (!showCaseOptions) {
-                clearCause();
-                clearCase();
-            }
+            // V1.3.36: 选择 chatbot 后案由/案件选择入口隐藏（chatbot 路径不带案件），并清除已选值
+            document.getElementById('causeWrapper').style.display = 'none';
+            document.getElementById('caseWrapper').style.display = 'none';
+            clearCause();
+            clearCase();
             
             // 更新发送按钮状态
             updateSendButtonState();
@@ -7177,16 +7190,16 @@
             if (currentSelection.task) {
                 let taskIcon = 'fa-tasks';
                 let taskClass = 'task';
-                if (currentSelection.task === '裁判文书') taskIcon = 'fa-gavel';
+                // V1.3.36: 图标映射同步 9 个 chatbot 预设
+                if (currentSelection.task === '执行裁定书') taskIcon = 'fa-gavel';
+                else if (currentSelection.task === '裁判文书') taskIcon = 'fa-pen-fancy';
+                else if (currentSelection.task === '五步法二审文书') taskIcon = 'fa-diagram-project';
                 else if (currentSelection.task === '庭审提纲') taskIcon = 'fa-clipboard-list';
-                else if (currentSelection.task === '案件分析') taskIcon = 'fa-search';
                 else if (currentSelection.task === '类案检索') taskIcon = 'fa-search';
                 else if (currentSelection.task === '法条适用') taskIcon = 'fa-balance-scale';
-                else if (currentSelection.task === '法条推荐') taskIcon = 'fa-book';
-                else if (currentSelection.task === '争议焦点') taskIcon = 'fa-crosshairs';
-                else if (currentSelection.task === '文本总结') taskIcon = 'fa-compress-alt';
-                else if (currentSelection.task === '文本润色') taskIcon = 'fa-pen-fancy';
-                else if (currentSelection.task === '票据汇总') taskIcon = 'fa-calculator';
+                else if (currentSelection.task === '案由生成') taskIcon = 'fa-diagram-project';
+                else if (currentSelection.task === '公文写作流程') taskIcon = 'fa-pen-fancy';
+                else if (currentSelection.task === '文书AI评查') taskIcon = 'fa-clipboard-list';
                 
                 tagsHtml += `<span class="msg-tag ${taskClass}"><i class="fas ${taskIcon}"></i> ${escapeHtml(currentSelection.task)}</span>`;
             }
@@ -7936,16 +7949,11 @@
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
-            // 只有当选择"裁判文书"时，才显示案由和案件选择
-            const showCaseOptions = taskName === '裁判文书';
-            document.getElementById('causeWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            document.getElementById('caseWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            
-            // 如果不需要显示案由和案件，清除已选择的案由和案件
-            if (!showCaseOptions) {
-                clearCause();
-                clearCase();
-            }
+            // V1.3.36: 选择 chatbot 后案由/案件选择入口隐藏（chatbot 路径不带案件），并清除已选值
+            document.getElementById('causeWrapper').style.display = 'none';
+            document.getElementById('caseWrapper').style.display = 'none';
+            clearCause();
+            clearCase();
             
             // 更新发送按钮状态
             updateSendButtonState();
@@ -7973,16 +7981,11 @@
             const inputField = document.getElementById('inputField');
             inputField.placeholder = taskPlaceholders[taskName] || '请输入您的需求……';
             
-            // 只有当选择"庭审提纲"或"裁判文书"时，才显示案由和案件选择
-            const showCaseOptions = taskName === '庭审提纲' || taskName === '裁判文书';
-            document.getElementById('causeWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            document.getElementById('caseWrapper').style.display = showCaseOptions ? 'block' : 'none';
-            
-            // 如果不需要显示案由和案件，清除已选择的案由和案件
-            if (!showCaseOptions) {
-                clearCause();
-                clearCase();
-            }
+            // V1.3.36: 选择 chatbot 后案由/案件选择入口隐藏（chatbot 路径不带案件），并清除已选值
+            document.getElementById('causeWrapper').style.display = 'none';
+            document.getElementById('caseWrapper').style.display = 'none';
+            clearCause();
+            clearCase();
             
             // 更新发送按钮状态
             updateSendButtonState();
@@ -8294,6 +8297,19 @@
                     input.value = '';
                     updateSendButtonState();
                     return;
+                }
+                
+                // V1.3.36: 数据统计采集点——演示触发文本（智能/全部任务选择）在上方已 return，不计；
+                // 一次发送最多记一条，三类互斥分流：命中简单问答规则 → chat_simple_qa；
+                // 否则已选 chatbot（任务标签）→ chatbot_use；否则带着案件标签 → chat_case_qa
+                if (typeof recordUsageEvent === 'function') {
+                    if (needsSimpleQAResponse(inputValue)) {
+                        recordUsageEvent({ type: 'chat_simple_qa', question: inputValue });
+                    } else if (currentSelection.task) {
+                        recordUsageEvent({ type: 'chatbot_use', taskName: currentSelection.task });
+                    } else if (currentSelection.case) {
+                        recordUsageEvent({ type: 'chat_case_qa', caseName: currentSelection.case });
+                    }
                 }
                 
                 // 检查是否是简单问答场景

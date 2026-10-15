@@ -1278,6 +1278,7 @@ function saveQuickDocument() {
     const savedVersion = addDocumentVersion(caseItem.id, {
         type: 'original',
         genMethod: 'material',
+        statGenMethod: 'quick',  // V1.3.34: 仅用于统计采集（不落库），区分列表页快速生成
         source: 'ai',
         content,
         createdBy: getCurrentUserName(),
@@ -1691,6 +1692,7 @@ async function runBatchAsync(taskId) {
         const savedVersion = addDocumentVersion(c.id, {
             type: 'original',
             genMethod: 'material',
+            statGenMethod: 'batch',  // V1.3.34: 仅用于统计采集（不落库），区分批量生成
             source: 'ai',
             content: batchContent,
             createdBy: getCurrentUserName(),
@@ -2202,6 +2204,10 @@ function submitCreateCase() {
 
     getCurrentBusiness().cases.unshift(newCase);
     saveBusinessSystems();
+    // V1.3.34: 数据统计采集点——新建案件（累计口径：时间窗口内新建数；案件删除不影响历史统计）
+    if (typeof recordUsageEvent === 'function') {
+        recordUsageEvent({ type: 'case_create', caseId: newCase.id, caseName: newCase.caseName || '' });
+    }
     renderCaseList();
     closeCreateCaseDialog();
 

@@ -3217,6 +3217,20 @@ function addDocumentVersion(caseId, versionData) {
     doc.versions.unshift(version);
     caseItem.updatedAt = new Date().toISOString().split('T')[0];
     saveBusinessSystems();
+    // V1.3.34: 数据统计采集点——仅 original（保存落库）计入「文书生成数」；精修（polish）不计。
+    // 维度/业务字段全部写时快照（usage-events.js）：删除案件或文书后历史统计不变。
+    // quick/batch 调用方通过 versionData.statGenMethod 区分生成方式（该字段不落库）。
+    if (versionData.type === 'original' && typeof recordUsageEvent === 'function') {
+        recordUsageEvent({
+            type: 'doc_generate',
+            caseId: caseId,
+            caseName: caseItem.caseName || '',
+            docType: config.docType || '',
+            workflowId: config.workflowId || '',
+            workflowName: config.workflowName || '',
+            genMethod: versionData.statGenMethod || versionData.genMethod || 'material'
+        });
+    }
     return version;
 }
 
